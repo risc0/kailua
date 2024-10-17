@@ -23,6 +23,9 @@ Kailua enables rollup operators to add a new `FaultProofGame` contract, compatib
 1. [rust](https://www.rust-lang.org/tools/install)
 2. [just](https://just.systems/man/en/)
 3. [docker](https://www.docker.com/)
+4. [solc](https://docs.soliditylang.org/en/latest/installing-solidity.html)
+5. [geth](https://geth.ethereum.org/docs/getting-started/installing-geth)
+6. [foundry](https://book.getfoundry.sh/getting-started/installation)
 
 ## Devnet Usage
 
