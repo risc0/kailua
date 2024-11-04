@@ -12,20 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::driver::DerivationDriver;
 use alloy_primitives::B256;
-use kona_client::l1::OracleL1ChainProvider;
-use kona_client::l2::OracleL2ChainProvider;
-use kona_client::BootInfo;
-use kona_derive::traits::BlobProvider;
-use kona_executor::StatelessL2BlockExecutor;
-use kona_preimage::CommsClient;
 use anyhow::bail;
+use kona_client::l1::{DerivationDriver, OracleL1ChainProvider};
+use kona_client::l2::OracleL2ChainProvider;
+use kona_client::{BootInfo, FlushableCache};
+use kona_derive::traits::BlobProvider;
+use kona_preimage::CommsClient;
 use std::fmt::Debug;
 use std::sync::Arc;
 
 pub fn run_client<
-    O: CommsClient + Send + Sync + Debug,
+    O: CommsClient + FlushableCache + Send + Sync + Debug,
     B: BlobProvider + Send + Sync + Debug + Clone,
 >(
     oracle: Arc<O>,
@@ -47,7 +45,7 @@ pub fn run_client<
         log("DERIVATION");
         let mut driver = DerivationDriver::new(
             boot.as_ref(),
-            oracle.as_ref(),
+            &oracle,
             beacon,
             l1_provider,
             l2_provider.clone(),
@@ -56,33 +54,18 @@ pub fn run_client<
 
         log(&format!(
             "PAYLOAD: safe_head({}|{})",
-            driver.l2_safe_head_header.number, boot.l2_output_root
+            driver.l2_safe_head_header().seal(),
+            boot.agreed_l2_output_root
         ));
-        let Some(payload) = driver.produce_disputed_payload().await? else {
-            // Insufficient l1 data as l1-head to derive l2 blocks of claim height
-            log("INSUFFICIENT DATA");
-            return Ok(None);
-        };
 
-        log("EXECUTION");
-        let mut executor: StatelessL2BlockExecutor<_, _> =
-            StatelessL2BlockExecutor::builder(&boot.rollup_config)
-                .with_parent_header(driver.l2_safe_head_header)
-                .with_fetcher(l2_provider.clone())
-                .with_hinter(l2_provider.clone())
-                .build()?;
+        log("STEP");
+        let (output_number, output_root) = driver
+            .produce_output(&boot.rollup_config, &l2_provider, &l2_provider, |_| {})
+            .await?;
 
-        log("HEADER");
-        let header = executor
-            .execute_payload(payload.attributes.clone())?
-            .clone();
-
-        if header.number != boot.l2_claim_block {
-            bail!("Only single-block proofs are supported now.");
+        if output_number != boot.claimed_l2_block_number {
+            bail!("Only single-block proofs are currently supported.");
         }
-
-        log("OUTPUT");
-        let output_root = executor.compute_output_root()?;
 
         return Ok(Some(output_root));
 

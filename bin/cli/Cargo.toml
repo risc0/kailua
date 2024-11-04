@@ -4,14 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-alloy = { workspace = true, features = ["full", "kzg"] }
-alloy-rpc-types-beacon.workspace = true
 anyhow.workspace = true
 bincode.workspace = true
 bytemuck.workspace = true
 c-kzg.workspace = true
 clap.workspace = true
 hex.workspace = true
+
+alloy = { workspace = true, features = ["full", "kzg"] }
+alloy-rpc-types-beacon.workspace = true
 
 kailua-build.workspace = true
 kailua-client.workspace = true
@@ -20,7 +21,7 @@ kailua-contracts.workspace = true
 kailua-host.workspace = true
 
 kona-host.workspace = true
-kona-derive = { workspace = true, features = ["online"] }
+kona-derive = { workspace = true }
 
 risc0-ethereum-contracts.workspace = true
 risc0-zkvm.workspace = true

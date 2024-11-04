@@ -14,20 +14,16 @@ bincode = "1.3.3"
 cfg-if = "1.0.0"
 c-kzg = "=1.0.2"
 
+alloy-primitives = { version = "0.8", features = ["map-hashbrown"] }
+
 kailua-common = { path = "../../../crates/common" }
 
-kona-client = { git = "https://github.com/hashcashier/kona", rev = "07b052c" }
-kona-common = { git = "https://github.com/hashcashier/kona", rev = "07b052c" }
-kona-common-proc = { git = "https://github.com/hashcashier/kona", rev = "07b052c" }
-kona-derive = { git = "https://github.com/hashcashier/kona", rev = "07b052c", default-features = false }
-kona-executor = { git = "https://github.com/hashcashier/kona", rev = "07b052c" }
-kona-preimage = { git = "https://github.com/hashcashier/kona", rev = "07b052c", features = ["rkyv"] }
-kona-primitives = { git = "https://github.com/hashcashier/kona", rev = "07b052c" }
+kona-client = { git = "https://github.com/ethereum-optimism/kona", rev = "c644ac6" }
+kona-common = { git = "https://github.com/ethereum-optimism/kona", rev = "c644ac6" }
 
 risc0-zkvm = { version = "1.1.2", features = ["std", "heap-embedded-alloc"] }
 
 [patch.crates-io]
-op-alloy-protocol = { git = "https://github.com/alloy-rs/op-alloy", rev = "0d8ef62" }
 crypto-bigint = { git = "https://github.com/risc0/RustCrypto-crypto-bigint", tag = "v0.5.5-risczero.0" }
 k256 = { git = "https://github.com/risc0/RustCrypto-elliptic-curves", tag = "k256/v0.13.3-risczero.0" }
 sha2 = { git = "https://github.com/risc0/RustCrypto-hashes", tag = "sha2-v0.10.8-risczero.0" }

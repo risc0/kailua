@@ -16,15 +16,15 @@ extern crate alloc;
 
 use crate::oracle::BlobFetchRequest;
 use alloy_eips::eip4844::{
-    kzg_to_versioned_hash, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
+    kzg_to_versioned_hash, Blob, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
 };
-use anyhow::anyhow;
 use async_trait::async_trait;
 use c_kzg::{Bytes48, KzgSettings};
 use kona_derive::errors::BlobProviderError;
+use kona_derive::prelude::IndexedBlobHash;
 use kona_derive::traits::BlobProvider;
-use kona_primitives::{Blob, BlockInfo, IndexedBlobHash};
 use lazy_static::lazy_static;
+use op_alloy_protocol::BlockInfo;
 use risc0_zkvm::guest::env::{FdReader, FdWriter};
 use std::io::{Read, Write};
 use std::sync::Mutex;
@@ -83,11 +83,13 @@ lazy_static! {
 
 #[async_trait]
 impl BlobProvider for RISCZeroPOSIXBlobProvider {
+    type Error = BlobProviderError;
+
     async fn get_blobs(
         &mut self,
         block_ref: &BlockInfo,
         blob_hashes: &[IndexedBlobHash],
-    ) -> Result<Vec<Blob>, BlobProviderError> {
+    ) -> Result<Vec<Box<Blob>>, BlobProviderError> {
         risc0_zkvm::guest::env::log(&format!(
             "Fetching {} blob hashes for L1 block {} ({}).",
             blob_hashes.len(),
@@ -132,7 +134,10 @@ impl BlobProvider for RISCZeroPOSIXBlobProvider {
         }
         risc0_zkvm::guest::env::log(&format!("Loaded {} blobs from oracle.", blobs.len()));
         if blob_hashes.len() != blobs.len() {
-            return Err(BlobProviderError::Custom(anyhow!("Missing blobs.")));
+            return Err(BlobProviderError::SidecarLengthMismatch(
+                blob_hashes.len(),
+                blobs.len(),
+            ));
         }
         // verify commitments
         // todo: amortize over entire client session
@@ -147,11 +152,12 @@ impl BlobProvider for RISCZeroPOSIXBlobProvider {
         // Validate commitment hashes
         for (commitment, blob_hash) in core::iter::zip(&commitments, blob_hashes) {
             let versioned_hash = kzg_to_versioned_hash(commitment.as_slice());
-            if versioned_hash != blob_hash.hash {
-                return Err(BlobProviderError::Custom(anyhow!("Invalid blob hash.")));
-            }
+            assert_eq!(versioned_hash, blob_hash.hash);
         }
         risc0_zkvm::guest::env::log("Blob hashes validated.");
-        Ok(blobs.into_iter().map(|b| Blob::from(*b)).collect())
+        Ok(blobs
+            .into_iter()
+            .map(|b| Box::new(Blob::from(*b)))
+            .collect())
     }
 }

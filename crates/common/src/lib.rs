@@ -12,18 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy_eips::eip1559::BaseFeeParams;
 use alloy_primitives::{Address, B256};
 use alloy_rpc_types_beacon::sidecar::BlobData;
 use anyhow::Context;
 use kona_client::BootInfo;
-use kona_primitives::RollupConfig;
+use op_alloy_genesis::RollupConfig;
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use serde::{Deserialize, Serialize};
 
 pub mod blobs;
 pub mod client;
-pub mod driver;
 pub mod oracle;
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
@@ -31,11 +29,11 @@ pub struct ProofJournal {
     /// The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
     pub l1_head: B256,
     /// The latest finalized L2 output root.
-    pub l2_output_root: B256,
+    pub agreed_l2_output_root: B256,
     /// The L2 output root claim.
-    pub l2_claim: B256,
+    pub claimed_l2_output_root: B256,
     /// The L2 claim block number.
-    pub l2_claim_block: u64,
+    pub claimed_l2_block_number: u64,
     /// The configuration hash.
     pub config_hash: [u8; 32],
 }
@@ -44,9 +42,9 @@ impl From<BootInfo> for ProofJournal {
     fn from(value: BootInfo) -> Self {
         Self {
             l1_head: value.l1_head,
-            l2_output_root: value.l2_output_root,
-            l2_claim: value.l2_claim,
-            l2_claim_block: value.l2_claim_block,
+            agreed_l2_output_root: value.agreed_l2_output_root,
+            claimed_l2_output_root: value.claimed_l2_output_root,
+            claimed_l2_block_number: value.claimed_l2_block_number,
             config_hash: config_hash(&value.rollup_config).unwrap(),
         }
     }
@@ -56,9 +54,9 @@ impl ProofJournal {
     pub fn encode_packed(&self) -> Vec<u8> {
         [
             self.l1_head.as_slice(),
-            self.l2_output_root.as_slice(),
-            self.l2_claim.as_slice(),
-            self.l2_claim_block.to_be_bytes().as_slice(),
+            self.agreed_l2_output_root.as_slice(),
+            self.claimed_l2_output_root.as_slice(),
+            self.claimed_l2_block_number.to_be_bytes().as_slice(),
             self.config_hash.as_slice(),
         ]
         .concat()
@@ -67,9 +65,9 @@ impl ProofJournal {
     pub fn decode_packed(encoded: &[u8]) -> Result<Self, anyhow::Error> {
         Ok(ProofJournal {
             l1_head: encoded[..32].try_into()?,
-            l2_output_root: encoded[32..64].try_into()?,
-            l2_claim: encoded[64..96].try_into()?,
-            l2_claim_block: u64::from_be_bytes(encoded[96..104].try_into()?),
+            agreed_l2_output_root: encoded[32..64].try_into()?,
+            claimed_l2_output_root: encoded[64..96].try_into()?,
+            claimed_l2_block_number: u64::from_be_bytes(encoded[96..104].try_into()?),
             config_hash: encoded[104..136].try_into()?,
         })
     }
@@ -113,14 +111,6 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
             Ok::<[u8; 32], anyhow::Error>(digest.as_bytes().try_into()?)
         })
         .unwrap_or(Ok([0u8; 32]))?;
-    let canyon_base_fee_params = safe_default(
-        rollup_config.canyon_base_fee_params,
-        BaseFeeParams {
-            max_change_denominator: u128::MAX,
-            elasticity_multiplier: u128::MAX,
-        },
-    )
-    .context("canyon_base_fee_params")?;
     let rollup_config_bytes = [
         rollup_config.genesis.l1.hash.0.as_slice(),
         rollup_config.genesis.l2.hash.0.as_slice(),
@@ -145,11 +135,13 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
             .elasticity_multiplier
             .to_be_bytes()
             .as_slice(),
-        canyon_base_fee_params
+        rollup_config
+            .canyon_base_fee_params
             .max_change_denominator
             .to_be_bytes()
             .as_slice(),
-        canyon_base_fee_params
+        rollup_config
+            .canyon_base_fee_params
             .elasticity_multiplier
             .to_be_bytes()
             .as_slice(),

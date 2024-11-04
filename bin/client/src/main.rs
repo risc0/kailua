@@ -36,8 +36,8 @@ async fn main() -> anyhow::Result<()> {
         .expect("Failed to decode receipt output");
     let mut output_file = File::create(fpvm_proof_file_name(
         proof_journal.l1_head,
-        proof_journal.l2_claim,
-        proof_journal.l2_output_root,
+        proof_journal.claimed_l2_output_root,
+        proof_journal.agreed_l2_output_root,
     ))
     .await
     .expect("Failed to create receipt output file");

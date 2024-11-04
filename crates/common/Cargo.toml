@@ -4,20 +4,22 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-alloy-eips.workspace = true
-alloy-primitives.workspace = true
-alloy-rpc-types-beacon.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
 bincode.workspace = true
 bytemuck.workspace = true
 c-kzg.workspace = true
+hashbrown.workspace = true
 lazy_static.workspace = true
 lru.workspace = true
-op-alloy-consensus = { workspace = true, features = ["serde"] }
-op-alloy-protocol = { workspace = true, features = ["serde"] }
-revm.workspace = true
 spin.workspace = true
+
+alloy-eips.workspace = true
+alloy-primitives.workspace = true
+alloy-rpc-types-beacon.workspace = true
+op-alloy-consensus = { workspace = true, features = ["serde"] }
+op-alloy-genesis = { workspace = true, features = ["serde"] }
+op-alloy-protocol = { workspace = true, features = ["serde"] }
 
 kona-client.workspace = true
 kona-common.workspace = true
@@ -26,7 +28,6 @@ kona-derive.workspace = true
 kona-executor.workspace = true
 kona-mpt.workspace = true
 kona-preimage.workspace = true
-kona-primitives.workspace = true
 
 risc0-zkvm.workspace = true
 risc0-zkvm-platform.workspace = true

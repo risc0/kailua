@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use alloy_primitives::B256;
 use kailua_common::client::run_client;
 use kailua_common::ProofJournal;
 use kona_client::BootInfo;
-use kona_primitives::alloy_primitives::B256;
 use risc0_zkvm::guest::env;
 use std::sync::Arc;
 
@@ -37,12 +37,12 @@ fn main() {
     let mut proof_journal = ProofJournal::from(boot.clone());
     if let Some(computed_output) = real_output_hash {
         // With sufficient data, the input l2_claim must be true
-        if computed_output != boot.l2_claim {
+        if computed_output != boot.claimed_l2_output_root {
             panic!("Invalid l2 claim.");
         }
     } else {
         // We use the zero claim hash to denote that the data as of l1 head is insufficient
-        proof_journal.l2_claim = B256::ZERO;
+        proof_journal.claimed_l2_output_root = B256::ZERO;
     }
     env::commit_slice(&proof_journal.encode_packed());
 }

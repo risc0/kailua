@@ -26,8 +26,11 @@ async fn main() -> anyhow::Result<()> {
     init_tracing_subscriber(cfg.kona.v)?;
 
     // compute receipt if uncached
-    let file_name =
-        fpvm_proof_file_name(cfg.kona.l1_head, cfg.kona.l2_claim, cfg.kona.l2_output_root);
+    let file_name = fpvm_proof_file_name(
+        cfg.kona.l1_head,
+        cfg.kona.claimed_l2_output_root,
+        cfg.kona.agreed_l2_output_root,
+    );
     if let Ok(true) = Path::new(&file_name).try_exists() {
         info!("Proving skipped. Receipt file {file_name} already exists.");
     } else {

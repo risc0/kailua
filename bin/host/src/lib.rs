@@ -14,7 +14,7 @@
 
 use alloy_provider::{Provider, ProviderBuilder};
 use clap::Parser;
-use kona_primitives::RollupConfig;
+use op_alloy_genesis::RollupConfig;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -38,7 +38,11 @@ pub async fn generate_rollup_config(
     tmp_dir: &TempDir,
 ) -> anyhow::Result<()> {
     // generate a RollupConfig for the target network
-    if RollupConfig::from_l2_chain_id(cfg.kona.l2_chain_id).is_none()
+    if cfg
+        .kona
+        .l2_chain_id
+        .map(RollupConfig::from_l2_chain_id)
+        .is_none()
         && cfg.kona.read_rollup_config().is_err()
     {
         info!("Fetching rollup config from nodes.");

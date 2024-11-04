@@ -2,6 +2,7 @@ use kailua_common::oracle::BlobFetchRequest;
 use kona_derive::traits::BlobProvider;
 use kona_preimage::{HintWriterClient, PreimageKey, PreimageOracleClient};
 use std::collections::VecDeque;
+use std::fmt::Debug;
 use std::io::{BufRead, Read, Write};
 use std::mem;
 use std::sync::{Arc, Mutex};
@@ -138,7 +139,10 @@ impl<BP: BlobProvider> Write for POSIXBlobProvider<BP> {
     }
 }
 
-impl<BP: BlobProvider> Read for POSIXBlobProvider<BP> {
+impl<BP: BlobProvider> Read for POSIXBlobProvider<BP>
+where
+    <BP as BlobProvider>::Error: Debug,
+{
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         // fetch blob if request is buffered
         if !self.request.is_empty() {

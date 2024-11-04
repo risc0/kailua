@@ -471,15 +471,16 @@ pub async fn handle_proposals(
                 .expect("Missing blob data.");
             let proposal_span =
                 (proposal.output_block_number - proposal_parent.output_block_number) as u32;
-            let challenge_position =
-                (proof_journal.l2_claim_block - proposal_parent.output_block_number) as u32;
+            let challenge_position = (proof_journal.claimed_l2_block_number
+                - proposal_parent.output_block_number) as u32;
             let io_hashes = intermediate_outputs(&io_blob, proposal_span as usize - 1)?;
 
             let challenged_output = io_hashes
                 .get(challenge_position as usize - 1)
                 .copied()
                 .unwrap_or(proposal.output_root);
-            let is_fault_proof = hash_to_fe(proof_journal.l2_claim) != challenged_output;
+            let is_fault_proof =
+                hash_to_fe(proof_journal.claimed_l2_output_root) != challenged_output;
             let proof_label = if is_fault_proof { "fault" } else { "validity" };
             info!(
                 "Utilizing {proof_label} proof in game at {}",
@@ -525,11 +526,11 @@ pub async fn handle_proposals(
                         "Generating kzg proof for parent output at {}.",
                         challenge_position - 2
                     );
-                    if value.to_vec() != hash_to_fe(proof_journal.l2_output_root).to_vec() {
+                    if value.to_vec() != hash_to_fe(proof_journal.agreed_l2_output_root).to_vec() {
                         error!(
                             "Invalid kzg proof {}/{}.",
                             hex::encode(value.to_vec()),
-                            proof_journal.l2_output_root
+                            proof_journal.agreed_l2_output_root
                         );
                     }
                 }
@@ -553,7 +554,7 @@ pub async fn handle_proposals(
                     "Submitting proof for position {challenge_position}/{proposal_span} with {} kzg proof(s).",
                     proofs.len()
                 );
-                debug!("safeOutput: {}", proof_journal.l2_output_root);
+                debug!("safeOutput: {}", proof_journal.agreed_l2_output_root);
                 debug!(
                     "startingRootHash: {}",
                     game_contract
@@ -567,7 +568,7 @@ pub async fn handle_proposals(
                     "rootClaim: {}",
                     game_contract.rootClaim().call().await?.rootClaim_
                 );
-                debug!("computedOutput: {}", proof_journal.l2_claim);
+                debug!("computedOutput: {}", proof_journal.claimed_l2_output_root);
                 debug!(
                     "blobCommitment: {}",
                     hex::encode(io_blob.kzg_commitment.as_slice())
@@ -586,9 +587,9 @@ pub async fn handle_proposals(
                     .prove(
                         challenge_position,
                         encoded_seal.into(),
-                        proof_journal.l2_output_root,
+                        proof_journal.agreed_l2_output_root,
                         challenged_output,
-                        proof_journal.l2_claim,
+                        proof_journal.claimed_l2_output_root,
                         Bytes::from(io_blob.kzg_commitment.to_vec()),
                         proofs,
                     )

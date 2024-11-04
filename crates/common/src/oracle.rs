@@ -13,10 +13,11 @@
 // limitations under the License.
 
 use alloy_primitives::keccak256;
-use anyhow::bail;
 use async_trait::async_trait;
+use kona_client::FlushableCache;
+use kona_derive::prelude::IndexedBlobHash;
+use kona_preimage::errors::PreimageOracleResult;
 use kona_preimage::{HintWriterClient, PreimageKey, PreimageKeyType, PreimageOracleClient};
-use kona_primitives::IndexedBlobHash;
 use lazy_static::lazy_static;
 use op_alloy_protocol::BlockInfo;
 use risc0_zkvm::guest::env::{FdReader, FdWriter};
@@ -25,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use std::sync::Mutex;
 
-pub fn validate_preimage(key: &PreimageKey, value: &[u8]) -> anyhow::Result<()> {
+pub fn validate_preimage(key: &PreimageKey, value: &[u8]) {
     let key_type = key.key_type();
     let image = match key_type {
         PreimageKeyType::Keccak256 => keccak256(value).0,
@@ -33,16 +34,10 @@ pub fn validate_preimage(key: &PreimageKey, value: &[u8]) -> anyhow::Result<()> 
             let x = SHA2::hash_bytes(value);
             x.as_bytes().try_into().unwrap()
         }
-        PreimageKeyType::Blob => {
-            // kzg validation done inside blob provider
-            return Ok(());
-        }
-        _ => return Ok(()),
+        // kzg validation done by blob provider
+        _ => return,
     };
-    if key != &PreimageKey::new(image, key_type) {
-        bail!("Invalid preimage provided for key: {:?}", key);
-    }
-    Ok(())
+    assert_eq!(key, &PreimageKey::new(image, key_type));
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -58,9 +53,15 @@ lazy_static! {
         Mutex::new(FdWriter::new(102, |_| {}));
 }
 
+impl FlushableCache for RISCZeroPOSIXOracle {
+    fn flush(&self) {
+        /* noop */
+    }
+}
+
 #[async_trait]
 impl PreimageOracleClient for RISCZeroPOSIXOracle {
-    async fn get(&self, key: PreimageKey) -> anyhow::Result<Vec<u8>> {
+    async fn get(&self, key: PreimageKey) -> PreimageOracleResult<Vec<u8>> {
         // Provide key
         let key_bytes: [u8; 32] = key.into();
         RISCZERO_POSIX_ORACLE_WRITER
@@ -82,12 +83,12 @@ impl PreimageOracleClient for RISCZeroPOSIXOracle {
             .read_exact(&mut response)
             .expect("Unexpected failure reading preimage");
         // Verify host response
-        validate_preimage(&key, &response).expect("Invalid preimage");
+        validate_preimage(&key, &response);
 
         Ok(response)
     }
 
-    async fn get_exact(&self, key: PreimageKey, buf: &mut [u8]) -> anyhow::Result<()> {
+    async fn get_exact(&self, key: PreimageKey, buf: &mut [u8]) -> PreimageOracleResult<()> {
         // Provide key
         let key_bytes: [u8; 32] = key.into();
         RISCZERO_POSIX_ORACLE_WRITER
@@ -107,7 +108,7 @@ impl PreimageOracleClient for RISCZeroPOSIXOracle {
             .read_exact(buf)
             .expect("Unexpected failure reading exact preimage");
         // Verify host response
-        validate_preimage(&key, buf).expect("Invalid exact preimage");
+        validate_preimage(&key, buf);
 
         Ok(())
     }
@@ -115,7 +116,7 @@ impl PreimageOracleClient for RISCZeroPOSIXOracle {
 
 #[async_trait]
 impl HintWriterClient for RISCZeroPOSIXOracle {
-    async fn write(&self, hint: &str) -> anyhow::Result<()> {
+    async fn write(&self, hint: &str) -> PreimageOracleResult<()> {
         let hint_bytes = hint.as_bytes();
         assert_eq!(
             RISCZERO_POSIX_HINT_WRITER
