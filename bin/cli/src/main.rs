@@ -25,10 +25,10 @@ async fn main() -> anyhow::Result<()> {
         Cli::Deploy(deploy_args) => kailua_cli::deploy::deploy(deploy_args).await?,
         Cli::Propose(propose_args) => kailua_cli::propose::propose(propose_args).await?,
         Cli::Validate(validate_args) => kailua_cli::validate::validate(validate_args).await?,
-        Cli::TestFault(fault_args) =>
+        Cli::TestFault(_fault_args) =>
         {
             #[cfg(feature = "devnet")]
-            kailua_cli::fault::fault(fault_args).await?
+            kailua_cli::fault::fault(_fault_args).await?
         }
         Cli::Benchmark(bench_args) => kailua_cli::bench::benchmark(bench_args).await?,
     }

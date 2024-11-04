@@ -27,7 +27,7 @@ use kailua_client::fpvm_proof_file_name;
 use kailua_common::{intermediate_outputs, ProofJournal};
 use kailua_contracts::{FaultProofGame, IAnchorStateRegistry, IDisputeGameFactory};
 use kailua_host::fetch_rollup_config;
-use risc0_zkvm::{InnerReceipt, MaybePruned, Receipt};
+use risc0_zkvm::Receipt;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::Path;
@@ -490,14 +490,14 @@ pub async fn handle_proposals(
             #[cfg(feature = "devnet")]
             let receipt = {
                 let mut receipt = receipt;
-                let InnerReceipt::Fake(fake_inner_receipt) = &mut receipt.inner else {
+                let risc0_zkvm::InnerReceipt::Fake(fake_inner_receipt) = &mut receipt.inner else {
                     bail!("Found real receipt under devmode");
                 };
-                let MaybePruned::Value(claim) = &mut fake_inner_receipt.claim else {
+                let risc0_zkvm::MaybePruned::Value(claim) = &mut fake_inner_receipt.claim else {
                     bail!("Fake receipt claim is pruned.");
                 };
                 warn!("DEVNET-ONLY: Patching fake receipt image id to match game contract.");
-                claim.pre = MaybePruned::Pruned(expected_image_id.into());
+                claim.pre = risc0_zkvm::MaybePruned::Pruned(expected_image_id.into());
                 receipt
             };
             // verify that the receipt is valid

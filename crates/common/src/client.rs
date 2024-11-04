@@ -13,17 +13,13 @@
 // limitations under the License.
 
 use crate::driver::DerivationDriver;
-// use alloy_eips::eip2718::Decodable2718;
-// use alloy_primitives::{Sealable, B256};
 use alloy_primitives::B256;
 use kona_client::l1::OracleL1ChainProvider;
 use kona_client::l2::OracleL2ChainProvider;
-// use kona_client::{BootInfo, HintType};
 use kona_client::BootInfo;
 use kona_derive::traits::BlobProvider;
 use kona_executor::StatelessL2BlockExecutor;
 use kona_preimage::CommsClient;
-// use kona_primitives::{L2ExecutionPayloadEnvelope, OpBlock};
 use anyhow::bail;
 use std::fmt::Debug;
 use std::sync::Arc;
