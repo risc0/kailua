@@ -60,7 +60,9 @@ pub fn run_client<
 
         log("STEP");
         let (output_number, output_root) = driver
-            .produce_output(&boot.rollup_config, &l2_provider, &l2_provider, |_| {})
+            .produce_output(&boot.rollup_config, &l2_provider, &l2_provider, |_| {
+                log("EXECUTE")
+            })
             .await?;
 
         if output_number != boot.claimed_l2_block_number {

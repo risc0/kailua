@@ -164,38 +164,27 @@ query block_number l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc:
   cast chain-id --rpc-url $L2_NODE_ADDRESS
 
 prove-offline block_number l2_claim l2_output_root l2_head l1_head l2_chain_id data verbosity="":
-  #!/usr/bin/env bash
-
-  L2_BLOCK_NUMBER={{block_number}}
-  L2_CLAIM={{l2_claim}}
-  L2_OUTPUT_ROOT={{l2_output_root}}
-  L2_HEAD={{l2_head}}
-  L1_HEAD={{l1_head}}
-  L2_CHAIN_ID={{l2_chain_id}}
-
   echo "Running host program with zk client program..."
   ./target/debug/kailua-host \
-    --l1-head $L1_HEAD \
-    --l2-head $L2_HEAD \
-    --l2-claim $L2_CLAIM \
-    --l2-output-root $L2_OUTPUT_ROOT \
-    --l2-block-number $L2_BLOCK_NUMBER \
-    --l2-chain-id $L2_CHAIN_ID \
+    --l1-head {{l1_head}} \
+    --l2-head {{l2_head}} \
+    --l2-claim {{l2_claim}} \
+    --l2-output-root {{l2_output_root}} \
+    --l2-block-number {{block_number}} \
+    --l2-chain-id {{l2_chain_id}} \
     --exec ./target/debug/kailua-client \
     --data-dir {{data}} \
     {{verbosity}}
 
 test verbosity="-v":
-    #!/usr/bin/env bash
-
     echo "Rebuilding kailua using cargo"
     just devnet-build
 
-    echo "Running cargo tests"
-    RISC0_DEV_MODE=1 cargo test -F devnet
-
     echo "Running offline proof for op-sepolia block 16491249 in dev-mode"
     RISC0_DEV_MODE=1 just prove-offline 16491249 0x82da7204148ba4d8d59e587b6b3fdde5561dc31d9e726220f7974bf9f2158d75 0xa548f22e1aa590de7ed271e3eab5b66c6c3db9b8cb0e3f91618516ea9ececde4 0x09b298a83baf4c2e3c6a2e355bb09e27e3fdca435080e8754f8749233d7333b2 0x33a3e5721faa4dc6f25e75000d9810fd6c41320868f3befcc0c261a71da398e1 11155420 ./testdata/16491249 {{verbosity}}
+
+    echo "Running cargo tests"
+    RISC0_DEV_MODE=1 cargo test -F devnet
 
     echo "Cleanup: Removing any .fake receipt files in directory."
     rm ./*.fake

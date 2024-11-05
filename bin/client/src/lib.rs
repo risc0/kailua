@@ -81,6 +81,7 @@ pub async fn prove_zkvm_client() -> anyhow::Result<ProveInfo> {
         let provider_posix_reader = BufReader::new(provider_posix.clone());
         // Execution environment
         let env = ExecutorEnv::builder()
+            .env_var("RUST_BACKTRACE", "full")
             // Handle preimage reads via posix
             .read_fd(100, oracle_posix_reader)
             .write_fd(101, oracle_posix)

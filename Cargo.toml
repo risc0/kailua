@@ -32,7 +32,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 alloy = { version = "0.5.4", default-features = false, features = ["json"] }
 alloy-consensus = "0.5.4"
 alloy-eips = { version = "0.5.4", features = ["kzg"] }
-alloy-primitives = { version = "0.8", features = ["map-hashbrown"] }
+alloy-primitives = { version = "0.8", default-features = false, features = ["map-hashbrown"] }
 alloy-provider = "0.5.4"
 alloy-rpc-types-beacon = "0.5.4"
 op-alloy-genesis = { version = "0.5.2", default-features = false }
@@ -46,7 +46,7 @@ kailua-common = { path = "crates/common" }
 kailua-contracts = { path = "crates/contracts" }
 kailua-host = { path = "bin/host" }
 
-# Kona "https://github.com/ethereum-optimism/kona"
+# Kona git = "https://github.com/ethereum-optimism/kona", rev = "c644ac6"
 kona-client = { git = "https://github.com/ethereum-optimism/kona", rev = "c644ac6" }
 kona-common = { git = "https://github.com/ethereum-optimism/kona", rev = "c644ac6" }
 kona-common-proc = { git = "https://github.com/ethereum-optimism/kona", rev = "c644ac6" }

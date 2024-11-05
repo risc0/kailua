@@ -20,7 +20,7 @@ use tracing::info;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    kona_host::init_tracing_subscriber(2)?;
+    kona_host::init_tracing_subscriber(0)?;
     // preload all data natively
     info!("Running native client.");
     kailua_client::run_native_client()
