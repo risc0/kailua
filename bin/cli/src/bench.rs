@@ -116,7 +116,7 @@ pub async fn benchmark(args: BenchArgs) -> anyhow::Result<()> {
                 &args.l2_node_address,
                 &args.op_node_address,
                 &args.data_dir,
-                "-vvv",
+                "-v",
             ])
             .stdout(output_file)
             .status()?;
