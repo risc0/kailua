@@ -7,24 +7,35 @@ edition = "2021"
 anyhow.workspace = true
 bincode.workspace = true
 clap.workspace = true
-
-alloy-primitives.workspace = true
-alloy-provider.workspace = true
-op-alloy-genesis.workspace = true
-
-kailua-build.workspace = true
-kailua-client.workspace = true
-kailua-common.workspace = true
-
-kona-client.workspace = true
-kona-host.workspace = true
-kona-preimage.workspace = true
-
-risc0-zkvm.workspace = true
-
+hashbrown = { workspace = true, features = ["rayon"] }
 serde.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
+
+# Alloy
+alloy.workspace = true
+alloy-primitives = { workspace = true, features = ["map-hashbrown"] }
+alloy-chains.workspace = true
+op-alloy-genesis.workspace = true
+
+# Kailua
+kailua-build.workspace = true
+kailua-client.workspace = true
+kailua-common.workspace = true
+
+# Kona
+kona-client.workspace = true
+kona-host.workspace = true
+kona-preimage.workspace = true
+
+# zkVM
+risc0-zkvm.workspace = true
+
+# Zeth
+zeth-core.workspace = true
+zeth-core-optimism.workspace = true
+zeth-preflight.workspace = true
+zeth-preflight-optimism.workspace = true

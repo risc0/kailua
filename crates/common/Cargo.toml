@@ -15,7 +15,7 @@ lru.workspace = true
 spin.workspace = true
 
 alloy-eips.workspace = true
-alloy-primitives.workspace = true
+alloy-primitives = { workspace = true, features = ["map-hashbrown"] }
 alloy-rpc-types-beacon.workspace = true
 op-alloy-consensus = { workspace = true, features = ["serde"] }
 op-alloy-genesis = { workspace = true, features = ["serde"] }

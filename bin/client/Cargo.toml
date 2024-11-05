@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 alloy = { workspace = true, features = ["full", "kzg"] }
 alloy-rpc-types-beacon.workspace = true
-alloy-primitives.workspace = true
+alloy-primitives = { workspace = true, features = ["map-hashbrown"] }
 anyhow.workspace = true
 async-trait.workspace = true
 bincode.workspace = true

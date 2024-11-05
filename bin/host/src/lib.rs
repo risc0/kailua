@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy_provider::{Provider, ProviderBuilder};
+use alloy::primitives::{keccak256, B256};
+use alloy::providers::{Provider, ProviderBuilder};
 use clap::Parser;
+use kona_host::kv::SharedKeyValueStore;
+use kona_preimage::{PreimageKey, PreimageKeyType};
 use op_alloy_genesis::RollupConfig;
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -21,6 +24,8 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 use tokio::fs;
 use tracing::info;
+use zeth_core::mpt::{MptNode, MptNodeData};
+use zeth_core::stateless::data::StatelessClientData;
 
 /// The host binary CLI application arguments.
 #[derive(Parser, Serialize, Clone, Debug)]
@@ -36,36 +41,38 @@ pub struct KailuaHostCli {
 pub async fn generate_rollup_config(
     cfg: &mut KailuaHostCli,
     tmp_dir: &TempDir,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<RollupConfig> {
     // generate a RollupConfig for the target network
-    if cfg
+    match cfg
         .kona
         .l2_chain_id
         .map(RollupConfig::from_l2_chain_id)
-        .is_none()
-        && cfg.kona.read_rollup_config().is_err()
+        .flatten()
     {
-        info!("Fetching rollup config from nodes.");
-        let tmp_cfg_file = tmp_dir.path().join("rollup-config.json");
-        fetch_rollup_config(
-            cfg.op_node_address
-                .clone()
-                .expect("Missing op-node-address")
-                .as_str(),
-            cfg.kona
-                .l2_node_address
-                .clone()
-                .expect("Missing l2-node-address")
-                .as_str(),
-            Some(&tmp_cfg_file),
-        )
-        .await?;
-        cfg.kona.rollup_config_path = Some(tmp_cfg_file);
-        cfg.kona
-            .read_rollup_config()
-            .expect("Failed to read custom rollup config");
+        Some(rollup_config) => Ok(rollup_config),
+        None => match cfg.kona.read_rollup_config().ok() {
+            Some(rollup_config) => Ok(rollup_config),
+            None => {
+                info!("Fetching rollup config from nodes.");
+                let tmp_cfg_file = tmp_dir.path().join("rollup-config.json");
+                fetch_rollup_config(
+                    cfg.op_node_address
+                        .clone()
+                        .expect("Missing op-node-address")
+                        .as_str(),
+                    cfg.kona
+                        .l2_node_address
+                        .clone()
+                        .expect("Missing l2-node-address")
+                        .as_str(),
+                    Some(&tmp_cfg_file),
+                )
+                .await?;
+                cfg.kona.rollup_config_path = Some(tmp_cfg_file);
+                cfg.kona.read_rollup_config()
+            }
+        },
     }
-    Ok(())
 }
 
 pub async fn fetch_rollup_config(
@@ -157,4 +164,56 @@ pub async fn fetch_rollup_config(
     }
 
     Ok(serde_json::from_str(&ser_config)?)
+}
+
+pub fn mpt_to_vec(node: &MptNode) -> Vec<(B256, Vec<u8>)> {
+    let mut res = vec![(node.hash(), alloy::rlp::encode(node))];
+    match node.as_data() {
+        MptNodeData::Branch(children) => {
+            children
+                .into_iter()
+                .flatten()
+                .for_each(|n| res.append(&mut mpt_to_vec(n)));
+        }
+        MptNodeData::Extension(_, target) => {
+            res.append(&mut mpt_to_vec(target));
+        }
+        _ => {}
+    };
+    res
+}
+
+pub async fn dump_mpt_to_kv_store(kv_store: &mut SharedKeyValueStore, mpt: &MptNode) {
+    let mut store = kv_store.write().await;
+    mpt_to_vec(&mpt).into_iter().for_each(|(hash, data)| {
+        store
+            .set(
+                PreimageKey::new(*hash, PreimageKeyType::Keccak256).into(),
+                data,
+            )
+            .expect("Failed to dump node to kv_store");
+    });
+}
+
+pub async fn dump_data_to_kv_store<B, H>(
+    kv_store: &mut SharedKeyValueStore,
+    data: &StatelessClientData<B, H>,
+) {
+    // State trie
+    dump_mpt_to_kv_store(kv_store, &data.state_trie).await;
+    // Storage tries
+    for (mpt, _) in data.storage_tries.values() {
+        dump_mpt_to_kv_store(kv_store, mpt).await;
+    }
+    // Contracts
+    let mut store = kv_store.write().await;
+    for contract in data.contracts.values() {
+        let hash = keccak256(contract);
+        store
+            .set(
+                PreimageKey::new(*hash, PreimageKeyType::Keccak256).into(),
+                contract.to_vec(),
+            )
+            .expect("Failed to dump contract to kv_store");
+    }
 }

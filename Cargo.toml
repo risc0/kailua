@@ -30,10 +30,12 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Alloy
 alloy = { version = "0.5.4", default-features = false, features = ["json"] }
+alloy-chains = "0.1.46"
 alloy-consensus = "0.5.4"
 alloy-eips = { version = "0.5.4", features = ["kzg"] }
-alloy-primitives = { version = "0.8", default-features = false, features = ["map-hashbrown"] }
+alloy-primitives = { version = "0.8", default-features = false }
 alloy-provider = "0.5.4"
+alloy-rlp = "0.3.8"
 alloy-rpc-types-beacon = "0.5.4"
 op-alloy-genesis = { version = "0.5.2", default-features = false }
 op-alloy-consensus = { version = "0.5.2", default-features = false }
@@ -56,11 +58,17 @@ kona-host = { git = "https://github.com/ethereum-optimism/kona", rev = "c644ac6"
 kona-mpt = { git = "https://github.com/ethereum-optimism/kona", rev = "c644ac6" }
 kona-preimage = { git = "https://github.com/ethereum-optimism/kona", rev = "c644ac6", features = ["rkyv"] }
 
-# RISC Zero
+# RISC Zero zkVM
 risc0-build = { version = "1.1.2" }
 risc0-ethereum-contracts = "1.1.0"
 risc0-zkvm = { version = "1.1.2", features = ["heap-embedded-alloc"] }
 risc0-zkvm-platform = { version = "1.1.2", features = ["heap-embedded-alloc"] }
+
+# RISC Zero Zeth
+zeth-core = { git = "https://github.com/risc0/zeth", branch = "rkhalil/reth" }
+zeth-core-optimism = { git = "https://github.com/risc0/zeth", branch = "rkhalil/reth" }
+zeth-preflight = { git = "https://github.com/risc0/zeth", branch = "rkhalil/reth" }
+zeth-preflight-optimism = { git = "https://github.com/risc0/zeth", branch = "rkhalil/reth" }
 
 [profile.dev]
 opt-level = 3
