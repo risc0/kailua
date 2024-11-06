@@ -17,6 +17,7 @@ use alloy::rpc::types::Block;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::fs::OpenOptions;
+use std::iter::repeat;
 use std::process::Command;
 use tracing::{info, warn};
 
@@ -106,6 +107,11 @@ pub async fn benchmark(args: BenchArgs) -> anyhow::Result<()> {
             .append(true)
             .open(&output_file_name)?;
         // Pipe outputs to file
+        let verbosity_level = if args.v > 0 {
+            format!("-{}", repeat('v').take(args.v as usize).collect::<String>())
+        } else {
+            String::new()
+        };
         Command::new("just")
             .env("RISC0_DEV_MODE", "1")
             .args(vec![
@@ -116,7 +122,7 @@ pub async fn benchmark(args: BenchArgs) -> anyhow::Result<()> {
                 &args.l2_node_address,
                 &args.op_node_address,
                 &args.data_dir,
-                "-v",
+                &verbosity_level,
             ])
             .stdout(output_file)
             .status()?;

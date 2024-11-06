@@ -176,7 +176,7 @@ prove-offline block_number l2_claim l2_output_root l2_head l1_head l2_chain_id d
     --data-dir {{data}} \
     {{verbosity}}
 
-test verbosity="-v":
+test verbosity="":
     echo "Rebuilding kailua using cargo"
     just devnet-build
 

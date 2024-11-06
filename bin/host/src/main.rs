@@ -18,6 +18,7 @@ use clap::Parser;
 use kailua_client::fpvm_proof_file_name;
 use kailua_host::{dump_data_to_kv_store, generate_rollup_config, KailuaHostCli};
 use kona_host::{init_tracing_subscriber, start_server_and_native_client};
+use std::env::set_var;
 use std::path::Path;
 use tempfile::tempdir;
 use tracing::info;
@@ -31,6 +32,7 @@ use zeth_preflight_optimism::OpRethPreflightClient;
 async fn main() -> anyhow::Result<()> {
     let mut cfg = KailuaHostCli::parse();
     init_tracing_subscriber(cfg.kona.v)?;
+    set_var("KAILUA_VERBOSITY", cfg.kona.v.to_string());
 
     // compute receipt if uncached
     let file_name = fpvm_proof_file_name(
@@ -49,7 +51,10 @@ async fn main() -> anyhow::Result<()> {
         // run zeth preflight to fetch the necessary preimages
         if let Ok(named_chain) = NamedChain::try_from(rollup_config.l2_chain_id) {
             // Limitation: Only works when disk caching is enabled under a known "NamedChain"
-            if !cfg.kona.is_offline() && cfg.kona.data_dir.is_some() && OpRethCoreDriver::chain_spec(&named_chain).is_some() {
+            if !cfg.kona.is_offline()
+                && cfg.kona.data_dir.is_some()
+                && OpRethCoreDriver::chain_spec(&named_chain).is_some()
+            {
                 let kona_cfg = cfg.kona.clone();
                 // Fetch all the initial data
                 let preflight_data: StatelessClientData<

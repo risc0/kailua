@@ -14,13 +14,17 @@
 
 use kailua_client::fpvm_proof_file_name;
 use kailua_common::ProofJournal;
+use std::env::var;
+use std::str::FromStr;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tracing::info;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    kona_host::init_tracing_subscriber(0)?;
+    if let Ok(Ok(verbosity_level)) = var("KAILUA_VERBOSITY").map(|s| u8::from_str(&s)) {
+        kona_host::init_tracing_subscriber(verbosity_level)?;
+    }
     // preload all data natively
     info!("Running native client.");
     kailua_client::run_native_client()

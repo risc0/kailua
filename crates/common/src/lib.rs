@@ -38,8 +38,8 @@ pub struct ProofJournal {
     pub config_hash: [u8; 32],
 }
 
-impl From<BootInfo> for ProofJournal {
-    fn from(value: BootInfo) -> Self {
+impl From<&BootInfo> for ProofJournal {
+    fn from(value: &BootInfo) -> Self {
         Self {
             l1_head: value.l1_head,
             agreed_l2_output_root: value.agreed_l2_output_root,
