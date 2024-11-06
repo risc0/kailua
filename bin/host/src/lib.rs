@@ -41,6 +41,10 @@ pub struct KailuaHostCli {
     /// Address of OP-NODE endpoint to use
     #[clap(long)]
     pub op_node_address: Option<String>,
+
+    /// Address of OP-NODE endpoint to use
+    #[clap(long, default_value_t = false)]
+    pub skip_zeth_preflight: bool
 }
 
 pub async fn generate_rollup_config(
@@ -171,6 +175,9 @@ pub async fn fetch_rollup_config(
 }
 
 pub fn mpt_to_vec(node: &MptNode) -> Vec<(B256, Vec<u8>)> {
+    if node.is_digest() {
+        return vec![];
+    }
     let mut res = vec![(node.hash(), alloy::rlp::encode(node))];
     match node.as_data() {
         MptNodeData::Branch(children) => {

@@ -43,7 +43,9 @@ async fn main() -> anyhow::Result<()> {
             .await
             .context("generate_rollup_config")?;
         // run zeth preflight to fetch the necessary preimages
-        zeth_execution_preflight(&cfg, rollup_config).await?;
+        if !cfg.skip_zeth_preflight {
+            zeth_execution_preflight(&cfg, rollup_config).await?;
+        }
         // generate a proof using the kailua client and kona server
         start_server_and_native_client(cfg.kona.clone())
             .await
