@@ -21,7 +21,6 @@ use alloy_primitives::{keccak256, B256};
 use anyhow::Context;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use kona_client::l1::OracleBlobProvider;
-use kona_client::l2::OracleL2ChainProvider;
 use kona_client::{BootInfo, CachingOracle};
 use oracle_posix::{POSIXCallbackHandle, POSIXPreimageOracleClient};
 use risc0_zkvm::{default_prover, ExecutorEnv, ProveInfo, ProverOpts};
@@ -49,8 +48,8 @@ pub async fn run_native_client() -> anyhow::Result<Option<B256>> {
             .context("BootInfo::load")?,
     );
     let beacon = OracleBlobProvider::new(oracle.clone());
-    let l2_provider = OracleL2ChainProvider::new(boot.clone(), oracle.clone());
-    kailua_common::client::run_client(oracle, boot, beacon, l2_provider)
+    // let l2_provider = OracleL2ChainProvider::new(boot.clone(), oracle.clone());
+    kailua_common::client::run_client(oracle, boot, beacon) //, l2_provider)
 }
 
 pub async fn prove_zkvm_client() -> anyhow::Result<ProveInfo> {

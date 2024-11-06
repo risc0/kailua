@@ -17,7 +17,6 @@ use kona_client::l1::{DerivationDriver, OracleL1ChainProvider};
 use kona_client::l2::OracleL2ChainProvider;
 use kona_client::{BootInfo, FlushableCache};
 use kona_derive::traits::BlobProvider;
-use kona_mpt::{TrieHinter, TrieProvider};
 use kona_preimage::CommsClient;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -25,12 +24,12 @@ use std::sync::Arc;
 pub fn run_client<
     O: CommsClient + FlushableCache + Send + Sync + Debug,
     B: BlobProvider + Send + Sync + Debug + Clone,
-    T: TrieProvider + TrieHinter + Send + Sync + Debug + Clone + 'static,
+    // T: TrieProvider + TrieHinter + Send + Sync + Debug + Clone + 'static,
 >(
     oracle: Arc<O>,
     boot: Arc<BootInfo>,
     beacon: B,
-    trie: T,
+    // execution_provider: T, // todo: skip oracle using provider
 ) -> anyhow::Result<Option<B256>> {
     kona_common::block_on(async move {
         ////////////////////////////////////////////////////////////////
@@ -62,7 +61,9 @@ pub fn run_client<
 
         log("STEP");
         let (output_number, output_root) = driver
-            .advance_to_target(&boot.rollup_config, &trie, &trie, |_| log("EXECUTE"))
+            .advance_to_target(&boot.rollup_config, &l2_provider, &l2_provider, |_| {
+                log("EXECUTE")
+            })
             .await?;
 
         assert_eq!(output_number, boot.claimed_l2_block_number);

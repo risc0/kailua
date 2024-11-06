@@ -44,7 +44,7 @@ pub struct KailuaHostCli {
 
     /// Address of OP-NODE endpoint to use
     #[clap(long, default_value_t = false)]
-    pub skip_zeth_preflight: bool
+    pub skip_zeth_preflight: bool,
 }
 
 pub async fn generate_rollup_config(
@@ -239,6 +239,7 @@ pub async fn zeth_execution_preflight(
             && cfg.kona.data_dir.is_some()
             && OpRethCoreDriver::chain_spec(&named_chain).is_some()
         {
+            info!("Performing zeth-optimism preflight.");
             let kona_cfg = cfg.kona.clone();
             // Fetch all the initial data
             let preflight_data: StatelessClientData<

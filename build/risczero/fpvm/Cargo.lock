@@ -67,6 +67,7 @@ dependencies = [
  "alloy-rlp",
  "alloy-serde",
  "auto_impl",
+ "c-kzg",
  "derive_more",
  "serde",
 ]
@@ -284,6 +285,7 @@ dependencies = [
  "arrayvec",
  "derive_more",
  "nybbles",
+ "serde",
  "smallvec",
  "tracing",
 ]
@@ -548,6 +550,9 @@ name = "arrayvec"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "async-trait"
@@ -1775,6 +1780,7 @@ dependencies = [
 name = "kailua-common"
 version = "0.1.0"
 dependencies = [
+ "alloy-consensus",
  "alloy-eips",
  "alloy-primitives",
  "alloy-rpc-types-beacon",
@@ -1840,7 +1846,7 @@ dependencies = [
 [[package]]
 name = "kona-client"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/kona#b9816a897cdb27302f2824d6bb1ba30619b2ba5a"
+source = "git+https://github.com/hashcashier/kona#92e52fb8835be08364e6b88c9fb079d0b5522856"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -1871,7 +1877,7 @@ dependencies = [
 [[package]]
 name = "kona-common"
 version = "0.0.4"
-source = "git+https://github.com/hashcashier/kona#b9816a897cdb27302f2824d6bb1ba30619b2ba5a"
+source = "git+https://github.com/hashcashier/kona#92e52fb8835be08364e6b88c9fb079d0b5522856"
 dependencies = [
  "cfg-if",
  "derive_more",
@@ -1881,7 +1887,7 @@ dependencies = [
 [[package]]
 name = "kona-common-proc"
 version = "0.0.4"
-source = "git+https://github.com/hashcashier/kona#b9816a897cdb27302f2824d6bb1ba30619b2ba5a"
+source = "git+https://github.com/hashcashier/kona#92e52fb8835be08364e6b88c9fb079d0b5522856"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -1894,7 +1900,7 @@ dependencies = [
 [[package]]
 name = "kona-derive"
 version = "0.0.5"
-source = "git+https://github.com/hashcashier/kona#b9816a897cdb27302f2824d6bb1ba30619b2ba5a"
+source = "git+https://github.com/hashcashier/kona#92e52fb8835be08364e6b88c9fb079d0b5522856"
 dependencies = [
  "alloc-no-stdlib",
  "alloy-consensus",
@@ -1917,7 +1923,7 @@ dependencies = [
 [[package]]
 name = "kona-executor"
 version = "0.0.4"
-source = "git+https://github.com/hashcashier/kona#b9816a897cdb27302f2824d6bb1ba30619b2ba5a"
+source = "git+https://github.com/hashcashier/kona#92e52fb8835be08364e6b88c9fb079d0b5522856"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -1935,19 +1941,20 @@ dependencies = [
 [[package]]
 name = "kona-mpt"
 version = "0.0.5"
-source = "git+https://github.com/hashcashier/kona#b9816a897cdb27302f2824d6bb1ba30619b2ba5a"
+source = "git+https://github.com/hashcashier/kona#92e52fb8835be08364e6b88c9fb079d0b5522856"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-trie",
  "derive_more",
+ "serde",
 ]
 
 [[package]]
 name = "kona-preimage"
 version = "0.0.4"
-source = "git+https://github.com/hashcashier/kona#b9816a897cdb27302f2824d6bb1ba30619b2ba5a"
+source = "git+https://github.com/hashcashier/kona#92e52fb8835be08364e6b88c9fb079d0b5522856"
 dependencies = [
  "alloy-primitives",
  "async-trait",
@@ -2245,6 +2252,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95f06be0417d97f81fe4e5c86d7d01b392655a9cac9c19a848aa033e18937b23"
 dependencies = [
  "const-hex",
+ "serde",
  "smallvec",
 ]
 
@@ -3468,6 +3476,9 @@ name = "smallvec"
 version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "socket2"

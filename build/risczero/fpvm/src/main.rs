@@ -18,7 +18,6 @@ use kailua_common::ProofJournal;
 use kona_client::BootInfo;
 use risc0_zkvm::guest::env;
 use std::sync::Arc;
-use kona_client::l2::OracleL2ChainProvider;
 
 fn main() {
     let oracle = Arc::new(kailua_common::oracle::RISCZERO_POSIX_ORACLE);
@@ -27,13 +26,20 @@ fn main() {
             .await
             .expect("Failed to load BootInfo")
     }));
-    let l2_provider = OracleL2ChainProvider::new(boot.clone(), oracle.clone());
+    // todo: bypass oracle using provider with preloaded data
+    // let l2_oracle_provider = OracleL2ChainProvider::new(boot.clone(), oracle.clone());
+    // let execution_provider = ExecutionProvider {
+    //     tries: Arc::new(Mutex::new(Default::default())),
+    //     contracts: Arc::new(Mutex::new(Default::default())),
+    //     headers: Arc::new(Mutex::new(Default::default())),
+    //     fallback: l2_oracle_provider,
+    // };
     // Attempt to recompute the output hash at the target block number using kona
     let real_output_hash = run_client(
         oracle.clone(),
         boot.clone(),
         kailua_common::blobs::RISCZERO_POSIX_BLOB_PROVIDER,
-        l2_provider,
+        // execution_provider,
     )
     .expect("Failed to compute output hash.");
     // Write the proof journal

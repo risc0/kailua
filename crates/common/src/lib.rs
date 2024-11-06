@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 pub mod blobs;
 pub mod client;
 pub mod oracle;
+pub mod provider;
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub struct ProofJournal {
