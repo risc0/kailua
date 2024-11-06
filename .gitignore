@@ -13,3 +13,4 @@ out
 optimism/
 *.out
 *.pb
+profiling/
