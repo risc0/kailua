@@ -14,7 +14,7 @@
 
 extern crate alloc;
 
-use crate::oracle::BlobFetchRequest;
+use crate::oracle::{BlobFetchRequest, OracleReader, OracleWriter};
 use alloy_eips::eip4844::{
     kzg_to_versioned_hash, Blob, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
 };
@@ -75,9 +75,9 @@ pub struct RISCZeroPOSIXBlobProvider;
 pub static RISCZERO_POSIX_BLOB_PROVIDER: RISCZeroPOSIXBlobProvider = RISCZeroPOSIXBlobProvider;
 
 lazy_static! {
-    pub static ref RISCZERO_POSIX_BLOB_PROVIDER_READER: Mutex<FdReader> =
+    pub static ref RISCZERO_POSIX_BLOB_PROVIDER_READER: OracleReader =
         Mutex::new(FdReader::new(104));
-    pub static ref RISCZERO_POSIX_BLOB_PROVIDER_WRITER: Mutex<FdWriter<fn(&[u8])>> =
+    pub static ref RISCZERO_POSIX_BLOB_PROVIDER_WRITER: OracleWriter =
         Mutex::new(FdWriter::new(105, |_| {}));
 }
 
@@ -101,12 +101,12 @@ impl BlobProvider for RISCZeroPOSIXBlobProvider {
         let mut proofs = Vec::with_capacity(blob_hashes.len());
         for blob_hash in blob_hashes {
             let request = bincode::serialize(&BlobFetchRequest {
-                block_ref: block_ref.clone(),
+                block_ref: *block_ref,
                 blob_hash: blob_hash.clone(),
             })
             .expect("Failed to serialize blob request.");
             // Write the request to the host
-            RISCZERO_POSIX_BLOB_PROVIDER_WRITER
+            let _ = RISCZERO_POSIX_BLOB_PROVIDER_WRITER
                 .lock()
                 .unwrap()
                 .write(&request)

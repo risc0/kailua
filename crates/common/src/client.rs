@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use alloy_primitives::B256;
-use anyhow::bail;
 use kona_client::l1::{DerivationDriver, OracleL1ChainProvider};
 use kona_client::l2::OracleL2ChainProvider;
 use kona_client::{BootInfo, FlushableCache};
@@ -63,13 +62,11 @@ pub fn run_client<
 
         log("STEP");
         let (output_number, output_root) = driver
-            .advance_to_target(&boot.rollup_config, &trie, &trie, |_| {
-                log("EXECUTE")
-            })
+            .advance_to_target(&boot.rollup_config, &trie, &trie, |_| log("EXECUTE"))
             .await?;
 
         assert_eq!(output_number, boot.claimed_l2_block_number);
-        return Ok(Some(output_root));
+        Ok(Some(output_root))
     })
 }
 

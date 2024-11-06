@@ -319,9 +319,7 @@ pub async fn handle_proposals(
             if !proposal.has_unresolved_challenges() {
                 continue;
             }
-            let validity_proofs = validity_proof_matrix
-                .entry(local_index)
-                .or_insert(HashSet::default());
+            let validity_proofs = validity_proof_matrix.entry(local_index).or_default();
             // todo: use events
             let proposal_span = (proposal.output_block_number - proposal_parent_obn) as u32;
             for challenged_position in 1..=proposal_span {
@@ -668,15 +666,15 @@ async fn request_proof<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         + challenged_position as u64
         - 1;
     debug!("l2_head_number {:?}", &l2_head_number);
-    let l2_head = block_hash(&l2_node_provider, l2_head_number)
+    let l2_head = block_hash(l2_node_provider, l2_head_number)
         .await
         .context("block_hash")?;
     debug!("l2_head {:?}", &l2_head);
-    let l2_output_root = output_at_block(&op_node_provider, l2_head_number)
+    let l2_output_root = output_at_block(op_node_provider, l2_head_number)
         .await
         .context("output_at_block")?;
     let l2_block_number = l2_head_number + 1;
-    let l2_claim = output_at_block(&op_node_provider, l2_block_number)
+    let l2_claim = output_at_block(op_node_provider, l2_block_number)
         .await
         .context("output_at_block")?;
     // Message proving task

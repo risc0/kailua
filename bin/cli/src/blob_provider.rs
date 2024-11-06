@@ -71,17 +71,17 @@ impl BlobProvider {
         provider: &ReqwestProvider,
         path: &str,
     ) -> anyhow::Result<T> {
-        Ok(provider
+        provider
             .client()
             .transport()
             .client()
-            .get(format!("{}/{}", Self::provider_url(&provider), path))
+            .get(format!("{}/{}", Self::provider_url(provider), path))
             .send()
             .await
             .context("get")?
             .json::<T>()
             .await
-            .context("json")?)
+            .context("json")
     }
 
     pub async fn get<T: DeserializeOwned>(&self, path: &str) -> anyhow::Result<T> {

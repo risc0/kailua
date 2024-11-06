@@ -266,12 +266,11 @@ pub async fn resolve_game<T: Transport + Clone, P: Provider<T, N>, N: Network>(
     game: kailua_contracts::FaultProofGame::FaultProofGameInstance<T, P, N>,
 ) -> anyhow::Result<N::ReceiptResponse> {
     info!("Resolving game.");
-    Ok(game
-        .resolve()
+    game.resolve()
         .send()
         .await
         .context("FaultProofSetup::resolve (send)")?
         .get_receipt()
         .await
-        .context("FaultProofSetup::resolve (get_receipt)")?)
+        .context("FaultProofSetup::resolve (get_receipt)")
 }

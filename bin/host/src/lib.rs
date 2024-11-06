@@ -14,6 +14,7 @@
 
 use alloy::primitives::{keccak256, B256};
 use alloy::providers::{Provider, ProviderBuilder};
+use alloy_chains::NamedChain;
 use clap::Parser;
 use kona_host::kv::SharedKeyValueStore;
 use kona_preimage::{PreimageKey, PreimageKeyType};
@@ -24,8 +25,12 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 use tokio::fs;
 use tracing::info;
+use zeth_core::driver::CoreDriver;
 use zeth_core::mpt::{MptNode, MptNodeData};
 use zeth_core::stateless::data::StatelessClientData;
+use zeth_core_optimism::OpRethCoreDriver;
+use zeth_preflight::client::PreflightClient;
+use zeth_preflight_optimism::OpRethPreflightClient;
 
 /// The host binary CLI application arguments.
 #[derive(Parser, Serialize, Clone, Debug)]
@@ -46,8 +51,7 @@ pub async fn generate_rollup_config(
     match cfg
         .kona
         .l2_chain_id
-        .map(RollupConfig::from_l2_chain_id)
-        .flatten()
+        .and_then(RollupConfig::from_l2_chain_id)
     {
         Some(rollup_config) => Ok(rollup_config),
         None => match cfg.kona.read_rollup_config().ok() {
@@ -171,7 +175,7 @@ pub fn mpt_to_vec(node: &MptNode) -> Vec<(B256, Vec<u8>)> {
     match node.as_data() {
         MptNodeData::Branch(children) => {
             children
-                .into_iter()
+                .iter()
                 .flatten()
                 .for_each(|n| res.append(&mut mpt_to_vec(n)));
         }
@@ -185,7 +189,7 @@ pub fn mpt_to_vec(node: &MptNode) -> Vec<(B256, Vec<u8>)> {
 
 pub async fn dump_mpt_to_kv_store(kv_store: &mut SharedKeyValueStore, mpt: &MptNode) {
     let mut store = kv_store.write().await;
-    mpt_to_vec(&mpt).into_iter().for_each(|(hash, data)| {
+    mpt_to_vec(mpt).into_iter().for_each(|(hash, data)| {
         store
             .set(
                 PreimageKey::new(*hash, PreimageKeyType::Keccak256).into(),
@@ -216,4 +220,42 @@ pub async fn dump_data_to_kv_store<B, H>(
             )
             .expect("Failed to dump contract to kv_store");
     }
+}
+
+pub async fn zeth_execution_preflight(
+    cfg: &KailuaHostCli,
+    rollup_config: RollupConfig,
+) -> anyhow::Result<()> {
+    if let Ok(named_chain) = NamedChain::try_from(rollup_config.l2_chain_id) {
+        // Limitation: Only works when disk caching is enabled under a known "NamedChain"
+        if !cfg.kona.is_offline()
+            && cfg.kona.data_dir.is_some()
+            && OpRethCoreDriver::chain_spec(&named_chain).is_some()
+        {
+            let kona_cfg = cfg.kona.clone();
+            // Fetch all the initial data
+            let preflight_data: StatelessClientData<
+                <OpRethCoreDriver as CoreDriver>::Block,
+                <OpRethCoreDriver as CoreDriver>::Header,
+            > = tokio::task::spawn_blocking(move || {
+                // Prepare the cache directory
+                let cache_dir = kona_cfg.data_dir.map(|dir| dir.join("optimism"));
+                if let Some(dir) = cache_dir.as_ref() {
+                    std::fs::create_dir_all(dir).expect("Could not create directory");
+                };
+                OpRethPreflightClient::preflight(
+                    Some(rollup_config.l2_chain_id),
+                    cache_dir,
+                    kona_cfg.l2_node_address,
+                    kona_cfg.claimed_l2_block_number,
+                    1, // todo: batching support
+                )
+            })
+            .await??;
+            // Write data to the cached Kona kv-store
+            let mut kv_store = cfg.kona.construct_kv_store();
+            dump_data_to_kv_store(&mut kv_store, &preflight_data).await;
+        }
+    }
+    Ok(())
 }

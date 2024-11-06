@@ -77,7 +77,7 @@ impl<T: Read> Read for POSIXCallbackHandle<T> {
             .lock()
             .unwrap()
             .read(buf)
-            .expect("PPOCHandle.read"))
+            .expect("POSIXCallbackHandle::read"))
     }
 }
 
@@ -88,16 +88,16 @@ impl<T: Write> Write for POSIXCallbackHandle<T> {
             .lock()
             .unwrap()
             .write(buf)
-            .expect("PPOCHandle.write"))
+            .expect("POSIXCallbackHandle::write"))
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        Ok(self
-            .inner
+        self.inner
             .lock()
             .unwrap()
             .flush()
-            .expect("PPOCHandle.flush"))
+            .expect("POSIXCallbackHandle::flush");
+        Ok(())
     }
 }
 

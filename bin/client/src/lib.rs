@@ -124,5 +124,5 @@ pub fn fpvm_proof_file_name(l1_head: B256, l2_claim: B256, l2_output_root: B256)
     ]
     .concat();
     let file_name = keccak256(data);
-    format!("risc0-{}-{file_name}.{suffix}", version.to_string())
+    format!("risc0-{version}-{file_name}.{suffix}")
 }

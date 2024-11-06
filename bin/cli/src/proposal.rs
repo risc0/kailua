@@ -225,7 +225,7 @@ impl ProposalDB {
             // Decide correctness according to op-node
             // todo: preform validations based on l1_head
             info!("Deciding proposal validity.");
-            let local_output_root = output_at_block(&op_node_provider, output_block_number).await?;
+            let local_output_root = output_at_block(op_node_provider, output_block_number).await?;
             // Parent must be correct if FaultProofGame and the local output must match the proposed output
             let is_correct_parent = parent.map(|p| p.is_correct()).unwrap_or(true);
             info!("Parent correctness: {is_correct_parent}");
@@ -240,11 +240,11 @@ impl ProposalDB {
                 let num_intermediate = (output_block_number - starting_output_number) as usize;
                 let outputs = intermediate_outputs(blob_data, num_intermediate)?;
                 let mut bad_io = 0;
-                for i in 0..num_intermediate {
+                for (i, output) in outputs.iter().enumerate().take(num_intermediate) {
                     let local_output =
-                        output_at_block(&op_node_provider, starting_output_number + i as u64)
+                        output_at_block(op_node_provider, starting_output_number + i as u64)
                             .await?;
-                    let io_correct = hash_to_fe(local_output) == outputs[i];
+                    let io_correct = &hash_to_fe(local_output) == output;
                     correct.push(io_correct);
                     if !io_correct {
                         bad_io += 1;

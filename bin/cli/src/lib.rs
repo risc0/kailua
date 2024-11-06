@@ -169,12 +169,8 @@ pub fn root_of_unity(index: usize) -> U256 {
         .sub(U256::from(1))
         .div(U256::from(FIELD_ELEMENTS_PER_BLOB));
     let root = PRIMITIVE_ROOT_OF_UNITY.pow_mod(primitive_root_exponent, BLS_MODULUS);
-    // tracing::info!("ROOT_OF_UNITY: {root}");
     let root_exponent = reverse_bits(index as u128, FE_ORDER_PO2);
-    let result = root.pow_mod(U256::from(root_exponent), BLS_MODULUS);
-    // tracing::info!("EXPONENTIATED: {result}");
-    // tracing::info!("{index}: Raising {PRIMITIVE_ROOT_OF_UNITY} to {root_exponent}: {result}");
-    result
+    root.pow_mod(U256::from(root_exponent), BLS_MODULUS)
 }
 
 pub fn blob_fe_proof(

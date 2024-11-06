@@ -17,7 +17,6 @@ use alloy::rpc::types::Block;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::fs::OpenOptions;
-use std::iter::repeat;
 use std::process::Command;
 use tracing::{info, warn};
 
@@ -60,7 +59,7 @@ pub struct CandidateBlock {
 
 impl PartialOrd for CandidateBlock {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.txn_count.partial_cmp(&other.txn_count)
+        Some(self.cmp(other))
     }
 }
 
@@ -108,7 +107,7 @@ pub async fn benchmark(args: BenchArgs) -> anyhow::Result<()> {
             .open(&output_file_name)?;
         // Pipe outputs to file
         let verbosity_level = if args.v > 0 {
-            format!("-{}", repeat('v').take(args.v as usize).collect::<String>())
+            format!("-{}", "v".repeat(args.v as usize))
         } else {
             String::new()
         };

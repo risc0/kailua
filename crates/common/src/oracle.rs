@@ -45,11 +45,14 @@ pub struct RISCZeroPOSIXOracle;
 
 pub static RISCZERO_POSIX_ORACLE: RISCZeroPOSIXOracle = RISCZeroPOSIXOracle;
 
+pub type OracleReader = Mutex<FdReader>;
+pub type OracleWriter = Mutex<FdWriter<fn(&[u8])>>;
+
 lazy_static! {
-    pub static ref RISCZERO_POSIX_ORACLE_READER: Mutex<FdReader> = Mutex::new(FdReader::new(100));
-    pub static ref RISCZERO_POSIX_ORACLE_WRITER: Mutex<FdWriter<fn(&[u8])>> =
+    pub static ref RISCZERO_POSIX_ORACLE_READER: OracleReader = Mutex::new(FdReader::new(100));
+    pub static ref RISCZERO_POSIX_ORACLE_WRITER: OracleWriter =
         Mutex::new(FdWriter::new(101, |_| {}));
-    pub static ref RISCZERO_POSIX_HINT_WRITER: Mutex<FdWriter<fn(&[u8])>> =
+    pub static ref RISCZERO_POSIX_HINT_WRITER: OracleWriter =
         Mutex::new(FdWriter::new(102, |_| {}));
 }
 
@@ -64,7 +67,7 @@ impl PreimageOracleClient for RISCZeroPOSIXOracle {
     async fn get(&self, key: PreimageKey) -> PreimageOracleResult<Vec<u8>> {
         // Provide key
         let key_bytes: [u8; 32] = key.into();
-        RISCZERO_POSIX_ORACLE_WRITER
+        let _ = RISCZERO_POSIX_ORACLE_WRITER
             .lock()
             .unwrap()
             .write(&key_bytes)
@@ -91,7 +94,7 @@ impl PreimageOracleClient for RISCZeroPOSIXOracle {
     async fn get_exact(&self, key: PreimageKey, buf: &mut [u8]) -> PreimageOracleResult<()> {
         // Provide key
         let key_bytes: [u8; 32] = key.into();
-        RISCZERO_POSIX_ORACLE_WRITER
+        let _ = RISCZERO_POSIX_ORACLE_WRITER
             .lock()
             .unwrap()
             .write(&key_bytes)
