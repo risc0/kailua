@@ -97,7 +97,7 @@ bench l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data start range count verbosi
           {{verbosity}}
 
 # Run the client program natively with the host program attached.
-prove block_number l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data verbosity="":
+prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data verbosity="":
   #!/usr/bin/env bash
 
   L1_NODE_ADDRESS="{{l1_rpc}}"
@@ -106,25 +106,32 @@ prove block_number l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data verbosity=""
   OP_NODE_ADDRESS="{{rollup_node_rpc}}"
 
   L2_BLOCK_NUMBER={{block_number}}
-  echo "Fetching data for block #$L2_BLOCK_NUMBER..."
+  CLAIMED_L2_BLOCK_NUMBER=$((L2_BLOCK_NUMBER + {{block_count}} - 1))
+
+  # Query the chain id
+  echo "Fetching chain id"
+  L2_CHAIN_ID=$(cast chain-id --rpc-url $L2_NODE_ADDRESS)
 
   # Get output root for block
-  L2_CLAIM=$(cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $L2_BLOCK_NUMBER) | jq -r .outputRoot)
-
-  # Get the info for the previous block
-  L2_OUTPUT_ROOT=$(cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $((L2_BLOCK_NUMBER - 1))) | jq -r .outputRoot)
-  L2_HEAD=$(cast block --rpc-url $L2_NODE_ADDRESS $((L2_BLOCK_NUMBER - 1)) -j | jq -r .hash)
-  L1_ORIGIN_NUM=$(cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $((L2_BLOCK_NUMBER - 1))) | jq -r .blockRef.l1origin.number)
+  echo "Fetching data for block #$CLAIMED_L2_BLOCK_NUMBER..."
+  CLAIMED_L2_OUTPUT_ROOT=$(cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $CLAIMED_L2_BLOCK_NUMBER) | jq -r .outputRoot)
+  # Get the info for the origin l1 block
+  L1_ORIGIN_NUM=$(cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $CLAIMED_L2_BLOCK_NUMBER) | jq -r .blockRef.l1origin.number)
   L1_HEAD=$(cast block --rpc-url $L1_NODE_ADDRESS $((L1_ORIGIN_NUM + 50)) -j | jq -r .hash)
-  L2_CHAIN_ID=$(cast chain-id --rpc-url $L2_NODE_ADDRESS)
+
+  # Get the info for the parent l2 block
+  echo "Fetching data for parent of block #$L2_BLOCK_NUMBER..."
+  AGREED_L2_OUTPUT_ROOT=$(cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $((L2_BLOCK_NUMBER - 1))) | jq -r .outputRoot)
+  AGREED_L2_HEAD=$(cast block --rpc-url $L2_NODE_ADDRESS $((L2_BLOCK_NUMBER - 1)) -j | jq -r .hash)
 
   echo "Running host program with zk client program..."
   ./target/debug/kailua-host \
     --l1-head $L1_HEAD \
-    --l2-head $L2_HEAD \
-    --l2-claim $L2_CLAIM \
-    --l2-output-root $L2_OUTPUT_ROOT \
-    --l2-block-number $L2_BLOCK_NUMBER \
+    --agreed-l2-head-hash $AGREED_L2_HEAD \
+    --agreed-l2-output-root $AGREED_L2_OUTPUT_ROOT \
+    --claimed-l2-output-root $CLAIMED_L2_OUTPUT_ROOT \
+    --claimed-l2-block-number $CLAIMED_L2_BLOCK_NUMBER \
+    --block-count {{block_count}} \
     --l2-chain-id $L2_CHAIN_ID \
     --l1-node-address $L1_NODE_ADDRESS \
     --l1-beacon-address $L1_BEACON_ADDRESS \
@@ -173,24 +180,14 @@ prove-offline block_number l2_claim l2_output_root l2_head l1_head l2_chain_id d
   echo "Running host program with zk client program..."
   ./target/debug/kailua-host \
     --l1-head {{l1_head}} \
-    --l2-head {{l2_head}} \
-    --l2-claim {{l2_claim}} \
-    --l2-output-root {{l2_output_root}} \
-    --l2-block-number {{block_number}} \
+    --agreed-l2-head-hash {{l2_head}} \
+    --claimed-l2-output-root {{l2_claim}} \
+    --agreed-l2-output-root {{l2_output_root}} \
+    --claimed-l2-block-number {{block_number}} \
     --l2-chain-id {{l2_chain_id}} \
     --exec ./target/debug/kailua-client \
     --data-dir {{data}} \
     {{verbosity}}
-
-test-offline verbosity="":
-    echo "Rebuilding kailua using cargo"
-    just devnet-build
-
-    echo "Running offline proof for op-sepolia block 16491249 in dev-mode"
-    RISC0_DEV_MODE=1 just prove-offline 16491249 0x82da7204148ba4d8d59e587b6b3fdde5561dc31d9e726220f7974bf9f2158d75 0xa548f22e1aa590de7ed271e3eab5b66c6c3db9b8cb0e3f91618516ea9ececde4 0x09b298a83baf4c2e3c6a2e355bb09e27e3fdca435080e8754f8749233d7333b2 0x33a3e5721faa4dc6f25e75000d9810fd6c41320868f3befcc0c261a71da398e1 11155420 ./testdata/16491249 {{verbosity}}
-
-    echo "Cleanup: Removing any .fake receipt files in directory."
-    rm ./*.fake
 
 test verbosity="":
     echo "Rebuilding kailua using cargo"
@@ -198,3 +195,11 @@ test verbosity="":
 
     echo "Running cargo tests"
     RISC0_DEV_MODE=1 cargo test -F devnet
+
+test-offline verbosity="":
+    echo "Running offline proof for op-sepolia block 16491249 in dev-mode"
+    RISC0_DEV_MODE=1 just prove-offline 16491249 0x82da7204148ba4d8d59e587b6b3fdde5561dc31d9e726220f7974bf9f2158d75 0xa548f22e1aa590de7ed271e3eab5b66c6c3db9b8cb0e3f91618516ea9ececde4 0x09b298a83baf4c2e3c6a2e355bb09e27e3fdca435080e8754f8749233d7333b2 0x33a3e5721faa4dc6f25e75000d9810fd6c41320868f3befcc0c261a71da398e1 11155420 ./testdata/16491249 {{verbosity}}
+
+cleanup:
+    echo "Cleanup: Removing any .fake receipt files in directory."
+    rm ./*.fake

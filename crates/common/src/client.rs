@@ -59,15 +59,24 @@ pub fn run_client<
             boot.agreed_l2_output_root
         ));
 
-        log("STEP");
+        log("ADVANCE");
         let (output_number, output_root) = driver
             .advance_to_target(&boot.rollup_config, &l2_provider, &l2_provider, |_| {
                 log("EXECUTE")
             })
             .await?;
 
-        assert_eq!(output_number, boot.claimed_l2_block_number);
-        Ok(Some(output_root))
+        // None indicates that there is insufficient L1 data available to produce an L2
+        // output root at the claimed block number
+        log(&format!(
+            "OUTPUT: {output_number}|{}",
+            boot.claimed_l2_block_number
+        ));
+        if output_number < boot.claimed_l2_block_number {
+            Ok(None)
+        } else {
+            Ok(Some(output_root))
+        }
     })
 }
 

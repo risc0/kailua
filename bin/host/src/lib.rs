@@ -42,6 +42,10 @@ pub struct KailuaHostCli {
     #[clap(long)]
     pub op_node_address: Option<String>,
 
+    #[clap(long, default_value_t = 1)]
+    /// Number of blocks to build in a single proof
+    pub block_count: u64,
+
     /// Address of OP-NODE endpoint to use
     #[clap(long, default_value_t = false)]
     pub skip_zeth_preflight: bool,
@@ -241,6 +245,8 @@ pub async fn zeth_execution_preflight(
         {
             info!("Performing zeth-optimism preflight.");
             let kona_cfg = cfg.kona.clone();
+            let preflight_start = kona_cfg.claimed_l2_block_number - cfg.block_count + 1;
+            let block_count = cfg.block_count;
             // Fetch all the initial data
             let preflight_data: StatelessClientData<
                 <OpRethCoreDriver as CoreDriver>::Block,
@@ -255,8 +261,8 @@ pub async fn zeth_execution_preflight(
                     Some(rollup_config.l2_chain_id),
                     cache_dir,
                     kona_cfg.l2_node_address,
-                    kona_cfg.claimed_l2_block_number,
-                    1, // todo: batching support
+                    preflight_start,
+                    block_count,
                 )
             })
             .await??;

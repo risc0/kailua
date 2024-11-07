@@ -32,6 +32,7 @@ async fn main() -> anyhow::Result<()> {
     let file_name = fpvm_proof_file_name(
         cfg.kona.l1_head,
         cfg.kona.claimed_l2_output_root,
+        cfg.kona.claimed_l2_block_number,
         cfg.kona.agreed_l2_output_root,
     );
     if let Ok(true) = Path::new(&file_name).try_exists() {

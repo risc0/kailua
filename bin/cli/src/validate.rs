@@ -89,10 +89,10 @@ pub enum Message {
     Proposal {
         local_index: usize,
         l1_head: FixedBytes<32>,
-        l2_head: FixedBytes<32>,
-        l2_output_root: FixedBytes<32>,
-        l2_block_number: u64,
-        l2_claim: FixedBytes<32>,
+        agreed_l2_head_hash: FixedBytes<32>,
+        agreed_l2_output_root: FixedBytes<32>,
+        claimed_l2_block_number: u64,
+        claimed_l2_output_root: FixedBytes<32>,
     },
     Proof(usize, Receipt),
 }
@@ -127,10 +127,10 @@ pub async fn handle_proofs(
         let Message::Proposal {
             local_index,
             l1_head,
-            l2_head,
-            l2_output_root,
-            l2_block_number,
-            l2_claim,
+            agreed_l2_head_hash,
+            agreed_l2_output_root,
+            claimed_l2_block_number,
+            claimed_l2_output_root,
         } = channel
             .receiver
             .recv()
@@ -141,12 +141,17 @@ pub async fn handle_proofs(
         };
         info!("Processing proof for local index {local_index}.");
         // Prepare kailua-host parameters
-        let proof_file_name = fpvm_proof_file_name(l1_head, l2_claim, l2_output_root);
+        let proof_file_name = fpvm_proof_file_name(
+            l1_head,
+            claimed_l2_output_root,
+            claimed_l2_block_number,
+            agreed_l2_output_root,
+        );
         let l1_head = l1_head.to_string();
-        let l2_head = l2_head.to_string();
-        let l2_output_root = l2_output_root.to_string();
-        let l2_claim = l2_claim.to_string();
-        let l2_block_number = l2_block_number.to_string();
+        let agreed_l2_head_hash = agreed_l2_head_hash.to_string();
+        let agreed_l2_output_root = agreed_l2_output_root.to_string();
+        let claimed_l2_output_root = claimed_l2_output_root.to_string();
+        let claimed_l2_block_number = claimed_l2_block_number.to_string();
         let verbosity = [
             String::from("-"),
             (0..args.v).map(|_| 'v').collect::<String>(),
@@ -155,14 +160,14 @@ pub async fn handle_proofs(
         let mut proving_args = vec![
             "--l1-head", // l1 head from on-chain proposal
             &l1_head,
-            "--l2-head", // l2 starting block hash from on-chain proposal
-            &l2_head,
-            "--l2-output-root", // l2 starting output root
-            &l2_output_root,
-            "--l2-claim", // proposed output root
-            &l2_claim,
-            "--l2-block-number", // proposed block number
-            &l2_block_number,
+            "--agreed-l2-head-hash", // l2 starting block hash from on-chain proposal
+            &agreed_l2_head_hash,
+            "--agreed-l2-output-root", // l2 starting output root
+            &agreed_l2_output_root,
+            "--claimed-l2-output-root", // proposed output root
+            &claimed_l2_output_root,
+            "--claimed-l2-block-number", // proposed block number
+            &claimed_l2_block_number,
             "--l2-chain-id", // rollup chain id
             &l2_chain_id,
             "--l1-node-address", // l1 el node
@@ -656,7 +661,7 @@ async fn request_proof<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         .context("l1Head")?
         .l1Head_;
     debug!("l1_head {:?}", &l1_head);
-    let l2_head_number = game_contract
+    let agreed_l2_head_number = game_contract
         .startingBlockNumber()
         .call()
         .await
@@ -665,16 +670,16 @@ async fn request_proof<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         .to::<u64>()
         + challenged_position as u64
         - 1;
-    debug!("l2_head_number {:?}", &l2_head_number);
-    let l2_head = block_hash(l2_node_provider, l2_head_number)
+    debug!("l2_head_number {:?}", &agreed_l2_head_number);
+    let agreed_l2_head_hash = block_hash(l2_node_provider, agreed_l2_head_number)
         .await
         .context("block_hash")?;
-    debug!("l2_head {:?}", &l2_head);
-    let l2_output_root = output_at_block(op_node_provider, l2_head_number)
+    debug!("l2_head {:?}", &agreed_l2_head_hash);
+    let agreed_l2_output_root = output_at_block(op_node_provider, agreed_l2_head_number)
         .await
         .context("output_at_block")?;
-    let l2_block_number = l2_head_number + 1;
-    let l2_claim = output_at_block(op_node_provider, l2_block_number)
+    let claimed_l2_block_number = agreed_l2_head_number + 1;
+    let claimed_l2_output_root = output_at_block(op_node_provider, claimed_l2_block_number)
         .await
         .context("output_at_block")?;
     // Message proving task
@@ -683,10 +688,10 @@ async fn request_proof<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         .send(Message::Proposal {
             local_index: proposal.local_index,
             l1_head,
-            l2_head,
-            l2_output_root,
-            l2_block_number,
-            l2_claim,
+            agreed_l2_head_hash,
+            agreed_l2_output_root,
+            claimed_l2_block_number,
+            claimed_l2_output_root,
         })
         .await?;
     Ok(())

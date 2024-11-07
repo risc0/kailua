@@ -42,16 +42,14 @@ fn main() {
         // execution_provider,
     )
     .expect("Failed to compute output hash.");
-    // Write the proof journal
-    let mut proof_journal = ProofJournal::from(boot.as_ref());
+    // Validate the output root
     if let Some(computed_output) = real_output_hash {
         // With sufficient data, the input l2_claim must be true
-        if computed_output != boot.claimed_l2_output_root {
-            panic!("Invalid l2 claim.");
-        }
+        assert_eq!(boot.claimed_l2_output_root, computed_output);
     } else {
         // We use the zero claim hash to denote that the data as of l1 head is insufficient
-        proof_journal.claimed_l2_output_root = B256::ZERO;
+        assert_eq!(boot.claimed_l2_output_root, B256::ZERO);
     }
-    env::commit_slice(&proof_journal.encode_packed());
+    // Write the proof journal
+    env::commit_slice(&ProofJournal::from(boot.as_ref()).encode_packed());
 }

@@ -41,6 +41,7 @@ async fn main() -> anyhow::Result<()> {
     let mut output_file = File::create(fpvm_proof_file_name(
         proof_journal.l1_head,
         proof_journal.claimed_l2_output_root,
+        proof_journal.claimed_l2_block_number,
         proof_journal.agreed_l2_output_root,
     ))
     .await

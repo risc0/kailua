@@ -34,7 +34,7 @@ use tracing::info;
 /// The size of the LRU cache in the oracle.
 pub const ORACLE_LRU_SIZE: usize = 1024;
 
-pub async fn run_native_client() -> anyhow::Result<Option<B256>> {
+pub async fn run_native_client() -> anyhow::Result<()> {
     info!("Preamble");
     let oracle = Arc::new(CachingOracle::new(
         ORACLE_LRU_SIZE,
@@ -49,7 +49,15 @@ pub async fn run_native_client() -> anyhow::Result<Option<B256>> {
     );
     let beacon = OracleBlobProvider::new(oracle.clone());
     // let l2_provider = OracleL2ChainProvider::new(boot.clone(), oracle.clone());
-    kailua_common::client::run_client(oracle, boot, beacon) //, l2_provider)
+    let real_output_hash = kailua_common::client::run_client(oracle, boot.clone(), beacon)?; //, l2_provider)
+    if let Some(computed_output) = real_output_hash {
+        // With sufficient data, the input l2_claim must be true
+        assert_eq!(boot.claimed_l2_output_root, computed_output);
+    } else {
+        // We use the zero claim hash to denote that the data as of l1 head is insufficient
+        assert_eq!(boot.claimed_l2_output_root, B256::ZERO);
+    }
+    Ok(())
 }
 
 pub async fn prove_zkvm_client() -> anyhow::Result<ProveInfo> {
@@ -108,18 +116,25 @@ pub async fn prove_zkvm_client() -> anyhow::Result<ProveInfo> {
     join!(client_task).0?
 }
 
-pub fn fpvm_proof_file_name(l1_head: B256, l2_claim: B256, l2_output_root: B256) -> String {
+pub fn fpvm_proof_file_name(
+    l1_head: B256,
+    claimed_l2_output_root: B256,
+    claimed_l2_block_number: u64,
+    agreed_l2_output_root: B256,
+) -> String {
     let version = risc0_zkvm::get_version().unwrap();
     let suffix = if risc0_zkvm::is_dev_mode() {
         "fake"
     } else {
         "zkp"
     };
+    let claimed_l2_block_number = claimed_l2_block_number.to_be_bytes();
     let data = [
         bytemuck::cast::<_, [u8; 32]>(KAILUA_FPVM_ID).as_slice(),
         l1_head.as_slice(),
-        l2_output_root.as_slice(),
-        l2_claim.as_slice(),
+        claimed_l2_output_root.as_slice(),
+        claimed_l2_block_number.as_slice(),
+        agreed_l2_output_root.as_slice(),
     ]
     .concat();
     let file_name = keccak256(data);
