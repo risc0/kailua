@@ -13,10 +13,13 @@
 // limitations under the License.
 
 use alloy_primitives::B256;
-use kona_client::l1::{DerivationDriver, OracleL1ChainProvider};
+use kona_client::executor::KonaExecutorConstructor;
+use kona_client::l1::{OracleL1ChainProvider, OraclePipeline};
 use kona_client::l2::OracleL2ChainProvider;
+use kona_client::sync::new_pipeline_cursor;
 use kona_client::{BootInfo, FlushableCache};
 use kona_derive::traits::BlobProvider;
+use kona_driver::Driver;
 use kona_preimage::CommsClient;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -44,26 +47,38 @@ pub fn run_client<
         //                   DERIVATION & EXECUTION                   //
         ////////////////////////////////////////////////////////////////
         log("DERIVATION");
-        let mut driver = DerivationDriver::new(
-            boot.as_ref(),
-            &oracle,
-            beacon,
-            l1_provider,
-            l2_provider.clone(),
+        let cursor = new_pipeline_cursor(
+            oracle.clone(),
+            &boot,
+            &mut l1_provider.clone(),
+            &mut l2_provider.clone(),
         )
         .await?;
+        let safe_head = cursor.l2_safe_head_header().seal();
+
+        let cfg = Arc::new(boot.rollup_config.clone());
+        let pipeline = OraclePipeline::new(
+            cfg.clone(),
+            cursor.clone(),
+            oracle.clone(),
+            beacon,
+            l1_provider.clone(),
+            l2_provider.clone(),
+        );
+
+        let executor = KonaExecutorConstructor::new(&cfg, l2_provider.clone(), l2_provider, |_| {
+            log("EXECUTE")
+        });
+        let mut driver = Driver::new(cursor, executor, pipeline);
 
         log(&format!(
             "PAYLOAD: safe_head({}|{})",
-            driver.l2_safe_head_header().seal(),
-            boot.agreed_l2_output_root
+            safe_head, boot.agreed_l2_output_root
         ));
 
         log("ADVANCE");
         let (output_number, output_root) = driver
-            .advance_to_target(&boot.rollup_config, &l2_provider, &l2_provider, |_| {
-                log("EXECUTE")
-            })
+            .advance_to_target(&boot.rollup_config, boot.claimed_l2_block_number)
             .await?;
 
         // None indicates that there is insufficient L1 data available to produce an L2

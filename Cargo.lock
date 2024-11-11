@@ -3350,6 +3350,7 @@ dependencies = [
  "kona-common",
  "kona-common-proc",
  "kona-derive",
+ "kona-driver",
  "kona-executor",
  "kona-mpt",
  "kona-preimage",
@@ -3426,7 +3427,7 @@ dependencies = [
 [[package]]
 name = "kona-client"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/kona#92e52fb8835be08364e6b88c9fb079d0b5522856"
+source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
 dependencies = [
  "alloy-consensus 0.5.4",
  "alloy-eips 0.5.4",
@@ -3439,6 +3440,7 @@ dependencies = [
  "kona-common",
  "kona-common-proc",
  "kona-derive",
+ "kona-driver",
  "kona-executor",
  "kona-mpt",
  "kona-preimage",
@@ -3457,7 +3459,7 @@ dependencies = [
 [[package]]
 name = "kona-common"
 version = "0.0.4"
-source = "git+https://github.com/hashcashier/kona#92e52fb8835be08364e6b88c9fb079d0b5522856"
+source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
 dependencies = [
  "cfg-if",
  "derive_more",
@@ -3466,8 +3468,8 @@ dependencies = [
 
 [[package]]
 name = "kona-common-proc"
-version = "0.0.4"
-source = "git+https://github.com/hashcashier/kona#92e52fb8835be08364e6b88c9fb079d0b5522856"
+version = "0.0.5"
+source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -3479,8 +3481,8 @@ dependencies = [
 
 [[package]]
 name = "kona-derive"
-version = "0.0.5"
-source = "git+https://github.com/hashcashier/kona#92e52fb8835be08364e6b88c9fb079d0b5522856"
+version = "0.0.6"
+source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
 dependencies = [
  "alloc-no-stdlib",
  "alloy-consensus 0.5.4",
@@ -3501,34 +3503,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "kona-derive-alloy"
-version = "0.0.2"
-source = "git+https://github.com/hashcashier/kona#92e52fb8835be08364e6b88c9fb079d0b5522856"
+name = "kona-driver"
+version = "0.0.0"
+source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
 dependencies = [
  "alloy-consensus 0.5.4",
- "alloy-eips 0.5.4",
  "alloy-primitives",
- "alloy-provider 0.5.4",
  "alloy-rlp",
- "alloy-rpc-types-beacon",
- "alloy-serde 0.5.4",
- "alloy-transport 0.5.4",
  "async-trait",
  "derive_more",
  "kona-derive",
- "lru",
  "op-alloy-consensus 0.5.2",
  "op-alloy-genesis",
  "op-alloy-protocol",
- "reqwest",
- "serde",
+ "op-alloy-rpc-types-engine",
  "tracing",
 ]
 
 [[package]]
 name = "kona-executor"
-version = "0.0.4"
-source = "git+https://github.com/hashcashier/kona#92e52fb8835be08364e6b88c9fb079d0b5522856"
+version = "0.0.5"
+source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
 dependencies = [
  "alloy-consensus 0.5.4",
  "alloy-eips 0.5.4",
@@ -3546,7 +3541,7 @@ dependencies = [
 [[package]]
 name = "kona-host"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/kona#92e52fb8835be08364e6b88c9fb079d0b5522856"
+source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
 dependencies = [
  "alloy-consensus 0.5.4",
  "alloy-eips 0.5.4",
@@ -3555,6 +3550,8 @@ dependencies = [
  "alloy-rlp",
  "alloy-rpc-client 0.5.4",
  "alloy-rpc-types 0.5.4",
+ "alloy-rpc-types-beacon",
+ "alloy-serde 0.5.4",
  "alloy-transport-http 0.5.4",
  "anyhow",
  "async-trait",
@@ -3564,7 +3561,6 @@ dependencies = [
  "kona-client",
  "kona-common",
  "kona-derive",
- "kona-derive-alloy",
  "kona-mpt",
  "kona-preimage",
  "op-alloy-genesis",
@@ -3582,8 +3578,8 @@ dependencies = [
 
 [[package]]
 name = "kona-mpt"
-version = "0.0.5"
-source = "git+https://github.com/hashcashier/kona#92e52fb8835be08364e6b88c9fb079d0b5522856"
+version = "0.0.6"
+source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
 dependencies = [
  "alloy-consensus 0.5.4",
  "alloy-primitives",
@@ -3596,7 +3592,7 @@ dependencies = [
 [[package]]
 name = "kona-preimage"
 version = "0.0.4"
-source = "git+https://github.com/hashcashier/kona#92e52fb8835be08364e6b88c9fb079d0b5522856"
+source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
 dependencies = [
  "alloy-primitives",
  "async-trait",
