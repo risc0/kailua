@@ -75,10 +75,10 @@ event Challenged(uint32 indexed outputIndex, address indexed challenger);
 event Proven(uint32 indexed outputIndex, ProofStatus indexed status);
 
 interface IFaultAttributionManager {
-    function propose() external;
+    function propose() external payable;
 }
 
-interface IFaultAttributionGame is Clone, IDisputeGame {}
+interface IFaultAttributionGame is IDisputeGame {}
 
 library ProofLib {
     /// @notice The modular exponentiation precompile

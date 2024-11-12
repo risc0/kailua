@@ -47,7 +47,7 @@ contract FaultAttributionManager is IFaultAttributionManager {
 
     /// @notice Validates that a new proposal may be submitted by a game creator
     /// @dev This function is safe to call from arbitrary sources.
-    function propose() external {
+    function propose() external payable {
         // Retrieve the proposer's address from the calling contract
         IFaultAttributionGame gameContract = IFaultAttributionGame(msg.sender);
         address proposer = gameContract.gameCreator();

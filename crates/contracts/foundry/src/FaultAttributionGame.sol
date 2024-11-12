@@ -19,7 +19,7 @@ import "./vendor/FlatOPImportV1.4.0.sol";
 import "./vendor/FlatR0ImportV1.0.0.sol";
 import "./FaultLib.sol";
 
-contract FaultAttributionGame is IFaultAttributionGame {
+contract FaultAttributionGame is Clone, IFaultAttributionGame {
     /// @notice Semantic version.
     /// @custom:semver 0.1.0
     string public constant version = "0.1.0";
@@ -51,11 +51,6 @@ contract FaultAttributionGame is IFaultAttributionGame {
     /// @notice Returns the max clock duration.
     function maxClockDuration() external view returns (Duration maxClockDuration_) {
         maxClockDuration_ = MAX_CLOCK_DURATION;
-    }
-
-    /// @notice Returns the game type.
-    function gameType() external view returns (GameType gameType_) {
-        gameType_ = GAME_TYPE;
     }
 
     /// @notice Returns the anchor state registry contract.
