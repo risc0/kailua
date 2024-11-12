@@ -17,7 +17,7 @@ pragma solidity ^0.8.24;
 
 import "./vendor/FlatOPImportV1.4.0.sol";
 import "./vendor/FlatR0ImportV1.0.0.sol";
-import "./FaultProofGameLib.sol";
+import "./FaultLib.sol";
 
 contract FaultProofGame is Clone, IDisputeGame {
     /// @notice Semantic version.
@@ -125,7 +125,7 @@ contract FaultProofGame is Clone, IDisputeGame {
         // - 0x14 creator address
         // - 0x20 root claim
         // - 0x20 l1 head
-        // - 0x30 extraData (0x05 l2BlockNumber, 0x05 parentGameIndex, 0x20 proposalBlobHash)
+        // - 0x30 extraData (0x08 l2BlockNumber, 0x08 parentGameIndex, 0x20 proposalBlobHash)
         // - 0x02 CWIA bytes
         assembly {
             if iszero(eq(calldatasize(), 0x8A)) {
@@ -196,7 +196,7 @@ contract FaultProofGame is Clone, IDisputeGame {
     function extraData() external pure returns (bytes memory extraData_) {
         // The extra data starts at the second word within the cwia calldata and
         // is 48 bytes long.
-        extraData_ = _getArgBytes(0x54, 0x30);
+        extraData_ = _getArgBytes(0x54, 0x0F);
     }
 
     /// @notice A compliant implementation of this interface should return the components of the
@@ -308,7 +308,7 @@ contract FaultProofGame is Clone, IDisputeGame {
             // When challenging another output, we must prove that we are using the
             // proposed intermediate output as the parent
             // todo: support empty output compression
-            bool success = FaultProofGameLib.verifyKZGBlobProof(
+            bool success = ProofLib.verifyKZGBlobProof(
                 proposalBlobHash().raw(), outputNumber - 2, safeOutput, blobCommitment, kzgProofs[0]
             );
             require(success, "bad safeOutput kzg proof");
@@ -320,7 +320,7 @@ contract FaultProofGame is Clone, IDisputeGame {
             // the last output  (outputNumber N)
             require(proposedOutput == rootClaim().raw());
         } else {
-            bool success = FaultProofGameLib.verifyKZGBlobProof(
+            bool success = ProofLib.verifyKZGBlobProof(
                 proposalBlobHash().raw(),
                 outputNumber - 1,
                 proposedOutput,

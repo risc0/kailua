@@ -60,6 +60,10 @@ error BlockCountExceeded(uint256 l2BlockNumber, uint256 rootBlockNumber);
 /// @notice Thrown when an incorrect blob hash is provided
 error BlobHashMismatch(bytes32 found, bytes32 expected);
 
+// 0x6dafbcfa
+/// @notice Thrown when a blob hash is missing
+error BlobHashMissing(uint64 index, uint64 count);
+
 /// @notice Emitted when an output is challenged.
 /// @param outputIndex The index of the challenged output
 /// @param challenger The address of the challenge issuer
@@ -70,7 +74,13 @@ event Challenged(uint32 indexed outputIndex, address indexed challenger);
 /// @param status The proven status of the output
 event Proven(uint32 indexed outputIndex, ProofStatus indexed status);
 
-library FaultProofGameLib {
+interface IFaultAttributionManager {
+    function propose() external;
+}
+
+interface IFaultAttributionGame is Clone, IDisputeGame {}
+
+library ProofLib {
     /// @notice The modular exponentiation precompile
     address internal constant MOD_EXP = address(0x05);
 
