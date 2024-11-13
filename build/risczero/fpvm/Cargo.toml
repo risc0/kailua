@@ -18,9 +18,9 @@ alloy-primitives = { version = "0.8", default-features = false, features = ["map
 
 kailua-common = { path = "../../../crates/common" }
 
-kona-client = { git = "https://github.com/ethereum-optimism/kona", rev = "2e943f4" }
-kona-driver = { git = "https://github.com/ethereum-optimism/kona", rev = "2e943f4" }
-kona-common = { git = "https://github.com/ethereum-optimism/kona", rev = "2e943f4" }
+kona-client = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
+kona-driver = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
+kona-common = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
 
 risc0-zkvm = { version = "1.1.3", features = ["std", "heap-embedded-alloc"] }
 

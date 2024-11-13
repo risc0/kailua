@@ -1848,7 +1848,7 @@ dependencies = [
 [[package]]
 name = "kona-client"
 version = "0.1.0"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -1880,7 +1880,7 @@ dependencies = [
 [[package]]
 name = "kona-common"
 version = "0.0.4"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "cfg-if",
  "derive_more",
@@ -1890,7 +1890,7 @@ dependencies = [
 [[package]]
 name = "kona-common-proc"
 version = "0.0.5"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -1903,7 +1903,7 @@ dependencies = [
 [[package]]
 name = "kona-derive"
 version = "0.0.6"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "alloc-no-stdlib",
  "alloy-consensus",
@@ -1926,7 +1926,7 @@ dependencies = [
 [[package]]
 name = "kona-driver"
 version = "0.0.0"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
@@ -1944,7 +1944,7 @@ dependencies = [
 [[package]]
 name = "kona-executor"
 version = "0.0.5"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -1962,7 +1962,7 @@ dependencies = [
 [[package]]
 name = "kona-mpt"
 version = "0.0.6"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
@@ -1975,7 +1975,7 @@ dependencies = [
 [[package]]
 name = "kona-preimage"
 version = "0.0.4"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "alloy-primitives",
  "async-trait",

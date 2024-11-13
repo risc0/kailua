@@ -3427,7 +3427,7 @@ dependencies = [
 [[package]]
 name = "kona-client"
 version = "0.1.0"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "alloy-consensus 0.5.4",
  "alloy-eips 0.5.4",
@@ -3459,7 +3459,7 @@ dependencies = [
 [[package]]
 name = "kona-common"
 version = "0.0.4"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "cfg-if",
  "derive_more",
@@ -3469,7 +3469,7 @@ dependencies = [
 [[package]]
 name = "kona-common-proc"
 version = "0.0.5"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -3482,7 +3482,7 @@ dependencies = [
 [[package]]
 name = "kona-derive"
 version = "0.0.6"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "alloc-no-stdlib",
  "alloy-consensus 0.5.4",
@@ -3505,7 +3505,7 @@ dependencies = [
 [[package]]
 name = "kona-driver"
 version = "0.0.0"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "alloy-consensus 0.5.4",
  "alloy-primitives",
@@ -3523,7 +3523,7 @@ dependencies = [
 [[package]]
 name = "kona-executor"
 version = "0.0.5"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "alloy-consensus 0.5.4",
  "alloy-eips 0.5.4",
@@ -3541,7 +3541,7 @@ dependencies = [
 [[package]]
 name = "kona-host"
 version = "0.1.0"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "alloy-consensus 0.5.4",
  "alloy-eips 0.5.4",
@@ -3579,7 +3579,7 @@ dependencies = [
 [[package]]
 name = "kona-mpt"
 version = "0.0.6"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "alloy-consensus 0.5.4",
  "alloy-primitives",
@@ -3592,7 +3592,7 @@ dependencies = [
 [[package]]
 name = "kona-preimage"
 version = "0.0.4"
-source = "git+https://github.com/ethereum-optimism/kona?rev=2e943f4#2e943f4dd475f513b95f052368a99e9ef2e8410b"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#c89ece358f83f68b595a07bd06454f57c99a4f1a"
 dependencies = [
  "alloy-primitives",
  "async-trait",
@@ -3683,7 +3683,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -4703,7 +4703,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9552f850d5f0964a4e4d0bf306459ac29323ddfbae05e35a7c0d35cb0803cc5"
 dependencies = [
  "anyhow",
- "itertools 0.13.0",
+ "itertools 0.11.0",
  "proc-macro2",
  "quote",
  "syn 2.0.87",
@@ -7303,7 +7303,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -7586,7 +7586,7 @@ dependencies = [
 [[package]]
 name = "zeth-core"
 version = "0.1.0"
-source = "git+https://github.com/risc0/zeth?branch=rkhalil/reth#db833a0915160bd7fcf32de41d9b3c470868d238"
+source = "git+https://github.com/risc0/zeth?branch=rkhalil/reth#08362984c43287ed762da35f2b7b121ca3bdaea3"
 dependencies = [
  "alloy-consensus 0.4.2",
  "alloy-primitives",
@@ -7610,7 +7610,7 @@ dependencies = [
 [[package]]
 name = "zeth-core-optimism"
 version = "0.1.0"
-source = "git+https://github.com/risc0/zeth?branch=rkhalil/reth#db833a0915160bd7fcf32de41d9b3c470868d238"
+source = "git+https://github.com/risc0/zeth?branch=rkhalil/reth#08362984c43287ed762da35f2b7b121ca3bdaea3"
 dependencies = [
  "anyhow",
  "reth-chainspec",
@@ -7619,6 +7619,7 @@ dependencies = [
  "reth-optimism-chainspec",
  "reth-optimism-consensus",
  "reth-optimism-evm",
+ "reth-optimism-forks",
  "reth-primitives",
  "reth-revm",
  "reth-storage-errors",
@@ -7628,7 +7629,7 @@ dependencies = [
 [[package]]
 name = "zeth-preflight"
 version = "0.1.0"
-source = "git+https://github.com/risc0/zeth?branch=rkhalil/reth#db833a0915160bd7fcf32de41d9b3c470868d238"
+source = "git+https://github.com/risc0/zeth?branch=rkhalil/reth#08362984c43287ed762da35f2b7b121ca3bdaea3"
 dependencies = [
  "alloy 0.4.2",
  "anyhow",
@@ -7653,7 +7654,7 @@ dependencies = [
 [[package]]
 name = "zeth-preflight-optimism"
 version = "0.1.0"
-source = "git+https://github.com/risc0/zeth?branch=rkhalil/reth#db833a0915160bd7fcf32de41d9b3c470868d238"
+source = "git+https://github.com/risc0/zeth?branch=rkhalil/reth#08362984c43287ed762da35f2b7b121ca3bdaea3"
 dependencies = [
  "alloy 0.4.2",
  "op-alloy-consensus 0.4.0",

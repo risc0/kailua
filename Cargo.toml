@@ -49,15 +49,15 @@ kailua-contracts = { path = "crates/contracts" }
 kailua-host = { path = "bin/host" }
 
 # Kona git = "https://github.com/ethereum-optimism/kona", rev = "2e943f4"
-kona-client = { git = "https://github.com/ethereum-optimism/kona", rev = "2e943f4" }
-kona-common = { git = "https://github.com/ethereum-optimism/kona", rev = "2e943f4" }
-kona-common-proc = { git = "https://github.com/ethereum-optimism/kona", rev = "2e943f4" }
-kona-derive = { git = "https://github.com/ethereum-optimism/kona", rev = "2e943f4", default-features = false, features = ["serde"] }
-kona-driver = { git = "https://github.com/ethereum-optimism/kona", rev = "2e943f4" }
-kona-executor = { git = "https://github.com/ethereum-optimism/kona", rev = "2e943f4" }
-kona-host = { git = "https://github.com/ethereum-optimism/kona", rev = "2e943f4" }
-kona-mpt = { git = "https://github.com/ethereum-optimism/kona", rev = "2e943f4", features = ["serde"] }
-kona-preimage = { git = "https://github.com/ethereum-optimism/kona", rev = "2e943f4", features = ["rkyv"] }
+kona-client = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
+kona-common = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
+kona-common-proc = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
+kona-derive = { git = "https://github.com/hashcashier/kona", branch = "kailua", default-features = false, features = ["serde"] }
+kona-driver = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
+kona-executor = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
+kona-host = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
+kona-mpt = { git = "https://github.com/hashcashier/kona", branch = "kailua", features = ["serde"] }
+kona-preimage = { git = "https://github.com/hashcashier/kona", branch = "kailua", features = ["rkyv"] }
 
 # RISC Zero zkVM
 risc0-build = { version = "1.1.3" }
