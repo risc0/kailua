@@ -4669,6 +4669,7 @@ error L2BlockNumberChallenged();
 //              `PermissionedDisputeGame` Errors              //
 ////////////////////////////////////////////////////////////////
 
+// 0xd386ef3e
 /// @notice Thrown when an unauthorized address attempts to interact with the game.
 error BadAuth();
 

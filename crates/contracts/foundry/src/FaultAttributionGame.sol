@@ -118,10 +118,10 @@ contract FaultAttributionGame is Clone, IFaultAttributionGame {
             proposalBlobHashes.push(Hash.wrap(blobhash(i)));
         }
 
-        // Store the game index
-
-        // Inform manager of proposer move while forwarding msg.value
-        FAULT_ATTRIBUTION_MANAGER.propose{value: msg.value}();
+        // Ensure new proposals only come through the manager
+        if (gameCreator() != address(FAULT_ATTRIBUTION_MANAGER)) {
+            revert BadAuth();
+        }
 
         // Set the game's starting timestamp
         createdAt = Timestamp.wrap(uint64(block.timestamp));
@@ -171,6 +171,15 @@ contract FaultAttributionGame is Clone, IFaultAttributionGame {
 
     /// @inheritdoc IDisputeGame
     function resolve() external returns (GameStatus status_) {
+        // Ensure resolutions are only authorized by the manager
+        if (msg.sender != address(FAULT_ATTRIBUTION_MANAGER)) {
+            revert BadAuth();
+        }
+
+        // Try to update the anchor state, this should not revert.
+        if (status_ == GameStatus.DEFENDER_WINS) {
+            ANCHOR_STATE_REGISTRY.tryUpdateAnchorState();
+        }
         // todo
     }
 

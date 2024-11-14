@@ -75,7 +75,35 @@ event Challenged(uint32 indexed outputIndex, address indexed challenger);
 event Proven(uint32 indexed outputIndex, ProofStatus indexed status);
 
 interface IFaultAttributionManager {
-    function propose() external payable;
+    struct ProposalData {
+        address proposerAddress;
+        IDisputeGame proposalContract;
+        uint64 previousProposalIndex;
+        uint64 challengeCount;
+    }
+
+    struct ChallengeData {
+        address challengerAddress;
+        uint64 proposalIndex;
+        uint64 outputOffset;
+        uint64 previousChallengeIndex;
+    }
+
+    function propose(Claim claimedOutputRoot, bytes calldata extraData) external payable;
+
+    function challenge(uint64 proposalIndex, uint64 outputOffset, uint64 challengePriority) external payable;
+
+    function prove(
+        uint64 proposalIndex,
+        uint64 outputOffset,
+        bytes calldata encodedSeal,
+        bytes32 acceptedOutput,
+        bytes32 proposedOutput,
+        bytes32 computedOutput,
+        bytes[] calldata kzgProofs
+    ) external payable;
+
+    function resolve(uint64 proposalIndex, uint64 outputOffset) external payable;
 }
 
 interface IFaultAttributionGame is IDisputeGame {}
