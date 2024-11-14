@@ -93,7 +93,7 @@ contract FaultAttributionGame is Clone, IFaultAttributionGame {
         // - 0x14 creator address
         // - 0x20 root claim
         // - 0x20 l1 head
-        // - 0x18 extraData (0x08 l2BlockNumber, 0x08 parentGameIndex, 0x08 proposalBlobHashCount)
+        // - 0x18 extraData (0x08 l2BlockNumber, 0x08 parentGameIndex, 0x08 intermediateOutputs)
         // - 0x02 CWIA bytes
         if (msg.data.length != 0x72) {
             revert BadExtraData();
@@ -109,11 +109,12 @@ contract FaultAttributionGame is Clone, IFaultAttributionGame {
         }
 
         // Store the intermediate output blob hashes
-        uint64 hashes = proposalBlobHashCount();
-        for (uint64 i = 0; i < hashes; i++) {
+        uint64 blobCommitments = uint64(intermediateOutputs() / (1 << ProofLib.FIELD_ELEMENTS_PER_BLOB_PO2))
+            + (intermediateOutputs() % (1 << ProofLib.FIELD_ELEMENTS_PER_BLOB_PO2) == 0 ? 0 : 1);
+        for (uint64 i = 0; i < blobCommitments; i++) {
             bytes32 hash = blobhash(i);
             if (hash == 0x0) {
-                revert BlobHashMissing(i, hashes);
+                revert BlobHashMissing(i, blobCommitments);
             }
             proposalBlobHashes.push(Hash.wrap(blobhash(i)));
         }
@@ -176,24 +177,64 @@ contract FaultAttributionGame is Clone, IFaultAttributionGame {
             revert BadAuth();
         }
 
+        // Mark resolution timestamp
+        resolvedAt = Timestamp.wrap(uint64(block.timestamp));
+
+        // Update the status and emit the resolved event, note that we're performing a storage update here.
+        emit Resolved(status = status_ = GameStatus.DEFENDER_WINS);
+
         // Try to update the anchor state, this should not revert.
-        if (status_ == GameStatus.DEFENDER_WINS) {
-            ANCHOR_STATE_REGISTRY.tryUpdateAnchorState();
-        }
-        // todo
+        ANCHOR_STATE_REGISTRY.tryUpdateAnchorState();
     }
 
-    /// @notice A compliant implementation of this interface should return the components of the
-    ///         game UUID's preimage provided in the cwia payload. The preimage of the UUID is
-    ///         constructed as `keccak256(gameType . rootClaim . extraData)` where `.` denotes
-    ///         concatenation.
-    /// @return gameType_ The type of proof system being used.
-    /// @return rootClaim_ The root claim of the DisputeGame.
-    /// @return extraData_ Any extra data supplied to the dispute game contract by the creator.
+    /// @inheritdoc IDisputeGame
     function gameData() external view returns (GameType gameType_, Claim rootClaim_, bytes memory extraData_) {
         gameType_ = this.gameType();
         rootClaim_ = this.rootClaim();
         extraData_ = this.extraData();
+    }
+
+    // ------------------------------
+    // IFaultAttributionGame implementation
+    // ------------------------------
+
+    /// @inheritdoc IFaultAttributionGame
+    function intermediateOutputs() public pure returns (uint64 intermediateOutputs_) {
+        intermediateOutputs_ = _getArgUint64(0x64);
+    }
+
+    /// @inheritdoc IFaultAttributionGame
+    function parentGame() public view returns (IFaultAttributionGame parentGame_) {
+        parentGame_ = FAULT_ATTRIBUTION_MANAGER.gameAtIndex(parentGameIndex());
+    }
+
+    /// @inheritdoc IFaultAttributionGame
+    function getChallengerDuration() public view returns (Duration duration_) {
+        // INVARIANT: The game must be in progress to query the remaining time to respond to a given claim.
+        if (status != GameStatus.IN_PROGRESS) {
+            revert GameNotInProgress();
+        }
+
+        // Compute the duration elapsed of the potential challenger's clock.
+        uint64 challengeDuration = uint64(block.timestamp - createdAt.raw());
+        duration_ = challengeDuration > MAX_CLOCK_DURATION.raw() ? MAX_CLOCK_DURATION : Duration.wrap(challengeDuration);
+    }
+
+    function prove(
+        uint64 outputOffset,
+        bytes calldata encodedSeal,
+        bytes32 acceptedOutput,
+        bytes32 proposedOutput,
+        bytes32 computedOutput,
+        bytes[] calldata kzgProofs
+    ) external payable returns (ProofStatus) {
+        // Ensure proofs are only authorized by the manager
+        if (msg.sender != address(FAULT_ATTRIBUTION_MANAGER)) {
+            revert BadAuth();
+        }
+
+        // todo
+        return ProofStatus.NONE;
     }
 
     // ------------------------------
@@ -214,23 +255,6 @@ contract FaultAttributionGame is Clone, IFaultAttributionGame {
         parentGameIndex_ = _getArgUint64(0x5C);
     }
 
-    /// @notice The number of blobs submitted along with the proposal
-    function proposalBlobHashCount() public pure returns (uint64 proposalBlobHashCount_) {
-        proposalBlobHashCount_ = _getArgUint64(0x64);
-    }
-
-    /// @notice The parent game contract.
-    function parentGame() public view returns (FaultAttributionGame parentGame_) {
-        (GameType parentGameType,, IDisputeGame parentDisputeGame) =
-            ANCHOR_STATE_REGISTRY.disputeGameFactory().gameAtIndex(parentGameIndex());
-
-        // Only allow fault claim games to be based off of other instances of the same game type
-        if (parentGameType.raw() != GAME_TYPE.raw()) revert GameTypeMismatch(parentGameType, GAME_TYPE);
-
-        // Interpret parent game as another instance of this game type
-        parentGame_ = FaultAttributionGame(address(parentDisputeGame));
-    }
-
     /// @notice Only the starting block number of the game.
     function startingBlockNumber() public view returns (uint256 startingBlockNumber_) {
         startingBlockNumber_ = parentGame().l2BlockNumber();
@@ -239,23 +263,5 @@ contract FaultAttributionGame is Clone, IFaultAttributionGame {
     /// @notice Only the starting output root of the game.
     function startingRootHash() public view returns (Hash startingRootHash_) {
         startingRootHash_ = Hash.wrap(parentGame().rootClaim().raw());
-    }
-
-    // ------------------------------
-    // Utility methods
-    // ------------------------------
-
-    /// @notice Returns the amount of time elapsed on the potential challenger to the claim's chess clock. Maxes
-    ///         out at `MAX_CLOCK_DURATION`.
-    /// @return duration_ The time elapsed on the potential challenger to `_claimIndex`'s chess clock.
-    function getChallengerDuration() public view returns (Duration duration_) {
-        // INVARIANT: The game must be in progress to query the remaining time to respond to a given claim.
-        if (status != GameStatus.IN_PROGRESS) {
-            revert GameNotInProgress();
-        }
-
-        // Compute the duration elapsed of the potential challenger's clock.
-        uint64 challengeDuration = uint64(block.timestamp - createdAt.raw());
-        duration_ = challengeDuration > MAX_CLOCK_DURATION.raw() ? MAX_CLOCK_DURATION : Duration.wrap(challengeDuration);
     }
 }

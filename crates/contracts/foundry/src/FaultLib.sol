@@ -40,6 +40,10 @@ error NotProven();
 /// @notice Thrown when a proving fault for an unchallenged game
 error UnchallengedGame();
 
+// 0x84b45441
+/// @notice Thrown when a proving fault for an unchallenged output
+error UnchallengedOutput();
+
 // 0xf1082a93
 /// @notice Thrown when a challenge is submitted against an already challenged game
 error AlreadyChallenged();
@@ -77,7 +81,7 @@ event Proven(uint32 indexed outputIndex, ProofStatus indexed status);
 interface IFaultAttributionManager {
     struct ProposalData {
         address proposerAddress;
-        IDisputeGame proposalContract;
+        IFaultAttributionGame gameContract;
         uint64 previousProposalIndex;
         uint64 challengeCount;
     }
@@ -89,13 +93,19 @@ interface IFaultAttributionManager {
         uint64 previousChallengeIndex;
     }
 
-    function propose(Claim claimedOutputRoot, bytes calldata extraData) external payable;
+    function gameAtIndex(uint64 index) external view returns (IFaultAttributionGame);
+
+    function propose(
+        Claim claimedOutputRoot,
+        uint64 l2BlockNumber,
+        uint64 parentGameIndex,
+        uint64 proposalBlobHashCount
+    ) external payable;
 
     function challenge(uint64 proposalIndex, uint64 outputOffset, uint64 challengePriority) external payable;
 
     function prove(
-        uint64 proposalIndex,
-        uint64 outputOffset,
+        uint64 challengeIndex,
         bytes calldata encodedSeal,
         bytes32 acceptedOutput,
         bytes32 proposedOutput,
@@ -103,10 +113,34 @@ interface IFaultAttributionManager {
         bytes[] calldata kzgProofs
     ) external payable;
 
-    function resolve(uint64 proposalIndex, uint64 outputOffset) external payable;
+    function acceptProposal(uint64 proposalIndex) external;
+
+    function rejectProposal(uint64 challengeIndex) external;
+
+    function resolveChallenge(uint64 proposalIndex, uint64 outputOffset) external;
 }
 
-interface IFaultAttributionGame is IDisputeGame {}
+interface IFaultAttributionGame is IDisputeGame {
+    function l2BlockNumber() external pure returns (uint256);
+
+    /// @notice The number of intermediate outputs submitted along with the proposal
+    function intermediateOutputs() external pure returns (uint64);
+
+    /// @notice The parent game contract.
+    function parentGame() external view returns (IFaultAttributionGame);
+
+    /// @notice Returns the time elapsed since proposal creation, capped by `MAX_CLOCK_DURATION`.
+    function getChallengerDuration() external view returns (Duration);
+
+    function prove(
+        uint64 outputOffset,
+        bytes calldata encodedSeal,
+        bytes32 acceptedOutput,
+        bytes32 proposedOutput,
+        bytes32 computedOutput,
+        bytes[] calldata kzgProofs
+    ) external payable returns (ProofStatus);
+}
 
 library ProofLib {
     /// @notice The modular exponentiation precompile
