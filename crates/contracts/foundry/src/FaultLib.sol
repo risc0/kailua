@@ -95,7 +95,8 @@ interface IFaultAttributionManager {
         uint64 proposalIndex;
         uint64 outputOffset;
         uint64 previousChallengeIndex;
-        uint64 challengePriority;
+        uint64 challengeBelowIndex;
+        uint64 challengeAboveIndex;
     }
 
     function gameAtIndex(uint64 index) external view returns (IFaultAttributionGame);
@@ -107,7 +108,7 @@ interface IFaultAttributionManager {
         uint64 proposalBlobHashCount
     ) external payable;
 
-    function challenge(uint64 proposalIndex, uint64 outputOffset, uint64 challengePriority) external payable;
+    function challenge(uint64 proposalIndex, uint64 outputOffset, uint64 revocableChallengeIndex) external payable;
 
     function prove(
         uint64 challengeIndex,
