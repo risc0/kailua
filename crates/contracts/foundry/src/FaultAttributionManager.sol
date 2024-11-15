@@ -66,7 +66,9 @@ contract FaultAttributionManager is IFaultAttributionManager {
     mapping(address => uint64) public challengerPreviousIndex;
 
     /// @notice The number of times an output of a proposal was challenged
-    mapping(uint64 => mapping(uint64 => uint64)) public outputChallengeCount;
+    mapping(uint64 => mapping(uint64 => uint64)) public outputChallenges;
+    /// @notice The number of times challenges against an output were revoked
+    mapping(uint64 => mapping(uint64 => uint64)) public outputChallengeRevocations;
     /// @notice The provability of an output of a proposal
     mapping(uint64 => mapping(uint64 => ProofStatus)) public outputProofStatus;
 
@@ -97,7 +99,8 @@ contract FaultAttributionManager is IFaultAttributionManager {
                 challengerAddress: address(0x0),
                 proposalIndex: 0,
                 outputOffset: 0,
-                previousChallengeIndex: 0
+                previousChallengeIndex: 0,
+                challengePriority: 0
             })
         );
     }
@@ -156,12 +159,20 @@ contract FaultAttributionManager is IFaultAttributionManager {
         if (gameContract.status() != GameStatus.IN_PROGRESS) {
             revert GameNotInProgress();
         }
-        // INVARIANT: The challenge must be against a proposed output.
+        // INVARIANT: The challenge targets a proposed output.
         if (gameContract.intermediateOutputs() < outputOffset) {
             revert NotProposed();
         }
+        // INVARIANT: The challenge clock has not expired
+        if (gameContract.getChallengerDuration().raw() >= MAX_CLOCK_DURATION.raw()) {
+            revert ClockExpired();
+        }
+        // INVARIANT: The challenge targets a possibly faulty output
+        if (outputProofStatus[proposalIndex][outputOffset] == ProofStatus.INTEGRITY) {
+            revert AlreadyProven();
+        }
 
-        // Only challengers not on the blacklist may make new challenges
+        // INVARIANT: The challenger is not blacklisted
         if (challengersBlacklisted[msg.sender]) {
             revert BadAuth();
         }
@@ -169,17 +180,16 @@ contract FaultAttributionManager is IFaultAttributionManager {
         if (msg.value > 0) {
             challengerBonds[msg.sender] += msg.value;
         }
-        // ensure that the challengers has the collateral staked to make this move
+        // INVARIANT: The challenger staked enough collateral
         if (challengerBonds[msg.sender] != CHALLENGER_BOND) {
             revert IncorrectBondAmount();
         }
-        // Prevent unnecessary challenges through challengePriority
-        uint64 duplicateChallenges = outputChallengeCount[proposalIndex][outputOffset]++;
-        if (duplicateChallenges != challengePriority) {
+        // INVARIANT: This challenge has the correct priority
+        if (outputChallenges[proposalIndex][outputOffset]++ != challengePriority) {
             revert AlreadyChallenged();
         }
-        // Record increment number of challenged outputs
-        if (duplicateChallenges == 0) {
+        // Record possible increment of number of challenged outputs
+        if (challengePriority == 0) {
             proposals[proposalIndex].challengeCount++;
         }
         // Record the challenger's move
@@ -188,7 +198,8 @@ contract FaultAttributionManager is IFaultAttributionManager {
                 challengerAddress: msg.sender,
                 proposalIndex: proposalIndex,
                 outputOffset: outputOffset,
-                previousChallengeIndex: challengerPreviousIndex[msg.sender]
+                previousChallengeIndex: challengerPreviousIndex[msg.sender],
+                challengePriority: challengePriority
             })
         );
         challengerPreviousIndex[msg.sender] = uint64(challenges.length - 1);
@@ -272,7 +283,7 @@ contract FaultAttributionManager is IFaultAttributionManager {
         if (gameContract.parentGame().status() != GameStatus.DEFENDER_WINS) {
             revert OutOfOrderResolution();
         }
-        // INVARIANT: Proposer's prior proposal(s) have been resolved
+        // INVARIANT: Proposer's prior proposal(s) have been resolved without fault
         uint64 previousProposalIndex = proposals[challenge.proposalIndex].previousProposalIndex;
         if (previousProposalIndex > 0) {
             IFaultAttributionGame previousGameContract = proposals[previousProposalIndex].gameContract;
@@ -296,13 +307,53 @@ contract FaultAttributionManager is IFaultAttributionManager {
                 revert OutOfOrderResolution();
             }
         }
-        // INVARIANT: todo cannot reject unless using the last remaining canonical challenge
-        // challenge counter is down to 1
-        // output challenge negation counter is up to challenge priority
-        // INVARIANT: todo cannot reject unless using the canonical challenge (first bad intermediate output)
+        // INVARIANT: This is the canonical challenge type
+        if (proposals[challenge.proposalIndex].challengeCount != 1) {
+            revert OutOfOrderResolution();
+        }
+        // INVARIANT: The challenger had priority
+        if (outputChallengeRevocations[challenge.proposalIndex][challenge.outputOffset] != challenge.challengePriority)
+        {
+            revert OutOfOrderResolution();
+        }
+        // todo blacklist proposer
+        // todo pay bond to challenger
+        // todo reject this proposal
+        // todo reject all subsequent proposals by proposer?
     }
 
-    // todo: function rejectNonCanonicalChallenge()
+    /// @notice Revokes a challenge because it was not the canonical challenge against this proposer
+    function revokeFaultChallenge(uint64 canonicalIndex, uint64 revokedIndex) external {
+        require(canonicalIndex > 0);
+        ChallengeData memory canonicalChallenge = challenges[canonicalIndex];
+        require(revokedIndex > 0);
+        ChallengeData memory revokedChallenge = challenges[revokedIndex];
+        // INVARIANT: The challengers are different entities
+        if (canonicalChallenge.challengerAddress == revokedChallenge.challengerAddress) {
+            // todo revert
+        }
+        // INVARIANT: The canonical challenge proves fault
+        if (outputProofStatus[canonicalChallenge.proposalIndex][canonicalChallenge.outputOffset] != ProofStatus.FAULT) {
+            revert NotProven();
+        }
+        // INVARIANT: The preceding challenge was canonical
+
+        if (canonicalChallenge.proposalIndex == revokedChallenge.proposalIndex) {
+            if (canonicalChallenge.outputOffset == revokedChallenge.outputOffset) {
+                require(canonicalChallenge.challengePriority < revokedChallenge.challengePriority);
+                // Revoking redundant challenges with lower priority
+            } else {
+                require(canonicalChallenge.outputOffset < revokedChallenge.outputOffset);
+                // Revoking challenges that target a higher offset
+            }
+        } else {
+            require(canonicalChallenge.proposalIndex < revokedChallenge.proposalIndex);
+            // Revoking challenges that target another proposal
+        }
+    }
+
+    /// @notice Revokes a challenge because its target transition was proven valid
+    function revokeIntegrityChallenge(uint64 challengeIndex) external {}
 
     function resolveChallenge(uint64 proposalIndex, uint64 outputOffset) external {
         require(proposalIndex > 0);

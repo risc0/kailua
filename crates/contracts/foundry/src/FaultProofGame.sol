@@ -380,12 +380,12 @@ contract FaultProofGame is Clone, IDisputeGame {
             status_ = GameStatus.DEFENDER_WINS;
 
             // Pay the challenger's bond to the prover as compensation
-            pay(getRequiredBond(), prover[outputNumber]);
+            ProofLib.pay(getRequiredBond(), prover[outputNumber]);
         } else {
             status_ = GameStatus.CHALLENGER_WINS;
 
             // Refund the challenger's bond
-            pay(getRequiredBond(), challenger[outputNumber]);
+            ProofLib.pay(getRequiredBond(), challenger[outputNumber]);
         }
 
         // Update game status in storage
@@ -416,13 +416,13 @@ contract FaultProofGame is Clone, IDisputeGame {
             status_ = GameStatus.CHALLENGER_WINS;
 
             // Pay the base game challenger
-            pay(address(this).balance, bondRecipient);
+            ProofLib.pay(address(this).balance, bondRecipient);
         } else if (faultOutputNumber != 0) {
             // Set the status in favor of the challenger
             status_ = GameStatus.CHALLENGER_WINS;
 
             // Pay the first fault prover
-            pay(bond, challenger[faultOutputNumber]);
+            ProofLib.pay(bond, challenger[faultOutputNumber]);
         } else {
             // INVARIANT: Optimistic resolution cannot occur unless parent game and intermediate claims are resolved.
             if (parentGameStatus == GameStatus.IN_PROGRESS || unresolvedClaimCount > 0) revert OutOfOrderResolution();
@@ -434,7 +434,7 @@ contract FaultProofGame is Clone, IDisputeGame {
             status_ = GameStatus.DEFENDER_WINS;
 
             // Refund the proposer
-            pay(address(this).balance, gameCreator());
+            ProofLib.pay(address(this).balance, gameCreator());
         }
 
         // Mark resolution timestamp
@@ -496,11 +496,5 @@ contract FaultProofGame is Clone, IDisputeGame {
         // challenger of bad proposal will double their money
         // prover of good proposal will be repaid for the validity proof
         requiredBond_ = bond / 2;
-    }
-
-    /// @notice Transfers ETH from the contract's balance to the recipient
-    function pay(uint256 amount, address recipient) internal {
-        (bool success,) = recipient.call{value: amount}(hex"");
-        if (!success) revert BondTransferFailed();
     }
 }

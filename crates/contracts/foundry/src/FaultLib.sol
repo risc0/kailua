@@ -32,6 +32,10 @@ enum ProofStatus {
 /// @notice Thrown when a proof is submitted for an already proven game
 error AlreadyProven();
 
+// 0xa37b6ee4
+/// @notice Thrown when a challenge is submitted after the clock has expired
+error ClockExpired();
+
 // 0xa506d334
 /// @notice Thrown when a resolution is attempted for an unproven claim
 error NotProven();
@@ -91,6 +95,7 @@ interface IFaultAttributionManager {
         uint64 proposalIndex;
         uint64 outputOffset;
         uint64 previousChallengeIndex;
+        uint64 challengePriority;
     }
 
     function gameAtIndex(uint64 index) external view returns (IFaultAttributionGame);
@@ -191,5 +196,11 @@ library ProofLib {
             result <<= 1;
             result |= ((1 << i) & index) >> i;
         }
+    }
+
+    /// @notice Transfers ETH from the contract's balance to the recipient
+    function pay(uint256 amount, address recipient) internal {
+        (bool success,) = recipient.call{value: amount}(hex"");
+        if (!success) revert BondTransferFailed();
     }
 }
