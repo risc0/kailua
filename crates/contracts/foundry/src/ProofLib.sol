@@ -70,7 +70,7 @@ error BlobHashMismatch(bytes32 found, bytes32 expected);
 
 // 0x6dafbcfa
 /// @notice Thrown when a blob hash is missing
-error BlobHashMissing(uint64 index, uint64 count);
+error BlobHashMissing(uint256 index, uint256 count);
 
 /// @notice Emitted when an output is challenged.
 /// @param outputIndex The index of the challenged output
@@ -82,99 +82,11 @@ event Challenged(uint32 indexed outputIndex, address indexed challenger);
 /// @param status The proven status of the output
 event Proven(uint32 indexed outputIndex, ProofStatus indexed status);
 
-interface IFaultAttributionManager {
-    struct Proposer {
-        address account;
-        uint256 bond;
-        Proposal[] proposals;
-    }
-
-    struct Proposal {
-        IFaultAttributionGame gameContract;
-        uint64 challengeCount;
-    }
-
-    struct Challenger {
-        address account;
-        uint256 bond;
-        Challenge[] challenges;
-        mapping(uint64 => bool) challengedProposers;
-    }
-
-    struct Challenge {
-        uint64 proposerIndex;
-        uint64 proposalIndex;
-        uint64 outputOffset;
-        uint64[2] previousChallenge;
-        uint64[2] nextChallenge;
-    }
-
-    struct ProposalData {
-        address proposerAddress;
-        IFaultAttributionGame gameContract;
-        uint64 previousProposalIndex;
-        uint64 challengeCount;
-    }
-
-    struct ChallengeData {
-        address challengerAddress;
-        uint64 proposalIndex;
-        uint64 outputOffset;
-        uint64 previousChallengeIndex;
-        uint64 challengeBelowIndex;
-        uint64 challengeAboveIndex;
-    }
-
-    function gameAtProposerIndex(uint64 proposer, uint64 index) external view returns (IFaultAttributionGame);
-
-    function propose(
-        Claim claimedOutputRoot,
-        uint64 l2BlockNumber,
-        uint64 parentGameIndex,
-        uint64 proposalBlobHashCount
-    ) external payable;
-
-    function challenge(uint64 proposalIndex, uint64 outputOffset, uint64 revocableChallengeIndex) external payable;
-
-    function prove(
-        uint64 challengeIndex,
-        bytes calldata encodedSeal,
-        bytes32 acceptedOutput,
-        bytes32 proposedOutput,
-        bytes32 computedOutput,
-        bytes[] calldata kzgProofs
-    ) external payable;
-
-    function acceptProposal(uint64 proposalIndex) external;
-
-    function rejectProposal(uint64 challengeIndex) external;
-
-    function resolveChallenge(uint64 proposalIndex, uint64 outputOffset) external;
-}
-
-interface IFaultAttributionGame is IDisputeGame {
-    function l2BlockNumber() external pure returns (uint256);
-
-    /// @notice The number of intermediate outputs submitted along with the proposal
-    function intermediateOutputs() external pure returns (uint64);
-
-    /// @notice The parent game contract.
-    function parentGame() external view returns (IFaultAttributionGame);
-
-    /// @notice Returns the time elapsed since proposal creation, capped by `MAX_CLOCK_DURATION`.
-    function getChallengerDuration() external view returns (Duration);
-
-    function prove(
-        uint64 outputOffset,
-        bytes calldata encodedSeal,
-        bytes32 acceptedOutput,
-        bytes32 proposedOutput,
-        bytes32 computedOutput,
-        bytes[] calldata kzgProofs
-    ) external payable returns (ProofStatus);
-}
-
 library ProofLib {
+    /// @notice The KZG commitment version
+    bytes32 internal constant KZG_COMMITMENT_VERSION =
+        bytes32(0x0100000000000000000000000000000000000000000000000000000000000000);
+
     /// @notice The modular exponentiation precompile
     address internal constant MOD_EXP = address(0x05);
 
@@ -191,6 +103,15 @@ library ProofLib {
 
     /// @notice The po2 for the number of field elements in a single blob
     uint256 internal constant FIELD_ELEMENTS_PER_BLOB_PO2 = 12;
+
+    function blobIndex(uint256 element) internal pure returns (uint256 index) {
+        index = element / (1 << FIELD_ELEMENTS_PER_BLOB_PO2);
+    }
+
+    function versionedKZGHash(bytes calldata blobCommitment) internal pure returns (bytes32 hash) {
+        require(blobCommitment.length == 48);
+        hash = ((sha256(blobCommitment) << 8) >> 8) | KZG_COMMITMENT_VERSION;
+    }
 
     function verifyKZGBlobProof(
         bytes32 versionedHash,
