@@ -47,31 +47,15 @@ contract FaultAttributionManager is IFaultAttributionManager {
     // Mutable storage
     // ------------------------------
 
-    /// @notice The proposals created by proposers
-    ProposalData[] public proposals;
-    /// @notice The bonds locked by proposers
-    mapping(address => uint256) public proposerBonds;
-    /// @notice The blacklist of proposers proven dishonest
-    mapping(address => bool) public proposerBlacklisted;
-    /// @notice The index of the last proposal made by each proposer
-    mapping(address => uint64) public proposerPreviousIndex;
-
-    /// @notice The challenges created by challengers
-    ChallengeData[] public challenges;
-    /// @notice The bonds locked by challengers
-    mapping(address => uint256) public challengerBonds;
-    /// @notice The blacklist of challengers proven dishonest
-    mapping(address => bool) public challengersBlacklisted;
-    /// @notice The index of the last challenge made by each challenge
-    mapping(address => uint64) public challengerPreviousIndex;
-
-    /// @notice Denotes which proposers have been challenged by whom
-    mapping(address => mapping(address => bool)) public proposerChallengerMatrix;
+    /// @notice Stores all proposers and their moves
+    Proposer[] internal proposers;
+    /// @notice Stores all challengers and their moves
+    Challenger[] internal challengers;
 
     /// @notice The index of the last challenge against an output
-    mapping(uint64 => mapping(uint64 => uint64)) public outputLastChallengeIndex;
+    mapping(address => mapping(uint64 => uint64[2])) public outputChallengeTip;
     /// @notice The provability of an output of a proposal
-    mapping(uint64 => mapping(uint64 => ProofStatus)) public outputProofStatus;
+    mapping(address => mapping(uint64 => ProofStatus)) public outputProofStatus;
 
     constructor(
         IDisputeGameFactory _disputeGameFactory,
@@ -86,25 +70,6 @@ contract FaultAttributionManager is IFaultAttributionManager {
         PROPOSER_BOND = _proposerBond;
         CHALLENGER_BOND = _challengerBond;
         MAX_CLOCK_DURATION = _maxClockDuration;
-        // Reserve index 0 moves
-        proposals.push(
-            ProposalData({
-                proposerAddress: address(0x0),
-                gameContract: IFaultAttributionGame(address(0x0)),
-                previousProposalIndex: 0,
-                challengeCount: 0
-            })
-        );
-        challenges.push(
-            ChallengeData({
-                challengerAddress: address(0x0),
-                proposalIndex: 0,
-                outputOffset: 0,
-                previousChallengeIndex: 0,
-                challengeBelowIndex: 0,
-                challengeAboveIndex: 0
-            })
-        );
     }
 
     // ------------------------------
@@ -112,51 +77,60 @@ contract FaultAttributionManager is IFaultAttributionManager {
     // ------------------------------
     // todo: reorg protection + sanity checks
 
-    function gameAtIndex(uint64 index) public view returns (IFaultAttributionGame) {
-        return proposals[index].gameContract;
+    function gameAtProposerIndex(uint64 proposerIndex, uint64 proposalIndex) public view returns (IFaultAttributionGame) {
+        return proposers[proposerIndex].proposals[proposalIndex].gameContract;
     }
 
     /// @notice Creates a new dispute game for a proposer using the DisputeGameFactory
-    function propose(Claim claimedOutputRoot, uint64 l2BlockNumber, uint64 parentGameIndex, uint64 intermediateOutputs)
+    function propose(
+        uint64 proposerIndex,
+        Claim claimedOutputRoot,
+        uint64 l2BlockNumber,
+        uint64 parentGameProposer,
+        uint64 parentGameIndex,
+        uint64 intermediateOutputs
+    )
         external
         payable
-        onlyBondedProposer
+        onlyBondedProposer(proposerIndex)
     {
         // Require parent game to not have been invalidated
-        IFaultAttributionGame parentGameContract = proposals[parentGameIndex].gameContract;
+        IFaultAttributionGame parentGameContract = gameAtProposerIndex(parentGameProposer, parentGameIndex);
         if (parentGameContract.status() == GameStatus.CHALLENGER_WINS) {
             revert InvalidParent();
         }
         // Invoke the dispute game factory to create a new game instance
-        bytes memory extraData = abi.encodePacked(l2BlockNumber, parentGameIndex, intermediateOutputs);
+        bytes memory extraData = abi.encodePacked(l2BlockNumber, parentGameProposer, parentGameProposer, intermediateOutputs);
         IFaultAttributionGame gameContract =
             IFaultAttributionGame(address(DISPUTE_GAME_FACTORY.create(GAME_TYPE, claimedOutputRoot, extraData)));
         // Record the proposer's move
-        proposals.push(
-            ProposalData({
-                proposerAddress: msg.sender,
+        proposers[proposerIndex].proposals.push(
+            Proposal({
                 gameContract: gameContract,
-                previousProposalIndex: proposerPreviousIndex[msg.sender],
                 challengeCount: 0
             })
         );
-        proposerPreviousIndex[msg.sender] = uint64(proposals.length - 1);
     }
 
-    function challenge(uint64 proposalIndex, uint64 outputOffset, uint64 challengeBelowIndex)
+    function challenge(
+        uint64 challengerIndex,
+        uint64 proposerIndex,
+        uint64 proposalIndex,
+        uint64 outputOffset,
+        uint64[2] previousChallenge
+    )
         external
         payable
-        onlyBondedChallenger
+        onlyBondedChallenger(challengerIndex)
     {
-        require(proposalIndex > 0);
-        IFaultAttributionGame gameContract = proposals[proposalIndex].gameContract;
+        IFaultAttributionGame gameContract = gameAtProposerIndex(proposerIndex, proposalIndex);
+        // INVARIANT: No prior challenge against same proposer by challenger
+        if (challengers[challengerIndex].challengedProposers[proposerIndex]) {
+            revert AlreadyChallenged();
+        }
         // INVARIANT: Challenges cannot be created unless the game is currently in progress.
         if (gameContract.status() != GameStatus.IN_PROGRESS) {
             revert GameNotInProgress();
-        }
-        // INVARIANT: No prior challenge against same proposer by challenger
-        if (proposerChallengerMatrix[proposals[proposalIndex].proposerAddress][msg.sender]) {
-            revert AlreadyChallenged();
         }
         // INVARIANT: The challenge targets a proposed output.
         if (gameContract.intermediateOutputs() < outputOffset) {
@@ -167,43 +141,36 @@ contract FaultAttributionManager is IFaultAttributionManager {
             revert ClockExpired();
         }
         // INVARIANT: The challenge targets a possibly faulty output
-        if (outputProofStatus[proposalIndex][outputOffset] == ProofStatus.INTEGRITY) {
+        if (outputProofStatus[gameContract][outputOffset] == ProofStatus.INTEGRITY) {
             revert AlreadyProven();
         }
-
         // INVARIANT: This challenge has the correct priority
-        if (outputLastChallengeIndex[proposalIndex][outputOffset] != challengeBelowIndex) {
+        if (outputChallengeTip[gameContract][outputOffset] != previousChallenge) {
             revert AlreadyChallenged();
         }
         // Record the challenger's move
-        uint64 challengeIndex = uint64(challenges.length);
-        if (challengeBelowIndex == 0) {
+        uint64 newChallengeTip = [challengerIndex, challengers[challengerIndex].challenges.length];
+        outputChallengeTip[gameContract][outputOffset] = newChallengeTip;
+        if (previousChallenge[0] == previousChallenge[1] == 0) {
             // Record possible increment of number of challenged outputs
-            proposals[proposalIndex].challengeCount++;
+            proposers[proposerIndex].proposals[proposalIndex].challengeCount++;
         } else {
-            // Update previous challenge against this output to point upwards to this new challenge
-            challenges[challengeBelowIndex].challengeAboveIndex = challengeIndex;
+            challengers[previousChallenge[0]].challenges[previousChallenge[1]].nextChallenge = newChallengeTip;
         }
         // Insert challenge into challenger timeline
-        challenges.push(
-            ChallengeData({
-                challengerAddress: msg.sender,
-                proposalIndex: proposalIndex,
-                outputOffset: outputOffset,
-                previousChallengeIndex: challengerPreviousIndex[msg.sender],
-                challengeBelowIndex: challengeBelowIndex,
-                challengeAboveIndex: 0
-            })
-        );
-        // Update the latest challenge against this output
-        outputLastChallengeIndex[proposalIndex][outputOffset] = challengeIndex;
-        // Update this challenger's latest move
-        challengerPreviousIndex[msg.sender] = challengeIndex;
+        challengers[challengerIndex].challenges.push(Challenge({
+            proposerIndex: proposerIndex,
+            proposalIndex: proposalIndex,
+            outputOffset: outputOffset,
+            previousChallenge: previousChallenge,
+            nextChallenge: [0, 0]
+        }));
         // Update the proposer-challenger matrix
-        proposerChallengerMatrix[proposals[proposalIndex].proposerAddress][msg.sender] = true;
+        challengers[challengerIndex].challengedProposers[proposerIndex] = true;
     }
 
     function prove(
+        uint64 challengerIndex,
         uint64 challengeIndex,
         bytes calldata encodedSeal,
         bytes32 acceptedOutput,
@@ -211,15 +178,14 @@ contract FaultAttributionManager is IFaultAttributionManager {
         bytes32 computedOutput,
         bytes[] calldata kzgProofs
     ) external payable {
-        require(challengeIndex > 0);
-        ChallengeData memory challenge = challenges[challengeIndex];
-        IFaultAttributionGame gameContract = proposals[challenge.proposalIndex].gameContract;
+        Challenge storage challenge = challengers[challengerIndex].challenges[challengeIndex];
+        IFaultAttributionGame gameContract = gameAtProposerIndex(challenge.proposerIndex, challenge.proposalIndex);
         // INVARIANT: Proofs cannot be submitted unless the game is currently in progress.
         if (gameContract.status() != GameStatus.IN_PROGRESS) {
             revert GameNotInProgress();
         }
         // INVARIANT: Proofs can only be submitted once
-        if (outputProofStatus[challenge.proposalIndex][challenge.outputOffset] != ProofStatus.NONE) {
+        if (outputProofStatus[gameContract][challenge.outputOffset] != ProofStatus.NONE) {
             revert AlreadyProven();
         }
 
@@ -228,18 +194,21 @@ contract FaultAttributionManager is IFaultAttributionManager {
             challenge.outputOffset, encodedSeal, acceptedOutput, proposedOutput, computedOutput, kzgProofs
         );
         // Record new proof status
-        outputProofStatus[challenge.proposalIndex][challenge.outputOffset] = proofStatus;
+        outputProofStatus[gameContract][challenge.outputOffset] = proofStatus;
         // Decrement unique challenge counter if output proven true
         if (proofStatus == ProofStatus.INTEGRITY) {
-            proposals[challenge.proposalIndex].challengeCount--;
+            proposers[challenge.proposerIndex].proposals[challenge.proposalIndex].challengeCount--;
             // todo: inherit the challenger / reject the challenge
         }
     }
 
     /// @notice Finalizes an honest unchallenged proposal
-    function acceptProposal(uint64 proposalIndex) external {
-        require(proposalIndex > 0);
-        IFaultAttributionGame gameContract = proposals[proposalIndex].gameContract;
+    function acceptProposal(
+        uint64 proposerIndex,
+        uint64 proposalIndex
+    ) external {
+        IFaultAttributionGame gameContract = gameAtProposerIndex(proposerIndex, proposalIndex);
+        Proposal storage proposal = proposers[proposerIndex].proposals[proposalIndex];
         // INVARIANT: Resolution cannot occur unless the game is currently in progress.
         if (gameContract.status() != GameStatus.IN_PROGRESS) {
             revert GameNotInProgress();
@@ -249,13 +218,12 @@ contract FaultAttributionManager is IFaultAttributionManager {
             revert OutOfOrderResolution();
         }
         // INVARIANT: Cannot resolve proposal while there are unresolved challenges.
-        if (proposals[proposalIndex].challengeCount > 0) {
+        if (proposal.challengeCount > 0) {
             revert OutOfOrderResolution();
         }
         // INVARIANT: Require proposer's prior proposal(s) to have been accepted.
-        uint64 previousProposalIndex = proposals[proposalIndex].previousProposalIndex;
-        if (previousProposalIndex > 0) {
-            IFaultAttributionGame previousGameContract = proposals[previousProposalIndex].gameContract;
+        if (proposalIndex > 0) {
+            IFaultAttributionGame previousGameContract = gameAtProposerIndex(proposerIndex, proposalIndex - 1);
             if (previousGameContract.status() != GameStatus.DEFENDER_WINS) {
                 revert OutOfOrderResolution();
             }
@@ -270,10 +238,10 @@ contract FaultAttributionManager is IFaultAttributionManager {
     }
 
     /// @notice Rejects a proposal and its proposer's subsequent proposals
-    function rejectProposal(uint64 challengeIndex) external {
-        require(challengeIndex > 0);
-        ChallengeData memory challenge = challenges[challengeIndex];
-        IFaultAttributionGame gameContract = proposals[challenge.proposalIndex].gameContract;
+    function rejectProposal(uint64 challengerIndex, uint64 challengeIndex) external {
+        Challenge storage challenge = challengers[challengerIndex].challenges[challengeIndex];
+        Proposer storage proposer = proposers[challenge.proposerIndex];
+        IFaultAttributionGame gameContract = gameAtProposerIndex(challenge.proposerIndex, challenge.proposalIndex);
         // INVARIANT: The proposal's game is currently in progress.
         if (gameContract.status() != GameStatus.IN_PROGRESS) {
             revert UnchallengedGame();
@@ -283,15 +251,14 @@ contract FaultAttributionManager is IFaultAttributionManager {
             revert OutOfOrderResolution();
         }
         // INVARIANT: Proposer's prior proposal(s) have been resolved without fault
-        uint64 previousProposalIndex = proposals[challenge.proposalIndex].previousProposalIndex;
-        if (previousProposalIndex > 0) {
-            IFaultAttributionGame previousGameContract = proposals[previousProposalIndex].gameContract;
+        if (challenge.proposalIndex > 0) {
+            IFaultAttributionGame previousGameContract = gameAtProposerIndex(challenge.proposerIndex, challenge.proposalIndex - 1);
             if (previousGameContract.status() != GameStatus.DEFENDER_WINS) {
                 revert OutOfOrderResolution();
             }
         }
         // INVARIANT: Fault has been proven
-        if (outputProofStatus[challenge.proposalIndex][challenge.outputOffset] != ProofStatus.FAULT) {
+        if (outputProofStatus[gameContract][challenge.outputOffset] != ProofStatus.FAULT) {
             revert NotProven();
         }
         // INVARIANT: The challenge clock has expired
@@ -299,21 +266,25 @@ contract FaultAttributionManager is IFaultAttributionManager {
             revert ClockNotExpired();
         }
         // INVARIANT: The challenger has no prior unclosed challenges
-        if (challenge.previousChallengeIndex > 0) {
-            uint64 lastChallengeProposalIndex = challenges[challenge.previousChallengeIndex].proposalIndex;
-            IFaultAttributionGame lastChallengeGameContract = proposals[lastChallengeProposalIndex].gameContract;
+        if (challengeIndex > 0) {
+            Challenge storage lastChallenge = challengers[challengerIndex].challenges[challengeIndex - 1];
+            IFaultAttributionGame lastChallengeGameContract = gameAtProposerIndex(lastChallenge.proposerIndex, lastChallenge.proposalIndex);
             if (lastChallengeGameContract.status() != GameStatus.CHALLENGER_WINS) {
                 revert OutOfOrderResolution();
             }
         }
         // INVARIANT: This is the canonical challenge type
-        if (proposals[challenge.proposalIndex].challengeCount != 1) {
+        if (proposer.proposals[challenge.proposalIndex].challengeCount != 1) {
             revert OutOfOrderResolution();
         }
         // INVARIANT: The challenger had priority
-        if (challenge.challengeBelowIndex != 0) {
+        if (challenge.previousChallenge[0] != 0 || challenge.previousChallenge[1] != 0) {
             revert OutOfOrderResolution();
         }
+        // INVARIANT: The proposer holds the bond
+        // Empty proposer's wallet
+        proposer.bond = 0;
+//        ProofLib.pay(challenger)
         // todo blacklist proposer
         // todo pay bond to original canonical challenger
         // todo reject this proposal
@@ -392,10 +363,10 @@ contract FaultAttributionManager is IFaultAttributionManager {
                         faultyChallenge.challengeAboveIndex;
                 }
             }
-            if (outputLastChallengeIndex[faultyChallenge.proposalIndex][faultyChallenge.outputOffset] == challengeIndex)
+            if (outputChallengeCount[faultyChallenge.proposalIndex][faultyChallenge.outputOffset] == challengeIndex)
             {
                 // Point the last challenge index to the challenge below this one
-                outputLastChallengeIndex[faultyChallenge.proposalIndex][faultyChallenge.outputOffset] =
+                outputChallengeCount[faultyChallenge.proposalIndex][faultyChallenge.outputOffset] =
                     faultyChallenge.challengeBelowIndex;
             }
             // move to challenger's previous move in the timeline
@@ -456,34 +427,34 @@ contract FaultAttributionManager is IFaultAttributionManager {
     // Utility methods
     // ------------------------------
 
-    modifier onlyBondedProposer() {
-        // Only proposers not on the blacklist may make new proposals
-        if (proposerBlacklisted[msg.sender]) {
+    modifier onlyBondedProposer(uint64 proposer) {
+        // only the proposer's account may proceed
+        if (msg.sender != proposers[proposer].account) {
             revert BadAuth();
         }
         // supplement proposer's collateral with transferred value
         if (msg.value > 0) {
-            proposerBonds[msg.sender] += msg.value;
+            proposers[proposer].bond += msg.value;
         }
         // ensure that the proposer has the collateral staked to make this move
-        if (proposerBonds[msg.sender] != PROPOSER_BOND) {
+        if (proposers[proposer].bond != PROPOSER_BOND) {
             revert IncorrectBondAmount();
         }
 
         _;
     }
 
-    modifier onlyBondedChallenger() {
+    modifier onlyBondedChallenger(uint64 challenger) {
         // INVARIANT: The challenger is not blacklisted
-        if (challengersBlacklisted[msg.sender]) {
+        if (msg.sender != challengers[challenger].account) {
             revert BadAuth();
         }
         // supplement challenger's collateral with transferred value
         if (msg.value > 0) {
-            challengerBonds[msg.sender] += msg.value;
+            challengers[challenger].bond += msg.value;
         }
         // INVARIANT: The challenger staked enough collateral
-        if (challengerBonds[msg.sender] != CHALLENGER_BOND) {
+        if (challengers[challenger].bond != CHALLENGER_BOND) {
             revert IncorrectBondAmount();
         }
 

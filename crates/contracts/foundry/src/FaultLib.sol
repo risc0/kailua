@@ -83,6 +83,32 @@ event Challenged(uint32 indexed outputIndex, address indexed challenger);
 event Proven(uint32 indexed outputIndex, ProofStatus indexed status);
 
 interface IFaultAttributionManager {
+    struct Proposer {
+        address account;
+        uint256 bond;
+        Proposal[] proposals;
+    }
+
+    struct Proposal {
+        IFaultAttributionGame gameContract;
+        uint64 challengeCount;
+    }
+
+    struct Challenger {
+        address account;
+        uint256 bond;
+        Challenge[] challenges;
+        mapping(uint64 => bool) challengedProposers;
+    }
+
+    struct Challenge {
+        uint64 proposerIndex;
+        uint64 proposalIndex;
+        uint64 outputOffset;
+        uint64[2] previousChallenge;
+        uint64[2] nextChallenge;
+    }
+
     struct ProposalData {
         address proposerAddress;
         IFaultAttributionGame gameContract;
@@ -99,7 +125,7 @@ interface IFaultAttributionManager {
         uint64 challengeAboveIndex;
     }
 
-    function gameAtIndex(uint64 index) external view returns (IFaultAttributionGame);
+    function gameAtProposerIndex(uint64 proposer, uint64 index) external view returns (IFaultAttributionGame);
 
     function propose(
         Claim claimedOutputRoot,
