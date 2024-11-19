@@ -24,6 +24,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     // Immutable configuration
     // ------------------------------
 
+    IKailuaTreasury internal immutable KAILUA_TREASURY;
+
     /// @notice The RISC Zero verifier contract
     IRiscZeroVerifier internal immutable RISC_ZERO_VERIFIER;
 
@@ -43,31 +45,36 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     IAnchorStateRegistry internal immutable ANCHOR_STATE_REGISTRY;
 
     /// @notice Returns the address of the RISC Zero verifier used by this contract
-    function verifier() external view returns (IRiscZeroVerifier verifier_) {
+    function verifier() public view returns (IRiscZeroVerifier verifier_) {
         verifier_ = RISC_ZERO_VERIFIER;
     }
 
     /// @notice Returns the RISC Zero Image ID of the FPVM program used by this contract
-    function imageId() external view returns (bytes32 imageId_) {
+    function imageId() public view returns (bytes32 imageId_) {
         imageId_ = FPVM_IMAGE_ID;
     }
 
     /// @notice Returns the hash of the configuration of this game
-    function configHash() external view returns (bytes32 configHash_) {
+    function configHash() public view returns (bytes32 configHash_) {
         configHash_ = GAME_CONFIG_HASH;
     }
 
     /// @notice Returns the number of blocks that must be covered by this game
-    function proposalBlockCount() external view returns (uint256 proposalBlockCount_) {
+    function proposalBlockCount() public view returns (uint256 proposalBlockCount_) {
         proposalBlockCount_ = PROPOSAL_BLOCK_COUNT;
     }
 
     /// @notice Returns the anchor state registry contract.
-    function anchorStateRegistry() external view returns (IAnchorStateRegistry registry_) {
+    function anchorStateRegistry() public view returns (IAnchorStateRegistry registry_) {
         registry_ = ANCHOR_STATE_REGISTRY;
     }
 
+    function disputeGameFactory() public view returns (IDisputeGameFactory factory_) {
+        factory_ = ANCHOR_STATE_REGISTRY.disputeGameFactory();
+    }
+
     constructor(
+        IKailuaTreasury _kailuaTreasury,
         IRiscZeroVerifier _verifierContract,
         bytes32 _imageId,
         bytes32 _configHash,
@@ -75,6 +82,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         GameType _gameType,
         IAnchorStateRegistry _anchorStateRegistry
     ) {
+        KAILUA_TREASURY = _kailuaTreasury;
         RISC_ZERO_VERIFIER = _verifierContract;
         FPVM_IMAGE_ID = _imageId;
         GAME_CONFIG_HASH = _configHash;
@@ -83,9 +91,23 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         ANCHOR_STATE_REGISTRY = _anchorStateRegistry;
     }
 
+    function initializeInternal() internal {
+        // INVARIANT: The game must not have already been initialized.
+        if (createdAt.raw() > 0) revert AlreadyInitialized();
+
+        // Set the game's starting timestamp
+        createdAt = Timestamp.wrap(uint64(block.timestamp));
+
+        // Set the game's index in the factory
+        gameIndex = disputeGameFactory().gameCount();
+    }
+
     // ------------------------------
     // Fault proving
     // ------------------------------
+
+    /// @notice The game's index in the factory
+    uint256 public gameIndex;
 
     /// @notice The address of the prover of a fight between children
     mapping(uint256 => mapping(uint256 => address)) public prover;
@@ -229,9 +251,9 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
     /// @notice Registers a new proposal that extends this one
     function appendChild() external {
-        IDisputeGameFactory disputeGameFactory = ANCHOR_STATE_REGISTRY.disputeGameFactory();
-        uint256 nonce = ANCHOR_STATE_REGISTRY.disputeGameFactory().gameCount();
-        address childAddress = address(bytes20(keccak256(abi.encodePacked(address(disputeGameFactory), nonce))));
+        IDisputeGameFactory _disputeGameFactory = disputeGameFactory();
+        uint256 nonce = _disputeGameFactory.gameCount();
+        address childAddress = address(bytes20(keccak256(abi.encodePacked(address(_disputeGameFactory), nonce))));
         // INVARIANT: The calling contract is a newly deployed contract by the dispute game factory
         if (msg.sender != childAddress) {
             revert BadAuth();
@@ -239,34 +261,80 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
         // Append new child to children list
         children.push(KailuaTournament(msg.sender));
-
-        // INVARIANT: Do not accept further proposals after the first child's timeout
-        if (children[0].getChallengerDuration().raw() == 0) {
-            revert ClockExpired();
-        }
-
         // todo: automatically request fault proof from boundless to resolve dispute
     }
 
     /// @notice Eliminates children until at least one remains
-    function pruneChildren() external view returns (KailuaTournament survivor) {
-        require(children.length > 0);
-        uint256 u = 0;
-        for (uint256 v = 1; v < children.length; v++) {
+    // todo: this needs to be refactored into a tape-style function that can be resumed in case gas is high
+    function pruneChildren() external returns (KailuaTournament survivor) {
+        // INVARIANT: Only finalized proposals may host tournaments
+        if (status != GameStatus.DEFENDER_WINS) {
+            revert GameNotResolved();
+        }
+
+        // INVARIANT: No tournament to play without at least one child
+        if (children.length == 0) {
+            revert NotProposed();
+        }
+
+        // Select the first possible survivor
+        uint256 u;
+        for (u = 0; u < children.length; u++) {
+            if (!isChildEliminated(children[u])) {
+                break;
+            }
+        }
+        // Eliminate other opponents
+        uint256 v;
+        for (v = u + 1; v < children.length; v++) {
+            KailuaTournament opponent = children[v];
+            // If the opponent is elimnated, skip
+            if (isChildEliminated(opponent)) {
+                continue;
+            }
+            KailuaTournament child = children[u];
+            // If the survivor hasn't been challenged for as long as the timeout, declare them winner
+            if (child.getChallengerDuration(opponent.createdAt().raw()).raw() == 0) {
+                break;
+            }
+            // Check if the result of playing this match is available
             ProofStatus proven = proofStatus[u][v];
+            // We must wait for more proofs if the result is unavailable
             require(proven != ProofStatus.NONE);
+            // Otherwise decide winner
             if (proven == ProofStatus.FAULT) {
-                // u was shown as faulty
+                // u was shown as faulty (beat by v)
+                // eliminate the player
+                KAILUA_TREASURY.eliminate(address(child), prover[u][v]);
+                // proceed with opponent as new player
                 u = v;
             } else {
                 // u survives
+                // eliminate the opponent
+                KAILUA_TREASURY.eliminate(address(opponent), prover[u][v]);
+                // proceed with the same player
             }
         }
+        // todo: Handle stragglers?
+        // Return the sole survivor
         survivor = children[u];
     }
 
-    /// @notice Returns the amount of time left for challenges.
-    function getChallengerDuration() public view virtual returns (Duration duration_);
+    function isChildEliminated(KailuaTournament child) internal returns (bool) {
+        address proposer = KAILUA_TREASURY.proposer(address(child));
+        uint256 eliminationRound = KAILUA_TREASURY.eliminationRound(proposer);
+        if (eliminationRound == 0 || eliminationRound > child.gameIndex()) {
+            // This proposer has not been eliminated as of their proposal at gameIndex
+            return false;
+        }
+        return true;
+    }
+
+    /// @notice Returns the amount of time left for challenges as of the input timestamp.
+    function getChallengerDuration(uint256 asOfTimestamp) public view virtual returns (Duration duration_);
+
+    /// @notice Returns the parent game contract.
+    function parentGame() public view virtual returns (KailuaTournament parentGame_);
 
     // ------------------------------
     // IDisputeGame implementation

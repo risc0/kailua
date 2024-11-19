@@ -19,6 +19,7 @@ import "./vendor/FlatOPImportV1.4.0.sol";
 import "./vendor/FlatR0ImportV1.0.0.sol";
 import "./KailuaLib.sol";
 import "./KailuaTournament.sol";
+import "./KailuaTreasury.sol";
 
 contract KailuaGame is KailuaTournament {
     /// @notice Semantic version.
@@ -45,31 +46,32 @@ contract KailuaGame is KailuaTournament {
     uint256 internal immutable PROPOSAL_BLOBS;
 
     /// @notice Returns the max clock duration.
-    function maxClockDuration() external view returns (Duration maxClockDuration_) {
+    function maxClockDuration() public view returns (Duration maxClockDuration_) {
         maxClockDuration_ = MAX_CLOCK_DURATION;
     }
 
     /// @notice Returns the timestamp of the genesis L2 block
-    function genesisTimeStamp() external view returns (uint256 genesisTimeStamp_) {
+    function genesisTimeStamp() public view returns (uint256 genesisTimeStamp_) {
         genesisTimeStamp_ = GENESIS_TIME_STAMP;
     }
 
     /// @notice Returns the inter-block time of the L2
-    function l2BlockTime() external view returns (uint256 l2BlockTime_) {
+    function l2BlockTime() public view returns (uint256 l2BlockTime_) {
         l2BlockTime_ = L2_BLOCK_TIME;
     }
 
     /// @notice Returns the required gap between the current l1 timestamp and the proposal's l2 timestamp
-    function proposalTimeGap() external view returns (uint256 proposalTimeGap_) {
+    function proposalTimeGap() public view returns (uint256 proposalTimeGap_) {
         proposalTimeGap_ = PROPOSAL_TIME_GAP;
     }
 
     /// @notice Returns the number of blobs containing intermediate blob data
-    function proposalBlobs() external view returns (uint256 proposalBlobs_) {
+    function proposalBlobs() public view returns (uint256 proposalBlobs_) {
         proposalBlobs_ = PROPOSAL_BLOBS;
     }
 
     constructor(
+        IKailuaTreasury _kailuaTreasury,
         IRiscZeroVerifier _verifierContract,
         bytes32 _imageId,
         bytes32 _configHash,
@@ -81,7 +83,15 @@ contract KailuaGame is KailuaTournament {
         uint256 _proposalTimeGap,
         Duration _maxClockDuration
     )
-        KailuaTournament(_verifierContract, _imageId, _configHash, _proposalBlockCount, _gameType, _anchorStateRegistry)
+        KailuaTournament(
+            _kailuaTreasury,
+            _verifierContract,
+            _imageId,
+            _configHash,
+            _proposalBlockCount,
+            _gameType,
+            _anchorStateRegistry
+        )
     {
         MAX_CLOCK_DURATION = _maxClockDuration;
         GENESIS_TIME_STAMP = _genesisTimeStamp;
@@ -98,13 +108,9 @@ contract KailuaGame is KailuaTournament {
     /// @notice The blob hashes used to create the game
     Hash[] public proposalBlobHashes;
 
-    /// @notice The bond paid to initiate the game
-    uint256 public bond;
-
     /// @inheritdoc IInitializable
-    function initialize() external payable {
-        // INVARIANT: The game must not have already been initialized.
-        if (createdAt.raw() > 0) revert AlreadyInitialized();
+    function initialize() external payable override {
+        super.initializeInternal();
 
         // Revert if the calldata size is not the expected length.
         //
@@ -159,8 +165,10 @@ contract KailuaGame is KailuaTournament {
             proposalBlobHashes.push(Hash.wrap(hash));
         }
 
-        // Record the bonded value
-        bond = msg.value;
+        // Allow only the treasury to create new games
+        if (gameCreator() != address(KAILUA_TREASURY)) {
+            revert BadAuth();
+        }
 
         // Register this new game in the parent game's contract
         parentGame().appendChild();
@@ -169,9 +177,6 @@ contract KailuaGame is KailuaTournament {
         if (block.timestamp <= GENESIS_TIME_STAMP + thisL2BlockNumber * L2_BLOCK_TIME + PROPOSAL_TIME_GAP) {
             revert ClockTimeExceeded();
         }
-
-        // Set the game's starting timestamp
-        createdAt = Timestamp.wrap(uint64(block.timestamp));
     }
 
     // ------------------------------
@@ -186,23 +191,20 @@ contract KailuaGame is KailuaTournament {
         }
 
         // INVARIANT: Optimistic resolution cannot occur unless parent game is resolved.
-        KailuaGame parentGame_ = parentGame();
+        KailuaTournament parentGame_ = parentGame();
         if (parentGame_.status() != GameStatus.DEFENDER_WINS) {
             revert OutOfOrderResolution();
         }
 
         // INVARIANT: Cannot resolve unless the clock has expired
-        if (getChallengerDuration().raw() > 0) {
+        if (getChallengerDuration(block.timestamp).raw() > 0) {
             revert ClockNotExpired();
         }
 
         // INVARIANT: Can only resolve the last remaining child
         if (parentGame_.pruneChildren() != this) {
-            revert AlreadyProven();
+            revert ProvenFaulty();
         }
-
-        // Refund the proposer
-        KailuaLib.pay(address(this).balance, gameCreator());
 
         // Mark resolution timestamp
         resolvedAt = Timestamp.wrap(uint64(block.timestamp));
@@ -228,8 +230,8 @@ contract KailuaGame is KailuaTournament {
         duplicationCounter_ = _getArgUint64(0x64);
     }
 
-    /// @notice The parent game contract.
-    function parentGame() public view returns (KailuaGame parentGame_) {
+    /// @inheritdoc KailuaTournament
+    function parentGame() public view override returns (KailuaTournament parentGame_) {
         (GameType parentGameType,, IDisputeGame parentDisputeGame) =
             ANCHOR_STATE_REGISTRY.disputeGameFactory().gameAtIndex(parentGameIndex());
 
@@ -237,7 +239,7 @@ contract KailuaGame is KailuaTournament {
         if (parentGameType.raw() != GAME_TYPE.raw()) revert GameTypeMismatch(parentGameType, GAME_TYPE);
 
         // Interpret parent game as another instance of this game type
-        parentGame_ = KailuaGame(address(parentDisputeGame));
+        parentGame_ = KailuaTournament(address(parentDisputeGame));
     }
 
     // ------------------------------
@@ -258,14 +260,14 @@ contract KailuaGame is KailuaTournament {
     }
 
     /// @inheritdoc KailuaTournament
-    function getChallengerDuration() public view override returns (Duration duration_) {
+    function getChallengerDuration(uint256 asOfTimestamp) public view override returns (Duration duration_) {
         // INVARIANT: The game must be in progress to query the remaining time to respond to a given claim.
         if (status != GameStatus.IN_PROGRESS) {
             revert GameNotInProgress();
         }
 
         // Compute the duration elapsed of the potential challenger's clock.
-        uint64 elapsed = uint64(block.timestamp - createdAt.raw());
+        uint64 elapsed = uint64(asOfTimestamp - createdAt.raw());
         uint64 maximum = MAX_CLOCK_DURATION.raw();
         duration_ = elapsed >= maximum ? Duration.wrap(0) : Duration.wrap(maximum - elapsed);
     }

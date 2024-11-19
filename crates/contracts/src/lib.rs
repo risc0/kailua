@@ -23,8 +23,8 @@ sol!(
 
 sol!(
     #[sol(rpc)]
-    KailuaSetup,
-    "foundry/out/KailuaSetup.sol/KailuaSetup.json"
+    KailuaTreasury,
+    "foundry/out/KailuaTreasury.sol/KailuaTreasury.json"
 );
 
 sol!(

@@ -28,6 +28,12 @@ enum ProofStatus {
     INTEGRITY
 }
 
+/// @notice Thrown when pruning children of an unresolved parent
+error GameNotResolved();
+
+/// @notice Thrown when eliminating an already removed child
+error AlreadyEliminated();
+
 // 0x2c06a364
 /// @notice Thrown when a proof is submitted for an already proven game
 error AlreadyProven();
@@ -49,11 +55,11 @@ error UnchallengedGame();
 error UnchallengedOutput();
 
 // 0xf1082a93
-/// @notice Thrown when a challenge is submitted against an already challenged game
-error AlreadyChallenged();
+/// @notice Thrown when resolving a faulty proposal
+error ProvenFaulty();
 
 // 0xf2a87d5e
-/// @notice Thrown when a challenge is submitted against an out of range output
+/// @notice Thrown when pruning is attempted with no children
 error NotProposed();
 
 // 0x1ebb374b
@@ -92,6 +98,21 @@ event Challenged(uint32 indexed outputIndex, address indexed challenger);
 /// @param outputIndex The index of the challenged output
 /// @param status The proven status of the output
 event Proven(uint32 indexed outputIndex, ProofStatus indexed status);
+
+/// @notice Emitted when the participation bond is updated
+/// @param amount The new required bond amount
+event BondUpdated(uint256 amount);
+
+interface IKailuaTreasury {
+    /// @notice Returns the game index at which proposer was proven faulty
+    function eliminationRound(address proposer) external returns (uint256);
+
+    /// @notice Returns the proposer of a game
+    function proposer(address game) external returns (address);
+
+    /// @notice Eliminates a child's proposer and transfers their bond to the prover
+    function eliminate(address child, address prover) external;
+}
 
 library KailuaLib {
     /// @notice The KZG commitment version
@@ -155,11 +176,5 @@ library KailuaLib {
             result <<= 1;
             result |= ((1 << i) & index) >> i;
         }
-    }
-
-    /// @notice Transfers ETH from the contract's balance to the recipient
-    function pay(uint256 amount, address recipient) internal {
-        (bool success,) = recipient.call{value: amount}(hex"");
-        if (!success) revert BondTransferFailed();
     }
 }
