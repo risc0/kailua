@@ -17,14 +17,10 @@ pragma solidity ^0.8.15;
 
 import "./vendor/FlatOPImportV1.4.0.sol";
 import "./vendor/FlatR0ImportV1.0.0.sol";
+import "./KailuaLib.sol";
+import "./KailuaTournament.sol";
 
-/// @notice Occurs when the anchored game is not finalized
-error InvalidAnchoredGame();
-
-/// @notice Occurs when the anchored game block number is different
-error BlockNumberMismatch(uint256 anchored, uint256 initialized);
-
-contract FaultProofSetup is Clone, IDisputeGame {
+contract KailuaSetup is KailuaTournament {
     /// @notice Semantic version.
     /// @custom:semver 0.1.0
     string public constant version = "0.1.0";
@@ -33,47 +29,35 @@ contract FaultProofSetup is Clone, IDisputeGame {
     // Immutable configuration
     // ------------------------------
 
-    /// @notice The game type ID
-    GameType internal immutable GAME_TYPE;
-
     /// @notice The anchored game type ID to clone
     GameType internal immutable ANCHORED_GAME_TYPE;
-
-    /// @notice The anchor state registry.
-    IAnchorStateRegistry internal immutable ANCHOR_STATE_REGISTRY;
-
-    /// @notice Returns the game type.
-    function gameType() external view returns (GameType gameType_) {
-        gameType_ = GAME_TYPE;
-    }
 
     /// @notice Returns the anchored game type.
     function anchoredGameType() external view returns (GameType anchoredGameType_) {
         anchoredGameType_ = ANCHORED_GAME_TYPE;
     }
 
-    /// @notice Returns the anchor state registry contract.
-    function anchorStateRegistry() external view returns (IAnchorStateRegistry registry_) {
-        registry_ = ANCHOR_STATE_REGISTRY;
-    }
-
-    constructor(GameType _gameType, GameType _anchoredGameType, IAnchorStateRegistry _anchorStateRegistry) {
+    constructor(
+        IRiscZeroVerifier _verifierContract,
+        bytes32 _imageId,
+        bytes32 _configHash,
+        uint256 _proposalBlockCount,
+        GameType _anchoredGameType,
+        GameType _gameType,
+        IAnchorStateRegistry _anchorStateRegistry
+    )
+        KailuaTournament(_verifierContract, _imageId, _configHash, _proposalBlockCount, _gameType, _anchorStateRegistry)
+    {
         GAME_TYPE = _gameType;
         ANCHORED_GAME_TYPE = _anchoredGameType;
         ANCHOR_STATE_REGISTRY = _anchorStateRegistry;
     }
 
-    /// @notice The starting timestamp of the game
-    Timestamp public createdAt;
+    // ------------------------------
+    // IInitializable implementation
+    // ------------------------------
 
-    /// @notice The timestamp of the game's global resolution.
-    Timestamp public resolvedAt;
-
-    /// @inheritdoc IDisputeGame
-    GameStatus public status;
-
-    /// @notice Initializes the contract
-    /// @dev This function may only be called once.
+    /// @inheritdoc IInitializable
     function initialize() external payable {
         // INVARIANT: The game must not have already been initialized.
         if (createdAt.raw() > 0) revert AlreadyInitialized();
@@ -102,11 +86,11 @@ contract FaultProofSetup is Clone, IDisputeGame {
         createdAt = Timestamp.wrap(uint64(block.timestamp));
     }
 
-    /// @notice If all necessary information has been gathered, this function should mark the game
-    ///         status as either `CHALLENGER_WINS` or `DEFENDER_WINS` and return the status of
-    ///         the resolved game.
-    /// @dev May only be called if the `status` is `IN_PROGRESS`.
-    /// @return status_ The status of the game after resolution.
+    // ------------------------------
+    // IDisputeGame implementation
+    // ------------------------------
+
+    /// @inheritdoc IDisputeGame
     function resolve() external returns (GameStatus status_) {
         // INVARIANT: Resolution cannot occur unless the game is currently in progress.
         if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
@@ -126,48 +110,21 @@ contract FaultProofSetup is Clone, IDisputeGame {
     }
 
     // ------------------------------
-    // Initialization data helpers
+    // Fault proving
     // ------------------------------
 
-    /// @inheritdoc IDisputeGame
-    function gameCreator() public pure returns (address creator_) {
-        creator_ = _getArgAddress(0x00);
+    /// @inheritdoc KailuaTournament
+    function verifyIntermediateOutput(
+        uint32 outputNumber,
+        bytes32 outputHash,
+        bytes calldata blobCommitment,
+        bytes calldata kzgProof
+    ) external override returns (bool success) {
+        success = false;
     }
 
-    /// @inheritdoc IDisputeGame
-    function rootClaim() public pure returns (Claim rootClaim_) {
-        rootClaim_ = Claim.wrap(_getArgBytes32(0x14));
-    }
-
-    /// @inheritdoc IDisputeGame
-    function l1Head() public pure returns (Hash l1Head_) {
-        l1Head_ = Hash.wrap(_getArgBytes32(0x34));
-    }
-
-    /// @notice The l2BlockNumber of the claim's output root.
-    function l2BlockNumber() public pure returns (uint256 l2BlockNumber_) {
-        l2BlockNumber_ = _getArgUint256(0x54);
-    }
-
-    /// @notice Getter for the extra data.
-    /// @dev `clones-with-immutable-args` argument #2
-    /// @return extraData_ Any extra data supplied to the dispute game contract by the creator.
-    function extraData() external pure returns (bytes memory extraData_) {
-        // The extra data starts at the second word within the cwia calldata and
-        // is 32 bytes long.
-        extraData_ = _getArgBytes(0x54, 0x20);
-    }
-
-    /// @notice A compliant implementation of this interface should return the components of the
-    ///         game UUID's preimage provided in the cwia payload. The preimage of the UUID is
-    ///         constructed as `keccak256(gameType . rootClaim . extraData)` where `.` denotes
-    ///         concatenation.
-    /// @return gameType_ The type of proof system being used.
-    /// @return rootClaim_ The root claim of the DisputeGame.
-    /// @return extraData_ Any extra data supplied to the dispute game contract by the creator.
-    function gameData() external view returns (GameType gameType_, Claim rootClaim_, bytes memory extraData_) {
-        gameType_ = this.gameType();
-        rootClaim_ = this.rootClaim();
-        extraData_ = this.extraData();
+    /// @inheritdoc KailuaTournament
+    function getChallengerDuration() public view override returns (Duration duration_) {
+        duration_ = Duration.wrap(0);
     }
 }

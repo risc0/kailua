@@ -72,6 +72,17 @@ error BlobHashMismatch(bytes32 found, bytes32 expected);
 /// @notice Thrown when a blob hash is missing
 error BlobHashMissing(uint256 index, uint256 count);
 
+/// @notice Occurs when the anchored game is not finalized
+error InvalidAnchoredGame();
+
+/// @notice Occurs when the duplication counter is wrong
+error InvalidDuplicationCounter();
+
+/// @notice Occurs when the anchored game block number is different
+/// @param anchored The L2 block number of the anchored game
+/// @param initialized This game's l2 block number
+error BlockNumberMismatch(uint256 anchored, uint256 initialized);
+
 /// @notice Emitted when an output is challenged.
 /// @param outputIndex The index of the challenged output
 /// @param challenger The address of the challenge issuer
@@ -82,7 +93,7 @@ event Challenged(uint32 indexed outputIndex, address indexed challenger);
 /// @param status The proven status of the output
 event Proven(uint32 indexed outputIndex, ProofStatus indexed status);
 
-library ProofLib {
+library KailuaLib {
     /// @notice The KZG commitment version
     bytes32 internal constant KZG_COMMITMENT_VERSION =
         bytes32(0x0100000000000000000000000000000000000000000000000000000000000000);

@@ -17,14 +17,20 @@ use alloy::sol;
 
 sol!(
     #[sol(rpc)]
-    FaultProofGame,
-    "foundry/out/FaultProofGame.sol/FaultProofGame.json"
+    KailuaGame,
+    "foundry/out/KailuaGame.sol/KailuaGame.json"
 );
 
 sol!(
     #[sol(rpc)]
-    FaultProofSetup,
-    "foundry/out/FaultProofSetup.sol/FaultProofSetup.json"
+    KailuaSetup,
+    "foundry/out/KailuaSetup.sol/KailuaSetup.json"
+);
+
+sol!(
+    #[sol(rpc)]
+    KailuaTournament,
+    "foundry/out/KailuaTournament.sol/KailuaTournament.json"
 );
 
 sol!(
