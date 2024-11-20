@@ -42,9 +42,6 @@ contract KailuaGame is KailuaTournament {
     /// @notice The minimum gap between the l1 and proposed l2 tip timestamps
     uint256 internal immutable PROPOSAL_TIME_GAP;
 
-    /// @notice The number of blobs a claim must provide
-    uint256 internal immutable PROPOSAL_BLOBS;
-
     /// @notice Returns the max clock duration.
     function maxClockDuration() public view returns (Duration maxClockDuration_) {
         maxClockDuration_ = MAX_CLOCK_DURATION;
@@ -63,11 +60,6 @@ contract KailuaGame is KailuaTournament {
     /// @notice Returns the required gap between the current l1 timestamp and the proposal's l2 timestamp
     function proposalTimeGap() public view returns (uint256 proposalTimeGap_) {
         proposalTimeGap_ = PROPOSAL_TIME_GAP;
-    }
-
-    /// @notice Returns the number of blobs containing intermediate blob data
-    function proposalBlobs() public view returns (uint256 proposalBlobs_) {
-        proposalBlobs_ = PROPOSAL_BLOBS;
     }
 
     constructor(
@@ -97,16 +89,11 @@ contract KailuaGame is KailuaTournament {
         GENESIS_TIME_STAMP = _genesisTimeStamp;
         L2_BLOCK_TIME = _l2BlockTime;
         PROPOSAL_TIME_GAP = _proposalTimeGap;
-        PROPOSAL_BLOBS = (_proposalBlockCount / (1 << KailuaLib.FIELD_ELEMENTS_PER_BLOB_PO2))
-            + ((_proposalBlockCount % (1 << KailuaLib.FIELD_ELEMENTS_PER_BLOB_PO2)) == 0 ? 0 : 1);
     }
 
     // ------------------------------
     // IInitializable implementation
     // ------------------------------
-
-    /// @notice The blob hashes used to create the game
-    Hash[] public proposalBlobHashes;
 
     /// @inheritdoc IInitializable
     function initialize() external payable override {

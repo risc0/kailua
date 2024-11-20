@@ -62,6 +62,9 @@ error ProvenFaulty();
 /// @notice Thrown when pruning is attempted with no children
 error NotProposed();
 
+/// @notice Thrown when proving is attempted with two agreeing outputs
+error NoConflict();
+
 // 0x1ebb374b
 /// @notice Thrown when a game is created with a parent instance from another game type
 error GameTypeMismatch(GameType parentType, GameType expectedType);

@@ -38,6 +38,9 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     /// @notice The number of blocks a claim must cover
     uint256 internal immutable PROPOSAL_BLOCK_COUNT;
 
+    /// @notice The number of blobs a claim must provide
+    uint256 internal immutable PROPOSAL_BLOBS;
+
     /// @notice The game type ID
     GameType internal immutable GAME_TYPE;
 
@@ -64,6 +67,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         proposalBlockCount_ = PROPOSAL_BLOCK_COUNT;
     }
 
+    /// @notice Returns the number of blobs containing intermediate blob data
+    function proposalBlobs() public view returns (uint256 proposalBlobs_) {
+        proposalBlobs_ = PROPOSAL_BLOBS;
+    }
+
     /// @notice Returns the anchor state registry contract.
     function anchorStateRegistry() public view returns (IAnchorStateRegistry registry_) {
         registry_ = ANCHOR_STATE_REGISTRY;
@@ -87,9 +95,14 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         FPVM_IMAGE_ID = _imageId;
         GAME_CONFIG_HASH = _configHash;
         PROPOSAL_BLOCK_COUNT = _proposalBlockCount;
+        PROPOSAL_BLOBS = (_proposalBlockCount / (1 << KailuaLib.FIELD_ELEMENTS_PER_BLOB_PO2))
+            + ((_proposalBlockCount % (1 << KailuaLib.FIELD_ELEMENTS_PER_BLOB_PO2)) == 0 ? 0 : 1);
         GAME_TYPE = _gameType;
         ANCHOR_STATE_REGISTRY = _anchorStateRegistry;
     }
+
+    /// @notice The blob hashes used to create the game
+    Hash[] public proposalBlobHashes;
 
     function initializeInternal() internal {
         // INVARIANT: The game must not have already been initialized.
@@ -159,7 +172,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
         // INVARIANT: Proofs can only argue on divergence points
         if (proposedOutput[0] == proposedOutput[1]) {
-            revert BadExtraData();
+            revert NoConflict();
         }
 
         // Validate the common output root.
@@ -296,6 +309,20 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             // If the survivor hasn't been challenged for as long as the timeout, declare them winner
             if (child.getChallengerDuration(opponent.createdAt().raw()).raw() == 0) {
                 break;
+            }
+            // If the opponent proposal is a duplicate, ignore it
+            if (child.rootClaim().raw() == opponent.rootClaim().raw()) {
+                uint256 common;
+                for (common = 0; common < PROPOSAL_BLOBS; common++) {
+                    if (child.proposalBlobHashes(common).raw() != opponent.proposalBlobHashes(common).raw()) {
+                        break;
+                    }
+                }
+                if (common == PROPOSAL_BLOBS) {
+                    // The opponent is an unjustified duplicate. Ignore it.
+                    // todo Close this straggler gracefully?
+                    continue;
+                }
             }
             // Check if the result of playing this match is available
             ProofStatus proven = proofStatus[u][v];
