@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::blob_provider::BlobProvider;
-use crate::{hash_to_fe, output_at_block, FAULT_PROOF_GAME_TYPE};
+use crate::{hash_to_fe, output_at_block, KAILUA_GAME_TYPE};
 use alloy::network::Network;
 use alloy::primitives::{Address, FixedBytes, U256};
 use alloy::providers::{Provider, ReqwestProvider};
@@ -140,7 +140,7 @@ impl ProposalDB {
                 .await
                 .context(format!("gameAtIndex {factory_index}/{game_count}"))?;
             // skip entries for other game types
-            if game_type != FAULT_PROOF_GAME_TYPE {
+            if game_type != KAILUA_GAME_TYPE {
                 continue;
             }
             info!("Processing proposal at factory index {factory_index}");

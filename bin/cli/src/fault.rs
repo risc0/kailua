@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::propose::ProposeArgs;
-use crate::{hash_to_fe, output_at_block, FAULT_PROOF_GAME_TYPE};
+use crate::{hash_to_fe, output_at_block, KAILUA_GAME_TYPE};
 use alloy::consensus::Blob;
 use alloy::network::EthereumWallet;
 use alloy::primitives::{Address, Bytes, B256, U256};
@@ -56,7 +56,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     );
     let kailua_game_implementation = kailua_contracts::KailuaGame::new(
         dispute_game_factory
-            .gameImpls(FAULT_PROOF_GAME_TYPE)
+            .gameImpls(KAILUA_GAME_TYPE)
             .call()
             .await?
             .impl_,
@@ -64,13 +64,13 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     );
     // load constants
     let max_proposal_span: u64 = kailua_game_implementation
-        .maxBlockCount()
+        .proposalBlockCount()
         .call()
         .await?
-        .maxBlockCount_
+        .proposalBlockCount_
         .to();
     let bond_value = dispute_game_factory
-        .initBonds(FAULT_PROOF_GAME_TYPE)
+        .initBonds(KAILUA_GAME_TYPE)
         .call()
         .await?
         .bond_;
@@ -78,7 +78,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let games_count = dispute_game_factory.gameCount().call().await?.gameCount_;
     let first_game_data = dispute_game_factory
         .findLatestGames(
-            FAULT_PROOF_GAME_TYPE,
+            KAILUA_GAME_TYPE,
             games_count - U256::from(1),
             games_count,
         )
@@ -144,7 +144,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     .concat();
     dispute_game_factory
         .create(
-            FAULT_PROOF_GAME_TYPE,
+            KAILUA_GAME_TYPE,
             proposed_output_root,
             Bytes::from(extra_data),
         )

@@ -47,6 +47,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     /// @notice The anchor state registry.
     IAnchorStateRegistry internal immutable ANCHOR_STATE_REGISTRY;
 
+    /// @notice Returns the address of the Kailua Treasury used by tournament instances
+    function treasury() public view returns (IKailuaTreasury treasury_) {
+        treasury_ = KAILUA_TREASURY;
+    }
+
     /// @notice Returns the address of the RISC Zero verifier used by this contract
     function verifier() public view returns (IRiscZeroVerifier verifier_) {
         verifier_ = RISC_ZERO_VERIFIER;
@@ -254,7 +259,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             uint64 claimBlockNumber = uint64(l2BlockNumber() + uvo[2]);
             bytes32 journalDigest = sha256(
                 abi.encodePacked(
-                // The parent proposal's claim hash
+                    // The parent proposal's claim hash
                     preconditionHash,
                     // The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
                     childContracts[1].l1Head().raw(),

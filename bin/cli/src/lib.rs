@@ -35,7 +35,7 @@ pub mod deploy;
 // pub mod propose;
 // pub mod validate;
 
-pub const FAULT_PROOF_GAME_TYPE: u32 = 1337;
+pub const KAILUA_GAME_TYPE: u32 = 1337;
 
 #[derive(clap::Parser, Debug, Clone)]
 #[command(name = "kailua-cli")]

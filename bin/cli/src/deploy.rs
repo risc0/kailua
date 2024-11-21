@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::FAULT_PROOF_GAME_TYPE;
+use crate::KAILUA_GAME_TYPE;
 use alloy::network::{EthereumWallet, TxSigner};
 use alloy::primitives::{Address, Bytes, Uint, U256};
 use alloy::providers::ProviderBuilder;
@@ -164,7 +164,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         rollup_config_hash.into(),
         Uint::from(64),
         fault_dispute_game_type,
-        FAULT_PROOF_GAME_TYPE,
+        KAILUA_GAME_TYPE,
         Address::from_str(&args.registry_contract)?,
     )
     .await
@@ -172,27 +172,44 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     info!("{:?}", &kailua_treasury_contract);
     // }
     // Update dispute factory implementation to KailuaTreasury
-    info!("Setting KailuaTreasury initialization bond value in DisputeGameFactory.");
-    let bond_value = U256::from(1);
+    info!("Setting KailuaTreasury initialization bond value in DisputeGameFactory to zero.");
     crate::exec_safe_txn(
-        dispute_game_factory.setInitBond(FAULT_PROOF_GAME_TYPE, bond_value),
+        dispute_game_factory.setInitBond(KAILUA_GAME_TYPE, U256::ZERO),
         &factory_owner_safe,
         owner_address,
     )
     .await
-    .context("setInitBond 1 wei")?;
+    .context("setInitBond 0 wei")?;
     assert_eq!(
         dispute_game_factory
-            .initBonds(FAULT_PROOF_GAME_TYPE)
+            .initBonds(KAILUA_GAME_TYPE)
             .call()
             .await?
             .bond_,
+        U256::ZERO
+    );
+    info!("Setting KailuaTreasury particpation bond value to 1 wei.");
+    let bond_value = U256::from(1);
+    crate::exec_safe_txn(
+        kailua_treasury_contract.setParticipationBond(bond_value),
+        &factory_owner_safe,
+        owner_address,
+    )
+    .await
+    .context("setParticipationBond 1 wei")?;
+    assert_eq!(
+        kailua_treasury_contract
+            .participationBond()
+            .call()
+            .await?
+            ._0,
         bond_value
     );
+
     info!("Setting KailuaTreasury implementation address in DisputeGameFactory.");
     crate::exec_safe_txn(
         dispute_game_factory
-            .setImplementation(FAULT_PROOF_GAME_TYPE, *kailua_treasury_contract.address()),
+            .setImplementation(KAILUA_GAME_TYPE, *kailua_treasury_contract.address()),
         &factory_owner_safe,
         owner_address,
     )
@@ -200,7 +217,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     .context("setImplementation KailuaTreasury")?;
     assert_eq!(
         dispute_game_factory
-            .gameImpls(FAULT_PROOF_GAME_TYPE)
+            .gameImpls(KAILUA_GAME_TYPE)
             .call()
             .await?
             .impl_,
@@ -215,7 +232,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     let extra_data = Bytes::from(fault_dispute_anchor._1.abi_encode_packed());
     // Skip setup if target anchor already exists
     let kailua_treasury_address = dispute_game_factory
-        .games(FAULT_PROOF_GAME_TYPE, root_claim, extra_data.clone())
+        .games(KAILUA_GAME_TYPE, root_claim, extra_data.clone())
         .call()
         .await
         .context("kailua_treasury_address")?
@@ -226,8 +243,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
             fault_dispute_anchor._1, fault_dispute_anchor._0
         );
         dispute_game_factory
-            .create(FAULT_PROOF_GAME_TYPE, root_claim, extra_data.clone())
-            .value(bond_value)
+            .create(KAILUA_GAME_TYPE, root_claim, extra_data.clone())
             .send()
             .await
             .context("create KailuaTreasury (send)")?
@@ -241,7 +257,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         );
     }
     let kailua_treasury_address = dispute_game_factory
-        .games(FAULT_PROOF_GAME_TYPE, root_claim, extra_data)
+        .games(KAILUA_GAME_TYPE, root_claim, extra_data)
         .call()
         .await
         .context("kailua_treasury_address")?
@@ -273,7 +289,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
         rollup_config_hash.into(),
         Uint::from(64),
-        FAULT_PROOF_GAME_TYPE,
+        KAILUA_GAME_TYPE,
         Address::from_str(&args.registry_contract)?,
         U256::from(config.genesis.l2_time),
         U256::from(config.block_time),
@@ -287,8 +303,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     // Update implementation to KailuaGame
     info!("Setting KailuaGame implementation address in DisputeGameFactory.");
     crate::exec_safe_txn(
-        dispute_game_factory
-            .setImplementation(FAULT_PROOF_GAME_TYPE, *kailua_game_contract.address()),
+        dispute_game_factory.setImplementation(KAILUA_GAME_TYPE, *kailua_game_contract.address()),
         &factory_owner_safe,
         owner_address,
     )
@@ -297,7 +312,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     // Update the respectedGameType as the guardian
     info!("Setting respectedGameType in OptimismPortal.");
     optimism_portal
-        .setRespectedGameType(FAULT_PROOF_GAME_TYPE)
+        .setRespectedGameType(KAILUA_GAME_TYPE)
         .send()
         .await
         .context("setImplementation KailuaGame")?

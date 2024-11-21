@@ -15,7 +15,7 @@
 use crate::blob_provider::BlobProvider;
 use crate::channel::DuplexChannel;
 use crate::proposal::{Proposal, ProposalDB};
-use crate::{blob_fe_proof, block_hash, hash_to_fe, output_at_block, FAULT_PROOF_GAME_TYPE};
+use crate::{blob_fe_proof, block_hash, hash_to_fe, output_at_block, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::kzg_to_versioned_hash;
 use alloy::network::{EthereumWallet, Network};
 use alloy::primitives::{Address, Bytes, FixedBytes, U256};
@@ -272,7 +272,7 @@ pub async fn handle_proposals(
     info!("There have been {game_count} games created using DisputeGameFactory");
     let kailua_game_implementation = KailuaGame::new(
         dispute_game_factory
-            .gameImpls(FAULT_PROOF_GAME_TYPE)
+            .gameImpls(KAILUA_GAME_TYPE)
             .call()
             .await?
             .impl_,
@@ -288,7 +288,7 @@ pub async fn handle_proposals(
     }
     // load constants
     let bond_value = dispute_game_factory
-        .initBonds(FAULT_PROOF_GAME_TYPE)
+        .initBonds(KAILUA_GAME_TYPE)
         .call()
         .await?
         .bond_;

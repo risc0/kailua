@@ -14,7 +14,7 @@
 
 use crate::blob_provider::BlobProvider;
 use crate::proposal::ProposalDB;
-use crate::{hash_to_fe, output_at_block, FAULT_PROOF_GAME_TYPE};
+use crate::{hash_to_fe, output_at_block, KAILUA_GAME_TYPE};
 use alloy::consensus::Blob;
 use alloy::network::{EthereumWallet, Network};
 use alloy::primitives::{Address, Bytes};
@@ -88,37 +88,38 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
     info!("There have been {game_count} games created using DisputeGameFactory");
     let kailua_game_implementation = kailua_contracts::KailuaGame::new(
         dispute_game_factory
-            .gameImpls(FAULT_PROOF_GAME_TYPE)
+            .gameImpls(KAILUA_GAME_TYPE)
             .call()
             .await?
             .impl_,
         &proposer_provider,
     );
-    info!(
-        "KailuaGame({:?})",
-        kailua_game_implementation.address()
-    );
+    info!("KailuaGame({:?})", kailua_game_implementation.address());
     if kailua_game_implementation.address().is_zero() {
         error!("Fault proof game is not installed!");
         exit(1);
     }
     // load constants
-    let max_proposal_span: u64 = kailua_game_implementation
-        .maxBlockCount()
+    let kailua_treasury = kailua_contracts::KailuaTreasury::new(
+        kailua_game_implementation
+            .treasury()
+            .call()
+            .await?
+            .treasury_,
+        &proposer_provider,
+    );
+    let proposal_block_count: u64 = kailua_game_implementation
+        .proposalBlockCount()
         .call()
         .await?
-        .maxBlockCount_
+        .proposalBlockCount_
         .to();
     let max_clock_duration = kailua_game_implementation
         .maxClockDuration()
         .call()
         .await?
         .maxClockDuration_;
-    let bond_value = dispute_game_factory
-        .initBonds(FAULT_PROOF_GAME_TYPE)
-        .call()
-        .await?
-        .bond_;
+    let bond_value = kailua_treasury.participationBond().call().await?._0;
     // Initialize empty state
     info!("Initializing..");
     let mut proposal_db = ProposalDB::default();
@@ -210,15 +211,15 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
                 canonical_tip.output_block_number - output_block_number
             );
             continue;
-        } else if output_block_number - canonical_tip.output_block_number < max_proposal_span {
+        } else if output_block_number - canonical_tip.output_block_number < proposal_block_count {
             info!(
                 "Waiting for safe l2 head to advance by {} more blocks before submitting proposal.",
-                max_proposal_span - (output_block_number - canonical_tip.output_block_number)
+                proposal_block_count - (output_block_number - canonical_tip.output_block_number)
             );
             continue;
         }
         // Prepare proposal
-        let proposed_block_number = canonical_tip.output_block_number + max_proposal_span;
+        let proposed_block_number = canonical_tip.output_block_number + proposal_block_count;
         let proposed_output_root =
             output_at_block(&op_node_provider, proposed_block_number).await?;
         // Prepare intermediate outputs
@@ -247,7 +248,7 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
         info!("Proposing output {proposed_output_root} at {proposed_block_number}.");
         dispute_game_factory
             .create(
-                FAULT_PROOF_GAME_TYPE,
+                KAILUA_GAME_TYPE,
                 proposed_output_root,
                 Bytes::from(extra_data),
             )
