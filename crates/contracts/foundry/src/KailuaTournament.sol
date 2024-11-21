@@ -134,11 +134,6 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     /// @notice The proposals extending this proposal
     KailuaTournament[] public children;
 
-    /// @notice The l2BlockNumber of the claim's output root.
-    function l2BlockNumber() public pure returns (uint256 l2BlockNumber_) {
-        l2BlockNumber_ = _getArgUint64(0x54);
-    }
-
     function verifyIntermediateOutput(
         uint32 outputNumber,
         bytes32 outputHash,
@@ -423,12 +418,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         l1Head_ = Hash.wrap(_getArgBytes32(0x34));
     }
 
-    /// @inheritdoc IDisputeGame
-    function extraData() external pure returns (bytes memory extraData_) {
-        // The extra data starts at the second word within the cwia calldata and
-        // is 48 bytes long.
-        extraData_ = _getArgBytes(0x54, 0x0F);
-    }
+    /// @notice The l2BlockNumber of the claim's output root.
+    function l2BlockNumber() public pure virtual returns (uint256 l2BlockNumber_);
 
     /// @inheritdoc IDisputeGame
     function gameData() external view returns (GameType gameType_, Claim rootClaim_, bytes memory extraData_) {

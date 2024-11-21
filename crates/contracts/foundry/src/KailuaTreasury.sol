@@ -70,26 +70,6 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         super.initializeInternal();
 
         proposer[address(this)] = address(this);
-
-        if ((rootClaim().raw() != bytes32(0)) || (l2BlockNumber() != 0)) {
-            // Validate the cloned anchor state
-            IDisputeGameFactory disputeGameFactory = ANCHOR_STATE_REGISTRY.disputeGameFactory();
-
-            (IDisputeGame proxyAddress,) = disputeGameFactory.games(ANCHORED_GAME_TYPE, rootClaim(), this.extraData());
-
-            IFaultDisputeGame anchoredGame = IFaultDisputeGame(address(proxyAddress));
-
-            // Validate that the game is resolved correctly
-            if (anchoredGame.status() != GameStatus.DEFENDER_WINS) revert InvalidAnchoredGame();
-
-            // Revert if different proposal root
-            if (anchoredGame.rootClaim().raw() != rootClaim().raw()) revert UnexpectedRootClaim(rootClaim());
-
-            // Revert if different proposal root block number
-            if (anchoredGame.l2BlockNumber() != l2BlockNumber()) {
-                revert BlockNumberMismatch(anchoredGame.l2BlockNumber(), l2BlockNumber());
-            }
-        }
     }
 
     // ------------------------------
@@ -97,13 +77,18 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     // ------------------------------
 
     /// @inheritdoc IDisputeGame
+    function extraData() external pure returns (bytes memory extraData_) {
+        // The extra data starts at the second word within the cwia calldata and
+        // is 32 bytes long.
+        extraData_ = _getArgBytes(0x54, 0x20);
+    }
+
+    /// @inheritdoc IDisputeGame
     function resolve() external returns (GameStatus status_) {
         // INVARIANT: Resolution cannot occur unless the game is currently in progress.
-        if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
-
-        // INVARIANT: Only the factory owner can resolve the setup game
-        //        IDisputeGameFactory disputeGameFactory = ANCHOR_STATE_REGISTRY.disputeGameFactory();
-        //        if (msg.sender != disputeGameFactory.owner())
+        if (status != GameStatus.IN_PROGRESS) {
+            revert GameNotInProgress();
+        }
 
         // Update the status and emit the resolved event, note that we're performing a storage update here.
         emit Resolved(status = status_ = GameStatus.DEFENDER_WINS);
@@ -113,6 +98,15 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
 
         // Try to update the anchor state, this should not revert.
         ANCHOR_STATE_REGISTRY.tryUpdateAnchorState();
+    }
+
+    // ------------------------------
+    // Immutable instance data
+    // ------------------------------
+
+    /// @inheritdoc KailuaTournament
+    function l2BlockNumber() public pure override returns (uint256 l2BlockNumber_) {
+        l2BlockNumber_ = _getArgUint256(0x54);
     }
 
     // ------------------------------

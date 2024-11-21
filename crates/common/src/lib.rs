@@ -259,7 +259,7 @@ where
     // Check equivalence until divergence point
     for i in 0..FIELD_ELEMENTS_PER_BLOB {
         let index = 32 * i as usize;
-        if &blobs[0][index..index + 32] != &blobs[1][index..index + 32] {
+        if blobs[0][index..index + 32] != blobs[1][index..index + 32] {
             if i == 0 {
                 bail!("Precondition validation failed at first element");
             } else if &blobs[0][index - 32..index] != boot.agreed_l2_output_root.as_slice() {

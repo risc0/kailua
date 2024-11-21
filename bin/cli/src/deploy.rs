@@ -79,7 +79,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     let portal_guardian_address = optimism_portal.guardian().call().await?._0;
     if portal_guardian_address != guardian_address {
         error!(
-            "OptimismPortal Guardian is {portal_guardian_address} instead of {guardian_address}."
+            "OptimismPortal Guardian is {portal_guardian_address}. Provided private key has account address {guardian_address}."
         );
         exit(3);
     }
@@ -137,27 +137,42 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
 
     info!("Fetching rollup configuration from L2 nodes.");
     // fetch rollup config
-    let config = fetch_rollup_config(&args.op_node_address, &args.l2_node_address, None).await?;
+    let config = fetch_rollup_config(&args.op_node_address, &args.l2_node_address, None)
+        .await
+        .context("fetch_rollup_config")?;
     let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
     info!("RollupConfigHash({})", hex::encode(rollup_config_hash));
     debug!("config {:?}", &config);
 
-    // Deploy FaultProofSetup contract
+    // Deploy MockVerifier contract
     // {
-    info!("Deploying FaultProofSetup contract to L1 rpc.");
+    info!("Deploying RiscZeroMockVerifier contract to L1 rpc.");
+    let mock_verifier_contract =
+        kailua_contracts::RiscZeroMockVerifier::deploy(&deployer_provider, [0u8; 4].into())
+            .await
+            .context("RiscZeroMockVerifier contract deployment error")?;
+    info!("{:?}", &mock_verifier_contract);
+
+    // Deploy KailuaTreasury contract
+    // {
+    info!("Deploying KailuaTreasury contract to L1 rpc.");
     let fault_dispute_game_type = 254;
-    let fault_proof_setup_contract = kailua_contracts::FaultProofSetup::deploy(
+    let kailua_treasury_contract = kailua_contracts::KailuaTreasury::deploy(
         &deployer_provider,
-        FAULT_PROOF_GAME_TYPE,
+        *mock_verifier_contract.address(),
+        bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
+        rollup_config_hash.into(),
+        Uint::from(64),
         fault_dispute_game_type,
+        FAULT_PROOF_GAME_TYPE,
         Address::from_str(&args.registry_contract)?,
     )
     .await
-    .context("FaultProofSetup contract deployment error")?;
-    info!("{:?}", &fault_proof_setup_contract);
+    .context("KailuaTreasury contract deployment error")?;
+    info!("{:?}", &kailua_treasury_contract);
     // }
-    // Update dispute factory implementation to FaultProofSetup
-    info!("Setting FaultProofSetup initialization bond value in DisputeGameFactory.");
+    // Update dispute factory implementation to KailuaTreasury
+    info!("Setting KailuaTreasury initialization bond value in DisputeGameFactory.");
     let bond_value = U256::from(1);
     crate::exec_safe_txn(
         dispute_game_factory.setInitBond(FAULT_PROOF_GAME_TYPE, bond_value),
@@ -174,24 +189,24 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
             .bond_,
         bond_value
     );
-    info!("Setting FaultProofSetup implementation address in DisputeGameFactory.");
+    info!("Setting KailuaTreasury implementation address in DisputeGameFactory.");
     crate::exec_safe_txn(
         dispute_game_factory
-            .setImplementation(FAULT_PROOF_GAME_TYPE, *fault_proof_setup_contract.address()),
+            .setImplementation(FAULT_PROOF_GAME_TYPE, *kailua_treasury_contract.address()),
         &factory_owner_safe,
         owner_address,
     )
     .await
-    .context("setImplementation FaultProofSetup")?;
+    .context("setImplementation KailuaTreasury")?;
     assert_eq!(
         dispute_game_factory
             .gameImpls(FAULT_PROOF_GAME_TYPE)
             .call()
             .await?
             .impl_,
-        *fault_proof_setup_contract.address()
+        *kailua_treasury_contract.address()
     );
-    // Create new setup game
+    // Create new treasury
     let fault_dispute_anchor = anchor_state_registry
         .anchors(fault_dispute_game_type)
         .call()
@@ -199,15 +214,15 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     let root_claim = fault_dispute_anchor._0;
     let extra_data = Bytes::from(fault_dispute_anchor._1.abi_encode_packed());
     // Skip setup if target anchor already exists
-    let fault_proof_setup_address = dispute_game_factory
+    let kailua_treasury_address = dispute_game_factory
         .games(FAULT_PROOF_GAME_TYPE, root_claim, extra_data.clone())
         .call()
         .await
-        .context("fault_proof_setup_address")?
+        .context("kailua_treasury_address")?
         .proxy_;
-    if fault_proof_setup_address.is_zero() {
+    if kailua_treasury_address.is_zero() {
         info!(
-            "Creating new FaultProofSetup game instance from {} ({}).",
+            "Creating new KailuaTreasury game instance from {} ({}).",
             fault_dispute_anchor._1, fault_dispute_anchor._0
         );
         dispute_game_factory
@@ -215,83 +230,79 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
             .value(bond_value)
             .send()
             .await
-            .context("create FaultProofSetup (send)")?
+            .context("create KailuaTreasury (send)")?
             .get_receipt()
             .await
-            .context("create FaultProofSetup (get_receipt)")?;
+            .context("create KailuaTreasury (get_receipt)")?;
     } else {
         info!(
             "Already found a game instance for anchor {} ({}).",
             fault_dispute_anchor._1, fault_dispute_anchor._0
         );
     }
-    let fault_proof_setup_address = dispute_game_factory
+    let kailua_treasury_address = dispute_game_factory
         .games(FAULT_PROOF_GAME_TYPE, root_claim, extra_data)
         .call()
         .await
-        .context("fault_proof_setup_address")?
+        .context("kailua_treasury_address")?
         .proxy_;
-    let fault_proof_setup =
-        kailua_contracts::FaultProofSetup::new(fault_proof_setup_address, &owner_provider);
-    let status = fault_proof_setup.status().call().await?._0;
+    let kailua_treasury =
+        kailua_contracts::KailuaTreasury::new(kailua_treasury_address, &owner_provider);
+    let status = kailua_treasury.status().call().await?._0;
     if status == 0 {
-        info!("Resolving FaultProofSetup instance");
-        fault_proof_setup
+        info!("Resolving KailuaTreasury instance");
+        kailua_treasury
             .resolve()
             .send()
             .await
-            .context("FaultProofSetup::resolve (send)")?
+            .context("KailuaTreasury::resolve (send)")?
             .get_receipt()
             .await
-            .context("FaultProofSetup::resolve (get_receipt)")?;
+            .context("KailuaTreasury::resolve (get_receipt)")?;
     } else {
         info!("Game instance is not ongoing ({status})");
     }
-    // Deploy MockVerifier contract
-    // {
-    info!("Deploying RiscZeroMockVerifier contract to L1 rpc.");
-    let mock_verifier_contract =
-        kailua_contracts::RiscZeroMockVerifier::deploy(&deployer_provider, [0u8; 4].into())
-            .await
-            .context("RiscZeroMockVerifier contract deployment error")?;
-    info!("{:?}", &mock_verifier_contract);
     // }
-    // Deploy FaultProofGame contract
+    // Deploy KailuaGame contract
     // {
-    info!("Deploying FaultProofGame contract to L1 rpc.");
-    let fault_proof_game_contract = kailua_contracts::FaultProofGame::deploy(
+    info!("Deploying KailuaGame contract to L1 rpc.");
+    let kailua_game_contract = kailua_contracts::KailuaGame::deploy(
         &deployer_provider,
+        kailua_treasury_address,
         *mock_verifier_contract.address(),
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
         rollup_config_hash.into(),
         Uint::from(64),
-        300,
         FAULT_PROOF_GAME_TYPE,
         Address::from_str(&args.registry_contract)?,
+        U256::from(config.genesis.l2_time),
+        U256::from(config.block_time),
+        U256::from(24),
+        300,
     )
     .await
-    .context("FaultProofGame contract deployment error")?;
-    info!("{:?}", &fault_proof_game_contract);
+    .context("KailuaGame contract deployment error")?;
+    info!("{:?}", &kailua_game_contract);
     // }
-    // Update implementation to FaultProofGame
-    info!("Setting FaultProofGame implementation address in DisputeGameFactory.");
+    // Update implementation to KailuaGame
+    info!("Setting KailuaGame implementation address in DisputeGameFactory.");
     crate::exec_safe_txn(
         dispute_game_factory
-            .setImplementation(FAULT_PROOF_GAME_TYPE, *fault_proof_game_contract.address()),
+            .setImplementation(FAULT_PROOF_GAME_TYPE, *kailua_game_contract.address()),
         &factory_owner_safe,
         owner_address,
     )
     .await
-    .context("setImplementation FaultProofGame")?;
+    .context("setImplementation KailuaGame")?;
     // Update the respectedGameType as the guardian
     info!("Setting respectedGameType in OptimismPortal.");
     optimism_portal
         .setRespectedGameType(FAULT_PROOF_GAME_TYPE)
         .send()
         .await
-        .context("setImplementation FaultProofGame")?
+        .context("setImplementation KailuaGame")?
         .get_receipt()
         .await?;
-    info!("FraudProofGame installed.");
+    info!("KailuaGame installed.");
     Ok(())
 }

@@ -15,7 +15,7 @@ Notably, the current version of Kailua does not yet have all features implemente
 
 ## Fraud/Validity Proofs
 
-Kailua enables rollup operators to add a new `FaultProofGame` contract, compatible with Bedrock contracts `v1.4.0` and above, using the `DisputeGameFactory` rollup instance to their deployment that relies on RISC-Zero zkVM proofs to finalize/dismiss output proposals.
+Kailua enables rollup operators to add a new fault proof contract, compatible with Bedrock contracts `v1.4.0` and above, using the `DisputeGameFactory` rollup instance to their deployment that relies on RISC-Zero zkVM proofs to finalize/dismiss output proposals.
 
 `FaultProofGame` optimistically allows outputs to be accepted after a timeout if no fraud proof is published against it, or if the output is challenged, waits for a proof to be submitted to decide whether to dismiss or finalize the output.
 
@@ -34,16 +34,16 @@ Kailua enables rollup operators to add a new `FaultProofGame` contract, compatib
    * Starts a local OP Stack devnet using docker.
    * Dumps the output into `devnetlog.txt` for inspection.
 4. `just devnet-upgrade`
-   * Upgrades the devnet to use the `FaultProofGame` contract.
+   * Upgrades the devnet to use the `KailuaGame` contract.
    * Assumes the default values of the local optimism devnet, but can take parameters.
 5. `just devnet-propose`
    * Launches the kailua proposer.
-   * This constantly creates new `FaultProofGame` instances to finalize the l2 on the l1.
+   * This constantly creates new `KailuaGame` instances to finalize the l2 on the l1.
 6. `just devnet-validate`
    * Launches the kailua validator.
-   * This challenges `FaultProofGame` instances that contain invalid proposals
+   * This challenges `KailuaGame` instances that contain invalid proposals
 7. `just devnet-fault`
-   * Deploys a single `FaultProofGame` instance with a faulty proposal.
+   * Deploys a single `KailuaGame` instance with a faulty proposal.
    * Tests the validator's fault proving functionality.
    * Tests the proposer's canonical chain decision functionality.
 8. After you're done:

@@ -86,7 +86,7 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
         .gameCount_
         .to();
     info!("There have been {game_count} games created using DisputeGameFactory");
-    let fault_proof_game_implementation = kailua_contracts::FaultProofGame::new(
+    let kailua_game_implementation = kailua_contracts::KailuaGame::new(
         dispute_game_factory
             .gameImpls(FAULT_PROOF_GAME_TYPE)
             .call()
@@ -95,21 +95,21 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
         &proposer_provider,
     );
     info!(
-        "FaultProofGame({:?})",
-        fault_proof_game_implementation.address()
+        "KailuaGame({:?})",
+        kailua_game_implementation.address()
     );
-    if fault_proof_game_implementation.address().is_zero() {
+    if kailua_game_implementation.address().is_zero() {
         error!("Fault proof game is not installed!");
         exit(1);
     }
     // load constants
-    let max_proposal_span: u64 = fault_proof_game_implementation
+    let max_proposal_span: u64 = kailua_game_implementation
         .maxBlockCount()
         .call()
         .await?
         .maxBlockCount_
         .to();
-    let max_clock_duration = fault_proof_game_implementation
+    let max_clock_duration = kailua_game_implementation
         .maxClockDuration()
         .call()
         .await?
@@ -255,22 +255,22 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             .sidecar(sidecar)
             .send()
             .await
-            .context("create FaultProofGame (send)")?
+            .context("create KailuaGame (send)")?
             .get_receipt()
             .await
-            .context("create FaultProofGame (get_receipt)")?;
+            .context("create KailuaGame (get_receipt)")?;
     }
 }
 
 pub async fn resolve_game<T: Transport + Clone, P: Provider<T, N>, N: Network>(
-    game: kailua_contracts::FaultProofGame::FaultProofGameInstance<T, P, N>,
+    game: kailua_contracts::KailuaGame::KailuaGameInstance<T, P, N>,
 ) -> anyhow::Result<N::ReceiptResponse> {
     info!("Resolving game.");
     game.resolve()
         .send()
         .await
-        .context("FaultProofSetup::resolve (send)")?
+        .context("KailuaTreasury::resolve (send)")?
         .get_receipt()
         .await
-        .context("FaultProofSetup::resolve (get_receipt)")
+        .context("KailuaTreasury::resolve (get_receipt)")
 }

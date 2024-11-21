@@ -22,7 +22,7 @@ use alloy_rpc_types_beacon::sidecar::BlobData;
 use anyhow::{bail, Context};
 use kailua_common::intermediate_outputs;
 use kailua_contracts::IDisputeGameFactory::{gameAtIndexReturn, IDisputeGameFactoryInstance};
-use kailua_contracts::{FaultProofGame, FaultProofGame::FaultProofGameInstance};
+use kailua_contracts::{KailuaGame, KailuaGame::KailuaGameInstance};
 use std::collections::{HashMap, HashSet};
 use tracing::{error, info, warn};
 
@@ -101,8 +101,8 @@ impl Proposal {
     pub fn game_contract<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         &self,
         l1_node_provider: P,
-    ) -> FaultProofGameInstance<T, P, N> {
-        FaultProofGame::new(self.game_address, l1_node_provider)
+    ) -> KailuaGameInstance<T, P, N> {
+        KailuaGame::new(self.game_address, l1_node_provider)
     }
 }
 
@@ -145,7 +145,7 @@ impl ProposalDB {
             }
             info!("Processing proposal at factory index {factory_index}");
             // Retrieve basic data
-            let game_contract = FaultProofGame::new(game_address, dispute_game_factory.provider());
+            let game_contract = KailuaGame::new(game_address, dispute_game_factory.provider());
             let output_root = game_contract
                 .rootClaim()
                 .call()
@@ -172,8 +172,8 @@ impl ProposalDB {
             // Retrieve game/setup data
             let (parent_local_index, blob, unresolved_challenges) = match extra_data.len() {
                 0x30 => {
-                    // FaultProofGame instance
-                    info!("Retrieving basic FaultProofGame proposal data");
+                    // KailuaGame instance
+                    info!("Retrieving basic KailuaGame proposal data");
                     // check if game was resolved
                     if game_contract.resolvedAt().call().await.context("resolvedAt")?._0 > 0 {
                         resolved.insert(0);
@@ -210,8 +210,8 @@ impl ProposalDB {
                     (*parent_local_index, Some(blob), unresolved_challenges)
                 }
                 0x20 => {
-                    // FaultProofSetup instance
-                    info!("Retrieving basic FaultProofSetup proposal data");
+                    // KailuaTreasury instance
+                    info!("Retrieving basic KailuaTreasury proposal data");
                     (local_index, None, 0u32)
                 }
                 len => bail!("Unexpected extra-data length {len} from game {game_address} at factory index {factory_index}")
@@ -226,7 +226,7 @@ impl ProposalDB {
             // todo: preform validations based on l1_head
             info!("Deciding proposal validity.");
             let local_output_root = output_at_block(op_node_provider, output_block_number).await?;
-            // Parent must be correct if FaultProofGame and the local output must match the proposed output
+            // Parent must be correct if KailuaGame and the local output must match the proposed output
             let is_correct_parent = parent.map(|p| p.is_correct()).unwrap_or(true);
             info!("Parent correctness: {is_correct_parent}");
             let game_correctness = is_correct_parent && local_output_root == output_root;
@@ -234,7 +234,7 @@ impl ProposalDB {
             // initialize correctness vector with game value at position 0
             let mut correct = vec![game_correctness];
             if let Some(parent) = parent {
-                // Calculate intermediate correctness values for FaultProofGame
+                // Calculate intermediate correctness values for KailuaGame
                 let blob_data = blob.as_ref().expect("Missing blob data.");
                 let starting_output_number = parent.output_block_number + 1;
                 let num_intermediate = (output_block_number - starting_output_number) as usize;

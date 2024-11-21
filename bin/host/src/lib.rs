@@ -33,7 +33,7 @@ use std::env::set_var;
 use std::path::PathBuf;
 use tempfile::TempDir;
 use tokio::fs;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use zeth_core::driver::CoreDriver;
 use zeth_core::mpt::{MptNode, MptNodeData};
 use zeth_core::stateless::data::StatelessClientData;
@@ -120,42 +120,16 @@ pub async fn fetch_rollup_config(
         .client()
         .request_noparams("optimism_rollupConfig")
         .await?;
+
+    debug!("Rollup config: {:?}", rollup_config);
+
     let chain_config: Value = l2_node_provider
         .client()
         .request_noparams("debug_chainConfig")
         .await?;
 
-    // genesis
-    rollup_config["genesis"]["L1"] = rollup_config["genesis"]
-        .as_object_mut()
-        .unwrap()
-        .remove("l1")
-        .unwrap();
-    rollup_config["genesis"]["L1"]["Hash"] = rollup_config["genesis"]["L1"]
-        .as_object_mut()
-        .unwrap()
-        .remove("hash")
-        .unwrap();
-    rollup_config["genesis"]["L1"]["Number"] = rollup_config["genesis"]["L1"]
-        .as_object_mut()
-        .unwrap()
-        .remove("number")
-        .unwrap();
-    rollup_config["genesis"]["L2"] = rollup_config["genesis"]
-        .as_object_mut()
-        .unwrap()
-        .remove("l2")
-        .unwrap();
-    rollup_config["genesis"]["L2"]["Hash"] = rollup_config["genesis"]["L2"]
-        .as_object_mut()
-        .unwrap()
-        .remove("hash")
-        .unwrap();
-    rollup_config["genesis"]["L2"]["Number"] = rollup_config["genesis"]["L2"]
-        .as_object_mut()
-        .unwrap()
-        .remove("number")
-        .unwrap();
+    debug!("ChainConfig: {:?}", chain_config);
+
     // base_fee_params
     rollup_config["base_fee_params"] = json!({
         "elasticity_multiplier": chain_config["optimism"]["eip1559Elasticity"]

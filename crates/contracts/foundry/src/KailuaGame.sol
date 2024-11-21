@@ -171,6 +171,13 @@ contract KailuaGame is KailuaTournament {
     // ------------------------------
 
     /// @inheritdoc IDisputeGame
+    function extraData() external pure returns (bytes memory extraData_) {
+        // The extra data starts at the second word within the cwia calldata and
+        // is 24 bytes long.
+        extraData_ = _getArgBytes(0x54, 0x18);
+    }
+
+    /// @inheritdoc IDisputeGame
     function resolve() external returns (GameStatus status_) {
         // INVARIANT: Resolution cannot occur unless the game is currently in progress.
         if (status != GameStatus.IN_PROGRESS) {
@@ -206,6 +213,11 @@ contract KailuaGame is KailuaTournament {
     // ------------------------------
     // Immutable instance data
     // ------------------------------
+
+    /// @inheritdoc KailuaTournament
+    function l2BlockNumber() public pure override returns (uint256 l2BlockNumber_) {
+        l2BlockNumber_ = uint256(_getArgUint64(0x54));
+    }
 
     /// @notice The index of the parent game in the `DisputeGameFactory`.
     function parentGameIndex() public pure returns (uint64 parentGameIndex_) {

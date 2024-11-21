@@ -21,7 +21,7 @@ use alloy::providers::ProviderBuilder;
 use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
 use anyhow::Context;
-use kailua_contracts::FaultProofGame::FaultProofGameInstance;
+use kailua_contracts::KailuaGame::KailuaGameInstance;
 use kailua_contracts::{IAnchorStateRegistry, IDisputeGameFactory};
 use std::str::FromStr;
 use tracing::info;
@@ -54,7 +54,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         anchor_state_registry.disputeGameFactory().call().await?._0,
         &tester_provider,
     );
-    let fault_proof_game_implementation = kailua_contracts::FaultProofGame::new(
+    let kailua_game_implementation = kailua_contracts::KailuaGame::new(
         dispute_game_factory
             .gameImpls(FAULT_PROOF_GAME_TYPE)
             .call()
@@ -63,7 +63,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         &tester_provider,
     );
     // load constants
-    let max_proposal_span: u64 = fault_proof_game_implementation
+    let max_proposal_span: u64 = kailua_game_implementation
         .maxBlockCount()
         .call()
         .await?
@@ -92,7 +92,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .call()
         .await?
         .proxy_;
-    let first_game_contract = FaultProofGameInstance::new(first_game_address, &tester_provider);
+    let first_game_contract = KailuaGameInstance::new(first_game_address, &tester_provider);
     let anchor_block_number: u64 = first_game_contract
         .l2BlockNumber()
         .call()
@@ -152,10 +152,10 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .sidecar(sidecar)
         .send()
         .await
-        .context("create FaultProofGame (send)")?
+        .context("create KailuaGame (send)")?
         .get_receipt()
         .await
-        .context("create FaultProofGame (get_receipt)")?;
+        .context("create KailuaGame (get_receipt)")?;
     info!(
         "Submitted faulty proposal at index {games_count} with parent at index {first_game_index}."
     );

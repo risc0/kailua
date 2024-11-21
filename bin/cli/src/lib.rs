@@ -19,21 +19,21 @@ use alloy::providers::{Provider, ReqwestProvider};
 use alloy::transports::Transport;
 use anyhow::{bail, Context};
 use std::ops::{Div, Sub};
-// use kailua_contracts::FaultProofGame::FaultProofGameInstance;
+// use kailua_contracts::KailuaGame::KailuaGameInstance;
 use alloy::consensus::{Blob, BlobTransactionSidecar};
 use alloy::eips::eip4844::{BLS_MODULUS, FIELD_ELEMENTS_PER_BLOB};
 use kailua_contracts::Safe::SafeInstance;
 use std::str::FromStr;
 use tracing::debug;
 
-pub mod bench;
+// pub mod bench;
 pub mod blob_provider;
 pub mod channel;
 pub mod deploy;
-pub mod fault;
-pub mod proposal;
-pub mod propose;
-pub mod validate;
+// pub mod fault;
+// pub mod proposal;
+// pub mod propose;
+// pub mod validate;
 
 pub const FAULT_PROOF_GAME_TYPE: u32 = 1337;
 
@@ -43,20 +43,20 @@ pub const FAULT_PROOF_GAME_TYPE: u32 = 1337;
 #[command(author, version, about, long_about = None)]
 pub enum Cli {
     Deploy(deploy::DeployArgs),
-    Propose(propose::ProposeArgs),
-    Validate(validate::ValidateArgs),
-    TestFault(fault::FaultArgs),
-    Benchmark(bench::BenchArgs),
+    // Propose(propose::ProposeArgs),
+    // Validate(validate::ValidateArgs),
+    // TestFault(fault::FaultArgs),
+    // Benchmark(bench::BenchArgs),
 }
 
 impl Cli {
     pub fn verbosity(&self) -> u8 {
         match self {
             Cli::Deploy(args) => args.v,
-            Cli::Propose(args) => args.v,
-            Cli::Validate(args) => args.v,
-            Cli::TestFault(args) => args.propose_args.v,
-            Cli::Benchmark(args) => args.v,
+            // Cli::Propose(args) => args.v,
+            // Cli::Validate(args) => args.v,
+            // Cli::TestFault(args) => args.propose_args.v,
+            // Cli::Benchmark(args) => args.v,
         }
     }
 }
@@ -200,7 +200,7 @@ pub fn blob_fe_proof(
 }
 
 // pub async fn derive_expected_journal<T: Transport + Clone, P: Provider<T, N>, N: Network>(
-//     game_contract: &FaultProofGameInstance<T, P, N>,
+//     game_contract: &KailuaGameInstance<T, P, N>,
 //     output_number: u32,
 //     safe_output: B256,
 //     proposed_output: B256,
@@ -209,7 +209,7 @@ pub fn blob_fe_proof(
 //     let l1_head = game_contract.l1Head().call().await?.l1Head_.0;
 //     let parent_contract_address = game_contract.parentGame().call().await?.parentGame_;
 //     let parent_contract =
-//         FaultProofGameInstance::new(parent_contract_address, game_contract.provider());
+//         KailuaGameInstance::new(parent_contract_address, game_contract.provider());
 //     let l2_output_root = parent_contract.rootClaim().call().await?.rootClaim_.0;
 //     let l2_claim = game_contract.rootClaim().call().await?.rootClaim_.0;
 //     let l2_claim_block = game_contract

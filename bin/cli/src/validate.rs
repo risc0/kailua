@@ -25,7 +25,7 @@ use alloy::transports::Transport;
 use anyhow::{anyhow, bail, Context};
 use kailua_client::fpvm_proof_file_name;
 use kailua_common::{intermediate_outputs, ProofJournal};
-use kailua_contracts::{FaultProofGame, IAnchorStateRegistry, IDisputeGameFactory};
+use kailua_contracts::{KailuaGame, IAnchorStateRegistry, IDisputeGameFactory};
 use kailua_host::fetch_rollup_config;
 use risc0_zkvm::Receipt;
 use std::collections::{HashMap, HashSet};
@@ -270,7 +270,7 @@ pub async fn handle_proposals(
         .gameCount_
         .to();
     info!("There have been {game_count} games created using DisputeGameFactory");
-    let fault_proof_game_implementation = FaultProofGame::new(
+    let kailua_game_implementation = KailuaGame::new(
         dispute_game_factory
             .gameImpls(FAULT_PROOF_GAME_TYPE)
             .call()
@@ -279,10 +279,10 @@ pub async fn handle_proposals(
         &validator_provider,
     );
     info!(
-        "FaultProofGame({:?})",
-        fault_proof_game_implementation.address()
+        "KailuaGame({:?})",
+        kailua_game_implementation.address()
     );
-    if fault_proof_game_implementation.address().is_zero() {
+    if kailua_game_implementation.address().is_zero() {
         error!("Fault proof game is not installed!");
         exit(1);
     }
