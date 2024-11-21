@@ -13,13 +13,13 @@
 // limitations under the License.
 
 use alloy_primitives::B256;
-use kailua_common::client::run_client;
 use kailua_common::ProofJournal;
 use kona_client::BootInfo;
 use risc0_zkvm::guest::env;
 use std::sync::Arc;
 
 fn main() {
+    let precondition_validation_data_hash = env::read();
     let oracle = Arc::new(kailua_common::oracle::RISCZERO_POSIX_ORACLE);
     let boot = Arc::new(kona_common::block_on(async {
         BootInfo::load(oracle.as_ref())
@@ -35,7 +35,8 @@ fn main() {
     //     fallback: l2_oracle_provider,
     // };
     // Attempt to recompute the output hash at the target block number using kona
-    let real_output_hash = run_client(
+    let (precondition_hash, real_output_hash) = kailua_common::client::run_client(
+        precondition_validation_data_hash,
         oracle.clone(),
         boot.clone(),
         kailua_common::blobs::RISCZERO_POSIX_BLOB_PROVIDER,
@@ -51,5 +52,5 @@ fn main() {
         assert_eq!(boot.claimed_l2_output_root, B256::ZERO);
     }
     // Write the proof journal
-    env::commit_slice(&ProofJournal::from(boot.as_ref()).encode_packed());
+    env::commit_slice(&ProofJournal::new(precondition_hash, boot.as_ref()).encode_packed());
 }

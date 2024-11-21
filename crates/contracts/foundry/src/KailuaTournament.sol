@@ -175,6 +175,34 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             revert NoConflict();
         }
 
+        bytes32 preconditionHash = bytes32(0x0);
+        // INVARIANT: Published data is equivalent until divergent blob
+        if (uvo[2] > 0) {
+            // Find the divergent blob index
+            uint256 divergentBlobIndex = KailuaLib.blobIndex(uvo[2]);
+            if (uvo[2] == PROPOSAL_BLOCK_COUNT) {
+                // If the only difference is the root claim, require all blobs to be equal.
+                divergentBlobIndex += 1;
+            }
+            // Ensure blob hashes are equal until divergence
+            for (uint256 i = 0; i < divergentBlobIndex; i++) {
+                if (childContracts[0].proposalBlobHashes(i).raw() != childContracts[1].proposalBlobHashes(i).raw()) {
+                    revert BlobHashMismatch(
+                        childContracts[0].proposalBlobHashes(i).raw(), childContracts[1].proposalBlobHashes(i).raw()
+                    );
+                }
+            }
+            // Update required precondition hash from proof if not at a boundary
+            if (KailuaLib.blobPosition(uvo[2]) != 0 && uvo[2] < PROPOSAL_BLOCK_COUNT) {
+                preconditionHash = sha256(
+                    abi.encodePacked(
+                        childContracts[0].proposalBlobHashes(divergentBlobIndex).raw(),
+                        childContracts[1].proposalBlobHashes(divergentBlobIndex).raw()
+                    )
+                );
+            }
+        }
+
         // Validate the common output root.
         if (uvo[2] == 0) {
             // The safe output is the parent game's output when proving the first output
@@ -226,34 +254,33 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         // fault => u was shown as faulty
         // bool isFaultProof = proposedOutput[0] != computedOutput;
 
-        // Construct the expected journal
-        uint64 claimBlockNumber = uint64(l2BlockNumber() + uvo[2]);
-        bytes32 journalDigest = sha256(
-            abi.encodePacked(
+        {
+            // Construct the expected journal
+            uint64 claimBlockNumber = uint64(l2BlockNumber() + uvo[2]);
+            bytes32 journalDigest = sha256(
+                abi.encodePacked(
                 // The parent proposal's claim hash
-                rootClaim().raw(),
-                // The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
-                childContracts[1].l1Head().raw(),
-                // The latest finalized L2 output root.
-                acceptedOutput,
-                // The L2 output root claim.
-                computedOutput,
-                // The L2 claim block number.
-                claimBlockNumber,
-                // The configuration hash for this game
-                GAME_CONFIG_HASH
-            )
-        );
+                    preconditionHash,
+                    // The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
+                    childContracts[1].l1Head().raw(),
+                    // The latest finalized L2 output root.
+                    acceptedOutput,
+                    // The L2 output root claim.
+                    computedOutput,
+                    // The L2 claim block number.
+                    claimBlockNumber,
+                    // The configuration hash for this game
+                    GAME_CONFIG_HASH
+                )
+            );
 
-        // reverts on failure
-        RISC_ZERO_VERIFIER.verify(encodedSeal, FPVM_IMAGE_ID, journalDigest);
+            // reverts on failure
+            RISC_ZERO_VERIFIER.verify(encodedSeal, FPVM_IMAGE_ID, journalDigest);
+        }
 
         // Update proof status
-        emit Proven(
-            uvo[2],
-            proofStatus[uvo[0]][uvo[1]] =
-                proposedOutput[0] != computedOutput ? ProofStatus.FAULT : ProofStatus.INTEGRITY
-        );
+        proofStatus[uvo[0]][uvo[1]] = proposedOutput[0] != computedOutput ? ProofStatus.FAULT : ProofStatus.INTEGRITY;
+        emit Proven(uvo[2], proofStatus[uvo[0]][uvo[1]]);
 
         // Set the game's prover address
         prover[uvo[0]][uvo[1]] = msg.sender;

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::validate_precondition;
 use alloy_primitives::B256;
 use kona_client::executor::KonaExecutorConstructor;
 use kona_client::l1::{OracleL1ChainProvider, OraclePipeline};
@@ -29,11 +30,15 @@ pub fn run_client<
     B: BlobProvider + Send + Sync + Debug + Clone,
     // T: TrieProvider + TrieHinter + Send + Sync + Debug + Clone + 'static,
 >(
+    precondition_validation_data_hash: B256,
     oracle: Arc<O>,
     boot: Arc<BootInfo>,
-    beacon: B,
+    mut beacon: B,
     // execution_provider: T, // todo: skip oracle using provider
-) -> anyhow::Result<Option<B256>> {
+) -> anyhow::Result<(B256, Option<B256>)>
+where
+    <B as BlobProvider>::Error: Debug,
+{
     kona_common::block_on(async move {
         ////////////////////////////////////////////////////////////////
         //                          PROLOGUE                          //
@@ -42,6 +47,18 @@ pub fn run_client<
 
         let l1_provider = OracleL1ChainProvider::new(boot.clone(), oracle.clone());
         let l2_provider = OracleL2ChainProvider::new(boot.clone(), oracle.clone());
+
+        ////////////////////////////////////////////////////////////////
+        //                        PRECONDITION                        //
+        ////////////////////////////////////////////////////////////////
+        log("PRECONDITION");
+        let precondition_hash = validate_precondition(
+            precondition_validation_data_hash,
+            oracle.clone(),
+            boot.clone(),
+            &mut beacon,
+        )
+        .await?;
 
         ////////////////////////////////////////////////////////////////
         //                   DERIVATION & EXECUTION                   //
@@ -88,9 +105,9 @@ pub fn run_client<
             boot.claimed_l2_block_number
         ));
         if output_number < boot.claimed_l2_block_number {
-            Ok(None)
+            Ok((precondition_hash, None))
         } else {
-            Ok(Some(output_root))
+            Ok((precondition_hash, Some(output_root)))
         }
     })
 }

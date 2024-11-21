@@ -12,33 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use kailua_client::fpvm_proof_file_name;
+use clap::Parser;
+use kailua_client::{fpvm_proof_file_name, KailuaClientCli};
 use kailua_common::ProofJournal;
-use std::env::var;
-use std::str::FromStr;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tracing::info;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    if let Ok(Ok(verbosity_level)) = var("KAILUA_VERBOSITY").map(|s| u8::from_str(&s)) {
-        kona_host::init_tracing_subscriber(verbosity_level)?;
-    }
+    let cfg = KailuaClientCli::parse();
+    kona_host::init_tracing_subscriber(cfg.kailua_verbosity)?;
+    let precondition_validation_data_hash =
+        cfg.precondition_validation_data_hash.unwrap_or_default();
+
+    // if let Ok(Ok(verbosity_level)) = var("KAILUA_VERBOSITY").map(|s| u8::from_str(&s)) {
+    //     kona_host::init_tracing_subscriber(verbosity_level)?;
+    // }
     // preload all data natively
     info!("Running native client.");
-    kailua_client::run_native_client()
+    kailua_client::run_native_client(precondition_validation_data_hash)
         .await
         .expect("Failed to run native client.");
     // compute the receipt in the zkvm
     info!("Running zk client.");
-    let prove_info = kailua_client::prove_zkvm_client()
+    let prove_info = kailua_client::prove_zkvm_client(precondition_validation_data_hash)
         .await
         .expect("Failed to run zk client.");
     // Prepare receipt file
     let proof_journal = ProofJournal::decode_packed(prove_info.receipt.journal.as_ref())
         .expect("Failed to decode receipt output");
     let mut output_file = File::create(fpvm_proof_file_name(
+        proof_journal.precondition_output,
         proof_journal.l1_head,
         proof_journal.claimed_l2_output_root,
         proof_journal.claimed_l2_block_number,

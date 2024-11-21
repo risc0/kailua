@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use alloy_primitives::B256;
 use anyhow::Context;
 use clap::Parser;
 use kailua_client::fpvm_proof_file_name;
-use kailua_host::{generate_rollup_config, zeth_execution_preflight, KailuaHostCli};
+use kailua_host::{
+    fetch_precondition_data, generate_rollup_config, zeth_execution_preflight, KailuaHostCli,
+};
 use kona_host::{init_tracing_subscriber, start_server_and_native_client};
 use std::env::set_var;
 use std::path::Path;
@@ -29,7 +32,15 @@ async fn main() -> anyhow::Result<()> {
     set_var("KAILUA_VERBOSITY", cfg.kona.v.to_string());
 
     // compute receipt if uncached
+    let precondition_hash = match fetch_precondition_data(&cfg).await? {
+        Some(data) => {
+            set_var("PRECONDITION_VALIDATION_DATA_HASH", data.hash().to_string());
+            data.precondition_hash()
+        }
+        None => B256::ZERO,
+    };
     let file_name = fpvm_proof_file_name(
+        precondition_hash,
         cfg.kona.l1_head,
         cfg.kona.claimed_l2_output_root,
         cfg.kona.claimed_l2_block_number,
@@ -47,6 +58,7 @@ async fn main() -> anyhow::Result<()> {
         if !cfg.skip_zeth_preflight {
             zeth_execution_preflight(&cfg, rollup_config).await?;
         }
+
         // generate a proof using the kailua client and kona server
         start_server_and_native_client(cfg.kona.clone())
             .await

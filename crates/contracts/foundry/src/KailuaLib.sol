@@ -143,6 +143,10 @@ library KailuaLib {
         index = element / (1 << FIELD_ELEMENTS_PER_BLOB_PO2);
     }
 
+    function blobPosition(uint256 element) internal pure returns (uint256 position) {
+        position = element % (1 << FIELD_ELEMENTS_PER_BLOB_PO2);
+    }
+
     function versionedKZGHash(bytes calldata blobCommitment) internal pure returns (bytes32 hash) {
         require(blobCommitment.length == 48);
         hash = ((sha256(blobCommitment) << 8) >> 8) | KZG_COMMITMENT_VERSION;

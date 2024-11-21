@@ -19,13 +19,16 @@ use crate::oracle::{HINT_WRITER, ORACLE_READER};
 use crate::oracle_posix::{POSIXBlobProvider, POSIXHintWriterClient};
 use alloy_primitives::{keccak256, B256};
 use anyhow::Context;
+use clap::Parser;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use kona_client::l1::OracleBlobProvider;
 use kona_client::{BootInfo, CachingOracle};
 use oracle_posix::{POSIXCallbackHandle, POSIXPreimageOracleClient};
 use risc0_zkvm::{default_prover, ExecutorEnv, ProveInfo, ProverOpts};
+use serde::Serialize;
 use std::collections::VecDeque;
 use std::io::BufReader;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::join;
 use tokio::task::spawn_blocking;
@@ -34,7 +37,21 @@ use tracing::info;
 /// The size of the LRU cache in the oracle.
 pub const ORACLE_LRU_SIZE: usize = 1024;
 
-pub async fn run_native_client() -> anyhow::Result<()> {
+/// The client binary CLI application arguments.
+#[derive(Parser, Serialize, Clone, Debug)]
+pub struct KailuaClientCli {
+    #[arg(long, action = clap::ArgAction::Count, env)]
+    pub kailua_verbosity: u8,
+
+    #[clap(long, value_parser = parse_b256, env)]
+    pub precondition_validation_data_hash: Option<B256>,
+}
+
+pub fn parse_b256(s: &str) -> Result<B256, String> {
+    B256::from_str(s).map_err(|_| format!("Invalid B256 value: {}", s))
+}
+
+pub async fn run_native_client(precondition_validation_data_hash: B256) -> anyhow::Result<B256> {
     info!("Preamble");
     let oracle = Arc::new(CachingOracle::new(
         ORACLE_LRU_SIZE,
@@ -49,7 +66,12 @@ pub async fn run_native_client() -> anyhow::Result<()> {
     );
     let beacon = OracleBlobProvider::new(oracle.clone());
     // let l2_provider = OracleL2ChainProvider::new(boot.clone(), oracle.clone());
-    let real_output_hash = kailua_common::client::run_client(oracle, boot.clone(), beacon)?; //, l2_provider)
+    let (precondition_hash, real_output_hash) = kailua_common::client::run_client(
+        precondition_validation_data_hash,
+        oracle,
+        boot.clone(),
+        beacon,
+    )?; //, l2_provider)
     if let Some(computed_output) = real_output_hash {
         // With sufficient data, the input l2_claim must be true
         assert_eq!(boot.claimed_l2_output_root, computed_output);
@@ -57,11 +79,11 @@ pub async fn run_native_client() -> anyhow::Result<()> {
         // We use the zero claim hash to denote that the data as of l1 head is insufficient
         assert_eq!(boot.claimed_l2_output_root, B256::ZERO);
     }
-    Ok(())
+    Ok(precondition_hash)
 }
 
-pub async fn prove_zkvm_client() -> anyhow::Result<ProveInfo> {
-    let client_task = spawn_blocking(|| {
+pub async fn prove_zkvm_client(precondition_output: B256) -> anyhow::Result<ProveInfo> {
+    let client_task = spawn_blocking(move || {
         // Kona preimage oracle
         let oracle = Arc::new(CachingOracle::new(
             ORACLE_LRU_SIZE,
@@ -99,6 +121,8 @@ pub async fn prove_zkvm_client() -> anyhow::Result<ProveInfo> {
             // Handle blob reads via posix
             .read_fd(104, provider_posix_reader)
             .write_fd(105, provider_posix)
+            // Pass in precondition
+            .write(&precondition_output)?
             .build()?;
         let prover = default_prover();
         let prove_info = prover.prove_with_opts(env, KAILUA_FPVM_ELF, &ProverOpts::groth16())?;
@@ -117,6 +141,7 @@ pub async fn prove_zkvm_client() -> anyhow::Result<ProveInfo> {
 }
 
 pub fn fpvm_proof_file_name(
+    precondition_output: B256,
     l1_head: B256,
     claimed_l2_output_root: B256,
     claimed_l2_block_number: u64,
@@ -131,6 +156,7 @@ pub fn fpvm_proof_file_name(
     let claimed_l2_block_number = claimed_l2_block_number.to_be_bytes();
     let data = [
         bytemuck::cast::<_, [u8; 32]>(KAILUA_FPVM_ID).as_slice(),
+        precondition_output.as_slice(),
         l1_head.as_slice(),
         claimed_l2_output_root.as_slice(),
         claimed_l2_block_number.as_slice(),

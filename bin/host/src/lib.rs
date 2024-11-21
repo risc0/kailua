@@ -12,19 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use alloy::consensus::Transaction;
+use alloy::network::primitives::BlockTransactionsKind;
 use alloy::primitives::{keccak256, B256};
-use alloy::providers::{Provider, ProviderBuilder};
+use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy_chains::NamedChain;
+use anyhow::bail;
 use clap::Parser;
+use kailua_client::parse_b256;
+use kailua_common::oracle::BlobFetchRequest;
+use kailua_common::precondition::PreconditionValidationData;
+use kona_derive::prelude::IndexedBlobHash;
 use kona_host::kv::SharedKeyValueStore;
 use kona_preimage::{PreimageKey, PreimageKeyType};
 use op_alloy_genesis::RollupConfig;
+use op_alloy_protocol::BlockInfo;
 use serde::Serialize;
 use serde_json::{json, Value};
+use std::env::set_var;
 use std::path::PathBuf;
 use tempfile::TempDir;
 use tokio::fs;
-use tracing::info;
+use tracing::{info, warn};
 use zeth_core::driver::CoreDriver;
 use zeth_core::mpt::{MptNode, MptNodeData};
 use zeth_core::stateless::data::StatelessClientData;
@@ -39,16 +48,28 @@ pub struct KailuaHostCli {
     pub kona: kona_host::HostCli,
 
     /// Address of OP-NODE endpoint to use
-    #[clap(long)]
+    #[clap(long, env)]
     pub op_node_address: Option<String>,
 
-    #[clap(long, default_value_t = 1)]
+    #[clap(long, default_value_t = 1, env)]
     /// Number of blocks to build in a single proof
     pub block_count: u64,
 
     /// Address of OP-NODE endpoint to use
-    #[clap(long, default_value_t = false)]
+    #[clap(long, default_value_t = false, env)]
     pub skip_zeth_preflight: bool,
+
+    #[clap(long, value_parser = parse_b256, env)]
+    pub u_block_hash: Option<B256>,
+
+    #[clap(long, value_parser = parse_b256, env)]
+    pub u_blob_kzg_hash: Option<B256>,
+
+    #[clap(long, value_parser = parse_b256, env)]
+    pub v_block_hash: Option<B256>,
+
+    #[clap(long, value_parser = parse_b256, env)]
+    pub v_blob_kzg_hash: Option<B256>,
 }
 
 pub async fn generate_rollup_config(
@@ -272,4 +293,87 @@ pub async fn zeth_execution_preflight(
         }
     }
     Ok(())
+}
+
+pub async fn get_blob_fetch_request(
+    l1_provider: &ReqwestProvider,
+    block_hash: B256,
+    blob_hash: B256,
+) -> anyhow::Result<BlobFetchRequest> {
+    let block = l1_provider
+        .get_block_by_hash(block_hash, BlockTransactionsKind::Full)
+        .await?
+        .expect("Failed to fetch block {block_hash}.");
+    let mut blob_index = 0usize;
+    for txn in block.transactions.into_transactions() {
+        if let Some(blobs) = txn.blob_versioned_hashes() {
+            for blob in blobs {
+                if blob == &blob_hash {
+                    break;
+                }
+                blob_index += 1;
+            }
+        }
+    }
+
+    Ok(BlobFetchRequest {
+        block_ref: BlockInfo {
+            hash: block.header.hash,
+            number: block.header.number,
+            parent_hash: block.header.parent_hash,
+            timestamp: block.header.timestamp,
+        },
+        blob_hash: IndexedBlobHash {
+            index: blob_index,
+            hash: blob_hash,
+        },
+    })
+}
+
+pub async fn fetch_precondition_data(
+    cfg: &KailuaHostCli,
+) -> anyhow::Result<Option<PreconditionValidationData>> {
+    // Determine precondition hash
+    let hash_arguments = [
+        cfg.u_block_hash,
+        cfg.u_blob_kzg_hash,
+        cfg.v_block_hash,
+        cfg.v_blob_kzg_hash,
+    ];
+
+    // fetch necessary data to validate blob equivalence precondition
+    if hash_arguments.iter().all(|arg| arg.is_some()) {
+        let (l1_provider, _, _) = cfg.kona.create_providers().await?;
+        // todo fetch & write data
+        let precondition_validation_data = PreconditionValidationData {
+            validated_blobs: [
+                get_blob_fetch_request(
+                    &l1_provider,
+                    cfg.u_block_hash.unwrap(),
+                    cfg.u_blob_kzg_hash.unwrap(),
+                )
+                .await?,
+                get_blob_fetch_request(
+                    &l1_provider,
+                    cfg.v_block_hash.unwrap(),
+                    cfg.v_blob_kzg_hash.unwrap(),
+                )
+                .await?,
+            ],
+        };
+        let kv_store = cfg.kona.construct_kv_store();
+        let mut store = kv_store.write().await;
+        let hash = precondition_validation_data.hash();
+        store.set(
+            PreimageKey::new(*hash, PreimageKeyType::Sha256).into(),
+            precondition_validation_data.to_vec(),
+        )?;
+        set_var("PRECONDITION_VALIDATION_DATA_HASH", hash.to_string());
+        Ok(Some(precondition_validation_data))
+    } else if hash_arguments.iter().any(|arg| arg.is_some()) {
+        bail!("Insufficient number of arguments provided for precondition hash.")
+    } else {
+        warn!("Proving without a precondition hash.");
+        Ok(None)
+    }
 }

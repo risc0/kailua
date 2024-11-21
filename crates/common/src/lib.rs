@@ -12,21 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::precondition::PreconditionValidationData;
+use alloy_eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy_primitives::{Address, B256};
 use alloy_rpc_types_beacon::sidecar::BlobData;
-use anyhow::Context;
-use kona_client::BootInfo;
+use anyhow::{bail, Context};
+use core::fmt::Debug;
+use kona_client::errors::OracleProviderError;
+use kona_client::{BootInfo, FlushableCache};
+use kona_derive::prelude::BlobProvider;
+use kona_preimage::{CommsClient, PreimageKey, PreimageKeyType};
 use op_alloy_genesis::RollupConfig;
+use risc0_zkvm::serde::from_slice;
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 pub mod blobs;
 pub mod client;
 pub mod oracle;
+pub mod precondition;
 pub mod provider;
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub struct ProofJournal {
+    /// The last finalized L2 output
+    pub precondition_output: B256,
     /// The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
     pub l1_head: B256,
     /// The latest finalized L2 output root.
@@ -39,14 +50,15 @@ pub struct ProofJournal {
     pub config_hash: [u8; 32],
 }
 
-impl From<&BootInfo> for ProofJournal {
-    fn from(value: &BootInfo) -> Self {
+impl ProofJournal {
+    pub fn new(precondition_output: B256, boot_info: &BootInfo) -> Self {
         Self {
-            l1_head: value.l1_head,
-            agreed_l2_output_root: value.agreed_l2_output_root,
-            claimed_l2_output_root: value.claimed_l2_output_root,
-            claimed_l2_block_number: value.claimed_l2_block_number,
-            config_hash: config_hash(&value.rollup_config).unwrap(),
+            precondition_output,
+            l1_head: boot_info.l1_head,
+            agreed_l2_output_root: boot_info.agreed_l2_output_root,
+            claimed_l2_output_root: boot_info.claimed_l2_output_root,
+            claimed_l2_block_number: boot_info.claimed_l2_block_number,
+            config_hash: config_hash(&boot_info.rollup_config).unwrap(),
         }
     }
 }
@@ -54,6 +66,7 @@ impl From<&BootInfo> for ProofJournal {
 impl ProofJournal {
     pub fn encode_packed(&self) -> Vec<u8> {
         [
+            self.precondition_output.as_slice(),
             self.l1_head.as_slice(),
             self.agreed_l2_output_root.as_slice(),
             self.claimed_l2_output_root.as_slice(),
@@ -65,16 +78,17 @@ impl ProofJournal {
 
     pub fn decode_packed(encoded: &[u8]) -> Result<Self, anyhow::Error> {
         Ok(ProofJournal {
-            l1_head: encoded[..32].try_into()?,
-            agreed_l2_output_root: encoded[32..64].try_into()?,
-            claimed_l2_output_root: encoded[64..96].try_into()?,
-            claimed_l2_block_number: u64::from_be_bytes(encoded[96..104].try_into()?),
-            config_hash: encoded[104..136].try_into()?,
+            precondition_output: encoded[..32].try_into()?,
+            l1_head: encoded[32..64].try_into()?,
+            agreed_l2_output_root: encoded[64..96].try_into()?,
+            claimed_l2_output_root: encoded[96..104].try_into()?,
+            claimed_l2_block_number: u64::from_be_bytes(encoded[104..136].try_into()?),
+            config_hash: encoded[136..168].try_into()?,
         })
     }
 }
 
-fn safe_default<V: core::fmt::Debug + Eq>(opt: Option<V>, default: V) -> anyhow::Result<V> {
+fn safe_default<V: Debug + Eq>(opt: Option<V>, default: V) -> anyhow::Result<V> {
     if let Some(v) = opt {
         if v == default {
             anyhow::bail!(format!("Unsafe value! {v:?}"))
@@ -204,4 +218,55 @@ pub fn intermediate_outputs(blob_data: &BlobData, blocks: usize) -> anyhow::Resu
         outputs.push(B256::from(bytes));
     }
     Ok(outputs)
+}
+
+pub async fn validate_precondition<
+    O: CommsClient + FlushableCache + Send + Sync + Debug,
+    B: BlobProvider + Send + Sync + Debug + Clone,
+>(
+    precondition_data_hash: B256,
+    oracle: Arc<O>,
+    boot: Arc<BootInfo>,
+    beacon: &mut B,
+) -> anyhow::Result<B256>
+where
+    <B as BlobProvider>::Error: core::fmt::Debug,
+{
+    // There is no condition to validate at blob boundaries
+    if precondition_data_hash.is_zero() {
+        return Ok(B256::ZERO);
+    }
+    // Read the blob references to fetch
+    let precondition_validation_data: PreconditionValidationData = from_slice(
+        &oracle
+            .get(PreimageKey::new(
+                *precondition_data_hash,
+                PreimageKeyType::Sha256,
+            ))
+            .await
+            .map_err(OracleProviderError::Preimage)?,
+    )?;
+    let precondition_hash = precondition_validation_data.precondition_hash();
+    // Read the blobs to validate
+    let mut blobs = Vec::new();
+    for request in precondition_validation_data.validated_blobs {
+        let blob = beacon
+            .get_blobs(&request.block_ref, &[request.blob_hash])
+            .await
+            .unwrap();
+        blobs.push(blob.first().unwrap().clone());
+    }
+    // Check equivalence until divergence point
+    for i in 0..FIELD_ELEMENTS_PER_BLOB {
+        let index = 32 * i as usize;
+        if &blobs[0][index..index + 32] != &blobs[1][index..index + 32] {
+            if i == 0 {
+                bail!("Precondition validation failed at first element");
+            } else if &blobs[0][index - 32..index] != boot.agreed_l2_output_root.as_slice() {
+                bail!("Agreed output not found before divergence point");
+            }
+        }
+    }
+    // Return the precondition hash
+    Ok(precondition_hash)
 }
