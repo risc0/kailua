@@ -102,7 +102,7 @@ impl KailuaDB {
             .await?
             .gameCount_
             .to();
-        for factory_index in self.last_factory_index..game_count {
+        for factory_index in (self.last_factory_index + 1)..game_count {
             let gameAtIndexReturn {
                 gameType_: game_type,
                 proxy_: game_address,

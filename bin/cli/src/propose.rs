@@ -69,6 +69,7 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
         .with_recommended_fillers()
         .wallet(&proposer_wallet)
         .on_http(args.l1_node_address.as_str().try_into()?);
+    info!("Proposer address: {proposer_address}");
 
     // Init registry and factory contracts
     let anchor_state_registry = kailua_contracts::IAnchorStateRegistry::new(
@@ -101,11 +102,26 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
         error!("Fault proof game is not installed!");
         exit(1);
     }
-
     // Initialize empty DB
     info!("Initializing..");
     let mut kailua_db = KailuaDB::init(&anchor_state_registry).await?;
+    info!("KailuaTreasury({:?})", kailua_db.treasury.address);
+    // Sanity check
+    if kailua_game_implementation
+        .treasury()
+        .call()
+        .await?
+        .treasury_
+        != kailua_db.treasury.address
+    {
+        error!("Invalid treasury address in KailuaGame implementation");
+        exit(1);
+    }
     // Run the proposer loop to sync and post
+    info!(
+        "Starting from treasury at factory index {}",
+        kailua_db.treasury.index
+    );
     loop {
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
@@ -232,19 +248,17 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
         }
         // Submit proposal
         info!("Proposing output {proposed_output_root} at {proposed_block_number} with {owed_collateral} additional collateral.");
-        dispute_game_factory
-            .create(
-                KAILUA_GAME_TYPE,
-                proposed_output_root,
-                Bytes::from(extra_data),
-            )
+        kailua_db
+            .treasury
+            .treasury_contract_instance(&proposer_provider)
+            .propose(proposed_output_root, Bytes::from(extra_data))
             .value(owed_collateral)
             .sidecar(sidecar)
             .send()
             .await
-            .context("create KailuaGame (send)")?
+            .context("propose (send)")?
             .get_receipt()
             .await
-            .context("create KailuaGame (get_receipt)")?;
+            .context("propose (get_receipt)")?;
     }
 }

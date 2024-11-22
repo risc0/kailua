@@ -150,7 +150,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         // INVARIANT: Only the child's parent may call this
         KailuaTournament parent = child.parentGame();
         if (msg.sender != address(parent)) {
-            revert BadAuth();
+            revert Unauthorized(msg.sender, address(parent));
         }
 
         // INVARIANT: Only known proposals may be eliminated
@@ -197,6 +197,8 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         emit BondUpdated(amount);
     }
 
+    bool public isProposing;
+
     /// @notice Checks the proposer's bonded amount and creates a new proposal through the factory
     function propose(Claim rootClaim, bytes calldata extraData)
         external
@@ -216,9 +218,11 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
             revert IncorrectBondAmount();
         }
         // Create proposal
+        isProposing = true;
         gameContract = KailuaTournament(
             address(ANCHOR_STATE_REGISTRY.disputeGameFactory().create(GAME_TYPE, rootClaim, extraData))
         );
+        isProposing = false;
         // Record proposer
         proposer[address(gameContract)] = msg.sender;
     }

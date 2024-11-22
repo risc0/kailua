@@ -154,13 +154,13 @@ contract KailuaGame is KailuaTournament {
 
         // Allow only the treasury to create new games
         if (gameCreator() != address(KAILUA_TREASURY)) {
-            revert BadAuth();
+            revert Unauthorized(gameCreator(), address(KAILUA_TREASURY));
         }
 
         // Register this new game in the parent game's contract
         parentGame().appendChild();
 
-        // Do not permit proposals of l2 blocks past the gap
+        // Do not permit proposals of l2 blocks inside the gap
         if (block.timestamp <= GENESIS_TIME_STAMP + thisL2BlockNumber * L2_BLOCK_TIME + PROPOSAL_TIME_GAP) {
             revert ClockTimeExceeded();
         }

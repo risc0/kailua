@@ -256,18 +256,18 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
             fault_dispute_anchor._1, fault_dispute_anchor._0
         );
     }
-    let kailua_treasury_address = dispute_game_factory
+    let kailua_treasury_instance_address = dispute_game_factory
         .games(KAILUA_GAME_TYPE, root_claim, extra_data)
         .call()
         .await
         .context("kailua_treasury_address")?
         .proxy_;
-    let kailua_treasury =
-        kailua_contracts::KailuaTreasury::new(kailua_treasury_address, &owner_provider);
-    let status = kailua_treasury.status().call().await?._0;
+    let kailua_treasury_instance =
+        kailua_contracts::KailuaTreasury::new(kailua_treasury_instance_address, &owner_provider);
+    let status = kailua_treasury_instance.status().call().await?._0;
     if status == 0 {
         info!("Resolving KailuaTreasury instance");
-        kailua_treasury
+        kailua_treasury_instance
             .resolve()
             .send()
             .await
@@ -284,7 +284,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     info!("Deploying KailuaGame contract to L1 rpc.");
     let kailua_game_contract = kailua_contracts::KailuaGame::deploy(
         &deployer_provider,
-        kailua_treasury_address,
+        *kailua_treasury_contract.address(),
         *mock_verifier_contract.address(),
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
         rollup_config_hash.into(),

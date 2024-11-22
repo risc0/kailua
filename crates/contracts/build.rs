@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use foundry_compilers::multi::MultiCompilerSettings;
 use foundry_compilers::{Project, ProjectPathsConfig};
 
 fn main() {
-    // configure the project with all its paths, solc, cache etc.
+    let mut settings = MultiCompilerSettings::default();
+    settings.solc.optimizer.enabled = Some(true);
     let project = Project::builder()
+        .settings(settings)
         .paths(ProjectPathsConfig::builder().build_with_root("foundry"))
         .build(Default::default())
         .expect("failed to build project");

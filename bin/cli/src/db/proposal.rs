@@ -82,27 +82,6 @@ impl Proposal {
             .l1Head_
             .0
             .into();
-        // tournament data
-        let mut children: Vec<u64> = Vec::new();
-        loop {
-            let child_address = treasury_instance
-                .children(U256::from(children.len()))
-                .call()
-                .await
-                .context("children")?
-                ._0;
-            if child_address.is_zero() {
-                break;
-            }
-            let child_game = KailuaGameInstance::new(child_address, treasury_instance.provider())
-                .gameIndex()
-                .call()
-                .await
-                .context("child game_index")?
-                ._0
-                .to();
-            children.push(child_game);
-        }
         // finality
         let mut proposal = Self {
             contract: config.treasury,
@@ -114,7 +93,7 @@ impl Proposal {
             output_root,
             output_block_number,
             l1_head,
-            children,
+            children: Default::default(),
             proven: Default::default(),
             prover: Default::default(),
             survivor: None,
@@ -156,16 +135,13 @@ impl Proposal {
         // fetch blob data
         let mut io_blobs = Vec::new();
         let mut io_hashes = Vec::new();
-        loop {
+        for _ in 0..config.proposal_blobs {
             let blob_kzg_hash = game_instance
                 .proposalBlobHashes(U256::from(io_blobs.len()))
                 .call()
                 .await
                 .context("proposal_blob_hashes")?
                 ._0;
-            if blob_kzg_hash.is_zero() {
-                break;
-            }
             let blob_data = blob_provider
                 .get_blob(created_at, blob_kzg_hash)
                 .await
@@ -200,27 +176,6 @@ impl Proposal {
             .l1Head_
             .0
             .into();
-        // tournament data
-        let mut children: Vec<u64> = Vec::new();
-        loop {
-            let child_address = game_instance
-                .children(U256::from(children.len()))
-                .call()
-                .await
-                .context("children")?
-                ._0;
-            if child_address.is_zero() {
-                break;
-            }
-            let child_game = KailuaGameInstance::new(child_address, game_instance.provider())
-                .gameIndex()
-                .call()
-                .await
-                .context("child game_index")?
-                ._0
-                .to();
-            children.push(child_game);
-        }
         // finality
         let mut proposal = Self {
             contract: *game_instance.address(),
@@ -232,7 +187,7 @@ impl Proposal {
             output_root,
             output_block_number,
             l1_head,
-            children,
+            children: Default::default(),
             proven: Default::default(),
             prover: Default::default(),
             survivor: None,

@@ -27,6 +27,14 @@ enum ProofStatus {
     U_WIN_V_LOSE
 }
 
+// 0x295a81c1
+/// @notice Thrown when an unauthorized address attempts to interact with the game.
+error Unauthorized(address source, address expected);
+
+// 0x9d3e7d24
+/// @notice Thrown when a child from an unknown source appends itself to a tournament
+error UnknownGame();
+
 /// @notice Thrown when pruning children of an unresolved parent
 error GameNotResolved();
 
@@ -110,6 +118,9 @@ interface IKailuaTreasury {
 
     /// @notice Eliminates a child's proposer and transfers their bond to the prover
     function eliminate(address child, address prover) external;
+
+    /// @notice Returns true iff a proposal is currently being submitted
+    function isProposing() external returns (bool);
 }
 
 library KailuaLib {

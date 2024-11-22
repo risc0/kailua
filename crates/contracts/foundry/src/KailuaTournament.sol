@@ -304,12 +304,9 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
     /// @notice Registers a new proposal that extends this one
     function appendChild() external {
-        IDisputeGameFactory _disputeGameFactory = disputeGameFactory();
-        uint256 nonce = _disputeGameFactory.gameCount();
-        address childAddress = address(bytes20(keccak256(abi.encodePacked(address(_disputeGameFactory), nonce))));
         // INVARIANT: The calling contract is a newly deployed contract by the dispute game factory
-        if (msg.sender != childAddress) {
-            revert BadAuth();
+        if (!KAILUA_TREASURY.isProposing()) {
+            revert UnknownGame();
         }
 
         // Append new child to children list

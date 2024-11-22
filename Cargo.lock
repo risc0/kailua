@@ -3372,6 +3372,7 @@ version = "0.1.0"
 dependencies = [
  "alloy 0.5.4",
  "foundry-compilers",
+ "semver 1.0.23",
 ]
 
 [[package]]

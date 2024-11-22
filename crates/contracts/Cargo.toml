@@ -8,4 +8,5 @@ alloy = { workspace = true, features = ["contract", "rlp", "json"]}
 foundry-compilers.workspace = true
 
 [build-dependencies]
-foundry-compilers = { workspace = true }
+foundry-compilers.workspace = true
+semver.workspace = true
