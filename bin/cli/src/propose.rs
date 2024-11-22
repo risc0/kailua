@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::blob_provider::BlobProvider;
-use crate::proposal::ProposalDB;
-use crate::{hash_to_fe, output_at_block, KAILUA_GAME_TYPE};
+use crate::db::KailuaDB;
+use crate::providers::beacon::{hash_to_fe, BlobProvider};
+use crate::providers::optimism::OpNodeProvider;
+use crate::KAILUA_GAME_TYPE;
 use alloy::consensus::Blob;
-use alloy::network::{EthereumWallet, Network};
+use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
+use alloy::network::EthereumWallet;
 use alloy::primitives::{Address, Bytes};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
-use alloy::transports::Transport;
 use anyhow::Context;
 use std::process::exit;
 use std::str::FromStr;
@@ -56,7 +57,7 @@ pub struct ProposeArgs {
 pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
     // initialize blockchain connections
     let op_node_provider =
-        ProviderBuilder::new().on_http(args.op_node_address.as_str().try_into()?);
+        OpNodeProvider(ProviderBuilder::new().on_http(args.op_node_address.as_str().try_into()?));
     let cl_node_provider = BlobProvider::new(args.l1_beacon_address.as_str()).await?;
 
     // initialize proposer wallet
@@ -68,6 +69,7 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
         .with_recommended_fillers()
         .wallet(&proposer_wallet)
         .on_http(args.l1_node_address.as_str().try_into()?);
+
     // Init registry and factory contracts
     let anchor_state_registry = kailua_contracts::IAnchorStateRegistry::new(
         Address::from_str(&args.registry_contract)?,
@@ -99,46 +101,21 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
         error!("Fault proof game is not installed!");
         exit(1);
     }
-    // load constants
-    let kailua_treasury = kailua_contracts::KailuaTreasury::new(
-        kailua_game_implementation
-            .treasury()
-            .call()
-            .await?
-            .treasury_,
-        &proposer_provider,
-    );
-    let proposal_block_count: u64 = kailua_game_implementation
-        .proposalBlockCount()
-        .call()
-        .await?
-        .proposalBlockCount_
-        .to();
-    let max_clock_duration = kailua_game_implementation
-        .maxClockDuration()
-        .call()
-        .await?
-        .maxClockDuration_;
-    let bond_value = kailua_treasury.participationBond().call().await?._0;
-    // Initialize empty state
+
+    // Initialize empty DB
     info!("Initializing..");
-    let mut proposal_db = ProposalDB::default();
-    // Run the proposer loop
+    let mut kailua_db = KailuaDB::init(&anchor_state_registry).await?;
+    // Run the proposer loop to sync and post
     loop {
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
         // fetch latest games
-        proposal_db
-            .load_proposals(&dispute_game_factory, &op_node_provider, &cl_node_provider)
+        kailua_db
+            .load_proposals(&anchor_state_registry, &op_node_provider, &cl_node_provider)
             .await
             .context("load_proposals")?;
-        // Maintain the canonical proposal chain
-        let Some(canonical_tip_index) = proposal_db.canonical_tip_index else {
-            warn!("No canonical proposal tip known!");
-            continue;
-        };
         // Stack unresolved ancestors
-        let mut unresolved_proposal_indices = proposal_db
+        let mut unresolved_proposal_indices = kailua_db
             .unresolved_canonical_proposals(&proposer_provider)
             .await?;
         // Resolve in reverse order
@@ -148,111 +125,120 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
                 unresolved_proposal_indices.len()
             );
         }
-        while let Some(local_index) = unresolved_proposal_indices.pop() {
-            let local_proposal = &mut proposal_db.proposals[local_index];
-            let proposal_contract = local_proposal.game_contract(&proposer_provider);
+        while let Some(proposal_index) = unresolved_proposal_indices.pop() {
+            let proposal = kailua_db.proposals.get_mut(&proposal_index).unwrap();
             // Skip resolved games
-            if local_proposal.is_game_resolved() {
+            if proposal
+                .fetch_finality(&proposer_provider)
+                .await?
+                .unwrap_or_default()
+            {
                 info!("Reached resolved ancestor proposal.");
                 continue;
             }
 
-            // Check for challenges
-            if proposal_contract.challengedAt(0).call().await?._0 > 0 {
-                local_proposal.challenged.insert(0);
-            }
-            local_proposal.unresolved_challenges = proposal_contract
-                .unresolvedClaimCount()
-                .call()
-                .await
-                .context(format!("unresolvedClaimCount local_index {local_index}"))?
-                ._0;
-            if local_proposal.has_unresolved_challenges() {
-                info!(
-                    "Waiting for {} challenges to be resolved.",
-                    local_proposal.unresolved_challenges
-                );
+            // Check if claim won in tournament
+            if !proposal
+                .fetch_parent_tournament_survivor_status(&proposer_provider)
+                .await?
+                .unwrap_or_default()
+            {
+                info!("Waiting for more proofs to resolve proposer as survivor");
                 break;
             }
 
             // Check for timeout
-            let challenger_duration = proposal_contract
-                .getChallengerDuration()
-                .call()
-                .await?
-                .duration_;
-            if challenger_duration < max_clock_duration {
-                info!(
-                    "Waiting for {} more seconds before resolution.",
-                    max_clock_duration - challenger_duration
-                );
+            let challenger_duration = proposal
+                .fetch_current_challenger_duration(&proposer_provider)
+                .await?;
+            if challenger_duration > 0 {
+                info!("Waiting for {challenger_duration} more seconds before resolution.");
                 break;
             }
 
             // resolve
-            resolve_game(proposal_contract).await?;
+            info!("Resolving game.");
+            proposal.resolve(&proposer_provider).await?;
         }
         // Submit proposal to extend canonical chain
-        let canonical_tip = &proposal_db.proposals[canonical_tip_index];
+        let canonical_tip = kailua_db.canonical_tip();
         // Query op-node to get latest safe l2 head
-        let sync_status: serde_json::Value = op_node_provider
-            .client()
-            .request_noparams("optimism_syncStatus")
-            .await?;
+        let sync_status = op_node_provider.sync_status().await?;
         debug!("sync_status[safe_l2] {:?}", &sync_status["safe_l2"]);
         let output_block_number = sync_status["safe_l2"]["number"].as_u64().unwrap();
-        let balance = proposer_provider.get_balance(proposer_address).await?;
-        if balance < bond_value {
-            error!("INSUFFICIENT BALANCE!");
-            continue;
-        } else if output_block_number < canonical_tip.output_block_number {
+        if output_block_number < canonical_tip.output_block_number {
             warn!(
                 "op-node is still {} blocks behind safe l2 head.",
                 canonical_tip.output_block_number - output_block_number
             );
             continue;
-        } else if output_block_number - canonical_tip.output_block_number < proposal_block_count {
+        } else if output_block_number - canonical_tip.output_block_number
+            < kailua_db.config.proposal_block_count
+        {
             info!(
                 "Waiting for safe l2 head to advance by {} more blocks before submitting proposal.",
-                proposal_block_count - (output_block_number - canonical_tip.output_block_number)
+                kailua_db.config.proposal_block_count
+                    - (output_block_number - canonical_tip.output_block_number)
             );
             continue;
         }
         // Prepare proposal
-        let proposed_block_number = canonical_tip.output_block_number + proposal_block_count;
-        let proposed_output_root =
-            output_at_block(&op_node_provider, proposed_block_number).await?;
+        let proposed_block_number =
+            canonical_tip.output_block_number + kailua_db.config.proposal_block_count;
+        let proposed_output_root = op_node_provider
+            .output_at_block(proposed_block_number)
+            .await?;
         // Prepare intermediate outputs
-        let mut intermediate_outputs = vec![];
+        let mut io_hashes = vec![];
         let first_io_number = canonical_tip.output_block_number + 1;
         for i in first_io_number..proposed_block_number {
-            let output = output_at_block(&op_node_provider, i).await?;
-            intermediate_outputs.push(hash_to_fe(output));
+            let output = op_node_provider.output_at_block(i).await?;
+            io_hashes.push(hash_to_fe(output));
         }
-        let io_bytes = intermediate_outputs.concat();
-        // Encode as blob sidecar
-        let blob = Blob::right_padding_from(io_bytes.as_slice());
-        let sidecar = crate::blob_sidecar(blob)?;
+        let mut io_blobs = vec![];
+        loop {
+            let start = io_blobs.len() * FIELD_ELEMENTS_PER_BLOB as usize;
+            if start >= io_hashes.len() {
+                break;
+            }
+            let end = (start + FIELD_ELEMENTS_PER_BLOB as usize).min(io_hashes.len());
+            let io_bytes = io_hashes[start..end].concat();
+            // Encode as blob sidecar
+            let blob = Blob::right_padding_from(io_bytes.as_slice());
+            io_blobs.push(blob);
+        }
+        let sidecar = crate::providers::beacon::blob_sidecar(io_blobs)?;
+
+        // todo calculate required duplication counter (factor proposer honesty into correctness)
 
         // compute extra data with block number, parent factory index, and blob hash
         let extra_data = [
             proposed_block_number.abi_encode_packed(),
-            canonical_tip.factory_index.abi_encode_packed(),
-            sidecar
-                .versioned_hash_for_blob(0)
-                .unwrap()
-                .abi_encode_packed(),
+            canonical_tip.index.abi_encode_packed(),
+            0u64.abi_encode_packed(),
         ]
         .concat();
+        // Check collateral requirements
+        let bond_value = kailua_db.treasury.fetch_bond(&proposer_provider).await?;
+        let paid_in = kailua_db
+            .treasury
+            .fetch_balance(&proposer_provider, proposer_address)
+            .await?;
+        let balance = proposer_provider.get_balance(proposer_address).await?;
+        let owed_collateral = bond_value.saturating_sub(paid_in);
+        if balance < owed_collateral {
+            error!("INSUFFICIENT BALANCE! Need to lock in at least {owed_collateral}.");
+            continue;
+        }
         // Submit proposal
-        info!("Proposing output {proposed_output_root} at {proposed_block_number}.");
+        info!("Proposing output {proposed_output_root} at {proposed_block_number} with {owed_collateral} additional collateral.");
         dispute_game_factory
             .create(
                 KAILUA_GAME_TYPE,
                 proposed_output_root,
                 Bytes::from(extra_data),
             )
-            .value(bond_value)
+            .value(owed_collateral)
             .sidecar(sidecar)
             .send()
             .await
@@ -261,17 +247,4 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             .await
             .context("create KailuaGame (get_receipt)")?;
     }
-}
-
-pub async fn resolve_game<T: Transport + Clone, P: Provider<T, N>, N: Network>(
-    game: kailua_contracts::KailuaGame::KailuaGameInstance<T, P, N>,
-) -> anyhow::Result<N::ReceiptResponse> {
-    info!("Resolving game.");
-    game.resolve()
-        .send()
-        .await
-        .context("KailuaTreasury::resolve (send)")?
-        .get_receipt()
-        .await
-        .context("KailuaTreasury::resolve (get_receipt)")
 }

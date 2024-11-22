@@ -279,8 +279,21 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         }
 
         // Update proof status
-        proofStatus[uvo[0]][uvo[1]] = proposedOutput[0] != computedOutput ? ProofStatus.FAULT : ProofStatus.INTEGRITY;
-        emit Proven(uvo[2], proofStatus[uvo[0]][uvo[1]]);
+        if (proposedOutput[0] != computedOutput) {
+            // u lose
+            if (proposedOutput[1] != computedOutput) {
+                // v lose
+                proofStatus[uvo[0]][uvo[1]] = ProofStatus.U_LOSE_V_LOSE;
+            } else {
+                // v win
+                proofStatus[uvo[0]][uvo[1]] = ProofStatus.U_LOSE_V_WIN;
+            }
+        } else {
+            // u win
+            proofStatus[uvo[0]][uvo[1]] = ProofStatus.U_WIN_V_LOSE;
+        }
+
+        emit Proven(uvo[0], uvo[1], proofStatus[uvo[0]][uvo[1]]);
 
         // Set the game's prover address
         prover[uvo[0]][uvo[1]] = msg.sender;
@@ -328,7 +341,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         uint256 v;
         for (v = u + 1; v < children.length; v++) {
             KailuaTournament opponent = children[v];
-            // If the opponent is elimnated, skip
+            // If the opponent is eliminated, skip
             if (isChildEliminated(opponent)) {
                 continue;
             }
@@ -337,7 +350,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             if (child.getChallengerDuration(opponent.createdAt().raw()).raw() == 0) {
                 break;
             }
-            // If the opponent proposal is a duplicate, ignore it
+            // If the opponent proposal is a twin, skip it
             if (child.rootClaim().raw() == opponent.rootClaim().raw()) {
                 uint256 common;
                 for (common = 0; common < PROPOSAL_BLOBS; common++) {
@@ -356,14 +369,15 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             // We must wait for more proofs if the result is unavailable
             require(proven != ProofStatus.NONE);
             // Otherwise decide winner
-            if (proven == ProofStatus.FAULT) {
+            if (proven == ProofStatus.U_LOSE_V_WIN) {
                 // u was shown as faulty (beat by v)
                 // eliminate the player
                 KAILUA_TREASURY.eliminate(address(child), prover[u][v]);
                 // proceed with opponent as new player
                 u = v;
             } else {
-                // u survives
+                // assume u survives
+                // todo jump over u if both players lose
                 // eliminate the opponent
                 KAILUA_TREASURY.eliminate(address(opponent), prover[u][v]);
                 // proceed with the same player

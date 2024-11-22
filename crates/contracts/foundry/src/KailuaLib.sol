@@ -20,12 +20,11 @@ import "./vendor/FlatR0ImportV1.0.0.sol";
 
 /// @notice Denotes the proven status of the game
 /// @custom:value NONE indicates that no proof has been submitted yet.
-/// @custom:value FAULT indicates that a valid fault proof has been submitted.
-/// @custom:value INTEGRITY indicates that a valid integrity proof has been submitted.
 enum ProofStatus {
     NONE,
-    FAULT,
-    INTEGRITY
+    U_LOSE_V_LOSE,
+    U_LOSE_V_WIN,
+    U_WIN_V_LOSE
 }
 
 /// @notice Thrown when pruning children of an unresolved parent
@@ -92,15 +91,11 @@ error InvalidDuplicationCounter();
 /// @param initialized This game's l2 block number
 error BlockNumberMismatch(uint256 anchored, uint256 initialized);
 
-/// @notice Emitted when an output is challenged.
-/// @param outputIndex The index of the challenged output
-/// @param challenger The address of the challenge issuer
-event Challenged(uint32 indexed outputIndex, address indexed challenger);
-
 /// @notice Emitted when an output is proven.
-/// @param outputIndex The index of the challenged output
-/// @param status The proven status of the output
-event Proven(uint32 indexed outputIndex, ProofStatus indexed status);
+/// @param u The preexisting proposal
+/// @param v The subsequent proposal
+/// @param status The proven status of the match
+event Proven(uint32 indexed u, uint32 indexed v, ProofStatus indexed status);
 
 /// @notice Emitted when the participation bond is updated
 /// @param amount The new required bond amount

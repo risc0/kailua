@@ -203,17 +203,17 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         payable
         returns (KailuaTournament gameContract)
     {
+        // Check proposer honesty
+        if (eliminationRound[msg.sender] > 0) {
+            revert BadAuth();
+        }
         // Update proposer bond
         if (msg.value > 0) {
             paidBonds[msg.sender] += msg.value;
         }
         // Check proposer bond
-        if (paidBonds[msg.sender] != participationBond) {
+        if (paidBonds[msg.sender] < participationBond) {
             revert IncorrectBondAmount();
-        }
-        // Check proposer honesty
-        if (eliminationRound[msg.sender] > 0) {
-            revert BadAuth();
         }
         // Create proposal
         gameContract = KailuaTournament(

@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy::eips::eip4844::kzg_to_versioned_hash;
-use alloy::primitives::B256;
+use alloy::consensus::{Blob, BlobTransactionSidecar};
+use alloy::eips::eip4844::{kzg_to_versioned_hash, BLS_MODULUS, FIELD_ELEMENTS_PER_BLOB};
+use alloy::primitives::{B256, U256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy_rpc_types_beacon::sidecar::{BeaconBlobBundle, BlobData};
 use anyhow::{bail, Context};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
+use std::ops::{Div, Sub};
 use tracing::debug;
 
 #[derive(Clone, Debug)]
@@ -104,4 +106,76 @@ impl BlobProvider {
 
         bail!("Blob {blob_hash} not found in block {timestamp}!");
     }
+}
+
+pub fn blob_sidecar(blob_data: Vec<Blob>) -> anyhow::Result<BlobTransactionSidecar> {
+    let mut blobs = Vec::with_capacity(blob_data.len());
+    let mut commitments = Vec::with_capacity(blob_data.len());
+    let mut proofs = Vec::with_capacity(blob_data.len());
+    for blob in blob_data {
+        let c_kzg_blob = c_kzg::Blob::from_bytes(blob.as_slice())?;
+        let settings = alloy::consensus::EnvKzgSettings::default();
+        let commitment = c_kzg::KzgCommitment::blob_to_kzg_commitment(&c_kzg_blob, settings.get())
+            .expect("Failed to convert blob to commitment");
+        let proof = c_kzg::KzgProof::compute_blob_kzg_proof(
+            &c_kzg_blob,
+            &commitment.to_bytes(),
+            settings.get(),
+        )?;
+        blobs.push(blob);
+        commitments.push(commitment.to_bytes().into_inner().into());
+        proofs.push(proof.to_bytes().into_inner().into());
+    }
+    Ok(BlobTransactionSidecar::new(blobs, commitments, proofs))
+}
+
+pub fn reverse_bits(index: u128, order_po2: u32) -> u128 {
+    index.reverse_bits() >> (u128::BITS - order_po2)
+}
+
+pub const PRIMITIVE_ROOT_OF_UNITY: U256 = U256::from_limbs([7, 0, 0, 0]);
+// primitive_root = 7
+// bls_mod = 52435875175126190479447740508185965837690552500527637822603658699938581184513
+// pow(primitive_root, (bls_mod - 1) // (2 ** 12), bls_mod)
+// 39033254847818212395286706435128746857159659164139250548781411570340225835782
+pub const FE_ORDER_PO2: u32 = 12;
+
+pub fn root_of_unity(index: usize) -> U256 {
+    let primitive_root_exponent = BLS_MODULUS
+        .sub(U256::from(1))
+        .div(U256::from(FIELD_ELEMENTS_PER_BLOB));
+    let root = PRIMITIVE_ROOT_OF_UNITY.pow_mod(primitive_root_exponent, BLS_MODULUS);
+    let root_exponent = reverse_bits(index as u128, FE_ORDER_PO2);
+    root.pow_mod(U256::from(root_exponent), BLS_MODULUS)
+}
+
+pub fn blob_fe_proof(
+    blob: &Blob,
+    index: usize,
+) -> anyhow::Result<(c_kzg::Bytes48, c_kzg::Bytes32)> {
+    let bytes = root_of_unity(index).to_be_bytes();
+    let z = c_kzg::Bytes32::new(bytes);
+    let c_kzg_blob = c_kzg::Blob::from_bytes(blob.as_slice())?;
+    let settings = alloy::consensus::EnvKzgSettings::default();
+    let (proof, value) = c_kzg::KzgProof::compute_kzg_proof(&c_kzg_blob, &z, settings.get())?;
+
+    let commitment = c_kzg::KzgCommitment::blob_to_kzg_commitment(&c_kzg_blob, settings.get())?;
+
+    let proof_bytes = proof.to_bytes();
+    if c_kzg::KzgProof::verify_kzg_proof(
+        &commitment.to_bytes(),
+        &z,
+        &value,
+        &proof_bytes,
+        settings.get(),
+    )? {
+        Ok((proof_bytes, value))
+    } else {
+        bail!("Generated invalid kzg proof.")
+    }
+}
+
+pub fn hash_to_fe(mut hash: B256) -> B256 {
+    hash.0[0] &= u8::MAX >> 2;
+    hash
 }
