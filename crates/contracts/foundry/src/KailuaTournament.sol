@@ -24,6 +24,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     // Immutable configuration
     // ------------------------------
 
+    /// @notice The Kailua Treasury Implementation contract address
     IKailuaTreasury internal immutable KAILUA_TREASURY;
 
     /// @notice The RISC Zero verifier contract

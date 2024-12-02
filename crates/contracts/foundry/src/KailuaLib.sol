@@ -35,9 +35,11 @@ error Unauthorized(address source, address expected);
 /// @notice Thrown when a child from an unknown source appends itself to a tournament
 error UnknownGame();
 
+// 0xc105260a
 /// @notice Thrown when pruning children of an unresolved parent
 error GameNotResolved();
 
+// 0x8b1dfa22
 /// @notice Thrown when eliminating an already removed child
 error AlreadyEliminated();
 
@@ -69,6 +71,7 @@ error ProvenFaulty();
 /// @notice Thrown when pruning is attempted with no children
 error NotProposed();
 
+// 0x7412124e
 /// @notice Thrown when proving is attempted with two agreeing outputs
 error NoConflict();
 
@@ -88,12 +91,15 @@ error BlobHashMismatch(bytes32 found, bytes32 expected);
 /// @notice Thrown when a blob hash is missing
 error BlobHashMissing(uint256 index, uint256 count);
 
+// 0x1be40a37
 /// @notice Occurs when the anchored game is not finalized
 error InvalidAnchoredGame();
 
+// 0x19e3a1dc
 /// @notice Occurs when the duplication counter is wrong
 error InvalidDuplicationCounter();
 
+// 0xeaa0996e
 /// @notice Occurs when the anchored game block number is different
 /// @param anchored The L2 block number of the anchored game
 /// @param initialized This game's l2 block number

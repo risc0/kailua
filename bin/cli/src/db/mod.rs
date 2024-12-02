@@ -26,11 +26,13 @@ use alloy::transports::Transport;
 use anyhow::Context;
 use config::Config;
 use kailua_contracts::IAnchorStateRegistry::IAnchorStateRegistryInstance;
-use kailua_contracts::IDisputeGameFactory::gameAtIndexReturn;
-use kailua_contracts::{IDisputeGameFactory, KailuaGame, KailuaTreasury};
+use kailua_contracts::IDisputeGameFactory::{gameAtIndexReturn, IDisputeGameFactoryInstance};
+use kailua_contracts::KailuaGame::KailuaGameInstance;
+use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
+use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
 use proposal::Proposal;
 use std::collections::HashMap;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 use treasury::Treasury;
 
 #[derive(Clone, Debug, Default)]
@@ -47,19 +49,19 @@ pub struct KailuaDB {
     pub config: Config,
     pub treasury: Treasury,
     pub proposals: HashMap<u64, Proposal>,
-    pub last_factory_index: u64,
-    pub canonical_tip_index: u64,
+    pub next_factory_index: u64,
+    pub canonical_tip_index: Option<u64>,
 }
 
 impl KailuaDB {
     pub async fn init<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         anchor_state_registry: &IAnchorStateRegistryInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
-        let dispute_game_factory = IDisputeGameFactory::new(
+        let dispute_game_factory = IDisputeGameFactoryInstance::new(
             anchor_state_registry.disputeGameFactory().call().await?._0,
             anchor_state_registry.provider(),
         );
-        let game_implementation = KailuaGame::new(
+        let game_implementation = KailuaGameInstance::new(
             dispute_game_factory
                 .gameImpls(KAILUA_GAME_TYPE)
                 .call()
@@ -68,20 +70,13 @@ impl KailuaDB {
             anchor_state_registry.provider(),
         );
         let config = Config::load(&game_implementation).await?;
-        let treasury_instance =
-            KailuaTreasury::new(config.treasury, anchor_state_registry.provider());
-        let treasury = Treasury::init(&treasury_instance).await?;
-        let treasury_index = treasury.index;
-        let treasury_proposal = Proposal::load_treasury(&config, &treasury, &treasury_instance)
-            .await
-            .context("load_treasury")?;
-        let proposals = [(treasury_index, treasury_proposal)].into_iter().collect();
+        let treasury_implementation =
+            KailuaTreasuryInstance::new(config.treasury, anchor_state_registry.provider());
+        let treasury = Treasury::init(&treasury_implementation).await?;
         Ok(Self {
             config,
             treasury,
-            proposals,
-            last_factory_index: treasury_index,
-            canonical_tip_index: treasury_index,
+            ..Default::default()
         })
     }
 
@@ -91,7 +86,7 @@ impl KailuaDB {
         op_node_provider: &OpNodeProvider,
         blob_provider: &BlobProvider,
     ) -> anyhow::Result<usize> {
-        let dispute_game_factory = IDisputeGameFactory::new(
+        let dispute_game_factory = IDisputeGameFactoryInstance::new(
             anchor_state_registry.disputeGameFactory().call().await?._0,
             anchor_state_registry.provider(),
         );
@@ -102,7 +97,9 @@ impl KailuaDB {
             .await?
             .gameCount_
             .to();
-        for factory_index in (self.last_factory_index + 1)..game_count {
+        while self.next_factory_index < game_count {
+            let factory_index = self.next_factory_index;
+            // process game
             let gameAtIndexReturn {
                 gameType_: game_type,
                 proxy_: game_address,
@@ -114,69 +111,89 @@ impl KailuaDB {
                 .context(format!("gameAtIndex {factory_index}/{game_count}"))?;
             // skip entries for other game types
             if game_type != KAILUA_GAME_TYPE {
+                info!("Skipping proposal of different game type {game_type} at factory index {factory_index}");
+                self.next_factory_index += 1;
                 continue;
             }
-            info!("Processing proposal at factory index {factory_index}");
-            let game_instance = KailuaGame::new(game_address, anchor_state_registry.provider());
+            info!("Processing tournament proposal at factory index {factory_index}");
+            let tournament_instance =
+                KailuaTournamentInstance::new(game_address, anchor_state_registry.provider());
             let mut proposal =
-                Proposal::load_game(&self.config, &game_instance, blob_provider).await?;
-            let is_parent_correct = if proposal.index == proposal.parent {
-                true
-            } else {
-                self.proposals
+                Proposal::load(&self.config, blob_provider, &tournament_instance).await?;
+            let is_correct_proposal = if proposal.index != proposal.parent {
+                // Validate game instance data
+                info!("Assessing proposal correctness..");
+                let is_parent_correct = self
+                    .proposals
                     .get(&proposal.parent)
                     .expect("Attempted to process child before registering parent.")
                     .is_correct()
-                    .expect("Attempted to process child before deciding parent correctness")
-            };
-            info!("Assessing proposal correctness..");
-            let is_correct_proposal = match proposal
-                .assess_correctness(&self.config, op_node_provider, is_parent_correct)
-                .await?
-            {
-                None => {
-                    warn!("Failed to assess correctness. Is op-node synced far enough?");
-                    break;
-                }
-                Some(correctness) => {
-                    info!("Assessed proposal as {correctness}.");
-                    correctness
-                }
-            };
-            // Append child to parent
-            if proposal.parent != proposal.index {
+                    .expect("Attempted to process child before deciding parent correctness");
+                let is_correct_proposal = match proposal
+                    .assess_correctness(&self.config, op_node_provider, is_parent_correct)
+                    .await?
+                {
+                    None => {
+                        error!("Failed to assess correctness. Is op-node synced far enough?");
+                        break;
+                    }
+                    Some(correct) => {
+                        if correct {
+                            info!("Assessed proposal as {correct}.");
+                        } else {
+                            warn!("Assessed proposal as {correct}.");
+                        }
+                        correct
+                    }
+                };
+                // Append child to parent
                 let parent = self.proposals.get_mut(&proposal.parent).unwrap();
                 if parent.children.last().is_none()
                     || parent.children.last().unwrap() < &proposal.index
                 {
                     parent.children.push(proposal.index);
                 }
+                is_correct_proposal
+            } else {
+                // Accept treasury instance data
+                info!("Accepting initial treasury proposal as true.");
+                proposal.accept_correctness();
+                true
+            };
+
+            // Consider updating canonical chain tip
+            // todo: take into account avoidance of unfinalizeable repeated proposals
+            if is_correct_proposal {
+                let canonical_tip_height = self.canonical_tip_height();
+                if canonical_tip_height.is_none()
+                    || canonical_tip_height.unwrap() < proposal.output_block_number
+                {
+                    info!(
+                        "Updating canonical proposal chain tip to game at index {}.",
+                        proposal.index
+                    );
+                    self.canonical_tip_index = Some(proposal.index);
+                }
             }
-            // Update canonical chain tip
-            if is_correct_proposal && proposal.output_block_number > self.canonical_tip_height() {
-                info!(
-                    "Updating canonical proposal chain tip to game at index {}.",
-                    proposal.index
-                );
-                self.canonical_tip_index = proposal.index;
-            }
+
             // Insert proposal in db
             self.proposals.insert(proposal.index, proposal);
-            // Update last processed game
-            self.last_factory_index = factory_index;
+
+            // Update next game index
+            self.next_factory_index += 1;
         }
 
         Ok(self.proposals.len() - initial_proposals)
     }
 
-    pub fn canonical_tip(&self) -> &Proposal {
-        self.proposals.get(&self.canonical_tip_index).unwrap()
+    pub fn canonical_tip(&self) -> Option<&Proposal> {
+        self.canonical_tip_index
+            .map(|i| self.proposals.get(&i).unwrap())
     }
-    pub fn canonical_tip_height(&self) -> u64 {
-        self.proposals
-            .get(&self.canonical_tip_index)
-            .unwrap()
-            .output_block_number
+
+    pub fn canonical_tip_height(&self) -> Option<u64> {
+        self.canonical_tip_index
+            .map(|i| self.proposals.get(&i).unwrap().output_block_number)
     }
 
     pub async fn unresolved_canonical_proposals<
@@ -187,8 +204,12 @@ impl KailuaDB {
         &mut self,
         l1_node_provider: &P,
     ) -> anyhow::Result<Vec<u64>> {
-        let mut unresolved_proposal_indices = vec![self.canonical_tip_index];
-        // traverse up tree
+        // Nothing to do without a canonical tip
+        if self.canonical_tip_index.is_none() {
+            return Ok(Vec::new());
+        }
+        // traverse up chain starting from canonical tip
+        let mut unresolved_proposal_indices = vec![self.canonical_tip_index.unwrap()];
         loop {
             let proposal_index = *unresolved_proposal_indices.last().unwrap();
             let proposal = self.proposals.get_mut(&proposal_index).unwrap();

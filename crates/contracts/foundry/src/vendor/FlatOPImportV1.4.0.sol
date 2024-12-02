@@ -4600,6 +4600,7 @@ error InvalidDisputedClaimIndex();
 ///         the game is not in progress.
 error GameNotInProgress();
 
+// 0x3381d114
 /// @notice Thrown when a move is attempted to be made after the clock has timed out.
 error ClockTimeExceeded();
 

@@ -21,10 +21,11 @@ use alloy::sol_types::SolValue;
 use anyhow::Context;
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_common::config_hash;
+use kailua_contracts::*;
 use kailua_host::fetch_rollup_config;
 use std::process::exit;
 use std::str::FromStr;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct DeployArgs {
@@ -72,7 +73,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         .with_recommended_fillers()
         .wallet(&guardian_wallet)
         .on_http(args.l1_node_address.as_str().try_into()?);
-    let optimism_portal = kailua_contracts::OptimismPortal::new(
+    let optimism_portal = OptimismPortal::new(
         Address::from_str(&args.portal_contract)?,
         &guardian_provider,
     );
@@ -92,20 +93,19 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         .with_recommended_fillers()
         .wallet(&owner_wallet)
         .on_http(args.l1_node_address.as_str().try_into()?);
+
     // Init registry and factory contracts
-    let anchor_state_registry = kailua_contracts::IAnchorStateRegistry::new(
-        Address::from_str(&args.registry_contract)?,
-        &owner_provider,
-    );
+    let anchor_state_registry =
+        IAnchorStateRegistry::new(Address::from_str(&args.registry_contract)?, &owner_provider);
     info!("AnchorStateRegistry({:?})", anchor_state_registry.address());
-    let dispute_game_factory = kailua_contracts::IDisputeGameFactory::new(
+    let dispute_game_factory = IDisputeGameFactory::new(
         anchor_state_registry.disputeGameFactory().call().await?._0,
         &owner_provider,
     );
     info!("DisputeGameFactory({:?})", dispute_game_factory.address());
     let game_count = dispute_game_factory.gameCount().call().await?.gameCount_;
     info!("There have been {game_count} games created using DisputeGameFactory");
-    let dispute_game_factory_ownable = kailua_contracts::OwnableUpgradeable::new(
+    let dispute_game_factory_ownable = OwnableUpgradeable::new(
         anchor_state_registry.disputeGameFactory().call().await?._0,
         &owner_provider,
     );
@@ -115,7 +115,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         .await
         .context("Failed to query factory owner.")?
         ._0;
-    let factory_owner_safe = kailua_contracts::Safe::new(factory_owner_address, &owner_provider);
+    let factory_owner_safe = Safe::new(factory_owner_address, &owner_provider);
     info!("Safe({:?})", factory_owner_safe.address());
     let safe_owners = factory_owner_safe.getOwners().call().await?._0;
     info!("Safe::owners({:?})", &safe_owners);
@@ -127,7 +127,9 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         error!("Expected exactly one owner of safe account.");
         exit(1);
     }
+
     // initialize deployment wallet
+    info!("Initializing deployer wallet.");
     let deployer_signer = LocalSigner::from_str(&args.deployer_key)?;
     let deployer_wallet = EthereumWallet::from(deployer_signer);
     let deployer_provider = ProviderBuilder::new()
@@ -142,22 +144,18 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         .context("fetch_rollup_config")?;
     let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
     info!("RollupConfigHash({})", hex::encode(rollup_config_hash));
-    debug!("config {:?}", &config);
 
     // Deploy MockVerifier contract
-    // {
-    info!("Deploying RiscZeroMockVerifier contract to L1 rpc.");
-    let mock_verifier_contract =
-        kailua_contracts::RiscZeroMockVerifier::deploy(&deployer_provider, [0u8; 4].into())
-            .await
-            .context("RiscZeroMockVerifier contract deployment error")?;
+    info!("Deploying RiscZeroMockVerifier contract to L1.");
+    let mock_verifier_contract = RiscZeroMockVerifier::deploy(&deployer_provider, [0u8; 4].into())
+        .await
+        .context("RiscZeroMockVerifier contract deployment error")?;
     info!("{:?}", &mock_verifier_contract);
 
     // Deploy KailuaTreasury contract
-    // {
     info!("Deploying KailuaTreasury contract to L1 rpc.");
     let fault_dispute_game_type = 254;
-    let kailua_treasury_contract = kailua_contracts::KailuaTreasury::deploy(
+    let kailua_treasury_implementation = KailuaTreasury::deploy(
         &deployer_provider,
         *mock_verifier_contract.address(),
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
@@ -168,9 +166,9 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         Address::from_str(&args.registry_contract)?,
     )
     .await
-    .context("KailuaTreasury contract deployment error")?;
-    info!("{:?}", &kailua_treasury_contract);
-    // }
+    .context("KailuaTreasury implementation contract deployment error")?;
+    info!("{:?}", &kailua_treasury_implementation);
+
     // Update dispute factory implementation to KailuaTreasury
     info!("Setting KailuaTreasury initialization bond value in DisputeGameFactory to zero.");
     crate::exec_safe_txn(
@@ -191,14 +189,14 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     info!("Setting KailuaTreasury particpation bond value to 1 wei.");
     let bond_value = U256::from(1);
     crate::exec_safe_txn(
-        kailua_treasury_contract.setParticipationBond(bond_value),
+        kailua_treasury_implementation.setParticipationBond(bond_value),
         &factory_owner_safe,
         owner_address,
     )
     .await
     .context("setParticipationBond 1 wei")?;
     assert_eq!(
-        kailua_treasury_contract
+        kailua_treasury_implementation
             .participationBond()
             .call()
             .await?
@@ -209,7 +207,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     info!("Setting KailuaTreasury implementation address in DisputeGameFactory.");
     crate::exec_safe_txn(
         dispute_game_factory
-            .setImplementation(KAILUA_GAME_TYPE, *kailua_treasury_contract.address()),
+            .setImplementation(KAILUA_GAME_TYPE, *kailua_treasury_implementation.address()),
         &factory_owner_safe,
         owner_address,
     )
@@ -221,8 +219,9 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
             .call()
             .await?
             .impl_,
-        *kailua_treasury_contract.address()
+        *kailua_treasury_implementation.address()
     );
+
     // Create new treasury
     let fault_dispute_anchor = anchor_state_registry
         .anchors(fault_dispute_game_type)
@@ -231,13 +230,13 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     let root_claim = fault_dispute_anchor._0;
     let extra_data = Bytes::from(fault_dispute_anchor._1.abi_encode_packed());
     // Skip setup if target anchor already exists
-    let kailua_treasury_address = dispute_game_factory
+    let existing_treasury_address = dispute_game_factory
         .games(KAILUA_GAME_TYPE, root_claim, extra_data.clone())
         .call()
         .await
         .context("kailua_treasury_address")?
         .proxy_;
-    if kailua_treasury_address.is_zero() {
+    if existing_treasury_address.is_zero() {
         info!(
             "Creating new KailuaTreasury game instance from {} ({}).",
             fault_dispute_anchor._1, fault_dispute_anchor._0
@@ -263,7 +262,8 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         .context("kailua_treasury_address")?
         .proxy_;
     let kailua_treasury_instance =
-        kailua_contracts::KailuaTreasury::new(kailua_treasury_instance_address, &owner_provider);
+        KailuaTreasury::new(kailua_treasury_instance_address, &owner_provider);
+    info!("{:?}", &kailua_treasury_instance);
     let status = kailua_treasury_instance.status().call().await?._0;
     if status == 0 {
         info!("Resolving KailuaTreasury instance");
@@ -278,13 +278,13 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     } else {
         info!("Game instance is not ongoing ({status})");
     }
-    // }
+
     // Deploy KailuaGame contract
     // {
     info!("Deploying KailuaGame contract to L1 rpc.");
-    let kailua_game_contract = kailua_contracts::KailuaGame::deploy(
+    let kailua_game_contract = KailuaGame::deploy(
         &deployer_provider,
-        *kailua_treasury_contract.address(),
+        *kailua_treasury_implementation.address(),
         *mock_verifier_contract.address(),
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
         rollup_config_hash.into(),
@@ -299,7 +299,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     .await
     .context("KailuaGame contract deployment error")?;
     info!("{:?}", &kailua_game_contract);
-    // }
+
     // Update implementation to KailuaGame
     info!("Setting KailuaGame implementation address in DisputeGameFactory.");
     crate::exec_safe_txn(

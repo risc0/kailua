@@ -1,5 +1,4 @@
 use crate::db::config::Config;
-use crate::db::treasury::Treasury;
 use crate::db::ProofStatus;
 use crate::providers::beacon::hash_to_fe;
 use crate::providers::beacon::BlobProvider;
@@ -47,11 +46,39 @@ pub struct Proposal {
 }
 
 impl Proposal {
-    pub async fn load_treasury<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+    pub async fn load<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         config: &Config,
-        treasury: &Treasury,
+        blob_provider: &BlobProvider,
+        tournament_instance: &KailuaTournamentInstance<T, P, N>,
+    ) -> anyhow::Result<Self> {
+        let instance_address = *tournament_instance.address();
+        let parent_address = tournament_instance.parentGame().call().await?.parentGame_;
+        if parent_address == instance_address {
+            Self::load_treasury(&KailuaTreasuryInstance::new(
+                instance_address,
+                tournament_instance.provider(),
+            ))
+            .await
+        } else {
+            Self::load_game(
+                config,
+                blob_provider,
+                &KailuaGameInstance::new(instance_address, tournament_instance.provider()),
+            )
+            .await
+        }
+    }
+
+    pub async fn load_treasury<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         treasury_instance: &KailuaTreasuryInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
+        let index = treasury_instance
+            .gameIndex()
+            .call()
+            .await
+            .context("game_index")?
+            ._0
+            .to();
         let created_at = treasury_instance
             .createdAt()
             .call()
@@ -84,9 +111,9 @@ impl Proposal {
             .into();
         // finality
         let mut proposal = Self {
-            contract: config.treasury,
-            index: treasury.index,
-            parent: treasury.index,
+            contract: *treasury_instance.address(),
+            index,
+            parent: index,
             created_at,
             io_blobs: vec![],
             io_hashes: vec![],
@@ -110,8 +137,8 @@ impl Proposal {
 
     pub async fn load_game<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         config: &Config,
-        game_instance: &KailuaGameInstance<T, P, N>,
         blob_provider: &BlobProvider,
+        game_instance: &KailuaGameInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
         let index = game_instance
             .gameIndex()
@@ -148,7 +175,7 @@ impl Proposal {
                 .context("get_blob")?;
             // save data
             let io_remaining = config.proposal_block_count - (io_hashes.len() as u64) - 1;
-            let io_in_blob = io_remaining.max(FIELD_ELEMENTS_PER_BLOB);
+            let io_in_blob = io_remaining.min(FIELD_ELEMENTS_PER_BLOB);
             io_hashes.extend(intermediate_outputs(&blob_data, io_in_blob as usize)?);
             io_blobs.push((blob_kzg_hash, blob_data));
         }
@@ -322,13 +349,17 @@ impl Proposal {
             for (i, output_hash) in self.io_hashes.iter().enumerate() {
                 let io_number = starting_block_number + (i as u64) + 1;
                 if let Ok(local_output) = op_node_provider.output_at_block(io_number).await {
-                    self.correct_io[io_number as usize] =
-                        Some(&hash_to_fe(local_output) == output_hash);
+                    self.correct_io[i] = Some(&hash_to_fe(local_output) == output_hash);
                 }
             }
         }
         // Return correctness
         Ok(self.is_correct())
+    }
+
+    pub fn accept_correctness(&mut self) {
+        self.is_correct_parent = Some(true);
+        self.correct_claim = Some(true);
     }
 
     pub fn is_correct(&self) -> Option<bool> {

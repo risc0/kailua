@@ -18,7 +18,9 @@ use crate::providers::optimism::OpNodeProvider;
 use crate::KAILUA_GAME_TYPE;
 use alloy::consensus::Blob;
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
-use alloy::network::EthereumWallet;
+use alloy::eips::{BlockId, BlockNumberOrTag};
+use alloy::network::primitives::BlockTransactionsKind;
+use alloy::network::{BlockResponse, EthereumWallet, HeaderResponse};
 use alloy::primitives::{Address, Bytes};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::signers::local::LocalSigner;
@@ -119,8 +121,8 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
     }
     // Run the proposer loop to sync and post
     info!(
-        "Starting from treasury at factory index {}",
-        kailua_db.treasury.index
+        "Starting from proposal at factory index {}",
+        kailua_db.next_factory_index
     );
     loop {
         // Wait for new data on every iteration
@@ -173,11 +175,17 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             }
 
             // resolve
-            info!("Resolving game.");
+            info!(
+                "Resolving game at index {} and height {}.",
+                proposal.index, proposal.output_block_number
+            );
             proposal.resolve(&proposer_provider).await?;
         }
         // Submit proposal to extend canonical chain
-        let canonical_tip = kailua_db.canonical_tip();
+        let Some(canonical_tip) = kailua_db.canonical_tip() else {
+            warn!("No canonical proposal chain to extend!");
+            continue;
+        };
         // Query op-node to get latest safe l2 head
         let sync_status = op_node_provider.sync_status().await?;
         debug!("sync_status[safe_l2] {:?}", &sync_status["safe_l2"]);
@@ -198,9 +206,30 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             );
             continue;
         }
-        // Prepare proposal
+        // Wait for L1 timestamp to advance beyond the safety gap for proposals
         let proposed_block_number =
             canonical_tip.output_block_number + kailua_db.config.proposal_block_count;
+        let chain_time = proposer_provider
+            .get_block(
+                BlockId::Number(BlockNumberOrTag::Latest),
+                BlockTransactionsKind::Hashes,
+            )
+            .await
+            .context("get_block")?
+            .expect("Could not fetch latest L1 block")
+            .header()
+            .timestamp();
+        if !kailua_db
+            .config
+            .allows_proposal(proposed_block_number, chain_time)
+        {
+            let min_proposal_time = kailua_db.config.min_proposal_time(proposed_block_number);
+            let time_to_wait = min_proposal_time.saturating_sub(chain_time);
+            info!("Waiting for {time_to_wait} more seconds of chain time for proposal gap.");
+            continue;
+        }
+
+        // Prepare proposal
         let proposed_output_root = op_node_provider
             .output_at_block(proposed_block_number)
             .await?;

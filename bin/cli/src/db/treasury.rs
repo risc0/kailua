@@ -18,11 +18,11 @@ use alloy::providers::Provider;
 use alloy::transports::Transport;
 use anyhow::Context;
 use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, Default)]
 pub struct Treasury {
-    pub index: u64,
     pub address: Address,
     pub elimination_round: HashMap<Address, u64>,
     pub claim_proposer: HashMap<Address, Address>,
@@ -32,25 +32,17 @@ pub struct Treasury {
 
 impl Treasury {
     pub async fn init<T: Transport + Clone, P: Provider<T, N>, N: Network>(
-        treasury_instance: &KailuaTreasuryInstance<T, P, N>,
+        treasury_implementation: &KailuaTreasuryInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
         // Load participation bond
-        let participation_bond = treasury_instance
+        let participation_bond = treasury_implementation
             .participationBond()
             .call()
             .await
             .context("participation_bond")?
             ._0;
-        let index = treasury_instance
-            .gameIndex()
-            .call()
-            .await
-            .context("game_index")?
-            ._0
-            .to();
         Ok(Self {
-            index,
-            address: *treasury_instance.address(),
+            address: *treasury_implementation.address(),
             elimination_round: Default::default(),
             claim_proposer: Default::default(),
             participation_bond,
@@ -100,17 +92,21 @@ impl Treasury {
         provider: P,
         address: Address,
     ) -> anyhow::Result<Address> {
-        if !self.claim_proposer.contains_key(&address) {
-            let proposer = self
-                .treasury_contract_instance(provider)
-                .proposer(address)
-                .call()
-                .await
-                .context("proposer")?
-                ._0;
-            self.claim_proposer.insert(address, proposer);
-        }
-        Ok(*self.claim_proposer.get(&address).unwrap())
+        let instance = self
+            .treasury_contract_instance(provider);
+        let proposer = match self.claim_proposer.entry(address) {
+            Entry::Vacant(entry) => {
+                let proposer = instance
+                    .proposer(address)
+                    .call()
+                    .await
+                    .context("proposer")?
+                    ._0;
+                *entry.insert(proposer)
+            }
+            Entry::Occupied(entry) => *entry.get(),
+        };
+        Ok(proposer)
     }
 
     pub async fn fetch_elimination_round<T: Transport + Clone, P: Provider<T, N>, N: Network>(
@@ -118,17 +114,21 @@ impl Treasury {
         provider: P,
         address: Address,
     ) -> anyhow::Result<u64> {
-        if !self.elimination_round.contains_key(&address) {
-            let round = self
-                .treasury_contract_instance(provider)
-                .eliminationRound(address)
-                .call()
-                .await
-                .context("proposer")?
-                ._0
-                .to();
-            self.elimination_round.insert(address, round);
-        }
-        Ok(*self.elimination_round.get(&address).unwrap())
+        let instance = self
+            .treasury_contract_instance(provider);
+        let round = match self.elimination_round.entry(address) {
+            Entry::Vacant(entry) => {
+                let round = instance
+                    .eliminationRound(address)
+                    .call()
+                    .await
+                    .context("proposer")?
+                    ._0
+                    .to();
+                *entry.insert(round)
+            }
+            Entry::Occupied(entry) => *entry.get(),
+        };
+        Ok(round)
     }
 }

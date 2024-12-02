@@ -141,4 +141,12 @@ impl Config {
             proposal_gap,
         })
     }
+
+    pub fn allows_proposal(&self, proposal_block_number: u64, proposal_time: u64) -> bool {
+        proposal_time >= self.min_proposal_time(proposal_block_number)
+    }
+
+    pub fn min_proposal_time(&self, proposal_block_number: u64) -> u64 {
+        self.genesis_time + proposal_block_number * self.block_time + self.proposal_gap + 1
+    }
 }

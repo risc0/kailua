@@ -18,7 +18,6 @@ use alloy::primitives::{Address, FixedBytes, Uint, U256};
 use alloy::providers::{Provider, ReqwestProvider};
 use alloy::transports::Transport;
 use anyhow::Context;
-// use kailua_contracts::KailuaGame::KailuaGameInstance;
 use kailua_contracts::Safe::SafeInstance;
 use std::str::FromStr;
 use tracing::debug;

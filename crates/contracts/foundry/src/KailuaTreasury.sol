@@ -59,6 +59,8 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         GAME_TYPE = _gameType;
         ANCHORED_GAME_TYPE = _anchoredGameType;
         ANCHOR_STATE_REGISTRY = _anchorStateRegistry;
+
+        proposer[address(this)] = address(this);
     }
 
     // ------------------------------
@@ -68,8 +70,6 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     /// @inheritdoc IInitializable
     function initialize() external payable override {
         super.initializeInternal();
-
-        proposer[address(this)] = address(this);
     }
 
     // ------------------------------
