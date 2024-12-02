@@ -92,12 +92,11 @@ impl Treasury {
         provider: P,
         address: Address,
     ) -> anyhow::Result<Address> {
-        let instance = self
-            .treasury_contract_instance(provider);
+        let instance = self.treasury_contract_instance(provider);
         let proposer = match self.claim_proposer.entry(address) {
             Entry::Vacant(entry) => {
                 let proposer = instance
-                    .proposer(address)
+                    .proposerOf(address)
                     .call()
                     .await
                     .context("proposer")?
@@ -114,8 +113,7 @@ impl Treasury {
         provider: P,
         address: Address,
     ) -> anyhow::Result<u64> {
-        let instance = self
-            .treasury_contract_instance(provider);
+        let instance = self.treasury_contract_instance(provider);
         let round = match self.elimination_round.entry(address) {
             Entry::Vacant(entry) => {
                 let round = instance

@@ -120,7 +120,7 @@ interface IKailuaTreasury {
     function eliminationRound(address proposer) external returns (uint256);
 
     /// @notice Returns the proposer of a game
-    function proposer(address game) external returns (address);
+    function proposerOf(address game) external returns (address);
 
     /// @notice Eliminates a child's proposer and transfers their bond to the prover
     function eliminate(address child, address prover) external;

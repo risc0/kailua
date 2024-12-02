@@ -20,7 +20,7 @@ use crate::providers::beacon::BlobProvider;
 use crate::providers::optimism::OpNodeProvider;
 use crate::KAILUA_GAME_TYPE;
 use alloy::network::Network;
-use alloy::primitives::U256;
+use alloy::primitives::{Address, U256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
 use anyhow::Context;
@@ -31,6 +31,7 @@ use kailua_contracts::KailuaGame::KailuaGameInstance;
 use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
 use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
 use proposal::Proposal;
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use tracing::{error, info, warn};
 use treasury::Treasury;
@@ -49,6 +50,7 @@ pub struct KailuaDB {
     pub config: Config,
     pub treasury: Treasury,
     pub proposals: HashMap<u64, Proposal>,
+    pub eliminations: HashMap<Address, u64>,
     pub next_factory_index: u64,
     pub canonical_tip_index: Option<u64>,
 }
@@ -120,7 +122,7 @@ impl KailuaDB {
                 KailuaTournamentInstance::new(game_address, anchor_state_registry.provider());
             let mut proposal =
                 Proposal::load(&self.config, blob_provider, &tournament_instance).await?;
-            let is_correct_proposal = if proposal.index != proposal.parent {
+            let is_correct_proposal = if proposal.has_parent() {
                 // Validate game instance data
                 info!("Assessing proposal correctness..");
                 let is_parent_correct = self
@@ -157,13 +159,14 @@ impl KailuaDB {
             } else {
                 // Accept treasury instance data
                 info!("Accepting initial treasury proposal as true.");
-                proposal.accept_correctness();
                 true
             };
 
-            // Consider updating canonical chain tip
             // todo: take into account avoidance of unfinalizeable repeated proposals
-            if is_correct_proposal {
+            if is_correct_proposal
+                && !self.was_proposer_eliminated_before(proposal.proposer, proposal.index)
+            {
+                // Consider updating canonical chain tip
                 let canonical_tip_height = self.canonical_tip_height();
                 if canonical_tip_height.is_none()
                     || canonical_tip_height.unwrap() < proposal.output_block_number
@@ -174,6 +177,9 @@ impl KailuaDB {
                     );
                     self.canonical_tip_index = Some(proposal.index);
                 }
+            } else if let Entry::Vacant(entry) = self.eliminations.entry(proposal.proposer) {
+                // Record proposal as first elimination cause
+                entry.insert(proposal.index);
             }
 
             // Insert proposal in db
@@ -184,6 +190,17 @@ impl KailuaDB {
         }
 
         Ok(self.proposals.len() - initial_proposals)
+    }
+
+    pub fn is_proposer_eliminated(&self, proposer: Address) -> bool {
+        self.eliminations.contains_key(&proposer)
+    }
+
+    pub fn was_proposer_eliminated_before(&self, proposer: Address, index: u64) -> bool {
+        self.eliminations
+            .get(&proposer)
+            .map(|p| p < &index)
+            .unwrap_or_default()
     }
 
     pub fn canonical_tip(&self) -> Option<&Proposal> {

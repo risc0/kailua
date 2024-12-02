@@ -25,6 +25,7 @@ pub struct Proposal {
     pub contract: Address,
     pub index: u64,
     pub parent: u64,
+    pub proposer: Address,
     // claim data
     pub created_at: u64,
     pub io_blobs: Vec<(B256, BlobData)>,
@@ -37,10 +38,10 @@ pub struct Proposal {
     pub proven: HashMap<u64, ProofStatus>,
     pub prover: HashMap<u64, Address>,
     pub survivor: Option<Address>,
-    // io assessment
+    // correctness
     pub correct_io: Vec<Option<bool>>,
     pub correct_claim: Option<bool>,
-    pub is_correct_parent: Option<bool>,
+    pub correct_parent: Option<bool>,
     // resolution
     pub finality: Option<bool>,
 }
@@ -114,6 +115,7 @@ impl Proposal {
             contract: *treasury_instance.address(),
             index,
             parent: index,
+            proposer: *treasury_instance.address(),
             created_at,
             io_blobs: vec![],
             io_hashes: vec![],
@@ -125,8 +127,8 @@ impl Proposal {
             prover: Default::default(),
             survivor: None,
             correct_io: vec![],
-            correct_claim: None,
-            is_correct_parent: Some(true),
+            correct_claim: Some(true),
+            correct_parent: Some(true),
             finality: None,
         };
         proposal
@@ -153,6 +155,12 @@ impl Proposal {
             .await
             .context("parent_game_index")?
             .parentGameIndex_;
+        let proposer = game_instance
+            .proposer()
+            .call()
+            .await
+            .context("proposer")?
+            .proposer_;
         let created_at = game_instance
             .createdAt()
             .call()
@@ -208,6 +216,7 @@ impl Proposal {
             contract: *game_instance.address(),
             index,
             parent,
+            proposer,
             created_at,
             io_blobs,
             io_hashes,
@@ -222,7 +231,7 @@ impl Proposal {
                 .take((config.proposal_block_count - 1) as usize)
                 .collect(),
             correct_claim: None,
-            is_correct_parent: None,
+            correct_parent: None,
             finality: None,
         };
         proposal.fetch_finality(game_instance.provider()).await?;
@@ -334,7 +343,7 @@ impl Proposal {
         is_correct_parent: bool,
     ) -> anyhow::Result<Option<bool>> {
         // Update parent status
-        self.is_correct_parent = Some(is_correct_parent);
+        self.correct_parent = Some(is_correct_parent);
         // Check root claim correctness
         let local_claim = op_node_provider
             .output_at_block(self.output_block_number)
@@ -342,7 +351,7 @@ impl Proposal {
             .context("output_at_block")?;
         self.correct_claim = Some(local_claim == self.output_root);
         // Check intermediate output correctness for KailuaGame instances
-        if self.index != self.parent {
+        if self.has_parent() {
             let starting_block_number = self
                 .output_block_number
                 .saturating_sub(config.proposal_block_count);
@@ -357,14 +366,9 @@ impl Proposal {
         Ok(self.is_correct())
     }
 
-    pub fn accept_correctness(&mut self) {
-        self.is_correct_parent = Some(true);
-        self.correct_claim = Some(true);
-    }
-
     pub fn is_correct(&self) -> Option<bool> {
         // False case
-        if let Some(false) = self.is_correct_parent {
+        if let Some(false) = self.correct_parent {
             return Some(false);
         }
         if let Some(false) = self.correct_claim {
@@ -374,7 +378,7 @@ impl Proposal {
             return Some(false);
         }
         // Unknown case
-        if self.is_correct_parent.is_none()
+        if self.correct_parent.is_none()
             || self.correct_claim.is_none()
             || self.correct_io.iter().any(|c| c.is_none())
         {

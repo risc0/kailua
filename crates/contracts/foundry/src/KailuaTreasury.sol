@@ -60,7 +60,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         ANCHORED_GAME_TYPE = _anchoredGameType;
         ANCHOR_STATE_REGISTRY = _anchorStateRegistry;
 
-        proposer[address(this)] = address(this);
+        proposerOf[address(this)] = address(this);
     }
 
     // ------------------------------
@@ -141,7 +141,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     mapping(address => uint256) public eliminationRound;
 
     /// @inheritdoc IKailuaTreasury
-    mapping(address => address) public proposer;
+    mapping(address => address) public proposerOf;
 
     /// @inheritdoc IKailuaTreasury
     function eliminate(address child, address prover) external {
@@ -154,7 +154,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         }
 
         // INVARIANT: Only known proposals may be eliminated
-        address eliminated = proposer[address(child)];
+        address eliminated = proposerOf[address(child)];
         if (eliminated == address(0x0)) {
             revert NotProposed();
         }
@@ -224,6 +224,6 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         );
         isProposing = false;
         // Record proposer
-        proposer[address(gameContract)] = msg.sender;
+        proposerOf[address(gameContract)] = msg.sender;
     }
 }

@@ -310,6 +310,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             revert UnknownGame();
         }
 
+        // INVARIANT: The calling KailuaGame contract is not referring to itself as a parent
+        if (msg.sender == address(this)) {
+            revert InvalidParent();
+        }
+
         // Append new child to children list
         children.push(KailuaTournament(msg.sender));
         // todo: automatically request fault proof from boundless to resolve dispute
@@ -387,7 +392,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     }
 
     function isChildEliminated(KailuaTournament child) internal returns (bool) {
-        address proposer = KAILUA_TREASURY.proposer(address(child));
+        address proposer = KAILUA_TREASURY.proposerOf(address(child));
         uint256 eliminationRound = KAILUA_TREASURY.eliminationRound(proposer);
         if (eliminationRound == 0 || eliminationRound > child.gameIndex()) {
             // This proposer has not been eliminated as of their proposal at gameIndex
@@ -401,6 +406,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
     /// @notice Returns the parent game contract.
     function parentGame() public view virtual returns (KailuaTournament parentGame_);
+
+    /// @notice Returns the proposer address
+    function proposer() public returns (address proposer_) {
+        proposer_ = KAILUA_TREASURY.proposerOf(address(this));
+    }
 
     // ------------------------------
     // IDisputeGame implementation
