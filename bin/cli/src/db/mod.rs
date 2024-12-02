@@ -162,10 +162,7 @@ impl KailuaDB {
                 true
             };
 
-            // todo: take into account avoidance of unfinalizeable repeated proposals
-            if is_correct_proposal
-                && !self.was_proposer_eliminated_before(proposal.proposer, proposal.index)
-            {
+            if is_correct_proposal && !self.was_proposer_eliminated_before(&proposal) {
                 // Consider updating canonical chain tip
                 let canonical_tip_height = self.canonical_tip_height();
                 if canonical_tip_height.is_none()
@@ -196,10 +193,10 @@ impl KailuaDB {
         self.eliminations.contains_key(&proposer)
     }
 
-    pub fn was_proposer_eliminated_before(&self, proposer: Address, index: u64) -> bool {
+    pub fn was_proposer_eliminated_before(&self, proposal: &Proposal) -> bool {
         self.eliminations
-            .get(&proposer)
-            .map(|p| p < &index)
+            .get(&proposal.proposer)
+            .map(|p| p < &proposal.index)
             .unwrap_or_default()
     }
 

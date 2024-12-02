@@ -26,6 +26,7 @@ use alloy::providers::{Provider, ProviderBuilder};
 use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
 use anyhow::Context;
+use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
 use std::process::exit;
 use std::str::FromStr;
 use std::time::Duration;
@@ -254,15 +255,58 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
         }
         let sidecar = crate::providers::beacon::blob_sidecar(io_blobs)?;
 
-        // todo calculate required duplication counter (factor proposer honesty into correctness)
+        // Calculate required duplication counter
+        let mut dupe_counter = 0u64;
+        let unique_extra_data = loop {
+            // compute extra data with block number, parent factory index, and blob hash
+            let extra_data = [
+                proposed_block_number.abi_encode_packed(),
+                canonical_tip.index.abi_encode_packed(),
+                dupe_counter.abi_encode_packed(),
+            ]
+            .concat();
+            // check if proposal exists
+            let dupe_game_address = dispute_game_factory
+                .games(
+                    KAILUA_GAME_TYPE,
+                    proposed_output_root,
+                    Bytes::from(extra_data.clone()),
+                )
+                .call()
+                .await
+                .context("dupe_game_address")?
+                .proxy_;
+            if dupe_game_address.is_zero() {
+                // proposal was not made before using this dupe counter
+                break Some(extra_data);
+            }
+            // fetch proposal from local data
+            let dupe_game_index: u64 =
+                KailuaTournamentInstance::new(dupe_game_address, &proposer_provider)
+                    .gameIndex()
+                    .call()
+                    .await
+                    .context("dupe_game_index")?
+                    ._0
+                    .to();
+            let Some(dupe_proposal) = kailua_db.proposals.get(&dupe_game_index) else {
+                // we need to fetch this proposal's data
+                break None;
+            };
+            // check if proposal was made incorrectly or by an already eliminated player
+            if dupe_proposal.is_correct().unwrap_or_default()
+                && !kailua_db.was_proposer_eliminated_before(dupe_proposal)
+            {
+                break None;
+            }
+            // increment counter
+            dupe_counter += 1;
+        };
 
-        // compute extra data with block number, parent factory index, and blob hash
-        let extra_data = [
-            proposed_block_number.abi_encode_packed(),
-            canonical_tip.index.abi_encode_packed(),
-            0u64.abi_encode_packed(),
-        ]
-        .concat();
+        let Some(extra_data) = unique_extra_data else {
+            // this proposal was already correctly made or we need more data
+            continue;
+        };
         // Check collateral requirements
         let bond_value = kailua_db.treasury.fetch_bond(&proposer_provider).await?;
         let paid_in = kailua_db
@@ -276,7 +320,7 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             continue;
         }
         // Submit proposal
-        info!("Proposing output {proposed_output_root} at {proposed_block_number} with {owed_collateral} additional collateral.");
+        info!("Proposing output {proposed_output_root} at l2 block number {proposed_block_number} with {owed_collateral} additional collateral and duplication counter {dupe_counter}.");
         kailua_db
             .treasury
             .treasury_contract_instance(&proposer_provider)
