@@ -44,6 +44,7 @@ pub struct Proposal {
     pub correct_claim: Option<bool>,
     pub correct_parent: Option<bool>,
     // resolution
+    pub canonical: Option<bool>,
     pub finality: Option<bool>,
 }
 
@@ -131,6 +132,7 @@ impl Proposal {
             correct_io: vec![],
             correct_claim: Some(true),
             correct_parent: Some(true),
+            canonical: None,
             finality: None,
         };
         proposal
@@ -235,6 +237,7 @@ impl Proposal {
                 .collect(),
             correct_claim: None,
             correct_parent: None,
+            canonical: None,
             finality: None,
         };
         proposal.fetch_finality(game_instance.provider()).await?;

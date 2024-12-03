@@ -167,30 +167,37 @@ impl KailuaDB {
             // Determine whether to follow or eliminate proposer
             if is_correct_proposal && !self.was_proposer_eliminated_before(&proposal) {
                 // Consider updating canonical chain tip
-                let canonical_tip_height = self.canonical_tip_height();
-                if canonical_tip_height.is_none()
-                    || canonical_tip_height.unwrap() < proposal.output_block_number
-                {
+                let canon_height = self.canonical_tip_height();
+                if canon_height.is_none() || canon_height.unwrap() < proposal.output_block_number {
                     info!(
                         "Updating canonical proposal chain tip to game at index {}.",
                         proposal.index
                     );
                     self.canonical_tip_index = Some(proposal.index);
+                    proposal.canonical = Some(true);
+                } else {
+                    proposal.canonical = Some(false);
                 }
-            } else if let Entry::Vacant(entry) = self.eliminations.entry(proposal.proposer) {
+            } else {
+                // Set as non-canonical
+                proposal.canonical = Some(false);
                 // Record proposal as first elimination cause
-                entry.insert(proposal.index);
+                if let Entry::Vacant(entry) = self.eliminations.entry(proposal.proposer) {
+                    entry.insert(proposal.index);
+                }
             }
 
             // Determine tournament performance
             if proposal.has_parent() {
+                let parent = self.proposals.get(&proposal.parent).unwrap();
                 // Participate in tournament only if this is a correct or first bad proposal
                 if self.was_proposer_eliminated_before(&proposal) {
                     continue;
                 }
-                // todo: Skip non-canonical tournaments
-
-                let parent = self.proposals.get(&proposal.parent).unwrap();
+                // Skip non-canonical tournaments
+                if !parent.canonical.unwrap_or_default() {
+                    continue;
+                }
                 // Update the contender
                 proposal.contender = parent.survivor;
                 // Determine survivorship
