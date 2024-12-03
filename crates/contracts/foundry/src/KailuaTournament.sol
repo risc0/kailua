@@ -141,7 +141,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     KailuaTournament[] public children;
 
     function verifyIntermediateOutput(
-        uint32 outputNumber,
+        uint64 outputNumber,
         bytes32 outputHash,
         bytes calldata blobCommitment,
         bytes calldata kzgProof
@@ -149,13 +149,13 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
     /// @notice Proves the outcome of a tournament match
     function prove(
-        uint32[3] calldata uvo,
+        uint64[3] calldata uvo,
         bytes calldata encodedSeal,
         bytes32 acceptedOutput,
         bytes32[2] calldata proposedOutput,
         bytes32 computedOutput,
-        bytes[2][] calldata blobCommitments,
-        bytes[2][] calldata kzgProofs
+        bytes[][2] calldata blobCommitments,
+        bytes[][2] calldata kzgProofs
     ) external {
         KailuaTournament[2] memory childContracts = [children[uvo[0]], children[uvo[1]]];
         // INVARIANT: Proofs cannot be submitted unless the children are playing.
@@ -363,7 +363,6 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                 }
                 if (common == PROPOSAL_BLOBS) {
                     // The opponent is an unjustified duplicate. Ignore it.
-                    // todo Close this straggler gracefully?
                     continue;
                 }
             }
@@ -380,7 +379,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                 u = v;
             } else {
                 // assume u survives
-                // todo jump over u if both players lose
+                // todo jump over u if both players lose?
                 // eliminate the opponent
                 KAILUA_TREASURY.eliminate(address(opponent), prover[u][v]);
                 // proceed with the same player

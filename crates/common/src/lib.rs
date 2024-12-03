@@ -230,7 +230,7 @@ pub async fn validate_precondition<
     beacon: &mut B,
 ) -> anyhow::Result<B256>
 where
-    <B as BlobProvider>::Error: core::fmt::Debug,
+    <B as BlobProvider>::Error: Debug,
 {
     // There is no condition to validate at blob boundaries
     if precondition_data_hash.is_zero() {

@@ -109,7 +109,7 @@ error BlockNumberMismatch(uint256 anchored, uint256 initialized);
 /// @param u The preexisting proposal
 /// @param v The subsequent proposal
 /// @param status The proven status of the match
-event Proven(uint32 indexed u, uint32 indexed v, ProofStatus indexed status);
+event Proven(uint64 indexed u, uint64 indexed v, ProofStatus indexed status);
 
 /// @notice Emitted when the participation bond is updated
 /// @param amount The new required bond amount

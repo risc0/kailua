@@ -1,13 +1,13 @@
 use crate::db::config::Config;
 use crate::db::ProofStatus;
-use crate::providers::beacon::hash_to_fe;
 use crate::providers::beacon::BlobProvider;
+use crate::providers::beacon::{blob_fe_proof, hash_to_fe};
 use crate::providers::optimism::OpNodeProvider;
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::network::{BlockResponse, HeaderResponse, Network};
-use alloy::primitives::{Address, B256, U256};
+use alloy::primitives::{Address, Bytes, B256, U256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
 use alloy_rpc_types_beacon::sidecar::BlobData;
@@ -37,7 +37,8 @@ pub struct Proposal {
     pub children: Vec<u64>,
     pub proven: HashMap<u64, ProofStatus>,
     pub prover: HashMap<u64, Address>,
-    pub survivor: Option<Address>,
+    pub survivor: Option<u64>,
+    pub contender: Option<u64>,
     // correctness
     pub correct_io: Vec<Option<bool>>,
     pub correct_claim: Option<bool>,
@@ -70,7 +71,7 @@ impl Proposal {
         }
     }
 
-    pub async fn load_treasury<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+    async fn load_treasury<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         treasury_instance: &KailuaTreasuryInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
         let index = treasury_instance
@@ -126,6 +127,7 @@ impl Proposal {
             proven: Default::default(),
             prover: Default::default(),
             survivor: None,
+            contender: None,
             correct_io: vec![],
             correct_claim: Some(true),
             correct_parent: Some(true),
@@ -137,7 +139,7 @@ impl Proposal {
         Ok(proposal)
     }
 
-    pub async fn load_game<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+    async fn load_game<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         config: &Config,
         blob_provider: &BlobProvider,
         game_instance: &KailuaGameInstance<T, P, N>,
@@ -227,6 +229,7 @@ impl Proposal {
             proven: Default::default(),
             prover: Default::default(),
             survivor: None,
+            contender: None,
             correct_io: repeat(None)
                 .take((config.proposal_block_count - 1) as usize)
                 .collect(),
@@ -411,5 +414,68 @@ impl Proposal {
 
     pub fn has_parent(&self) -> bool {
         self.index != self.parent
+    }
+
+    pub fn divergence_point(&self, proposal: &Proposal) -> Option<usize> {
+        // Check divergence in IO
+        for i in 0..self.io_hashes.len() {
+            if self.io_hashes[i] != proposal.io_hashes[i] {
+                return Some(i);
+            }
+        }
+        // Check divergence in final claim
+        if self.output_root != proposal.output_root {
+            return Some(self.io_hashes.len());
+        }
+        // Report equivalence
+        None
+    }
+
+    pub fn wins_against(&self, proposal: &Proposal) -> bool {
+        // todo: If the survivor hasn't been challenged for as long as the timeout, declare them winner
+        match self.divergence_point(proposal) {
+            // u wins if v is a duplicate
+            None => true,
+            // u wins if v is wrong (even if u is wrong)
+            Some(point) => {
+                if point < self.io_hashes.len() {
+                    !proposal.correct_io[point].unwrap()
+                } else {
+                    !proposal.correct_claim.unwrap()
+                }
+            }
+        }
+    }
+
+    pub fn has_precondition_for(&self, position: u64) -> bool {
+        if position == self.io_hashes.len() as u64 {
+            false
+        } else {
+            // technically this can be > 1 instead
+            (position % FIELD_ELEMENTS_PER_BLOB) > 0
+        }
+    }
+
+    pub fn io_blob_for(&self, position: u64) -> (B256, BlobData) {
+        let index = position / FIELD_ELEMENTS_PER_BLOB;
+        self.io_blobs[index as usize].clone()
+    }
+
+    pub fn io_commitment_for(&self, position: u64) -> Bytes {
+        let blob = self.io_blob_for(position);
+        Bytes::from(blob.1.kzg_commitment.to_vec())
+    }
+
+    pub fn io_proof_for(&self, position: u64) -> anyhow::Result<Bytes> {
+        let io_blob = self.io_blob_for(position);
+        let (proof, _) = blob_fe_proof(&io_blob.1.blob, position as usize)?;
+        Ok(Bytes::from(proof.to_vec()))
+    }
+
+    pub fn output_at(&self, position: u64) -> B256 {
+        self.io_hashes
+            .get(position as usize)
+            .copied()
+            .unwrap_or(self.output_root)
     }
 }

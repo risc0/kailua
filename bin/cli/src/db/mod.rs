@@ -32,7 +32,7 @@ use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
 use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
 use proposal::Proposal;
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use tracing::{error, info, warn};
 use treasury::Treasury;
 
@@ -49,7 +49,7 @@ pub enum ProofStatus {
 pub struct KailuaDB {
     pub config: Config,
     pub treasury: Treasury,
-    pub proposals: HashMap<u64, Proposal>,
+    pub proposals: BTreeMap<u64, Proposal>,
     pub eliminations: HashMap<Address, u64>,
     pub next_factory_index: u64,
     pub canonical_tip_index: Option<u64>,
@@ -122,6 +122,8 @@ impl KailuaDB {
                 KailuaTournamentInstance::new(game_address, anchor_state_registry.provider());
             let mut proposal =
                 Proposal::load(&self.config, blob_provider, &tournament_instance).await?;
+
+            // Determine inherited correctness
             let is_correct_proposal = if proposal.has_parent() {
                 // Validate game instance data
                 info!("Assessing proposal correctness..");
@@ -162,6 +164,7 @@ impl KailuaDB {
                 true
             };
 
+            // Determine whether to follow or eliminate proposer
             if is_correct_proposal && !self.was_proposer_eliminated_before(&proposal) {
                 // Consider updating canonical chain tip
                 let canonical_tip_height = self.canonical_tip_height();
@@ -177,6 +180,36 @@ impl KailuaDB {
             } else if let Entry::Vacant(entry) = self.eliminations.entry(proposal.proposer) {
                 // Record proposal as first elimination cause
                 entry.insert(proposal.index);
+            }
+
+            // Determine tournament performance
+            if proposal.has_parent() {
+                // Participate in tournament only if this is a correct or first bad proposal
+                if self.was_proposer_eliminated_before(&proposal) {
+                    continue;
+                }
+                // todo: Skip non-canonical tournaments
+
+                let parent = self.proposals.get(&proposal.parent).unwrap();
+                // Update the contender
+                proposal.contender = parent.survivor;
+                // Determine survivorship
+                if parent
+                    .survivor
+                    .map(|contender| {
+                        !self
+                            .proposals
+                            .get(&contender)
+                            .unwrap()
+                            .wins_against(&proposal)
+                    })
+                    .unwrap_or(true)
+                {
+                    // If the old survivor (if any) is defeated,
+                    // set this proposal as the new survivor
+                    let parent = self.proposals.get_mut(&proposal.parent).unwrap();
+                    parent.survivor = Some(proposal.index);
+                }
             }
 
             // Insert proposal in db

@@ -13,6 +13,7 @@ hex.workspace = true
 
 alloy = { workspace = true, features = ["full", "kzg"] }
 alloy-rpc-types-beacon.workspace = true
+op-alloy-protocol.workspace = true
 
 kailua-build.workspace = true
 kailua-client.workspace = true

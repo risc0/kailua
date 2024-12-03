@@ -3291,6 +3291,7 @@ dependencies = [
  "kailua-host",
  "kona-derive",
  "kona-host",
+ "op-alloy-protocol",
  "risc0-ethereum-contracts",
  "risc0-zkvm",
  "serde",

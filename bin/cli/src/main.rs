@@ -24,7 +24,7 @@ async fn main() -> anyhow::Result<()> {
     match cli {
         Cli::Deploy(deploy_args) => kailua_cli::deploy::deploy(deploy_args).await?,
         Cli::Propose(propose_args) => kailua_cli::propose::propose(propose_args).await?,
-        // Cli::Validate(validate_args) => kailua_cli::validate::validate(validate_args).await?,
+        Cli::Validate(validate_args) => kailua_cli::validate::validate(validate_args).await?,
         // Cli::TestFault(_fault_args) =>
         // {
         //     #[cfg(feature = "devnet")]

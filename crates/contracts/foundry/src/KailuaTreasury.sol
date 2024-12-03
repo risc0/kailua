@@ -115,7 +115,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
 
     /// @inheritdoc KailuaTournament
     function verifyIntermediateOutput(
-        uint32 outputNumber,
+        uint64 outputNumber,
         bytes32 outputHash,
         bytes calldata blobCommitment,
         bytes calldata kzgProof

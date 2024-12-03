@@ -14,13 +14,10 @@
 
 use alloy::contract::SolCallBuilder;
 use alloy::network::{Network, TransactionBuilder};
-use alloy::primitives::{Address, FixedBytes, Uint, U256};
-use alloy::providers::{Provider, ReqwestProvider};
+use alloy::primitives::{Address, Uint, U256};
+use alloy::providers::Provider;
 use alloy::transports::Transport;
-use anyhow::Context;
 use kailua_contracts::Safe::SafeInstance;
-use std::str::FromStr;
-use tracing::debug;
 
 // pub mod bench;
 pub mod channel;
@@ -29,7 +26,7 @@ pub mod deploy;
 // pub mod fault;
 pub mod propose;
 pub mod providers;
-// pub mod validate;
+pub mod validate;
 
 pub const KAILUA_GAME_TYPE: u32 = 1337;
 
@@ -40,7 +37,7 @@ pub const KAILUA_GAME_TYPE: u32 = 1337;
 pub enum Cli {
     Deploy(deploy::DeployArgs),
     Propose(propose::ProposeArgs),
-    // Validate(validate::ValidateArgs),
+    Validate(validate::ValidateArgs),
     // TestFault(fault::FaultArgs),
     // Benchmark(bench::BenchArgs),
 }
@@ -50,7 +47,7 @@ impl Cli {
         match self {
             Cli::Deploy(args) => args.v,
             Cli::Propose(args) => args.v,
-            // Cli::Validate(args) => args.v,
+            Cli::Validate(args) => args.v,
             // Cli::TestFault(args) => args.propose_args.v,
             // Cli::Benchmark(args) => args.v,
         }
@@ -94,24 +91,6 @@ pub async fn exec_safe_txn<
     .get_receipt()
     .await?;
     Ok(())
-}
-
-pub async fn block_hash(
-    l2_node_provider: &ReqwestProvider,
-    block_number: u64,
-) -> anyhow::Result<FixedBytes<32>> {
-    let block: serde_json::Value = l2_node_provider
-        .client()
-        .request(
-            "eth_getBlockByNumber",
-            (format!("0x{:x}", block_number), false),
-        )
-        .await
-        .context(format!("eth_getBlockByNumber {block_number}"))?;
-    debug!("block_hash {:?}", &block);
-    Ok(FixedBytes::<32>::from_str(
-        block["hash"].as_str().expect("Failed to parse block hash"),
-    )?)
 }
 
 // pub async fn derive_expected_journal<T: Transport + Clone, P: Provider<T, N>, N: Network>(

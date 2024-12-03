@@ -109,22 +109,12 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
     info!("Initializing..");
     let mut kailua_db = KailuaDB::init(&anchor_state_registry).await?;
     info!("KailuaTreasury({:?})", kailua_db.treasury.address);
-    // Sanity check
-    if kailua_game_implementation
-        .treasury()
-        .call()
-        .await?
-        .treasury_
-        != kailua_db.treasury.address
-    {
-        error!("Invalid treasury address in KailuaGame implementation");
-        exit(1);
-    }
     // Run the proposer loop to sync and post
     info!(
         "Starting from proposal at factory index {}",
         kailua_db.next_factory_index
     );
+
     loop {
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
@@ -133,6 +123,7 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             .load_proposals(&anchor_state_registry, &op_node_provider, &cl_node_provider)
             .await
             .context("load_proposals")?;
+
         // Stack unresolved ancestors
         let mut unresolved_proposal_indices = kailua_db
             .unresolved_canonical_proposals(&proposer_provider)
@@ -182,6 +173,7 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             );
             proposal.resolve(&proposer_provider).await?;
         }
+
         // Submit proposal to extend canonical chain
         let Some(canonical_tip) = kailua_db.canonical_tip() else {
             warn!("No canonical proposal chain to extend!");
