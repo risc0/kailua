@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use alloy_consensus::Header;
-use alloy_primitives::{Address, Bytes, B256, U256};
+use alloy_primitives::{Address, B256, U256};
 use hashbrown::HashMap;
 use kona_mpt::{TrieHinter, TrieNode, TrieProvider};
 use std::fmt::Debug;
@@ -41,28 +41,6 @@ where
         drop(tries);
         // the fallback takes care of repeated lookups
         self.fallback.trie_node_by_hash(key).map_err(Into::into)
-    }
-
-    fn bytecode_by_hash(&self, code_hash: B256) -> Result<Bytes, Self::Error> {
-        let mut contracts = self.contracts.lock().unwrap();
-        if let Some(bytecode) = contracts.remove(&code_hash) {
-            return Ok(bytecode.into());
-        }
-        drop(contracts);
-        // the fallback takes care of repeated lookups
-        self.fallback
-            .bytecode_by_hash(code_hash)
-            .map_err(Into::into)
-    }
-
-    fn header_by_hash(&self, hash: B256) -> Result<Header, Self::Error> {
-        let mut headers = self.headers.lock().unwrap();
-        if let Some(header) = headers.remove(&hash) {
-            return Ok(header);
-        }
-        drop(headers);
-        // the fallback takes care of repeated lookups
-        self.fallback.header_by_hash(hash).map_err(Into::into)
     }
 }
 

@@ -19,7 +19,7 @@ use kailua_client::fpvm_proof_file_name;
 use kailua_host::{
     fetch_precondition_data, generate_rollup_config, zeth_execution_preflight, KailuaHostCli,
 };
-use kona_host::{init_tracing_subscriber, start_server_and_native_client};
+use kona_host::init_tracing_subscriber;
 use std::env::set_var;
 use std::path::Path;
 use tempfile::tempdir;
@@ -32,13 +32,18 @@ async fn main() -> anyhow::Result<()> {
     set_var("KAILUA_VERBOSITY", cfg.kona.v.to_string());
 
     // compute receipt if uncached
-    let precondition_hash = match fetch_precondition_data(&cfg).await? {
-        Some(data) => {
-            set_var("PRECONDITION_VALIDATION_DATA_HASH", data.hash().to_string());
-            data.precondition_hash()
-        }
-        None => B256::ZERO,
-    };
+    let (precondition_hash, precondition_validation_data_hash) =
+        match fetch_precondition_data(&cfg).await? {
+            Some(data) => {
+                let precondition_validation_data_hash = data.hash();
+                set_var(
+                    "PRECONDITION_VALIDATION_DATA_HASH",
+                    precondition_validation_data_hash.to_string(),
+                );
+                (data.precondition_hash(), precondition_validation_data_hash)
+            }
+            None => (B256::ZERO, B256::ZERO),
+        };
     let file_name = fpvm_proof_file_name(
         precondition_hash,
         cfg.kona.l1_head,
@@ -60,7 +65,7 @@ async fn main() -> anyhow::Result<()> {
         }
 
         // generate a proof using the kailua client and kona server
-        start_server_and_native_client(cfg.kona.clone())
+        kailua_host::start_server_and_native_client(cfg.kona, precondition_validation_data_hash)
             .await
             .expect("Proving failure");
     }

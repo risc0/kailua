@@ -12,26 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use alloy::consensus::Transaction;
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::primitives::{keccak256, B256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy_chains::NamedChain;
+use alloy_eips::eip4844::IndexedBlobHash;
 use anyhow::bail;
 use clap::Parser;
 use kailua_client::parse_b256;
 use kailua_common::oracle::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
-use kona_derive::prelude::IndexedBlobHash;
+use kona_host::fetcher::Fetcher;
 use kona_host::kv::SharedKeyValueStore;
-use kona_preimage::{PreimageKey, PreimageKeyType};
+use kona_host::start_native_preimage_server;
+use kona_preimage::{BidirectionalChannel, HintWriter, OracleReader, PreimageKey, PreimageKeyType};
 use op_alloy_genesis::RollupConfig;
 use op_alloy_protocol::BlockInfo;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::env::set_var;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tempfile::TempDir;
-use tokio::fs;
+use tokio::sync::RwLock;
+use tokio::{fs, task};
 use tracing::{debug, info, warn};
 use zeth_core::driver::CoreDriver;
 use zeth_core::mpt::{MptNode, MptNodeData};
@@ -71,39 +76,85 @@ pub struct KailuaHostCli {
     pub v_blob_kzg_hash: Option<B256>,
 }
 
+/// Starts the [PreimageServer] and the client program in separate threads. The client program is
+/// ran natively in this mode.
+///
+/// ## Takes
+/// - `cfg`: The host configuration.
+///
+/// ## Returns
+/// - `Ok(exit_code)` if the client program exits successfully.
+/// - `Err(_)` if the client program failed to execute, was killed by a signal, or the host program
+///   exited first.
+pub async fn start_server_and_native_client(
+    cfg: kona_host::cli::HostCli,
+    precondition_validation_data_hash: B256,
+) -> anyhow::Result<i32> {
+    let hint_chan = BidirectionalChannel::new()?;
+    let preimage_chan = BidirectionalChannel::new()?;
+    let kv_store = cfg.construct_kv_store();
+    let fetcher = if !cfg.is_offline() {
+        let (l1_provider, blob_provider, l2_provider) = cfg.create_providers().await?;
+        Some(Arc::new(RwLock::new(Fetcher::new(
+            kv_store.clone(),
+            l1_provider,
+            blob_provider,
+            l2_provider,
+            cfg.agreed_l2_head_hash,
+        ))))
+    } else {
+        None
+    };
+
+    // Create the server and start it.
+    let server_task = task::spawn(start_native_preimage_server(
+        kv_store,
+        fetcher,
+        hint_chan.host,
+        preimage_chan.host,
+    ));
+
+    // Start the client program in a separate child process.
+    let program_task = task::spawn(kailua_client::run_client(
+        OracleReader::new(preimage_chan.client),
+        HintWriter::new(hint_chan.client),
+        precondition_validation_data_hash,
+    ));
+
+    // Execute both tasks and wait for them to complete.
+    info!("Starting preimage server and client program.");
+    let (_, client_result) = tokio::try_join!(server_task, program_task,)?;
+    info!(target: "kona_host", "Preimage server and client program have joined.");
+
+    Ok(client_result.is_err() as i32)
+}
+
 pub async fn generate_rollup_config(
     cfg: &mut KailuaHostCli,
     tmp_dir: &TempDir,
 ) -> anyhow::Result<RollupConfig> {
     // generate a RollupConfig for the target network
-    match cfg
-        .kona
-        .l2_chain_id
-        .and_then(RollupConfig::from_l2_chain_id)
-    {
+    match cfg.kona.read_rollup_config().ok() {
         Some(rollup_config) => Ok(rollup_config),
-        None => match cfg.kona.read_rollup_config().ok() {
-            Some(rollup_config) => Ok(rollup_config),
-            None => {
-                info!("Fetching rollup config from nodes.");
-                let tmp_cfg_file = tmp_dir.path().join("rollup-config.json");
-                fetch_rollup_config(
-                    cfg.op_node_address
-                        .clone()
-                        .expect("Missing op-node-address")
-                        .as_str(),
-                    cfg.kona
-                        .l2_node_address
-                        .clone()
-                        .expect("Missing l2-node-address")
-                        .as_str(),
-                    Some(&tmp_cfg_file),
-                )
-                .await?;
-                cfg.kona.rollup_config_path = Some(tmp_cfg_file);
-                cfg.kona.read_rollup_config()
-            }
-        },
+        None => {
+            info!("Fetching rollup config from nodes.");
+            let tmp_cfg_file = tmp_dir.path().join("rollup-config.json");
+            fetch_rollup_config(
+                cfg.op_node_address
+                    .clone()
+                    .expect("Missing op-node-address")
+                    .as_str(),
+                cfg.kona
+                    .l2_node_address
+                    .clone()
+                    .expect("Missing l2-node-address")
+                    .as_str(),
+                Some(&tmp_cfg_file),
+            )
+            .await?;
+            cfg.kona.rollup_config_path = Some(tmp_cfg_file);
+            cfg.kona.read_rollup_config()
+        }
     }
 }
 
@@ -277,13 +328,12 @@ pub async fn get_blob_fetch_request(
         .get_block_by_hash(block_hash, BlockTransactionsKind::Full)
         .await?
         .expect("Failed to fetch block {block_hash}.");
-    let mut blob_index = 0usize;
-    for blob in block
-        .transactions
-        .into_transactions()
-        .filter_map(|tx| tx.blob_versioned_hashes)
-        .flatten()
-    {
+    let mut blob_index = 0;
+    for blob in block.transactions.into_transactions().flat_map(|tx| {
+        tx.blob_versioned_hashes()
+            .map(|h| h.to_vec())
+            .unwrap_or_default()
+    }) {
         if blob == blob_hash {
             break;
         }

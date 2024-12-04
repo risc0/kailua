@@ -18,6 +18,7 @@ use crate::db::KailuaDB;
 use crate::providers::beacon::BlobProvider;
 use crate::providers::optimism::OpNodeProvider;
 use crate::KAILUA_GAME_TYPE;
+use alloy::eips::eip4844::IndexedBlobHash;
 use alloy::eips::BlockNumberOrTag;
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::network::EthereumWallet;
@@ -31,7 +32,6 @@ use kailua_common::precondition::PreconditionValidationData;
 use kailua_common::ProofJournal;
 use kailua_contracts::{IAnchorStateRegistry, IDisputeGameFactory, KailuaGame};
 use kailua_host::fetch_rollup_config;
-use kona_derive::sources::IndexedBlobHash;
 use op_alloy_protocol::BlockInfo;
 use risc0_zkvm::Receipt;
 use std::env;
@@ -356,7 +356,10 @@ async fn request_proof(
         proposal.output_block_number - proposal.io_hashes.len() as u64 - 1 + challenge_point; // the challenge point is zero indexed, so it cancels out
     debug!("l2_head_number {:?}", &agreed_l2_head_number);
     let agreed_l2_head_hash = l2_node_provider
-        .get_block_by_number(BlockNumberOrTag::Number(agreed_l2_head_number), false)
+        .get_block_by_number(
+            BlockNumberOrTag::Number(agreed_l2_head_number),
+            BlockTransactionsKind::Hashes,
+        )
         .await
         .context("agreed_l2_head_hash")?
         .expect("Agreed l2 head not found")
@@ -384,7 +387,7 @@ async fn request_proof(
         let u_blob_block = l1_node_provider
             .get_block_by_number(
                 BlockNumberOrTag::Number(u_blob_block_parent.header.number + 1),
-                false,
+                BlockTransactionsKind::Hashes,
             )
             .await
             .context("u_blob_block get_block_by_number")?
@@ -399,7 +402,7 @@ async fn request_proof(
         let v_blob_block = l1_node_provider
             .get_block_by_number(
                 BlockNumberOrTag::Number(v_blob_block_parent.header.number + 1),
-                false,
+                BlockTransactionsKind::Hashes,
             )
             .await
             .context("v_blob_block get_block_by_number")?
@@ -422,7 +425,7 @@ async fn request_proof(
                         timestamp: u_blob_block.header.timestamp,
                     },
                     blob_hash: IndexedBlobHash {
-                        index: u_blob.index as usize,
+                        index: u_blob.index,
                         hash: u_blob_hash,
                     },
                 },
@@ -435,7 +438,7 @@ async fn request_proof(
                         timestamp: v_blob_block.header.timestamp,
                     },
                     blob_hash: IndexedBlobHash {
-                        index: v_blob.index as usize,
+                        index: v_blob.index,
                         hash: v_blob_hash,
                     },
                 },
@@ -473,10 +476,6 @@ pub async fn handle_proofs(
     let kailua_host = env::var("KAILUA_HOST").unwrap_or_else(|_| {
         warn!("KAILUA_HOST set to default ./target/debug/kailua-host");
         String::from("./target/debug/kailua-host")
-    });
-    let kailua_client = env::var("KAILUA_CLIENT").unwrap_or_else(|_| {
-        warn!("KAILUA_CLIENT set to default ./target/debug/kailua-client");
-        String::from("./target/debug/kailua-client")
     });
     let data_dir = env::var("KAILUA_DATA").unwrap_or_else(|_| {
         warn!("KAILUA_DATA set to default .localtestdata");
@@ -545,10 +544,9 @@ pub async fn handle_proofs(
             args.l2_node_address.clone(),
             String::from("--op-node-address"), // l2 cl node
             args.op_node_address.clone(),
-            String::from("--exec"), // path to kailua-client
-            kailua_client.clone(),
             String::from("--data-dir"), // path to cache
             data_dir.clone(),
+            String::from("--native"), // run the client natively
         ];
         // precondition data
         if let Some(precondition_data) = precondition_validation_data {

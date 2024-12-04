@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use alloy_eips::eip4844::IndexedBlobHash;
 use alloy_primitives::keccak256;
 use async_trait::async_trait;
-use kona_client::FlushableCache;
-use kona_derive::prelude::IndexedBlobHash;
 use kona_preimage::errors::PreimageOracleResult;
 use kona_preimage::{HintWriterClient, PreimageKey, PreimageKeyType, PreimageOracleClient};
+use kona_proof::FlushableCache;
 use lazy_static::lazy_static;
 use op_alloy_protocol::BlockInfo;
 use risc0_zkvm::guest::env::{FdReader, FdWriter};

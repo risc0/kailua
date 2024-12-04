@@ -31,17 +31,15 @@ tracing = "0.1.40"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Alloy
-alloy = { version = "0.5.4", default-features = false, features = ["json"] }
+alloy = { version = "0.7.2", default-features = false, features = ["json"] }
 alloy-chains = "0.1.46"
-alloy-consensus = "0.5.4"
-alloy-eips = { version = "0.5.4", features = ["kzg"] }
+alloy-consensus = "0.7.2"
+alloy-eips = { version = "0.7.2", features = ["kzg"] }
 alloy-primitives = { version = "0.8", default-features = false }
-alloy-provider = "0.5.4"
-alloy-rlp = "0.3.8"
-alloy-rpc-types-beacon = "0.5.4"
-op-alloy-genesis = { version = "0.5.2", default-features = false }
-op-alloy-consensus = { version = "0.5.2", default-features = false }
-op-alloy-protocol = { version = "0.5.2", default-features = false }
+alloy-rpc-types-beacon = "0.7.2"
+op-alloy-genesis = { version = "0.7.2", default-features = false }
+op-alloy-consensus = { version = "0.7.2", default-features = false }
+op-alloy-protocol = { version = "0.7.2", default-features = false }
 
 # Kailua
 kailua-build = { path = "build/risczero" }
@@ -51,15 +49,15 @@ kailua-contracts = { path = "crates/contracts" }
 kailua-host = { path = "bin/host" }
 
 # Kona git = "https://github.com/ethereum-optimism/kona", rev = "2e943f4"
-kona-client = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
-kona-common = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
-kona-common-proc = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
+kona-client = { git = "https://github.com/hashcashier/kona", branch = "kailua", default-features = false }
 kona-derive = { git = "https://github.com/hashcashier/kona", branch = "kailua", default-features = false, features = ["serde"] }
 kona-driver = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
 kona-executor = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
 kona-host = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
 kona-mpt = { git = "https://github.com/hashcashier/kona", branch = "kailua", features = ["serde"] }
 kona-preimage = { git = "https://github.com/hashcashier/kona", branch = "kailua", features = ["rkyv"] }
+kona-proof = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
+kona-std-fpvm = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
 
 # RISC Zero zkVM
 risc0-build = { version = "1.1.3" }

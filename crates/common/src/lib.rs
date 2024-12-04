@@ -18,10 +18,10 @@ use alloy_primitives::{Address, B256};
 use alloy_rpc_types_beacon::sidecar::BlobData;
 use anyhow::{bail, Context};
 use core::fmt::Debug;
-use kona_client::errors::OracleProviderError;
-use kona_client::{BootInfo, FlushableCache};
 use kona_derive::prelude::BlobProvider;
 use kona_preimage::{CommsClient, PreimageKey, PreimageKeyType};
+use kona_proof::errors::OracleProviderError;
+use kona_proof::BootInfo;
 use op_alloy_genesis::RollupConfig;
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use serde::{Deserialize, Serialize};
@@ -228,7 +228,7 @@ pub fn intermediate_outputs(blob_data: &BlobData, blocks: usize) -> anyhow::Resu
 }
 
 pub async fn validate_precondition<
-    O: CommsClient + FlushableCache + Send + Sync + Debug,
+    O: CommsClient + Send + Sync + Debug,
     B: BlobProvider + Send + Sync + Debug + Clone,
 >(
     precondition_data_hash: B256,

@@ -16,12 +16,12 @@ extern crate alloc;
 
 use crate::oracle::{BlobFetchRequest, OracleReader, OracleWriter};
 use alloy_eips::eip4844::{
-    kzg_to_versioned_hash, Blob, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
+    kzg_to_versioned_hash, Blob, IndexedBlobHash, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
+    BYTES_PER_PROOF,
 };
 use async_trait::async_trait;
 use c_kzg::{Bytes48, KzgSettings};
 use kona_derive::errors::BlobProviderError;
-use kona_derive::prelude::IndexedBlobHash;
 use kona_derive::traits::BlobProvider;
 use lazy_static::lazy_static;
 use op_alloy_protocol::BlockInfo;

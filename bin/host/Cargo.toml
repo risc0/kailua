@@ -16,9 +16,10 @@ tracing-subscriber.workspace = true
 tracing.workspace = true
 
 # Alloy
-alloy = { workspace = true, features = ["rlp"] }
+alloy = { workspace = true, features = ["rlp", "reqwest"] }
 alloy-primitives = { workspace = true, features = ["map-hashbrown"] }
 alloy-chains.workspace = true
+alloy-eips.workspace = true
 op-alloy-genesis.workspace = true
 op-alloy-protocol.workspace = true
 

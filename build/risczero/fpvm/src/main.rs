@@ -14,14 +14,14 @@
 
 use alloy_primitives::B256;
 use kailua_common::ProofJournal;
-use kona_client::BootInfo;
 use risc0_zkvm::guest::env;
 use std::sync::Arc;
+use kona_proof::BootInfo;
 
 fn main() {
     let precondition_validation_data_hash = env::read();
     let oracle = Arc::new(kailua_common::oracle::RISCZERO_POSIX_ORACLE);
-    let boot = Arc::new(kona_common::block_on(async {
+    let boot = Arc::new(kona_proof::block_on(async {
         BootInfo::load(oracle.as_ref())
             .await
             .expect("Failed to load BootInfo")
