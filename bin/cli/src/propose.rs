@@ -14,7 +14,7 @@
 
 use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
-use crate::providers::beacon::{hash_to_fe, BlobProvider};
+use crate::providers::beacon::BlobProvider;
 use crate::providers::optimism::OpNodeProvider;
 use crate::KAILUA_GAME_TYPE;
 use alloy::eips::{BlockId, BlockNumberOrTag};
@@ -25,6 +25,7 @@ use alloy::providers::{Provider, ProviderBuilder};
 use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
 use anyhow::Context;
+use kailua_common::hash_to_fe;
 use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
 use std::process::exit;
 use std::str::FromStr;
@@ -149,7 +150,8 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             // Check if claim won in tournament
             if !proposal
                 .fetch_parent_tournament_survivor_status(&proposer_provider)
-                .await?
+                .await
+                .unwrap_or_default()
                 .unwrap_or_default()
             {
                 info!("Waiting for more proofs to resolve proposer as survivor");

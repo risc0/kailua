@@ -183,7 +183,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             uint256 divergentBlobIndex = KailuaLib.blobIndex(uvo[2]);
             if (uvo[2] == PROPOSAL_BLOCK_COUNT) {
                 // If the only difference is the root claim, require all blobs to be equal.
-                divergentBlobIndex += 1;
+                divergentBlobIndex = PROPOSAL_BLOBS;
             }
             // Ensure blob hashes are equal until divergence
             for (uint256 i = 0; i < divergentBlobIndex; i++) {
@@ -226,7 +226,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         }
 
         // Validate the claimed output roots.
-        if (uvo[2] == PROPOSAL_BLOCK_COUNT - 1) {
+        if (uvo[2] == PROPOSAL_BLOCK_COUNT) {
             require(proposedOutput[0] == childContracts[0].rootClaim().raw());
             require(proposedOutput[1] == childContracts[1].rootClaim().raw());
         } else {
@@ -251,9 +251,6 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                 "bad right child proposedOutput kzg proof"
             );
         }
-
-        // fault => u was shown as faulty
-        // bool isFaultProof = proposedOutput[0] != computedOutput;
 
         {
             // Construct the expected journal

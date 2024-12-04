@@ -14,7 +14,6 @@
 
 use crate::db::proposal::Proposal;
 use crate::propose::ProposeArgs;
-use crate::providers::beacon::hash_to_fe;
 use crate::providers::optimism::OpNodeProvider;
 use crate::KAILUA_GAME_TYPE;
 use alloy::network::EthereumWallet;
@@ -23,6 +22,7 @@ use alloy::providers::ProviderBuilder;
 use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
 use anyhow::Context;
+use kailua_common::hash_to_fe;
 use kailua_contracts::KailuaGame::KailuaGameInstance;
 use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
 use kailua_contracts::{IAnchorStateRegistry, IDisputeGameFactory};

@@ -1,6 +1,6 @@
 use crate::db::config::Config;
 use crate::db::ProofStatus;
-use crate::providers::beacon::{blob_fe_proof, hash_to_fe};
+use crate::providers::beacon::blob_fe_proof;
 use crate::providers::beacon::{blob_sidecar, BlobProvider};
 use crate::providers::optimism::OpNodeProvider;
 use alloy::consensus::{Blob, BlobTransactionSidecar};
@@ -13,7 +13,7 @@ use alloy::providers::Provider;
 use alloy::transports::Transport;
 use alloy_rpc_types_beacon::sidecar::BlobData;
 use anyhow::{bail, Context};
-use kailua_common::intermediate_outputs;
+use kailua_common::{hash_to_fe, intermediate_outputs};
 use kailua_contracts::KailuaGame::KailuaGameInstance;
 use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
 use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
@@ -451,6 +451,14 @@ impl Proposal {
         }
     }
 
+    pub fn child_index(&self, proposal_index: u64) -> Option<u64> {
+        self.children
+            .iter()
+            .enumerate()
+            .find(|(_, idx)| *idx == &proposal_index)
+            .map(|r| r.0 as u64)
+    }
+
     pub fn has_precondition_for(&self, position: u64) -> bool {
         if position == self.io_hashes.len() as u64 {
             false
@@ -483,7 +491,7 @@ impl Proposal {
             .unwrap_or(self.output_root)
     }
 
-    pub fn create_sidecar(io_hashes: &Vec<B256>) -> anyhow::Result<BlobTransactionSidecar> {
+    pub fn create_sidecar(io_hashes: &[B256]) -> anyhow::Result<BlobTransactionSidecar> {
         let mut io_blobs = vec![];
         loop {
             let start = io_blobs.len() * FIELD_ELEMENTS_PER_BLOB as usize;
@@ -496,6 +504,6 @@ impl Proposal {
             let blob = Blob::right_padding_from(io_bytes.as_slice());
             io_blobs.push(blob);
         }
-        Ok(blob_sidecar(io_blobs)?)
+        blob_sidecar(io_blobs)
     }
 }

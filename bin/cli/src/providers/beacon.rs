@@ -174,8 +174,3 @@ pub fn blob_fe_proof(
         bail!("Generated invalid kzg proof.")
     }
 }
-
-pub fn hash_to_fe(mut hash: B256) -> B256 {
-    hash.0[0] &= u8::MAX >> 2;
-    hash
-}

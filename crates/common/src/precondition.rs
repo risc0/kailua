@@ -14,7 +14,6 @@
 
 use crate::oracle::BlobFetchRequest;
 use alloy_primitives::B256;
-use risc0_zkvm::serde::to_vec;
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use serde::{Deserialize, Serialize};
 
@@ -25,8 +24,7 @@ pub struct PreconditionValidationData {
 
 impl PreconditionValidationData {
     pub fn to_vec(&self) -> Vec<u8> {
-        let words = to_vec(self).unwrap();
-        bytemuck::cast_vec(words)
+        pot::to_vec(self).unwrap()
     }
 
     pub fn hash(&self) -> B256 {

@@ -23,7 +23,6 @@ use kona_client::{BootInfo, FlushableCache};
 use kona_derive::prelude::BlobProvider;
 use kona_preimage::{CommsClient, PreimageKey, PreimageKeyType};
 use op_alloy_genesis::RollupConfig;
-use risc0_zkvm::serde::from_slice;
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -78,12 +77,20 @@ impl ProofJournal {
 
     pub fn decode_packed(encoded: &[u8]) -> Result<Self, anyhow::Error> {
         Ok(ProofJournal {
-            precondition_output: encoded[..32].try_into()?,
-            l1_head: encoded[32..64].try_into()?,
-            agreed_l2_output_root: encoded[64..96].try_into()?,
-            claimed_l2_output_root: encoded[96..104].try_into()?,
-            claimed_l2_block_number: u64::from_be_bytes(encoded[104..136].try_into()?),
-            config_hash: encoded[136..168].try_into()?,
+            precondition_output: encoded[..32].try_into().context("precondition_output")?,
+            l1_head: encoded[32..64].try_into().context("l1_head")?,
+            agreed_l2_output_root: encoded[64..96]
+                .try_into()
+                .context("agreed_l2_output_root")?,
+            claimed_l2_output_root: encoded[96..128]
+                .try_into()
+                .context("claimed_l2_output_root")?,
+            claimed_l2_block_number: u64::from_be_bytes(
+                encoded[128..136]
+                    .try_into()
+                    .context("claimed_l2_block_number")?,
+            ),
+            config_hash: encoded[136..168].try_into().context("config_hash")?,
         })
     }
 }
@@ -237,7 +244,7 @@ where
         return Ok(B256::ZERO);
     }
     // Read the blob references to fetch
-    let precondition_validation_data: PreconditionValidationData = from_slice(
+    let precondition_validation_data: PreconditionValidationData = pot::from_slice(
         &oracle
             .get(PreimageKey::new(
                 *precondition_data_hash,
@@ -250,23 +257,51 @@ where
     // Read the blobs to validate
     let mut blobs = Vec::new();
     for request in precondition_validation_data.validated_blobs {
-        let blob = beacon
+        #[cfg(not(target_os = "zkvm"))]
+        let expected_hash = request.blob_hash.hash;
+
+        let response = beacon
             .get_blobs(&request.block_ref, &[request.blob_hash])
             .await
             .unwrap();
-        blobs.push(blob.first().unwrap().clone());
+        let blob = *response[0];
+        #[cfg(not(target_os = "zkvm"))]
+        {
+            let settings = blobs::kzg_settings();
+            let blob = c_kzg::Blob::new(blob.0);
+            let commitment = c_kzg::KzgCommitment::blob_to_kzg_commitment(&blob, settings)?;
+            let hash = alloy_eips::eip4844::kzg_to_versioned_hash(commitment.as_slice());
+            assert_eq!(hash, expected_hash);
+        }
+
+        blobs.push(blob);
     }
     // Check equivalence until divergence point
     for i in 0..FIELD_ELEMENTS_PER_BLOB {
         let index = 32 * i as usize;
         if blobs[0][index..index + 32] != blobs[1][index..index + 32] {
+            let agreed_l2_output_root_fe = hash_to_fe(boot.agreed_l2_output_root);
             if i == 0 {
                 bail!("Precondition validation failed at first element");
-            } else if &blobs[0][index - 32..index] != boot.agreed_l2_output_root.as_slice() {
-                bail!("Agreed output not found before divergence point");
+            } else if &blobs[0][index - 32..index] != agreed_l2_output_root_fe.as_slice() {
+                bail!(
+                    "Agreed output {} not found in contender blob before sub-offset {i}",
+                    boot.agreed_l2_output_root
+                );
+            } else if &blobs[1][index - 32..index] != agreed_l2_output_root_fe.as_slice() {
+                bail!(
+                    "Agreed output {} not found in proposal before sub-offset {i}",
+                    boot.agreed_l2_output_root
+                );
             }
+            break;
         }
     }
     // Return the precondition hash
     Ok(precondition_hash)
+}
+
+pub fn hash_to_fe(mut hash: B256) -> B256 {
+    hash.0[0] &= u8::MAX >> 2;
+    hash
 }

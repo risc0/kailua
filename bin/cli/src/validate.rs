@@ -219,7 +219,8 @@ pub async fn handle_proposals(
             let proposal_parent = kailua_db.proposals.get(&proposal.parent).unwrap();
             let proposal_parent_contract =
                 proposal_parent.tournament_contract_instance(&validator_provider);
-            let game_contract = proposal.tournament_contract_instance(&validator_provider);
+            let tournament_contract_instance =
+                proposal.tournament_contract_instance(&validator_provider);
             let proof_journal = ProofJournal::decode_packed(receipt.journal.as_ref())?;
             let contender_index = proposal.contender.unwrap();
             let contender = kailua_db.proposals.get(&contender_index).unwrap();
@@ -228,7 +229,12 @@ pub async fn handle_proposals(
                 proof_journal.claimed_l2_block_number - proposal_parent.output_block_number - 1;
 
             // patch the receipt image id if in dev mode
-            let expected_image_id = game_contract.imageId().call().await?.imageId_.0;
+            let expected_image_id = tournament_contract_instance
+                .imageId()
+                .call()
+                .await?
+                .imageId_
+                .0;
             #[cfg(feature = "devnet")]
             let receipt = {
                 let mut receipt = receipt;
@@ -285,14 +291,22 @@ pub async fn handle_proposals(
                 proofs[1].push(proposal.io_proof_for(challenge_position)?);
             }
 
+            let u_index = proposal_parent
+                .child_index(contender_index)
+                .expect("Could not look up contender's index in parent tournament");
+            let v_index = proposal_parent
+                .child_index(proposal.index)
+                .expect("Could not look up contender's index in parent tournament");
+
             info!(
-                "Submitting proof for position {challenge_position} with {} kzg proof(s).",
+                "Submitting proof to tournament at index {} for match between children {u_index} and {v_index} over output {challenge_position} with {} kzg proof(s).",
+                proposal_parent.index,
                 proofs[0].len() + proofs[1].len()
             );
 
-            game_contract
+            tournament_contract_instance
                 .prove(
-                    [contender_index, proposal.index, challenge_position],
+                    [u_index, v_index, challenge_position],
                     encoded_seal.into(),
                     proof_journal.agreed_l2_output_root,
                     [
@@ -310,7 +324,7 @@ pub async fn handle_proposals(
                 .await
                 .context("prove (get_receipt)")?;
 
-            let proof_status = game_contract
+            let proof_status = tournament_contract_instance
                 .proofStatus(U256::from(contender_index), U256::from(proposal.index))
                 .call()
                 .await
@@ -390,6 +404,12 @@ async fn request_proof(
             .await
             .context("v_blob_block get_block_by_number")?
             .expect("v_blob_block not found");
+
+        info!(
+            "Fetched blobs {}:{u_blob_hash} and {}:{v_blob_hash} for challenge point {challenge_point}",
+            u_blob.index,
+            v_blob.index,
+        );
 
         Some(PreconditionValidationData {
             validated_blobs: [

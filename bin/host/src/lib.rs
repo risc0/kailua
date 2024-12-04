@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy::consensus::Transaction;
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::primitives::{keccak256, B256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
@@ -279,15 +278,16 @@ pub async fn get_blob_fetch_request(
         .await?
         .expect("Failed to fetch block {block_hash}.");
     let mut blob_index = 0usize;
-    for txn in block.transactions.into_transactions() {
-        if let Some(blobs) = txn.blob_versioned_hashes() {
-            for blob in blobs {
-                if blob == &blob_hash {
-                    break;
-                }
-                blob_index += 1;
-            }
+    for blob in block
+        .transactions
+        .into_transactions()
+        .filter_map(|tx| tx.blob_versioned_hashes)
+        .flatten()
+    {
+        if blob == blob_hash {
+            break;
         }
+        blob_index += 1;
     }
 
     Ok(BlobFetchRequest {
@@ -318,7 +318,6 @@ pub async fn fetch_precondition_data(
     // fetch necessary data to validate blob equivalence precondition
     if hash_arguments.iter().all(|arg| arg.is_some()) {
         let (l1_provider, _, _) = cfg.kona.create_providers().await?;
-        // todo fetch & write data
         let precondition_validation_data = PreconditionValidationData {
             validated_blobs: [
                 get_blob_fetch_request(

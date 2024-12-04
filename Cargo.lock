@@ -3360,6 +3360,7 @@ dependencies = [
  "op-alloy-consensus 0.5.2",
  "op-alloy-genesis",
  "op-alloy-protocol",
+ "pot",
  "risc0-zkvm",
  "risc0-zkvm-platform",
  "serde",
