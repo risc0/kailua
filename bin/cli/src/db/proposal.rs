@@ -1,8 +1,9 @@
 use crate::db::config::Config;
 use crate::db::ProofStatus;
-use crate::providers::beacon::BlobProvider;
 use crate::providers::beacon::{blob_fe_proof, hash_to_fe};
+use crate::providers::beacon::{blob_sidecar, BlobProvider};
 use crate::providers::optimism::OpNodeProvider;
+use alloy::consensus::{Blob, BlobTransactionSidecar};
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::primitives::BlockTransactionsKind;
@@ -480,5 +481,21 @@ impl Proposal {
             .get(position as usize)
             .copied()
             .unwrap_or(self.output_root)
+    }
+
+    pub fn create_sidecar(io_hashes: &Vec<B256>) -> anyhow::Result<BlobTransactionSidecar> {
+        let mut io_blobs = vec![];
+        loop {
+            let start = io_blobs.len() * FIELD_ELEMENTS_PER_BLOB as usize;
+            if start >= io_hashes.len() {
+                break;
+            }
+            let end = (start + FIELD_ELEMENTS_PER_BLOB as usize).min(io_hashes.len());
+            let io_bytes = io_hashes[start..end].concat();
+            // Encode as blob sidecar
+            let blob = Blob::right_padding_from(io_bytes.as_slice());
+            io_blobs.push(blob);
+        }
+        Ok(blob_sidecar(io_blobs)?)
     }
 }

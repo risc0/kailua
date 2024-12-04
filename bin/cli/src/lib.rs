@@ -23,7 +23,7 @@ use kailua_contracts::Safe::SafeInstance;
 pub mod channel;
 pub mod db;
 pub mod deploy;
-// pub mod fault;
+pub mod fault;
 pub mod propose;
 pub mod providers;
 pub mod validate;
@@ -38,7 +38,7 @@ pub enum Cli {
     Deploy(deploy::DeployArgs),
     Propose(propose::ProposeArgs),
     Validate(validate::ValidateArgs),
-    // TestFault(fault::FaultArgs),
+    TestFault(fault::FaultArgs),
     // Benchmark(bench::BenchArgs),
 }
 
@@ -48,7 +48,7 @@ impl Cli {
             Cli::Deploy(args) => args.v,
             Cli::Propose(args) => args.v,
             Cli::Validate(args) => args.v,
-            // Cli::TestFault(args) => args.propose_args.v,
+            Cli::TestFault(args) => args.propose_args.v,
             // Cli::Benchmark(args) => args.v,
         }
     }

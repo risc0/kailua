@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
 use crate::providers::beacon::{hash_to_fe, BlobProvider};
 use crate::providers::optimism::OpNodeProvider;
 use crate::KAILUA_GAME_TYPE;
-use alloy::consensus::Blob;
-use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::network::{BlockResponse, EthereumWallet, HeaderResponse};
@@ -233,19 +232,7 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             let output = op_node_provider.output_at_block(i).await?;
             io_hashes.push(hash_to_fe(output));
         }
-        let mut io_blobs = vec![];
-        loop {
-            let start = io_blobs.len() * FIELD_ELEMENTS_PER_BLOB as usize;
-            if start >= io_hashes.len() {
-                break;
-            }
-            let end = (start + FIELD_ELEMENTS_PER_BLOB as usize).min(io_hashes.len());
-            let io_bytes = io_hashes[start..end].concat();
-            // Encode as blob sidecar
-            let blob = Blob::right_padding_from(io_bytes.as_slice());
-            io_blobs.push(blob);
-        }
-        let sidecar = crate::providers::beacon::blob_sidecar(io_blobs)?;
+        let sidecar = Proposal::create_sidecar(&io_hashes)?;
 
         // Calculate required duplication counter
         let mut dupe_counter = 0u64;
