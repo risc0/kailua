@@ -33,13 +33,14 @@ impl PreconditionValidationData {
     }
 
     pub fn precondition_hash(&self) -> B256 {
-        let digest = *SHA2::hash_bytes(
-            &[
-                self.validated_blobs[0].blob_hash.hash.as_slice(),
-                self.validated_blobs[1].blob_hash.hash.as_slice(),
-            ]
-            .concat(),
-        );
-        B256::from_slice(digest.as_bytes())
+        precondition_hash(
+            &self.validated_blobs[0].blob_hash.hash,
+            &self.validated_blobs[1].blob_hash.hash,
+        )
     }
+}
+
+pub fn precondition_hash(contender: &B256, proposal: &B256) -> B256 {
+    let digest = *SHA2::hash_bytes(&[contender.as_slice(), proposal.as_slice()].concat());
+    B256::from_slice(digest.as_bytes())
 }

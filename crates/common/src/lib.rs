@@ -46,7 +46,7 @@ pub struct ProofJournal {
     /// The L2 claim block number.
     pub claimed_l2_block_number: u64,
     /// The configuration hash.
-    pub config_hash: [u8; 32],
+    pub config_hash: B256,
 }
 
 impl ProofJournal {
@@ -57,7 +57,7 @@ impl ProofJournal {
             agreed_l2_output_root: boot_info.agreed_l2_output_root,
             claimed_l2_output_root: boot_info.claimed_l2_output_root,
             claimed_l2_block_number: boot_info.claimed_l2_block_number,
-            config_hash: config_hash(&boot_info.rollup_config).unwrap(),
+            config_hash: B256::from(config_hash(&boot_info.rollup_config).unwrap()),
         }
     }
 }

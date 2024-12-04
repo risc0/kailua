@@ -254,7 +254,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
         {
             // Construct the expected journal
-            uint64 claimBlockNumber = uint64(l2BlockNumber() + uvo[2]);
+            uint64 claimBlockNumber = uint64(l2BlockNumber() + uvo[2] + 1);
             bytes32 journalDigest = sha256(
                 abi.encodePacked(
                     // The parent proposal's claim hash

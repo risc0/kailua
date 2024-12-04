@@ -28,7 +28,7 @@ use alloy::signers::local::LocalSigner;
 use anyhow::{anyhow, bail, Context};
 use kailua_client::fpvm_proof_file_name;
 use kailua_common::oracle::BlobFetchRequest;
-use kailua_common::precondition::PreconditionValidationData;
+use kailua_common::precondition::{precondition_hash, PreconditionValidationData};
 use kailua_common::ProofJournal;
 use kailua_contracts::{IAnchorStateRegistry, IDisputeGameFactory, KailuaGame};
 use kailua_host::fetch_rollup_config;
@@ -185,6 +185,10 @@ pub async fn handle_proposals(
 
         // check new proposals for fault and queue potential responses
         for (_, proposal) in kailua_db.proposals.range(last_proposal_index..u64::MAX) {
+            // skip seen before proposal
+            if proposal.index == last_proposal_index {
+                continue;
+            }
             // skip this proposal if it has no contender
             let Some(contender) = proposal.contender else {
                 continue;
@@ -219,22 +223,23 @@ pub async fn handle_proposals(
             let proposal_parent = kailua_db.proposals.get(&proposal.parent).unwrap();
             let proposal_parent_contract =
                 proposal_parent.tournament_contract_instance(&validator_provider);
-            let tournament_contract_instance =
-                proposal.tournament_contract_instance(&validator_provider);
             let proof_journal = ProofJournal::decode_packed(receipt.journal.as_ref())?;
+            info!("Proof journal: {:?}", proof_journal);
             let contender_index = proposal.contender.unwrap();
             let contender = kailua_db.proposals.get(&contender_index).unwrap();
+
+            let u_index = proposal_parent
+                .child_index(contender_index)
+                .expect("Could not look up contender's index in parent tournament");
+            let v_index = proposal_parent
+                .child_index(proposal.index)
+                .expect("Could not look up contender's index in parent tournament");
 
             let challenge_position =
                 proof_journal.claimed_l2_block_number - proposal_parent.output_block_number - 1;
 
             // patch the receipt image id if in dev mode
-            let expected_image_id = tournament_contract_instance
-                .imageId()
-                .call()
-                .await?
-                .imageId_
-                .0;
+            let expected_image_id = proposal_parent_contract.imageId().call().await?.imageId_.0;
             #[cfg(feature = "devnet")]
             let receipt = {
                 let mut receipt = receipt;
@@ -258,7 +263,7 @@ pub async fn handle_proposals(
 
             // only prove unproven games
             let proof_status = proposal_parent_contract
-                .proofStatus(U256::from(contender_index), U256::from(proposal.index))
+                .proofStatus(U256::from(u_index), U256::from(v_index))
                 .call()
                 .await
                 .context("proof_status")?
@@ -266,6 +271,8 @@ pub async fn handle_proposals(
             if proof_status != 0 {
                 warn!("Skipping proof submission for already proven game at local index {proposal_index}.");
                 continue;
+            } else {
+                info!("Proof status: {proof_status}");
             }
 
             let encoded_seal = risc0_ethereum_contracts::encode_seal(&receipt)?;
@@ -291,20 +298,57 @@ pub async fn handle_proposals(
                 proofs[1].push(proposal.io_proof_for(challenge_position)?);
             }
 
-            let u_index = proposal_parent
-                .child_index(contender_index)
-                .expect("Could not look up contender's index in parent tournament");
-            let v_index = proposal_parent
-                .child_index(proposal.index)
-                .expect("Could not look up contender's index in parent tournament");
-
             info!(
                 "Submitting proof to tournament at index {} for match between children {u_index} and {v_index} over output {challenge_position} with {} kzg proof(s).",
                 proposal_parent.index,
                 proofs[0].len() + proofs[1].len()
             );
 
-            tournament_contract_instance
+            let possible_precondition_hash = precondition_hash(
+                &contender.io_blob_for(challenge_position).0,
+                &proposal.io_blob_for(challenge_position).0,
+            );
+            if possible_precondition_hash != proof_journal.precondition_output {
+                warn!("Possible precondition hash mismatch. Found {}, computed {possible_precondition_hash}", proof_journal.precondition_output);
+            } else {
+                info!("Proof Precondition hash confirmed.")
+            }
+
+            let config_hash = proposal_parent_contract
+                .configHash()
+                .call()
+                .await?
+                .configHash_;
+            if config_hash != proof_journal.config_hash {
+                warn!(
+                    "Config hash mismatch. Found {}, expected {config_hash}.",
+                    proof_journal.config_hash
+                );
+            } else {
+                info!("Proof Config hash confirmed.");
+            }
+
+            if proposal.l1_head != proof_journal.l1_head {
+                warn!(
+                    "L1 head mismatch. Found {}, expected {}.",
+                    proof_journal.l1_head, proposal.l1_head
+                );
+            } else {
+                info!("Proof L1 head confirmed.");
+            }
+
+            let expected_block_number =
+                proposal_parent.output_block_number + challenge_position + 1;
+            if expected_block_number != proof_journal.claimed_l2_block_number {
+                warn!(
+                    "Claimed l2 block number mismatch. Found {}, expected {expected_block_number}.",
+                    proof_journal.claimed_l2_block_number
+                );
+            } else {
+                info!("Claimed l2 block number confirmed.");
+            }
+
+            proposal_parent_contract
                 .prove(
                     [u_index, v_index, challenge_position],
                     encoded_seal.into(),
@@ -324,8 +368,8 @@ pub async fn handle_proposals(
                 .await
                 .context("prove (get_receipt)")?;
 
-            let proof_status = tournament_contract_instance
-                .proofStatus(U256::from(contender_index), U256::from(proposal.index))
+            let proof_status = proposal_parent_contract
+                .proofStatus(U256::from(u_index), U256::from(v_index))
                 .call()
                 .await
                 .context("proof_status (verify)")?
