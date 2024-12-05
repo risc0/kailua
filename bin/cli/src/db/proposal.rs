@@ -19,6 +19,7 @@ use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
 use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
 use std::collections::HashMap;
 use std::iter::repeat;
+use tracing::{error, info};
 
 #[derive(Clone, Debug)]
 pub struct Proposal {
@@ -30,7 +31,7 @@ pub struct Proposal {
     // claim data
     pub created_at: u64,
     pub io_blobs: Vec<(B256, BlobData)>,
-    pub io_hashes: Vec<B256>,
+    pub io_field_elements: Vec<B256>,
     pub output_root: B256,
     pub output_block_number: u64,
     pub l1_head: B256,
@@ -121,7 +122,7 @@ impl Proposal {
             proposer: *treasury_instance.address(),
             created_at,
             io_blobs: vec![],
-            io_hashes: vec![],
+            io_field_elements: vec![],
             output_root,
             output_block_number,
             l1_head,
@@ -174,7 +175,7 @@ impl Proposal {
             ._0;
         // fetch blob data
         let mut io_blobs = Vec::new();
-        let mut io_hashes = Vec::new();
+        let mut io_field_elements = Vec::new();
         for _ in 0..config.proposal_blobs {
             let blob_kzg_hash = game_instance
                 .proposalBlobHashes(U256::from(io_blobs.len()))
@@ -187,9 +188,9 @@ impl Proposal {
                 .await
                 .context("get_blob")?;
             // save data
-            let io_remaining = config.proposal_block_count - (io_hashes.len() as u64) - 1;
+            let io_remaining = config.proposal_block_count - (io_field_elements.len() as u64) - 1;
             let io_in_blob = io_remaining.min(FIELD_ELEMENTS_PER_BLOB);
-            io_hashes.extend(intermediate_outputs(&blob_data, io_in_blob as usize)?);
+            io_field_elements.extend(intermediate_outputs(&blob_data, io_in_blob as usize)?);
             io_blobs.push((blob_kzg_hash, blob_data));
         }
         // claim data
@@ -224,7 +225,7 @@ impl Proposal {
             proposer,
             created_at,
             io_blobs,
-            io_hashes,
+            io_field_elements,
             output_root,
             output_block_number,
             l1_head,
@@ -286,10 +287,9 @@ impl Proposal {
         &self,
         provider: P,
     ) -> anyhow::Result<Option<bool>> {
-        Ok(self
-            .fetch_parent_tournament_survivor(provider)
-            .await?
-            .map(|survivor| survivor == self.contract))
+        let survivor = self.fetch_parent_tournament_survivor(provider).await?;
+        info!("Survivor: {survivor:?} vs {}", self.contract);
+        Ok(survivor.map(|survivor| survivor == self.contract))
     }
 
     pub async fn fetch_finality<T: Transport + Clone, P: Provider<T, N>, N: Network>(
@@ -362,10 +362,12 @@ impl Proposal {
             let starting_block_number = self
                 .output_block_number
                 .saturating_sub(config.proposal_block_count);
-            for (i, output_hash) in self.io_hashes.iter().enumerate() {
+            for (i, output_hash) in self.io_field_elements.iter().enumerate() {
                 let io_number = starting_block_number + (i as u64) + 1;
                 if let Ok(local_output) = op_node_provider.output_at_block(io_number).await {
                     self.correct_io[i] = Some(&hash_to_fe(local_output) == output_hash);
+                } else {
+                    error!("Could not get output hash {io_number} from op node");
                 }
             }
         }
@@ -422,14 +424,14 @@ impl Proposal {
 
     pub fn divergence_point(&self, proposal: &Proposal) -> Option<usize> {
         // Check divergence in IO
-        for i in 0..self.io_hashes.len() {
-            if self.io_hashes[i] != proposal.io_hashes[i] {
+        for i in 0..self.io_field_elements.len() {
+            if self.io_field_elements[i] != proposal.io_field_elements[i] {
                 return Some(i);
             }
         }
         // Check divergence in final claim
         if self.output_root != proposal.output_root {
-            return Some(self.io_hashes.len());
+            return Some(self.io_field_elements.len());
         }
         // Report equivalence
         None
@@ -442,7 +444,7 @@ impl Proposal {
             None => true,
             // u wins if v is wrong (even if u is wrong)
             Some(point) => {
-                if point < self.io_hashes.len() {
+                if point < self.io_field_elements.len() {
                     !proposal.correct_io[point].unwrap()
                 } else {
                     !proposal.correct_claim.unwrap()
@@ -460,7 +462,7 @@ impl Proposal {
     }
 
     pub fn has_precondition_for(&self, position: u64) -> bool {
-        if position == self.io_hashes.len() as u64 {
+        if position == self.io_field_elements.len() as u64 {
             false
         } else {
             // technically this can be > 1 instead
@@ -485,21 +487,21 @@ impl Proposal {
     }
 
     pub fn output_at(&self, position: u64) -> B256 {
-        self.io_hashes
+        self.io_field_elements
             .get(position as usize)
             .copied()
             .unwrap_or(self.output_root)
     }
 
-    pub fn create_sidecar(io_hashes: &[B256]) -> anyhow::Result<BlobTransactionSidecar> {
+    pub fn create_sidecar(io_field_elements: &[B256]) -> anyhow::Result<BlobTransactionSidecar> {
         let mut io_blobs = vec![];
         loop {
             let start = io_blobs.len() * FIELD_ELEMENTS_PER_BLOB as usize;
-            if start >= io_hashes.len() {
+            if start >= io_field_elements.len() {
                 break;
             }
-            let end = (start + FIELD_ELEMENTS_PER_BLOB as usize).min(io_hashes.len());
-            let io_bytes = io_hashes[start..end].concat();
+            let end = (start + FIELD_ELEMENTS_PER_BLOB as usize).min(io_field_elements.len());
+            let io_bytes = io_field_elements[start..end].concat();
             // Encode as blob sidecar
             let blob = Blob::right_padding_from(io_bytes.as_slice());
             io_blobs.push(blob);

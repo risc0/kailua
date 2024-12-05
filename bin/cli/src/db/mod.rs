@@ -190,12 +190,25 @@ impl KailuaDB {
             // Determine tournament performance
             if proposal.has_parent() {
                 let parent = self.proposals.get(&proposal.parent).unwrap();
+                // Ignore self-conflict
+                if parent
+                    .survivor
+                    .map(|contender| {
+                        self.proposals.get(&contender).unwrap().proposer == proposal.proposer
+                    })
+                    .unwrap_or_default()
+                {
+                    self.next_factory_index += 1;
+                    continue;
+                }
                 // Participate in tournament only if this is a correct or first bad proposal
                 if self.was_proposer_eliminated_before(&proposal) {
+                    self.next_factory_index += 1;
                     continue;
                 }
                 // Skip non-canonical tournaments
                 if !parent.canonical.unwrap_or_default() {
+                    self.next_factory_index += 1;
                     continue;
                 }
                 // Update the contender

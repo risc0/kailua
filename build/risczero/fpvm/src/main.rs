@@ -14,9 +14,9 @@
 
 use alloy_primitives::B256;
 use kailua_common::ProofJournal;
+use kona_proof::BootInfo;
 use risc0_zkvm::guest::env;
 use std::sync::Arc;
-use kona_proof::BootInfo;
 
 fn main() {
     let precondition_validation_data_hash = env::read();

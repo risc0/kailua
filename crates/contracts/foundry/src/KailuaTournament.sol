@@ -276,10 +276,10 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             RISC_ZERO_VERIFIER.verify(encodedSeal, FPVM_IMAGE_ID, journalDigest);
         }
 
-        // Update proof status
-        if (proposedOutput[0] != computedOutput) {
+        // Update proof status based on normalized hashes
+        if (KailuaLib.hashToFe(proposedOutput[0]) != KailuaLib.hashToFe(computedOutput)) {
             // u lose
-            if (proposedOutput[1] != computedOutput) {
+            if (KailuaLib.hashToFe(proposedOutput[1]) != KailuaLib.hashToFe(computedOutput)) {
                 // v lose
                 proofStatus[uvo[0]][uvo[1]] = ProofStatus.U_LOSE_V_LOSE;
             } else {
@@ -340,21 +340,21 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         // Eliminate other opponents
         uint256 v;
         for (v = u + 1; v < children.length; v++) {
+            KailuaTournament contender = children[u];
             KailuaTournament opponent = children[v];
-            // If the opponent is eliminated, skip
-            if (isChildEliminated(opponent)) {
+            // If the opponent is eliminated or has the same identity, skip
+            if (canIgnoreOpponent(contender, opponent)) {
                 continue;
             }
-            KailuaTournament child = children[u];
             // If the survivor hasn't been challenged for as long as the timeout, declare them winner
-            if (child.getChallengerDuration(opponent.createdAt().raw()).raw() == 0) {
+            if (contender.getChallengerDuration(opponent.createdAt().raw()).raw() == 0) {
                 break;
             }
             // If the opponent proposal is a twin, skip it
-            if (child.rootClaim().raw() == opponent.rootClaim().raw()) {
+            if (contender.rootClaim().raw() == opponent.rootClaim().raw()) {
                 uint256 common;
                 for (common = 0; common < PROPOSAL_BLOBS; common++) {
-                    if (child.proposalBlobHashes(common).raw() != opponent.proposalBlobHashes(common).raw()) {
+                    if (contender.proposalBlobHashes(common).raw() != opponent.proposalBlobHashes(common).raw()) {
                         break;
                     }
                 }
@@ -371,7 +371,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             if (proven == ProofStatus.U_LOSE_V_WIN) {
                 // u was shown as faulty (beat by v)
                 // eliminate the player
-                KAILUA_TREASURY.eliminate(address(child), prover[u][v]);
+                KAILUA_TREASURY.eliminate(address(contender), prover[u][v]);
                 // proceed with opponent as new player
                 u = v;
             } else {
@@ -394,6 +394,18 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             // This proposer has not been eliminated as of their proposal at gameIndex
             return false;
         }
+        return true;
+    }
+
+    function canIgnoreOpponent(KailuaTournament contender, KailuaTournament opponent) internal returns (bool) {
+        address opponentProposer = KAILUA_TREASURY.proposerOf(address(opponent));
+        uint256 eliminationRound = KAILUA_TREASURY.eliminationRound(opponentProposer);
+        if (eliminationRound == 0 || eliminationRound > opponent.gameIndex()) {
+            address contenderProposer = KAILUA_TREASURY.proposerOf(address(contender));
+            // The opponent is fighting itself
+            return contenderProposer == opponentProposer;
+        }
+        // The opponent had been eliminated prior to their proposal
         return true;
     }
 

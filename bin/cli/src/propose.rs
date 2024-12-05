@@ -137,6 +137,22 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             );
         }
         while let Some(proposal_index) = unresolved_proposal_indices.pop() {
+            let proposal = kailua_db.proposals.get(&proposal_index).unwrap();
+            let parent = kailua_db.proposals.get(&proposal.parent).unwrap();
+            let parent_contract = parent.tournament_contract_instance(&proposer_provider);
+            info!("Parent Tournament Children:");
+            for i in 0..u64::MAX {
+                if let Ok(res) = parent_contract
+                    .children(alloy::primitives::U256::from(i))
+                    .call()
+                    .await
+                {
+                    info!("{}", res._0);
+                } else {
+                    break;
+                }
+            }
+
             let proposal = kailua_db.proposals.get_mut(&proposal_index).unwrap();
             // Skip resolved games
             if proposal
@@ -149,11 +165,12 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             }
 
             // Check if claim won in tournament
-            if !proposal
-                .fetch_parent_tournament_survivor_status(&proposer_provider)
-                .await
-                .unwrap_or_default()
-                .unwrap_or_default()
+            if proposal.has_parent()
+                && !proposal
+                    .fetch_parent_tournament_survivor_status(&proposer_provider)
+                    .await
+                    .unwrap_or_default()
+                    .unwrap_or_default()
             {
                 info!("Waiting for more proofs to resolve proposer as survivor");
                 break;
@@ -229,13 +246,13 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             .output_at_block(proposed_block_number)
             .await?;
         // Prepare intermediate outputs
-        let mut io_hashes = vec![];
+        let mut io_field_elements = vec![];
         let first_io_number = canonical_tip.output_block_number + 1;
         for i in first_io_number..proposed_block_number {
             let output = op_node_provider.output_at_block(i).await?;
-            io_hashes.push(hash_to_fe(output));
+            io_field_elements.push(hash_to_fe(output));
         }
-        let sidecar = Proposal::create_sidecar(&io_hashes)?;
+        let sidecar = Proposal::create_sidecar(&io_field_elements)?;
 
         // Calculate required duplication counter
         let mut dupe_counter = 0u64;

@@ -117,7 +117,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     };
 
     // Prepare intermediate outputs
-    let mut intermediate_outputs = vec![];
+    let mut io_field_elements = vec![];
     let first_io_number = anchor_block_number + 1;
     for i in first_io_number..proposed_block_number {
         let output = if i == faulty_block_number {
@@ -125,9 +125,9 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         } else {
             op_node_provider.output_at_block(i).await?
         };
-        intermediate_outputs.push(hash_to_fe(output));
+        io_field_elements.push(hash_to_fe(output));
     }
-    let sidecar = Proposal::create_sidecar(&intermediate_outputs)?;
+    let sidecar = Proposal::create_sidecar(&io_field_elements)?;
 
     // Calculate required duplication counter
     let mut dupe_counter = 0u64;

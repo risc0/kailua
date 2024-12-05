@@ -29,20 +29,11 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     // Immutable configuration
     // ------------------------------
 
-    /// @notice The anchored game type ID to clone
-    GameType internal immutable ANCHORED_GAME_TYPE;
-
-    /// @notice Returns the anchored game type.
-    function anchoredGameType() external view returns (GameType anchoredGameType_) {
-        anchoredGameType_ = ANCHORED_GAME_TYPE;
-    }
-
     constructor(
         IRiscZeroVerifier _verifierContract,
         bytes32 _imageId,
         bytes32 _configHash,
         uint256 _proposalBlockCount,
-        GameType _anchoredGameType,
         GameType _gameType,
         IAnchorStateRegistry _anchorStateRegistry
     )
@@ -56,10 +47,6 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
             _anchorStateRegistry
         )
     {
-        GAME_TYPE = _gameType;
-        ANCHORED_GAME_TYPE = _anchoredGameType;
-        ANCHOR_STATE_REGISTRY = _anchorStateRegistry;
-
         proposerOf[address(this)] = address(this);
     }
 
@@ -80,7 +67,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     function extraData() external pure returns (bytes memory extraData_) {
         // The extra data starts at the second word within the cwia calldata and
         // is 32 bytes long.
-        extraData_ = _getArgBytes(0x54, 0x20);
+        extraData_ = _getArgBytes(0x54, 0x08);
     }
 
     /// @inheritdoc IDisputeGame
@@ -106,7 +93,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
 
     /// @inheritdoc KailuaTournament
     function l2BlockNumber() public pure override returns (uint256 l2BlockNumber_) {
-        l2BlockNumber_ = _getArgUint256(0x54);
+        l2BlockNumber_ = uint256(_getArgUint64(0x54));
     }
 
     // ------------------------------

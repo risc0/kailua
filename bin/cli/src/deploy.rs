@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::providers::optimism::OpNodeProvider;
 use crate::KAILUA_GAME_TYPE;
 use alloy::network::{EthereumWallet, TxSigner};
 use alloy::primitives::{Address, Bytes, Uint, U256};
@@ -64,6 +65,9 @@ pub struct DeployArgs {
 }
 
 pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
+    let op_node_provider =
+        OpNodeProvider(ProviderBuilder::new().on_http(args.op_node_address.as_str().try_into()?));
+
     // initialize guardian wallet
     info!("Initializing guardian wallet.");
     let guardian_signer = LocalSigner::from_str(&args.guardian_key)?;
@@ -161,7 +165,6 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
         rollup_config_hash.into(),
         Uint::from(64),
-        fault_dispute_game_type,
         KAILUA_GAME_TYPE,
         Address::from_str(&args.registry_contract)?,
     )
@@ -227,8 +230,10 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         .anchors(fault_dispute_game_type)
         .call()
         .await?;
-    let root_claim = fault_dispute_anchor._0;
-    let extra_data = Bytes::from(fault_dispute_anchor._1.abi_encode_packed());
+    let root_claim_number: u64 = fault_dispute_anchor._1.to();
+    let root_claim = op_node_provider.output_at_block(root_claim_number).await?;
+
+    let extra_data = Bytes::from(root_claim_number.abi_encode_packed());
     // Skip setup if target anchor already exists
     let existing_treasury_address = dispute_game_factory
         .games(KAILUA_GAME_TYPE, root_claim, extra_data.clone())
@@ -239,7 +244,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     if existing_treasury_address.is_zero() {
         info!(
             "Creating new KailuaTreasury game instance from {} ({}).",
-            fault_dispute_anchor._1, fault_dispute_anchor._0
+            fault_dispute_anchor._1, root_claim
         );
         dispute_game_factory
             .create(KAILUA_GAME_TYPE, root_claim, extra_data.clone())
@@ -251,8 +256,8 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
             .context("create KailuaTreasury (get_receipt)")?;
     } else {
         info!(
-            "Already found a game instance for anchor {} ({}).",
-            fault_dispute_anchor._1, fault_dispute_anchor._0
+            "Already found a game instance for anchor {}.",
+            fault_dispute_anchor._1
         );
     }
     let kailua_treasury_instance_address = dispute_game_factory
@@ -280,7 +285,6 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     }
 
     // Deploy KailuaGame contract
-    // {
     info!("Deploying KailuaGame contract to L1 rpc.");
     let kailua_game_contract = KailuaGame::deploy(
         &deployer_provider,

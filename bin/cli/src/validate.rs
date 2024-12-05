@@ -29,7 +29,7 @@ use anyhow::{anyhow, bail, Context};
 use kailua_client::fpvm_proof_file_name;
 use kailua_common::oracle::BlobFetchRequest;
 use kailua_common::precondition::{precondition_hash, PreconditionValidationData};
-use kailua_common::ProofJournal;
+use kailua_common::{hash_to_fe, ProofJournal};
 use kailua_contracts::{IAnchorStateRegistry, IDisputeGameFactory, KailuaGame};
 use kailua_host::fetch_rollup_config;
 use op_alloy_protocol::BlockInfo;
@@ -198,15 +198,38 @@ pub async fn handle_proposals(
                 .proposals
                 .get(&contender)
                 .expect("Missing contender from database.");
-            request_proof(
-                &mut channel,
-                contender,
-                proposal,
-                &l1_node_provider,
-                &l2_node_provider,
-                &op_node_provider,
-            )
-            .await?;
+
+            let proposal_parent = kailua_db.proposals.get(&proposal.parent).unwrap();
+            let proposal_parent_contract =
+                proposal_parent.tournament_contract_instance(&validator_provider);
+            let u_index = proposal_parent
+                .child_index(contender.index)
+                .expect("Could not look up contender's index in parent tournament");
+            let v_index = proposal_parent
+                .child_index(proposal.index)
+                .expect("Could not look up contender's index in parent tournament");
+            let proof_status = proposal_parent_contract
+                .proofStatus(U256::from(u_index), U256::from(v_index))
+                .call()
+                .await
+                .context("proof_status")?
+                ._0;
+
+            if proof_status == 0 {
+                request_proof(
+                    &mut channel,
+                    contender,
+                    proposal,
+                    &l1_node_provider,
+                    &l2_node_provider,
+                    &op_node_provider,
+                )
+                .await?;
+            } else {
+                info!(
+                    "Match between children {u_index} and {v_index} already proven {proof_status}"
+                );
+            }
         }
 
         // publish computed proofs and resolve proven challenges
@@ -261,6 +284,35 @@ pub async fn handle_proposals(
                 info!("Receipt validated.");
             }
 
+            let contender_output = contender.output_at(challenge_position);
+            if contender_output != hash_to_fe(proof_journal.claimed_l2_output_root) {
+                warn!(
+                    "Contender output fe {contender_output} doesn't match proof fe {}",
+                    hash_to_fe(proof_journal.claimed_l2_output_root)
+                );
+            }
+            let proposal_output = proposal.output_at(challenge_position);
+            if proposal_output != hash_to_fe(proof_journal.claimed_l2_output_root) {
+                warn!(
+                    "Proposal output fe {proposal_output} doesn't match proof fe {}",
+                    hash_to_fe(proof_journal.claimed_l2_output_root)
+                );
+            }
+            let op_node_output = op_node_provider
+                .output_at_block(proof_journal.claimed_l2_block_number)
+                .await?;
+            if op_node_output != proof_journal.claimed_l2_output_root {
+                error!(
+                    "Local op node output {op_node_output} doesn't match proof {}",
+                    proof_journal.claimed_l2_output_root
+                );
+            } else {
+                info!(
+                    "Proven output matches local op node output {}:{op_node_output}.",
+                    proof_journal.claimed_l2_block_number
+                );
+            }
+
             // only prove unproven games
             let proof_status = proposal_parent_contract
                 .proofStatus(U256::from(u_index), U256::from(v_index))
@@ -304,11 +356,64 @@ pub async fn handle_proposals(
                 proofs[0].len() + proofs[1].len()
             );
 
+            let contender_contract = contender.tournament_contract_instance(&validator_provider);
+            let proposal_contract = proposal.tournament_contract_instance(&validator_provider);
+
+            let is_agreed_output_confirmed = if challenge_position == 0 {
+                let parent_output_matches =
+                    proposal_parent.output_root == proof_journal.agreed_l2_output_root;
+                if !parent_output_matches {
+                    warn!(
+                        "Parent claim {} is last common output and does not match {}",
+                        proposal_parent.output_root, proof_journal.agreed_l2_output_root
+                    );
+                }
+                parent_output_matches
+            } else {
+                let contender_has_output = contender_contract
+                    .verifyIntermediateOutput(
+                        challenge_position - 1,
+                        proof_journal.agreed_l2_output_root,
+                        commitments[0][0].clone(),
+                        proofs[0][0].clone(),
+                    )
+                    .call()
+                    .await
+                    .context("verifyIntermediateOutput 0,0")?
+                    .success;
+                if !contender_has_output {
+                    warn!("Could not verify last common output for contender");
+                }
+                let proposal_has_output = proposal_contract
+                    .verifyIntermediateOutput(
+                        challenge_position - 1,
+                        proof_journal.agreed_l2_output_root,
+                        commitments[0][1].clone(),
+                        proofs[0][1].clone(),
+                    )
+                    .call()
+                    .await
+                    .context("verifyIntermediateOutput 0,1")?
+                    .success;
+                if !proposal_has_output {
+                    warn!("Could not verify last common output for proposal");
+                }
+                contender_has_output && proposal_has_output
+            };
+            if is_agreed_output_confirmed {
+                info!(
+                    "Confirmed last common output: {}",
+                    proof_journal.agreed_l2_output_root
+                );
+            }
+
             let possible_precondition_hash = precondition_hash(
                 &contender.io_blob_for(challenge_position).0,
                 &proposal.io_blob_for(challenge_position).0,
             );
-            if possible_precondition_hash != proof_journal.precondition_output {
+            if proofs[0].len() == 2
+                && possible_precondition_hash != proof_journal.precondition_output
+            {
                 warn!("Possible precondition hash mismatch. Found {}, computed {possible_precondition_hash}", proof_journal.precondition_output);
             } else {
                 info!("Proof Precondition hash confirmed.")
@@ -397,7 +502,8 @@ async fn request_proof(
     // Read additional data for Kona invocation
     info!("Requesting proof for proposal {}.", proposal.index);
     let agreed_l2_head_number =
-        proposal.output_block_number - proposal.io_hashes.len() as u64 - 1 + challenge_point; // the challenge point is zero indexed, so it cancels out
+        proposal.output_block_number - proposal.io_field_elements.len() as u64 - 1
+            + challenge_point; // the challenge point is zero indexed, so it cancels out
     debug!("l2_head_number {:?}", &agreed_l2_head_number);
     let agreed_l2_head_hash = l2_node_provider
         .get_block_by_number(

@@ -164,6 +164,10 @@ library KailuaLib {
         hash = ((sha256(blobCommitment) << 8) >> 8) | KZG_COMMITMENT_VERSION;
     }
 
+    function hashToFe(bytes32 hash) internal returns (bytes32 fe) {
+        fe = ((hash << 2) >> 2);
+    }
+
     function verifyKZGBlobProof(
         bytes32 versionedHash,
         uint32 index,
@@ -176,7 +180,7 @@ library KailuaLib {
         bytes memory kzgCallData = abi.encodePacked(
             versionedHash, // proposalBlobHash().raw(),
             rootOfUnity,
-            ((value << 2) >> 2),
+            hashToFe(value),
             blobCommitment,
             proof
         );
