@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::stall::Stall;
 use alloy::network::Network;
 use alloy::primitives::{Address, B256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
-use anyhow::Context;
 use kailua_contracts::IAnchorStateRegistry::IAnchorStateRegistryInstance;
 use kailua_contracts::KailuaGame::KailuaGameInstance;
 
@@ -43,86 +43,69 @@ impl Config {
     ) -> anyhow::Result<Self> {
         let treasury = kailua_game_implementation
             .treasury()
-            .call()
+            .stall()
             .await
-            .context("treasury")?
             .treasury_;
         let verifier = kailua_game_implementation
             .verifier()
-            .call()
+            .stall()
             .await
-            .context("verifier")?
             .verifier_;
-        let image_id = kailua_game_implementation
-            .imageId()
-            .call()
-            .await
-            .context("image_id")?
-            .imageId_;
+        let image_id = kailua_game_implementation.imageId().stall().await.imageId_;
         let cfg_hash = kailua_game_implementation
             .configHash()
-            .call()
+            .stall()
             .await
-            .context("config_hash")?
             .configHash_;
         let proposal_block_count = kailua_game_implementation
             .proposalBlockCount()
-            .call()
+            .stall()
             .await
-            .context("proposal_block_count")?
             .proposalBlockCount_
             .to();
         let proposal_blobs = kailua_game_implementation
             .proposalBlobs()
-            .call()
+            .stall()
             .await
-            .context("proposal_blobs")?
             .proposalBlobs_
             .to();
         let game_type = kailua_game_implementation
             .gameType()
-            .call()
+            .stall()
             .await
-            .context("game_type")?
             .gameType_ as u8;
         let registry = kailua_game_implementation
             .anchorStateRegistry()
-            .call()
+            .stall()
             .await
-            .context("registry")?
             .registry_;
         let factory =
             IAnchorStateRegistryInstance::new(registry, kailua_game_implementation.provider())
                 .disputeGameFactory()
-                .call()
+                .stall()
                 .await
-                .context("dispute_game_factory")?
                 ._0;
         let timeout = kailua_game_implementation
             .maxClockDuration()
-            .call()
+            .stall()
             .await
-            .context("max_clock_duration")?
             .maxClockDuration_;
         let genesis_time = kailua_game_implementation
             .genesisTimeStamp()
-            .call()
+            .stall()
             .await
-            .context("genesis_time")?
             .genesisTimeStamp_
             .to();
         let block_time = kailua_game_implementation
             .l2BlockTime()
-            .call()
+            .stall()
             .await
-            .context("block_time")?
             .l2BlockTime_
             .to();
         let proposal_gap = kailua_game_implementation
             .proposalTimeGap()
-            .call()
+            .stall()
             .await
-            .context("proposal_gap")?
             .proposalTimeGap_
             .to();
         Ok(Self {

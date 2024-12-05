@@ -15,6 +15,7 @@
 use crate::db::proposal::Proposal;
 use crate::propose::ProposeArgs;
 use crate::providers::optimism::OpNodeProvider;
+use crate::stall::Stall;
 use crate::KAILUA_GAME_TYPE;
 use alloy::network::EthereumWallet;
 use alloy::primitives::{Address, Bytes, B256, U256};
@@ -62,21 +63,21 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         &tester_provider,
     );
     let dispute_game_factory = IDisputeGameFactory::new(
-        anchor_state_registry.disputeGameFactory().call().await?._0,
+        anchor_state_registry.disputeGameFactory().stall().await._0,
         &tester_provider,
     );
     let kailua_game_implementation = kailua_contracts::KailuaGame::new(
         dispute_game_factory
             .gameImpls(KAILUA_GAME_TYPE)
-            .call()
-            .await?
+            .stall()
+            .await
             .impl_,
         &tester_provider,
     );
     let kailua_treasury_address = kailua_game_implementation
         .treasury()
-        .call()
-        .await?
+        .stall()
+        .await
         .treasury_;
     let kailua_treasury_instance =
         KailuaTreasuryInstance::new(kailua_treasury_address, &tester_provider);
@@ -84,23 +85,23 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     // load constants
     let proposal_block_count: u64 = kailua_game_implementation
         .proposalBlockCount()
-        .call()
-        .await?
+        .stall()
+        .await
         .proposalBlockCount_
         .to();
 
     // get proposal parent
-    let games_count = dispute_game_factory.gameCount().call().await?.gameCount_;
+    let games_count = dispute_game_factory.gameCount().stall().await.gameCount_;
     let parent_game_address = dispute_game_factory
         .gameAtIndex(U256::from(args.fault_parent))
-        .call()
-        .await?
+        .stall()
+        .await
         .proxy_;
     let parent_game_contract = KailuaGameInstance::new(parent_game_address, &tester_provider);
     let anchor_block_number: u64 = parent_game_contract
         .l2BlockNumber()
-        .call()
-        .await?
+        .stall()
+        .await
         .l2BlockNumber_
         .to();
     // Prepare faulty proposal
@@ -146,9 +147,8 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
                 proposed_output_root,
                 Bytes::from(extra_data.clone()),
             )
-            .call()
+            .stall()
             .await
-            .context("dupe_game_address")?
             .proxy_;
         if dupe_game_address.is_zero() {
             // proposal was not made before using this dupe counter
@@ -160,14 +160,13 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
 
     let bond_value = kailua_treasury_instance
         .participationBond()
-        .call()
+        .stall()
         .await
-        .context("participation_bond")?
         ._0;
     let paid_in = kailua_treasury_instance
         .paidBonds(tester_address)
-        .call()
-        .await?
+        .stall()
+        .await
         ._0;
     let owed_collateral = bond_value.saturating_sub(paid_in);
     kailua_treasury_instance

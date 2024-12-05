@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::stall::Stall;
 use alloy::network::Network;
 use alloy::primitives::{Address, U256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
-use anyhow::Context;
 use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -35,12 +35,7 @@ impl Treasury {
         treasury_implementation: &KailuaTreasuryInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
         // Load participation bond
-        let participation_bond = treasury_implementation
-            .participationBond()
-            .call()
-            .await
-            .context("participation_bond")?
-            ._0;
+        let participation_bond = treasury_implementation.participationBond().stall().await._0;
         Ok(Self {
             address: *treasury_implementation.address(),
             elimination_round: Default::default(),
@@ -64,9 +59,8 @@ impl Treasury {
         self.participation_bond = self
             .treasury_contract_instance(provider)
             .participationBond()
-            .call()
+            .stall()
             .await
-            .context("participation_bond")?
             ._0;
         Ok(self.participation_bond)
     }
@@ -79,9 +73,8 @@ impl Treasury {
         let paid_bond = self
             .treasury_contract_instance(provider)
             .paidBonds(address)
-            .call()
+            .stall()
             .await
-            .context("paid_bonds")?
             ._0;
         self.paid_bond.insert(address, paid_bond);
         Ok(paid_bond)
@@ -95,12 +88,7 @@ impl Treasury {
         let instance = self.treasury_contract_instance(provider);
         let proposer = match self.claim_proposer.entry(address) {
             Entry::Vacant(entry) => {
-                let proposer = instance
-                    .proposerOf(address)
-                    .call()
-                    .await
-                    .context("proposer")?
-                    ._0;
+                let proposer = instance.proposerOf(address).stall().await._0;
                 *entry.insert(proposer)
             }
             Entry::Occupied(entry) => *entry.get(),
@@ -116,13 +104,7 @@ impl Treasury {
         let instance = self.treasury_contract_instance(provider);
         let round = match self.elimination_round.entry(address) {
             Entry::Vacant(entry) => {
-                let round = instance
-                    .eliminationRound(address)
-                    .call()
-                    .await
-                    .context("proposer")?
-                    ._0
-                    .to();
+                let round = instance.eliminationRound(address).stall().await._0.to();
                 *entry.insert(round)
             }
             Entry::Occupied(entry) => *entry.get(),

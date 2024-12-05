@@ -3365,6 +3365,7 @@ dependencies = [
  "alloy-rpc-types-beacon",
  "anyhow",
  "assert_cmd",
+ "async-trait",
  "bincode",
  "bytemuck",
  "c-kzg",

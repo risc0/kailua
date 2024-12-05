@@ -19,11 +19,11 @@ pub mod treasury;
 use crate::providers::beacon::BlobProvider;
 use crate::providers::optimism::OpNodeProvider;
 use crate::KAILUA_GAME_TYPE;
+use crate::stall::Stall;
 use alloy::network::Network;
 use alloy::primitives::{Address, U256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
-use anyhow::Context;
 use config::Config;
 use kailua_contracts::IAnchorStateRegistry::IAnchorStateRegistryInstance;
 use kailua_contracts::IDisputeGameFactory::{gameAtIndexReturn, IDisputeGameFactoryInstance};
@@ -60,14 +60,14 @@ impl KailuaDB {
         anchor_state_registry: &IAnchorStateRegistryInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
         let dispute_game_factory = IDisputeGameFactoryInstance::new(
-            anchor_state_registry.disputeGameFactory().call().await?._0,
+            anchor_state_registry.disputeGameFactory().stall().await._0,
             anchor_state_registry.provider(),
         );
         let game_implementation = KailuaGameInstance::new(
             dispute_game_factory
                 .gameImpls(KAILUA_GAME_TYPE)
-                .call()
-                .await?
+                .stall()
+                .await
                 .impl_,
             anchor_state_registry.provider(),
         );
@@ -89,14 +89,14 @@ impl KailuaDB {
         blob_provider: &BlobProvider,
     ) -> anyhow::Result<usize> {
         let dispute_game_factory = IDisputeGameFactoryInstance::new(
-            anchor_state_registry.disputeGameFactory().call().await?._0,
+            anchor_state_registry.disputeGameFactory().stall().await._0,
             anchor_state_registry.provider(),
         );
         let initial_proposals = self.proposals.len();
         let game_count: u64 = dispute_game_factory
             .gameCount()
-            .call()
-            .await?
+            .stall()
+            .await
             .gameCount_
             .to();
         while self.next_factory_index < game_count {
@@ -108,9 +108,8 @@ impl KailuaDB {
                 ..
             } = dispute_game_factory
                 .gameAtIndex(U256::from(factory_index))
-                .call()
-                .await
-                .context(format!("gameAtIndex {factory_index}/{game_count}"))?;
+                .stall()
+                .await;
             // skip entries for other game types
             if game_type != KAILUA_GAME_TYPE {
                 info!("Skipping proposal of different game type {game_type} at factory index {factory_index}");

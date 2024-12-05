@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::providers::optimism::OpNodeProvider;
+use crate::stall::Stall;
 use crate::KAILUA_GAME_TYPE;
 use alloy::network::{EthereumWallet, TxSigner};
 use alloy::primitives::{Address, Bytes, Uint, U256};
@@ -81,7 +82,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         Address::from_str(&args.portal_contract)?,
         &guardian_provider,
     );
-    let portal_guardian_address = optimism_portal.guardian().call().await?._0;
+    let portal_guardian_address = optimism_portal.guardian().stall().await._0;
     if portal_guardian_address != guardian_address {
         error!(
             "OptimismPortal Guardian is {portal_guardian_address}. Provided private key has account address {guardian_address}."
@@ -103,25 +104,20 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         IAnchorStateRegistry::new(Address::from_str(&args.registry_contract)?, &owner_provider);
     info!("AnchorStateRegistry({:?})", anchor_state_registry.address());
     let dispute_game_factory = IDisputeGameFactory::new(
-        anchor_state_registry.disputeGameFactory().call().await?._0,
+        anchor_state_registry.disputeGameFactory().stall().await._0,
         &owner_provider,
     );
     info!("DisputeGameFactory({:?})", dispute_game_factory.address());
-    let game_count = dispute_game_factory.gameCount().call().await?.gameCount_;
+    let game_count = dispute_game_factory.gameCount().stall().await.gameCount_;
     info!("There have been {game_count} games created using DisputeGameFactory");
     let dispute_game_factory_ownable = OwnableUpgradeable::new(
-        anchor_state_registry.disputeGameFactory().call().await?._0,
+        anchor_state_registry.disputeGameFactory().stall().await._0,
         &owner_provider,
     );
-    let factory_owner_address = dispute_game_factory_ownable
-        .owner()
-        .call()
-        .await
-        .context("Failed to query factory owner.")?
-        ._0;
+    let factory_owner_address = dispute_game_factory_ownable.owner().stall().await._0;
     let factory_owner_safe = Safe::new(factory_owner_address, &owner_provider);
     info!("Safe({:?})", factory_owner_safe.address());
-    let safe_owners = factory_owner_safe.getOwners().call().await?._0;
+    let safe_owners = factory_owner_safe.getOwners().stall().await._0;
     info!("Safe::owners({:?})", &safe_owners);
     let owner_address = owner_wallet.default_signer().address();
     if safe_owners.first().unwrap() != &owner_address {
@@ -184,8 +180,8 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     assert_eq!(
         dispute_game_factory
             .initBonds(KAILUA_GAME_TYPE)
-            .call()
-            .await?
+            .stall()
+            .await
             .bond_,
         U256::ZERO
     );
@@ -201,8 +197,8 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     assert_eq!(
         kailua_treasury_implementation
             .participationBond()
-            .call()
-            .await?
+            .stall()
+            .await
             ._0,
         bond_value
     );
@@ -219,8 +215,8 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     assert_eq!(
         dispute_game_factory
             .gameImpls(KAILUA_GAME_TYPE)
-            .call()
-            .await?
+            .stall()
+            .await
             .impl_,
         *kailua_treasury_implementation.address()
     );
@@ -228,8 +224,8 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     // Create new treasury
     let fault_dispute_anchor = anchor_state_registry
         .anchors(fault_dispute_game_type)
-        .call()
-        .await?;
+        .stall()
+        .await;
     let root_claim_number: u64 = fault_dispute_anchor._1.to();
     let root_claim = op_node_provider.output_at_block(root_claim_number).await?;
 
@@ -237,9 +233,8 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     // Skip setup if target anchor already exists
     let existing_treasury_address = dispute_game_factory
         .games(KAILUA_GAME_TYPE, root_claim, extra_data.clone())
-        .call()
+        .stall()
         .await
-        .context("kailua_treasury_address")?
         .proxy_;
     if existing_treasury_address.is_zero() {
         info!(
@@ -262,14 +257,13 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     }
     let kailua_treasury_instance_address = dispute_game_factory
         .games(KAILUA_GAME_TYPE, root_claim, extra_data)
-        .call()
+        .stall()
         .await
-        .context("kailua_treasury_address")?
         .proxy_;
     let kailua_treasury_instance =
         KailuaTreasury::new(kailua_treasury_instance_address, &owner_provider);
     info!("{:?}", &kailua_treasury_instance);
-    let status = kailua_treasury_instance.status().call().await?._0;
+    let status = kailua_treasury_instance.status().stall().await._0;
     if status == 0 {
         info!("Resolving KailuaTreasury instance");
         kailua_treasury_instance

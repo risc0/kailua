@@ -26,6 +26,7 @@ pub mod deploy;
 pub mod fault;
 pub mod propose;
 pub mod providers;
+pub mod stall;
 pub mod validate;
 
 pub const KAILUA_GAME_TYPE: u32 = 1337;
@@ -92,34 +93,3 @@ pub async fn exec_safe_txn<
     .await?;
     Ok(())
 }
-
-// pub async fn derive_expected_journal<T: Transport + Clone, P: Provider<T, N>, N: Network>(
-//     game_contract: &KailuaGameInstance<T, P, N>,
-//     output_number: u32,
-//     safe_output: B256,
-//     proposed_output: B256,
-//     computed_output: B256
-// ) -> anyhow::Result<Vec<u8>> {
-//     let l1_head = game_contract.l1Head().call().await?.l1Head_.0;
-//     let parent_contract_address = game_contract.parentGame().call().await?.parentGame_;
-//     let parent_contract =
-//         KailuaGameInstance::new(parent_contract_address, game_contract.provider());
-//     let l2_output_root = parent_contract.rootClaim().call().await?.rootClaim_.0;
-//     let l2_claim = game_contract.rootClaim().call().await?.rootClaim_.0;
-//     let l2_claim_block = game_contract
-//         .l2BlockNumber()
-//         .call()
-//         .await?
-//         .l2BlockNumber_
-//         .to::<u64>()
-//         .to_be_bytes();
-//     let config_hash = game_contract.configHash().call().await?.configHash_.0;
-//     Ok([
-//         l1_head.as_slice(),
-//         l2_output_root.as_slice(),
-//         l2_claim.as_slice(),
-//         l2_claim_block.as_slice(),
-//         config_hash.as_slice(),
-//     ]
-//     .concat())
-// }

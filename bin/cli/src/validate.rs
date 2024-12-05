@@ -17,7 +17,7 @@ use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
 use crate::providers::beacon::BlobProvider;
 use crate::providers::optimism::OpNodeProvider;
-use crate::KAILUA_GAME_TYPE;
+use crate::{stall::Stall, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::IndexedBlobHash;
 use alloy::eips::BlockNumberOrTag;
 use alloy::network::primitives::BlockTransactionsKind;
@@ -135,22 +135,22 @@ pub async fn handle_proposals(
     );
     info!("AnchorStateRegistry({:?})", anchor_state_registry.address());
     let dispute_game_factory = IDisputeGameFactory::new(
-        anchor_state_registry.disputeGameFactory().call().await?._0,
+        anchor_state_registry.disputeGameFactory().stall().await._0,
         &validator_provider,
     );
     info!("DisputeGameFactory({:?})", dispute_game_factory.address());
     let game_count: u64 = dispute_game_factory
         .gameCount()
-        .call()
-        .await?
+        .stall()
+        .await
         .gameCount_
         .to();
     info!("There have been {game_count} games created using DisputeGameFactory");
     let kailua_game_implementation = KailuaGame::new(
         dispute_game_factory
             .gameImpls(KAILUA_GAME_TYPE)
-            .call()
-            .await?
+            .stall()
+            .await
             .impl_,
         &validator_provider,
     );
@@ -210,9 +210,8 @@ pub async fn handle_proposals(
                 .expect("Could not look up contender's index in parent tournament");
             let proof_status = proposal_parent_contract
                 .proofStatus(U256::from(u_index), U256::from(v_index))
-                .call()
+                .stall()
                 .await
-                .context("proof_status")?
                 ._0;
 
             if proof_status == 0 {
@@ -262,7 +261,7 @@ pub async fn handle_proposals(
                 proof_journal.claimed_l2_block_number - proposal_parent.output_block_number - 1;
 
             // patch the receipt image id if in dev mode
-            let expected_image_id = proposal_parent_contract.imageId().call().await?.imageId_.0;
+            let expected_image_id = proposal_parent_contract.imageId().stall().await.imageId_.0;
             #[cfg(feature = "devnet")]
             let receipt = {
                 let mut receipt = receipt;
@@ -316,9 +315,8 @@ pub async fn handle_proposals(
             // only prove unproven games
             let proof_status = proposal_parent_contract
                 .proofStatus(U256::from(u_index), U256::from(v_index))
-                .call()
+                .stall()
                 .await
-                .context("proof_status")?
                 ._0;
             if proof_status != 0 {
                 warn!("Skipping proof submission for already proven game at local index {proposal_index}.");
@@ -377,9 +375,8 @@ pub async fn handle_proposals(
                         commitments[0][0].clone(),
                         proofs[0][0].clone(),
                     )
-                    .call()
+                    .stall()
                     .await
-                    .context("verifyIntermediateOutput 0,0")?
                     .success;
                 if !contender_has_output {
                     warn!("Could not verify last common output for contender");
@@ -391,9 +388,8 @@ pub async fn handle_proposals(
                         commitments[0][1].clone(),
                         proofs[0][1].clone(),
                     )
-                    .call()
+                    .stall()
                     .await
-                    .context("verifyIntermediateOutput 0,1")?
                     .success;
                 if !proposal_has_output {
                     warn!("Could not verify last common output for proposal");
@@ -421,8 +417,8 @@ pub async fn handle_proposals(
 
             let config_hash = proposal_parent_contract
                 .configHash()
-                .call()
-                .await?
+                .stall()
+                .await
                 .configHash_;
             if config_hash != proof_journal.config_hash {
                 warn!(
@@ -475,9 +471,8 @@ pub async fn handle_proposals(
 
             let proof_status = proposal_parent_contract
                 .proofStatus(U256::from(u_index), U256::from(v_index))
-                .call()
+                .stall()
                 .await
-                .context("proof_status (verify)")?
                 ._0;
             info!(
                 "Match between {contender_index} and {} proven: {proof_status}",

@@ -16,7 +16,7 @@ use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
 use crate::providers::beacon::BlobProvider;
 use crate::providers::optimism::OpNodeProvider;
-use crate::KAILUA_GAME_TYPE;
+use crate::{stall::Stall, KAILUA_GAME_TYPE};
 use alloy::consensus::BlockHeader;
 use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::primitives::BlockTransactionsKind;
@@ -82,22 +82,22 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
     );
     info!("AnchorStateRegistry({:?})", anchor_state_registry.address());
     let dispute_game_factory = kailua_contracts::IDisputeGameFactory::new(
-        anchor_state_registry.disputeGameFactory().call().await?._0,
+        anchor_state_registry.disputeGameFactory().stall().await._0,
         &proposer_provider,
     );
     info!("DisputeGameFactory({:?})", dispute_game_factory.address());
     let game_count: u64 = dispute_game_factory
         .gameCount()
-        .call()
-        .await?
+        .stall()
+        .await
         .gameCount_
         .to();
     info!("There have been {game_count} games created using DisputeGameFactory");
     let kailua_game_implementation = kailua_contracts::KailuaGame::new(
         dispute_game_factory
             .gameImpls(KAILUA_GAME_TYPE)
-            .call()
-            .await?
+            .stall()
+            .await
             .impl_,
         &proposer_provider,
     );
@@ -271,9 +271,8 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
                     proposed_output_root,
                     Bytes::from(extra_data.clone()),
                 )
-                .call()
+                .stall()
                 .await
-                .context("dupe_game_address")?
                 .proxy_;
             if dupe_game_address.is_zero() {
                 // proposal was not made before using this dupe counter
@@ -283,9 +282,8 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             let dupe_game_index: u64 =
                 KailuaTournamentInstance::new(dupe_game_address, &proposer_provider)
                     .gameIndex()
-                    .call()
+                    .stall()
                     .await
-                    .context("dupe_game_index")?
                     ._0
                     .to();
             let Some(dupe_proposal) = kailua_db.proposals.get(&dupe_game_index) else {

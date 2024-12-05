@@ -3,6 +3,7 @@ use crate::db::ProofStatus;
 use crate::providers::beacon::blob_fe_proof;
 use crate::providers::beacon::{blob_sidecar, BlobProvider};
 use crate::providers::optimism::OpNodeProvider;
+use crate::stall::Stall;
 use alloy::consensus::{Blob, BlobTransactionSidecar, BlockHeader};
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy::eips::{BlockId, BlockNumberOrTag};
@@ -57,7 +58,7 @@ impl Proposal {
         tournament_instance: &KailuaTournamentInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
         let instance_address = *tournament_instance.address();
-        let parent_address = tournament_instance.parentGame().call().await?.parentGame_;
+        let parent_address = tournament_instance.parentGame().stall().await.parentGame_;
         if parent_address == instance_address {
             Self::load_treasury(&KailuaTreasuryInstance::new(
                 instance_address,
@@ -77,43 +78,23 @@ impl Proposal {
     async fn load_treasury<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         treasury_instance: &KailuaTreasuryInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
-        let index = treasury_instance
-            .gameIndex()
-            .call()
-            .await
-            .context("game_index")?
-            ._0
-            .to();
-        let created_at = treasury_instance
-            .createdAt()
-            .call()
-            .await
-            .context("created_at")?
-            ._0;
+        let index = treasury_instance.gameIndex().stall().await._0.to();
+        let created_at = treasury_instance.createdAt().stall().await._0;
         // claim data
         let output_root = treasury_instance
             .rootClaim()
-            .call()
+            .stall()
             .await
-            .context("root_claim")?
             .rootClaim_
             .0
             .into();
         let output_block_number = treasury_instance
             .l2BlockNumber()
-            .call()
+            .stall()
             .await
-            .context("l2_block_number")?
             .l2BlockNumber_
             .to();
-        let l1_head = treasury_instance
-            .l1Head()
-            .call()
-            .await
-            .context("l1_head")?
-            .l1Head_
-            .0
-            .into();
+        let l1_head = treasury_instance.l1Head().stall().await.l1Head_.0.into();
         // finality
         let mut proposal = Self {
             contract: *treasury_instance.address(),
@@ -148,40 +129,22 @@ impl Proposal {
         blob_provider: &BlobProvider,
         game_instance: &KailuaGameInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
-        let index = game_instance
-            .gameIndex()
-            .call()
-            .await
-            .context("game_index")?
-            ._0
-            .to();
+        let index = game_instance.gameIndex().stall().await._0.to();
         let parent = game_instance
             .parentGameIndex()
-            .call()
+            .stall()
             .await
-            .context("parent_game_index")?
             .parentGameIndex_;
-        let proposer = game_instance
-            .proposer()
-            .call()
-            .await
-            .context("proposer")?
-            .proposer_;
-        let created_at = game_instance
-            .createdAt()
-            .call()
-            .await
-            .context("created_at")?
-            ._0;
+        let proposer = game_instance.proposer().stall().await.proposer_;
+        let created_at = game_instance.createdAt().stall().await._0;
         // fetch blob data
         let mut io_blobs = Vec::new();
         let mut io_field_elements = Vec::new();
         for _ in 0..config.proposal_blobs {
             let blob_kzg_hash = game_instance
                 .proposalBlobHashes(U256::from(io_blobs.len()))
-                .call()
+                .stall()
                 .await
-                .context("proposal_blob_hashes")?
                 ._0;
             let blob_data = blob_provider
                 .get_blob(created_at, blob_kzg_hash)
@@ -194,29 +157,14 @@ impl Proposal {
             io_blobs.push((blob_kzg_hash, blob_data));
         }
         // claim data
-        let output_root = game_instance
-            .rootClaim()
-            .call()
-            .await
-            .context("root_claim")?
-            .rootClaim_
-            .0
-            .into();
+        let output_root = game_instance.rootClaim().stall().await.rootClaim_.0.into();
         let output_block_number: u64 = game_instance
             .l2BlockNumber()
-            .call()
+            .stall()
             .await
-            .context("l2_block_number")?
             .l2BlockNumber_
             .to();
-        let l1_head = game_instance
-            .l1Head()
-            .call()
-            .await
-            .context("l1_head")?
-            .l1Head_
-            .0
-            .into();
+        let l1_head = game_instance.l1Head().stall().await.l1Head_.0.into();
         // finality
         let mut proposal = Self {
             contract: *game_instance.address(),
@@ -260,17 +208,15 @@ impl Proposal {
         let parent_tournament: Address = self
             .tournament_contract_instance(&provider)
             .parentGame()
-            .call()
+            .stall()
             .await
-            .context("parent_game")?
             .parentGame_;
         let parent_tournament_instance =
             KailuaTournamentInstance::new(parent_tournament, &provider);
         let survivor = parent_tournament_instance
             .pruneChildren()
-            .call()
+            .stall()
             .await
-            .context("prune_children")?
             .survivor;
         if survivor.is_zero() {
             Ok(None)
@@ -299,9 +245,8 @@ impl Proposal {
         self.finality = Self::parse_finality(
             self.tournament_contract_instance(provider)
                 .status()
-                .call()
+                .stall()
                 .await
-                .context("status")?
                 ._0,
         )?;
         Ok(self.finality)
@@ -328,9 +273,8 @@ impl Proposal {
         Ok(self
             .tournament_contract_instance(provider)
             .getChallengerDuration(U256::from(chain_time))
-            .call()
+            .stall()
             .await
-            .context("get_challenger_duration")?
             .duration_)
     }
 
