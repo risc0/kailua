@@ -209,6 +209,7 @@ library OutputLib {
     }
 }
 
+// 0x439cc0cd
 /// @notice Error raised when cryptographic verification of the zero-knowledge proof fails.
 error VerificationFailed();
 

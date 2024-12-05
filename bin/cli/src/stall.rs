@@ -51,7 +51,7 @@ where
             {
                 Ok(res) => break res,
                 Err(error) => {
-                    error!("Stall Error: {}", error);
+                    error!("Stall Error: {:?}", error);
                     // Wait before retrying
                     sleep(Duration::from_millis(250)).await;
                 }

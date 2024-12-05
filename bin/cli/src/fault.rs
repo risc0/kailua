@@ -183,11 +183,11 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
                 info!("Faulty proposal submitted at index {games_count}: {receipt:?}")
             }
             Err(e) => {
-                error!("Failed to confirm faulty proposal txn: {e}");
+                error!("Failed to confirm faulty proposal txn: {e:?}");
             }
         },
         Err(e) => {
-            error!("Failed to send faulty proposal txn: {e}");
+            error!("Failed to send faulty proposal txn: {e:?}");
         }
     }
     Ok(())

@@ -181,7 +181,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         if (uvo[2] > 0) {
             // Find the divergent blob index
             uint256 divergentBlobIndex = KailuaLib.blobIndex(uvo[2]);
-            if (uvo[2] == PROPOSAL_BLOCK_COUNT) {
+            if (uvo[2] == PROPOSAL_BLOCK_COUNT - 1) {
                 // If the only difference is the root claim, require all blobs to be equal.
                 divergentBlobIndex = PROPOSAL_BLOBS;
             }
@@ -194,7 +194,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                 }
             }
             // Update required precondition hash from proof if not at a boundary
-            if (KailuaLib.blobPosition(uvo[2]) != 0 && uvo[2] < PROPOSAL_BLOCK_COUNT) {
+            if (KailuaLib.blobPosition(uvo[2]) != 0 && uvo[2] < PROPOSAL_BLOCK_COUNT - 1) {
                 preconditionHash = sha256(
                     abi.encodePacked(
                         childContracts[0].proposalBlobHashes(divergentBlobIndex).raw(),
@@ -226,7 +226,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         }
 
         // Validate the claimed output roots.
-        if (uvo[2] == PROPOSAL_BLOCK_COUNT) {
+        if (uvo[2] == PROPOSAL_BLOCK_COUNT - 1) {
             require(proposedOutput[0] == childContracts[0].rootClaim().raw());
             require(proposedOutput[1] == childContracts[1].rootClaim().raw());
         } else {

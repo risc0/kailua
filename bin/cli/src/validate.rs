@@ -357,6 +357,58 @@ pub async fn handle_proposals(
             let contender_contract = contender.tournament_contract_instance(&validator_provider);
             let proposal_contract = proposal.tournament_contract_instance(&validator_provider);
 
+            if proof_journal.claimed_l2_block_number == proposal.output_block_number {
+                if contender.output_root != contender.output_at(challenge_position) {
+                    warn!(
+                        "Contender proposed output root {} does not match submitted {}",
+                        contender.output_root,
+                        contender.output_at(challenge_position)
+                    );
+                } else {
+                    info!("Contender proposed output confirmed.");
+                }
+                if proposal.output_root != proposal.output_at(challenge_position) {
+                    warn!(
+                        "Proposal proposed output root {} does not match submitted {}",
+                        proposal.output_root,
+                        proposal.output_at(challenge_position)
+                    );
+                } else {
+                    info!("Proposal proposed output confirmed.");
+                }
+            } else {
+                let contender_has_output = contender_contract
+                    .verifyIntermediateOutput(
+                        challenge_position,
+                        contender.output_at(challenge_position),
+                        commitments[0].last().unwrap().clone(),
+                        proofs[0].last().unwrap().clone(),
+                    )
+                    .stall()
+                    .await
+                    .success;
+                if !contender_has_output {
+                    warn!("Could not verify proposed output for contender");
+                } else {
+                    info!("Contender proposed output confirmed.");
+                }
+                let proposal_has_output = proposal_contract
+                    .verifyIntermediateOutput(
+                        challenge_position,
+                        proposal.output_at(challenge_position),
+                        commitments[1].last().unwrap().clone(),
+                        proofs[1].last().unwrap().clone(),
+                    )
+                    .stall()
+                    .await
+                    .success;
+                if !proposal_has_output {
+                    warn!("Could not verify proposed output for proposal");
+                } else {
+                    info!("Proposal proposed output confirmed.");
+                }
+            }
+
             let is_agreed_output_confirmed = if challenge_position == 0 {
                 let parent_output_matches =
                     proposal_parent.output_root == proof_journal.agreed_l2_output_root;
@@ -372,27 +424,31 @@ pub async fn handle_proposals(
                     .verifyIntermediateOutput(
                         challenge_position - 1,
                         proof_journal.agreed_l2_output_root,
-                        commitments[0][0].clone(),
-                        proofs[0][0].clone(),
+                        commitments[0].first().unwrap().clone(),
+                        proofs[0].first().unwrap().clone(),
                     )
                     .stall()
                     .await
                     .success;
                 if !contender_has_output {
                     warn!("Could not verify last common output for contender");
+                } else {
+                    info!("Contender common output confirmed.");
                 }
                 let proposal_has_output = proposal_contract
                     .verifyIntermediateOutput(
                         challenge_position - 1,
                         proof_journal.agreed_l2_output_root,
-                        commitments[0][1].clone(),
-                        proofs[0][1].clone(),
+                        commitments[1].first().unwrap().clone(),
+                        proofs[1].first().unwrap().clone(),
                     )
                     .stall()
                     .await
                     .success;
                 if !proposal_has_output {
                     warn!("Could not verify last common output for proposal");
+                } else {
+                    info!("Proposal common output confirmed.");
                 }
                 contender_has_output && proposal_has_output
             };
@@ -480,11 +536,11 @@ pub async fn handle_proposals(
                         );
                     }
                     Err(e) => {
-                        error!("Failed to confirm proof txn: {e}");
+                        error!("Failed to confirm proof txn: {e:?}");
                     }
                 },
                 Err(e) => {
-                    error!("Failed to send proof txn: {e}");
+                    error!("Failed to send proof txn: {e:?}");
                 }
             }
         }

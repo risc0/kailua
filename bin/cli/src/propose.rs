@@ -192,7 +192,7 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             );
 
             if let Err(e) = proposal.resolve(&proposer_provider).await {
-                error!("Failed to resolve proposal: {e}");
+                error!("Failed to resolve proposal: {e:?}");
             }
         }
 
@@ -336,11 +336,11 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
                     info!("Proposal submitted: {receipt:?}")
                 }
                 Err(e) => {
-                    error!("Failed to confirm proposal txn: {e}");
+                    error!("Failed to confirm proposal txn: {e:?}");
                 }
             },
             Err(e) => {
-                error!("Failed to send proposal txn: {e}");
+                error!("Failed to send proposal txn: {e:?}");
             }
         }
     }
