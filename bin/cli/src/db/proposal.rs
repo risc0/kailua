@@ -215,8 +215,8 @@ impl Proposal {
             KailuaTournamentInstance::new(parent_tournament, &provider);
         let survivor = parent_tournament_instance
             .pruneChildren()
-            .stall()
-            .await
+            .call()
+            .await?
             .survivor;
         if survivor.is_zero() {
             Ok(None)
