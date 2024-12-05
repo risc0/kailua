@@ -11,8 +11,6 @@ All proving costs are borne by the dishonest party in the protocol, whether that
 
 `kailua` as well as `kona` are still in active development and are NOT recommended for production usage.
 
-Notably, the current version of Kailua does not yet have all features implemented and does not realize the full benefits of the entire design.
-
 ## Fraud/Validity Proofs
 
 Kailua enables rollup operators to add a new fault proof contract, compatible with Bedrock contracts `v1.4.0` and above, using the `DisputeGameFactory` rollup instance to their deployment that relies on RISC-Zero zkVM proofs to finalize/dismiss output proposals.
