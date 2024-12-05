@@ -18,8 +18,8 @@ pub mod treasury;
 
 use crate::providers::beacon::BlobProvider;
 use crate::providers::optimism::OpNodeProvider;
-use crate::KAILUA_GAME_TYPE;
 use crate::stall::Stall;
+use crate::KAILUA_GAME_TYPE;
 use alloy::network::Network;
 use alloy::primitives::{Address, U256};
 use alloy::providers::Provider;

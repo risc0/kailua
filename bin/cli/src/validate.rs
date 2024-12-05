@@ -449,7 +449,7 @@ pub async fn handle_proposals(
                 info!("Claimed l2 block number confirmed.");
             }
 
-            proposal_parent_contract
+            if let Err(e) = proposal_parent_contract
                 .prove(
                     [u_index, v_index, challenge_position],
                     encoded_seal.into(),
@@ -467,17 +467,20 @@ pub async fn handle_proposals(
                 .context("prove (send)")?
                 .get_receipt()
                 .await
-                .context("prove (get_receipt)")?;
-
-            let proof_status = proposal_parent_contract
-                .proofStatus(U256::from(u_index), U256::from(v_index))
-                .stall()
-                .await
-                ._0;
-            info!(
-                "Match between {contender_index} and {} proven: {proof_status}",
-                proposal.index
-            );
+                .context("prove (get_receipt)")
+            {
+                error!("Failed to submit proof: {e}");
+            } else {
+                let proof_status = proposal_parent_contract
+                    .proofStatus(U256::from(u_index), U256::from(v_index))
+                    .stall()
+                    .await
+                    ._0;
+                info!(
+                    "Match between {contender_index} and {} proven: {proof_status}",
+                    proposal.index
+                );
+            }
         }
     }
 }

@@ -28,7 +28,7 @@ use kailua_contracts::KailuaGame::KailuaGameInstance;
 use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
 use kailua_contracts::{IAnchorStateRegistry, IDisputeGameFactory};
 use std::str::FromStr;
-use tracing::info;
+use tracing::{error, info};
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct FaultArgs {
@@ -169,7 +169,8 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .await
         ._0;
     let owed_collateral = bond_value.saturating_sub(paid_in);
-    kailua_treasury_instance
+
+    if let Err(e) = kailua_treasury_instance
         .propose(proposed_output_root, Bytes::from(extra_data))
         .value(owed_collateral)
         .sidecar(sidecar)
@@ -178,12 +179,14 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .context("propose (send)")?
         .get_receipt()
         .await
-        .context("propose (get_receipt)")?;
-
-    info!(
-        "Submitted faulty proposal at index {games_count} with parent at index {}.",
-        args.fault_parent
-    );
-
+        .context("propose (get_receipt)")
+    {
+        error!("Failed to submit faulty proposal: {e}");
+    } else {
+        info!(
+            "Submitted faulty proposal at index {games_count} with parent at index {}.",
+            args.fault_parent
+        );
+    }
     Ok(())
 }

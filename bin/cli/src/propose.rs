@@ -190,7 +190,10 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
                 "Resolving game at index {} and height {}.",
                 proposal.index, proposal.output_block_number
             );
-            proposal.resolve(&proposer_provider).await?;
+
+            if let Err(e) = proposal.resolve(&proposer_provider).await {
+                error!("Failed to resolve proposal: {e}");
+            }
         }
 
         // Submit proposal to extend canonical chain
@@ -318,7 +321,7 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
         }
         // Submit proposal
         info!("Proposing output {proposed_output_root} at l2 block number {proposed_block_number} with {owed_collateral} additional collateral and duplication counter {dupe_counter}.");
-        kailua_db
+        if let Err(e) = kailua_db
             .treasury
             .treasury_contract_instance(&proposer_provider)
             .propose(proposed_output_root, Bytes::from(extra_data))
@@ -329,6 +332,9 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             .context("propose (send)")?
             .get_receipt()
             .await
-            .context("propose (get_receipt)")?;
+            .context("propose (get_receipt)")
+        {
+            error!("Failed to submit proposal: {e}");
+        }
     }
 }
