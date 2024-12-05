@@ -449,7 +449,7 @@ pub async fn handle_proposals(
                 info!("Claimed l2 block number confirmed.");
             }
 
-            if let Err(e) = proposal_parent_contract
+            match proposal_parent_contract
                 .prove(
                     [u_index, v_index, challenge_position],
                     encoded_seal.into(),
@@ -464,22 +464,28 @@ pub async fn handle_proposals(
                 )
                 .send()
                 .await
-                .context("prove (send)")?
-                .get_receipt()
-                .await
-                .context("prove (get_receipt)")
+                .context("prove (send)")
             {
-                error!("Failed to submit proof: {e}");
-            } else {
-                let proof_status = proposal_parent_contract
-                    .proofStatus(U256::from(u_index), U256::from(v_index))
-                    .stall()
-                    .await
-                    ._0;
-                info!(
-                    "Match between {contender_index} and {} proven: {proof_status}",
-                    proposal.index
-                );
+                Ok(txn) => match txn.get_receipt().await.context("prove (get_receipt)") {
+                    Ok(receipt) => {
+                        info!("Proof submitted: {receipt:?}");
+                        let proof_status = proposal_parent_contract
+                            .proofStatus(U256::from(u_index), U256::from(v_index))
+                            .stall()
+                            .await
+                            ._0;
+                        info!(
+                            "Match between {contender_index} and {} proven: {proof_status}",
+                            proposal.index
+                        );
+                    }
+                    Err(e) => {
+                        error!("Failed to confirm proof txn: {e}");
+                    }
+                },
+                Err(e) => {
+                    error!("Failed to send proof txn: {e}");
+                }
             }
         }
     }

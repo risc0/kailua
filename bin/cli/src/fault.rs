@@ -170,23 +170,25 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         ._0;
     let owed_collateral = bond_value.saturating_sub(paid_in);
 
-    if let Err(e) = kailua_treasury_instance
+    match kailua_treasury_instance
         .propose(proposed_output_root, Bytes::from(extra_data))
         .value(owed_collateral)
         .sidecar(sidecar)
         .send()
         .await
-        .context("propose (send)")?
-        .get_receipt()
-        .await
-        .context("propose (get_receipt)")
+        .context("propose (send)")
     {
-        error!("Failed to submit faulty proposal: {e}");
-    } else {
-        info!(
-            "Submitted faulty proposal at index {games_count} with parent at index {}.",
-            args.fault_parent
-        );
+        Ok(txn) => match txn.get_receipt().await.context("propose (get_receipt)") {
+            Ok(receipt) => {
+                info!("Faulty proposal submitted at index {games_count}: {receipt:?}")
+            }
+            Err(e) => {
+                error!("Failed to confirm faulty proposal txn: {e}");
+            }
+        },
+        Err(e) => {
+            error!("Failed to send faulty proposal txn: {e}");
+        }
     }
     Ok(())
 }
