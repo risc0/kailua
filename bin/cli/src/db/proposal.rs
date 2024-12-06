@@ -17,10 +17,11 @@ use kailua_common::{hash_to_fe, intermediate_outputs};
 use kailua_contracts::KailuaGame::KailuaGameInstance;
 use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
 use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
+use serde::{Deserialize, Serialize};
 use std::iter::repeat;
 use tracing::{error, info};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Proposal {
     // pointers
     pub contract: Address,
@@ -223,13 +224,13 @@ impl Proposal {
         &self,
         provider: P,
     ) -> anyhow::Result<Option<bool>> {
-        Ok(Self::parse_finality(
+        Self::parse_finality(
             self.tournament_contract_instance(provider)
                 .status()
                 .stall()
                 .await
                 ._0,
-        )?)
+        )
     }
 
     pub async fn fetch_current_challenger_duration<

@@ -15,16 +15,22 @@
 use clap::Parser;
 use kailua_cli::Cli;
 use kona_host::init_tracing_subscriber;
+use tempfile::tempdir;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     init_tracing_subscriber(cli.verbosity())?;
 
+    let tmp_dir = tempdir()?;
+    let data_dir = cli.data_dir().unwrap_or(tmp_dir.path().to_path_buf());
+
     match cli {
         Cli::Deploy(deploy_args) => kailua_cli::deploy::deploy(deploy_args).await?,
-        Cli::Propose(propose_args) => kailua_cli::propose::propose(propose_args).await?,
-        Cli::Validate(validate_args) => kailua_cli::validate::validate(validate_args).await?,
+        Cli::Propose(propose_args) => kailua_cli::propose::propose(propose_args, data_dir).await?,
+        Cli::Validate(validate_args) => {
+            kailua_cli::validate::validate(validate_args, data_dir).await?
+        }
         Cli::TestFault(_fault_args) =>
         {
             #[cfg(feature = "devnet")]

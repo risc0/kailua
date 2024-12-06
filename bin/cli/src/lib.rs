@@ -18,6 +18,7 @@ use alloy::primitives::{Address, Uint, U256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
 use kailua_contracts::Safe::SafeInstance;
+use std::path::PathBuf;
 
 // pub mod bench;
 pub mod channel;
@@ -43,14 +44,46 @@ pub enum Cli {
     // Benchmark(bench::BenchArgs),
 }
 
+#[derive(clap::Args, Debug, Clone)]
+pub struct CoreArgs {
+    #[arg(long, short, help = "Verbosity level (0-4)", action = clap::ArgAction::Count)]
+    pub v: u8,
+
+    /// Address of OP-NODE endpoint to use
+    #[clap(long, env)]
+    pub op_node_address: String,
+    /// Address of L1 JSON-RPC endpoint to use (eth namespace required)
+    #[clap(long, env)]
+    pub l1_node_address: String,
+    /// Address of the L1 Beacon API endpoint to use.
+    #[clap(long, env)]
+    pub l1_beacon_address: String,
+
+    /// Address of the L1 `AnchorStateRegistry` contract
+    #[clap(long, env)]
+    pub registry_contract: String,
+
+    /// Directory to use for caching data
+    #[clap(long, env)]
+    pub data_dir: Option<PathBuf>,
+}
+
 impl Cli {
     pub fn verbosity(&self) -> u8 {
         match self {
             Cli::Deploy(args) => args.v,
-            Cli::Propose(args) => args.v,
-            Cli::Validate(args) => args.v,
-            Cli::TestFault(args) => args.propose_args.v,
+            Cli::Propose(args) => args.core.v,
+            Cli::Validate(args) => args.core.v,
+            Cli::TestFault(args) => args.propose_args.core.v,
             // Cli::Benchmark(args) => args.v,
+        }
+    }
+
+    pub fn data_dir(&self) -> Option<PathBuf> {
+        match self {
+            Cli::Propose(args) => args.core.data_dir.clone(),
+            Cli::Validate(args) => args.core.data_dir.clone(),
+            _ => None,
         }
     }
 }

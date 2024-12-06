@@ -46,7 +46,7 @@ pub struct FaultArgs {
 
 pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let op_node_provider = OpNodeProvider(
-        ProviderBuilder::new().on_http(args.propose_args.op_node_address.as_str().try_into()?),
+        ProviderBuilder::new().on_http(args.propose_args.core.op_node_address.as_str().try_into()?),
     );
 
     // init l1 stuff
@@ -56,10 +56,10 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let tester_provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .wallet(tester_wallet)
-        .on_http(args.propose_args.l1_node_address.as_str().try_into()?);
+        .on_http(args.propose_args.core.l1_node_address.as_str().try_into()?);
 
     let anchor_state_registry = IAnchorStateRegistry::new(
-        Address::from_str(&args.propose_args.registry_contract)?,
+        Address::from_str(&args.propose_args.core.registry_contract)?,
         &tester_provider,
     );
     let dispute_game_factory = IDisputeGameFactory::new(

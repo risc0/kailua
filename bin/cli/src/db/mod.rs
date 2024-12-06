@@ -25,7 +25,7 @@ use alloy::network::Network;
 use alloy::primitives::{Address, U256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
-use anyhow::bail;
+use anyhow::{bail, Context};
 use config::Config;
 use kailua_contracts::IAnchorStateRegistry::IAnchorStateRegistryInstance;
 use kailua_contracts::IDisputeGameFactory::{gameAtIndexReturn, IDisputeGameFactoryInstance};
@@ -35,7 +35,7 @@ use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
 use proposal::Proposal;
 use state::State;
 use std::collections::hash_map::Entry;
-use std::collections::BTreeMap;
+use std::path::PathBuf;
 use tracing::{error, info, warn};
 use treasury::Treasury;
 
@@ -48,16 +48,29 @@ pub enum ProofStatus {
     UWinVLose,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug)]
 pub struct KailuaDB {
     pub config: Config,
     pub treasury: Treasury,
-    pub proposals: BTreeMap<u64, Proposal>,
+    pub db: rocksdb::DB,
     pub state: State,
 }
 
+impl Drop for KailuaDB {
+    fn drop(&mut self) {
+        let _ = rocksdb::DB::destroy(&Self::options(), self.db.path());
+    }
+}
+
 impl KailuaDB {
+    pub fn options() -> rocksdb::Options {
+        let mut options = rocksdb::Options::default();
+        options.create_if_missing(true);
+        options
+    }
+
     pub async fn init<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+        mut data_dir: PathBuf,
         anchor_state_registry: &IAnchorStateRegistryInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
         let dispute_game_factory = IDisputeGameFactoryInstance::new(
@@ -76,10 +89,14 @@ impl KailuaDB {
         let treasury_implementation =
             KailuaTreasuryInstance::new(config.treasury, anchor_state_registry.provider());
         let treasury = Treasury::init(&treasury_implementation).await?;
+
+        data_dir.push(config.cfg_hash.to_string());
+        let db = rocksdb::DB::open(&Self::options(), &data_dir)?;
         Ok(Self {
             config,
             treasury,
-            ..Default::default()
+            db,
+            state: Default::default(),
         })
     }
 
@@ -93,6 +110,7 @@ impl KailuaDB {
             anchor_state_registry.disputeGameFactory().stall().await._0,
             anchor_state_registry.provider(),
         );
+        let canonical_start = self.state.canonical_tip_index;
         let game_count: u64 = dispute_game_factory
             .gameCount()
             .stall()
@@ -102,77 +120,127 @@ impl KailuaDB {
         let mut proposals =
             Vec::with_capacity((game_count - self.state.next_factory_index) as usize);
         while self.state.next_factory_index < game_count {
-            let factory_index = self.state.next_factory_index;
-            // process game
-            let gameAtIndexReturn {
-                gameType_: game_type,
-                proxy_: game_address,
-                ..
-            } = dispute_game_factory
-                .gameAtIndex(U256::from(factory_index))
-                .stall()
-                .await;
-            // skip entries for other game types
-            if game_type != KAILUA_GAME_TYPE {
-                info!("Skipping proposal of different game type {game_type} at factory index {factory_index}");
-                self.state.next_factory_index += 1;
-                continue;
-            }
-            info!("Processing tournament proposal at factory index {factory_index}");
-            let tournament_instance =
-                KailuaTournamentInstance::new(game_address, anchor_state_registry.provider());
-            let mut proposal =
-                Proposal::load(&self.config, blob_provider, &tournament_instance).await?;
-
-            // Determine inherited correctness
-            if let Err(e) = self
-                .determine_correctness(&mut proposal, op_node_provider)
-                .await
-            {
-                error!(
-                    "Failed to determine proposal {} correctness: {e:?}",
-                    proposal.index
-                );
-                break;
+            let proposal = match self.get_local_proposal(&self.state.next_factory_index) {
+                Some(proposal) => Some(proposal),
+                None => {
+                    match self
+                        .load_game_at_index(
+                            anchor_state_registry,
+                            op_node_provider,
+                            blob_provider,
+                            self.state.next_factory_index,
+                        )
+                        .await
+                    {
+                        Ok(processed) => {
+                            if processed {
+                                proposals.push(self.state.next_factory_index);
+                                Some(
+                                    self.get_local_proposal(&self.state.next_factory_index)
+                                        .expect("Failed to load immediately processed proposal"),
+                                )
+                            } else {
+                                None
+                            }
+                        }
+                        Err(err) => {
+                            error!(
+                                "Error loading game at index {}: {err:?}",
+                                self.state.next_factory_index
+                            );
+                            break;
+                        }
+                    }
+                }
             };
 
-            // Determine whether to follow or eliminate proposer
-            if self.determine_if_canonical(&mut proposal).is_none() {
-                error!(
-                    "Failed to determine if proposal {} is canonical (correctness: {:?}).",
-                    proposal.index,
-                    proposal.is_correct()
-                );
-                break;
-            }
-
-            // Determine tournament performance
-            match self.determine_tournament_participation(&mut proposal) {
-                Ok(true) => {
-                    // Insert proposal in db
-                    proposals.push(proposal.index);
-                    self.proposals.insert(proposal.index, proposal);
-                }
-                Ok(false) => {
-                    warn!(
-                        "Ignoring proposal {} (no tournament participation)",
-                        proposal.index
-                    );
-                }
-                Err(e) => {
-                    error!(
-                        "Failed to determine proposal {} tournament participation: {e:?}",
-                        proposal.index
-                    );
-                    break;
+            // Update state according to proposal
+            if let Some(proposal) = proposal {
+                if let Some(true) = proposal.canonical {
+                    // Update canonical chain tip
+                    self.state.canonical_tip_index = Some(proposal.index);
+                } else if let Some(false) = proposal.is_correct() {
+                    // Update player eliminations
+                    if let Entry::Vacant(entry) = self.state.eliminations.entry(proposal.proposer) {
+                        entry.insert(proposal.index);
+                    }
                 }
             }
 
-            // Update next game index
+            // Process next game index
             self.state.next_factory_index += 1;
         }
 
+        if canonical_start != self.state.canonical_tip_index {
+            info!(
+                "Updating canonical proposal chain tip to {:?}.",
+                self.state.canonical_tip_index
+            );
+        }
+
         Ok(proposals)
+    }
+
+    pub async fn load_game_at_index<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+        &mut self,
+        anchor_state_registry: &IAnchorStateRegistryInstance<T, P, N>,
+        op_node_provider: &OpNodeProvider,
+        blob_provider: &BlobProvider,
+        index: u64,
+    ) -> anyhow::Result<bool> {
+        let dispute_game_factory = IDisputeGameFactoryInstance::new(
+            anchor_state_registry.disputeGameFactory().stall().await._0,
+            anchor_state_registry.provider(),
+        );
+        // process game
+        let gameAtIndexReturn {
+            gameType_: game_type,
+            proxy_: game_address,
+            ..
+        } = dispute_game_factory
+            .gameAtIndex(U256::from(index))
+            .stall()
+            .await;
+        // skip entries for other game types
+        if game_type != KAILUA_GAME_TYPE {
+            info!("Skipping proposal of different game type {game_type} at factory index {index}");
+            return Ok(false);
+        }
+        info!("Processing tournament proposal at factory index {index}");
+        let tournament_instance =
+            KailuaTournamentInstance::new(game_address, anchor_state_registry.provider());
+        let mut proposal =
+            Proposal::load(&self.config, blob_provider, &tournament_instance).await?;
+
+        // Determine inherited correctness
+        self.determine_correctness(&mut proposal, op_node_provider)
+            .await
+            .context("Failed to determine proposal correctness")?;
+
+        // Determine whether to follow or eliminate proposer
+        if self.determine_if_canonical(&mut proposal).is_none() {
+            bail!(
+                "Failed to determine if proposal {} is canonical (correctness: {:?}).",
+                proposal.index,
+                proposal.is_correct()
+            );
+        }
+
+        // Determine tournament performance
+        if self
+            .determine_tournament_participation(&mut proposal)
+            .context("Failed to determine tournament participation")?
+        {
+            // Insert proposal in db
+            self.set_local_proposal(proposal.index, &proposal)?;
+            Ok(true)
+        } else {
+            warn!(
+                "Ignoring proposal {} (no tournament participation)",
+                proposal.index
+            );
+            Ok(false)
+        }
     }
 
     pub async fn determine_correctness(
@@ -209,14 +277,6 @@ impl KailuaDB {
                 correct
             }
         };
-        // Append child to parent
-        let parent = self.proposals.get_mut(&proposal.parent).unwrap();
-        if !parent.append_child(proposal.index) {
-            warn!(
-                "Attempted out of order child {} insertion into parent {} ",
-                proposal.index, parent.index
-            );
-        }
         Ok(is_correct_proposal)
     }
 
@@ -227,11 +287,6 @@ impl KailuaDB {
                 .canonical_tip_height()
                 .map_or(true, |h| h < proposal.output_block_number)
             {
-                info!(
-                    "Updating canonical proposal chain tip to game at index {}.",
-                    proposal.index
-                );
-                self.state.canonical_tip_index = Some(proposal.index);
                 proposal.canonical = Some(true);
             } else {
                 proposal.canonical = Some(false);
@@ -239,10 +294,6 @@ impl KailuaDB {
         } else {
             // Set as non-canonical
             proposal.canonical = Some(false);
-            // Record proposal as first elimination cause
-            if let Entry::Vacant(entry) = self.state.eliminations.entry(proposal.proposer) {
-                entry.insert(proposal.index);
-            }
         }
         proposal.canonical
     }
@@ -255,7 +306,7 @@ impl KailuaDB {
             return Ok(true);
         }
 
-        let parent = self.get_local_proposal(&proposal.parent).unwrap();
+        let mut parent = self.get_local_proposal(&proposal.parent).unwrap().clone();
         // Ignore self-conflict
         if parent
             .survivor
@@ -276,6 +327,13 @@ impl KailuaDB {
         }
         // Update the contender
         proposal.contender = parent.survivor;
+        // Append child to parent
+        if !parent.append_child(proposal.index) {
+            warn!(
+                "Attempted out of order child {} insertion into parent {} ",
+                proposal.index, parent.index
+            );
+        }
         // Determine survivorship
         if parent
             .survivor
@@ -289,14 +347,24 @@ impl KailuaDB {
         {
             // If the old survivor (if any) is defeated,
             // set this proposal as the new survivor
-            let parent = self.proposals.get_mut(&proposal.parent).unwrap();
             parent.survivor = Some(proposal.index);
         }
+        // Commit updated parent data
+        self.set_local_proposal(proposal.parent, &parent)?;
         Ok(true)
     }
 
-    pub fn get_local_proposal(&self, index: &u64) -> Option<&Proposal> {
-        self.proposals.get(index)
+    pub fn get_local_proposal(&self, index: &u64) -> Option<Proposal> {
+        self.db
+            .get(index.to_be_bytes())
+            .ok()?
+            .and_then(|data| bincode::deserialize(&data).ok())
+    }
+
+    pub fn set_local_proposal(&mut self, index: u64, proposal: &Proposal) -> anyhow::Result<()> {
+        Ok(self
+            .db
+            .put(index.to_be_bytes(), bincode::serialize(proposal)?)?)
     }
 
     pub fn is_proposer_eliminated(&self, proposer: Address) -> bool {
@@ -311,7 +379,7 @@ impl KailuaDB {
             .unwrap_or_default()
     }
 
-    pub fn canonical_tip(&self) -> Option<&Proposal> {
+    pub fn canonical_tip(&self) -> Option<Proposal> {
         self.state
             .canonical_tip_index
             .map(|i| self.get_local_proposal(&i).unwrap())

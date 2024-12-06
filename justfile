@@ -52,12 +52,13 @@ devnet-reset:
   just devnet-up
 
 
-devnet-propose verbosity="-vv" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" rollup_node_rpc="http://127.0.0.1:7545" registry="0xd801426328C609fCDe6E3B7a5623C27e8F607832" deployer="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba":
+devnet-propose verbosity="-vv" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" rollup_node_rpc="http://127.0.0.1:7545" data_dir=".localtestdata/propose" registry="0xd801426328C609fCDe6E3B7a5623C27e8F607832" deployer="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba":
   ./target/debug/kailua-cli propose \
       --registry-contract {{registry}} \
       --l1-node-address {{l1_rpc}} \
       --l1-beacon-address {{l1_beacon_rpc}} \
       --op-node-address {{rollup_node_rpc}} \
+      --data-dir {{data_dir}} \
       --proposer-key {{deployer}} \
       {{verbosity}}
 
@@ -72,13 +73,15 @@ devnet-fault verbosity="-vv" offset="1" parent="1" l1_rpc="http://127.0.0.1:8545
       --fault-parent {{parent}} \
       {{verbosity}}
 
-devnet-validate verbosity="-vv" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" registry="0xd801426328C609fCDe6E3B7a5623C27e8F607832" validator="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba":
+devnet-validate verbosity="-vv" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" data_dir=".localtestdata/validate" kailua_host="./target/debug/kailua-host" registry="0xd801426328C609fCDe6E3B7a5623C27e8F607832" validator="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba":
   RISC0_DEV_MODE=1 ./target/debug/kailua-cli validate \
       --registry-contract {{registry}} \
       --l1-node-address {{l1_rpc}} \
       --l1-beacon-address {{l1_beacon_rpc}} \
       --l2-node-address {{l2_rpc}} \
       --op-node-address {{rollup_node_rpc}} \
+      --data-dir {{data_dir}} \
+      --kailua-host {{kailua_host}} \
       --validator-key {{validator}} \
       {{verbosity}}
 

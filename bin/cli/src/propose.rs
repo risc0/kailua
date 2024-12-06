@@ -16,7 +16,7 @@ use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
 use crate::providers::beacon::BlobProvider;
 use crate::providers::optimism::OpNodeProvider;
-use crate::{stall::Stall, KAILUA_GAME_TYPE};
+use crate::{stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::consensus::BlockHeader;
 use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::primitives::BlockTransactionsKind;
@@ -28,6 +28,7 @@ use alloy::sol_types::SolValue;
 use anyhow::Context;
 use kailua_common::hash_to_fe;
 use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
+use std::path::PathBuf;
 use std::process::exit;
 use std::str::FromStr;
 use std::time::Duration;
@@ -36,33 +37,20 @@ use tracing::{debug, error, info, warn};
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct ProposeArgs {
-    #[arg(long, short, help = "Verbosity level (0-4)", action = clap::ArgAction::Count)]
-    pub v: u8,
-
-    /// Address of OP-NODE endpoint to use
-    #[clap(long)]
-    pub op_node_address: String,
-    /// Address of L1 JSON-RPC endpoint to use (eth namespace required)
-    #[clap(long)]
-    pub l1_node_address: String,
-    /// Address of the L1 Beacon API endpoint to use.
-    #[clap(long)]
-    pub l1_beacon_address: String,
-
-    /// Address of the L1 `AnchorStateRegistry` contract
-    #[clap(long)]
-    pub registry_contract: String,
+    #[clap(flatten)]
+    pub core: CoreArgs,
 
     /// Secret key of L1 wallet to use for proposing outputs
-    #[clap(long)]
+    #[clap(long, env)]
     pub proposer_key: String,
 }
 
-pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
+pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()> {
     // initialize blockchain connections
-    let op_node_provider =
-        OpNodeProvider(ProviderBuilder::new().on_http(args.op_node_address.as_str().try_into()?));
-    let cl_node_provider = BlobProvider::new(args.l1_beacon_address.as_str()).await?;
+    let op_node_provider = OpNodeProvider(
+        ProviderBuilder::new().on_http(args.core.op_node_address.as_str().try_into()?),
+    );
+    let cl_node_provider = BlobProvider::new(args.core.l1_beacon_address.as_str()).await?;
 
     // initialize proposer wallet
     info!("Initializing proposer wallet.");
@@ -72,12 +60,12 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
     let proposer_provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .wallet(&proposer_wallet)
-        .on_http(args.l1_node_address.as_str().try_into()?);
+        .on_http(args.core.l1_node_address.as_str().try_into()?);
     info!("Proposer address: {proposer_address}");
 
     // Init registry and factory contracts
     let anchor_state_registry = kailua_contracts::IAnchorStateRegistry::new(
-        Address::from_str(&args.registry_contract)?,
+        Address::from_str(&args.core.registry_contract)?,
         &proposer_provider,
     );
     info!("AnchorStateRegistry({:?})", anchor_state_registry.address());
@@ -108,7 +96,7 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
     }
     // Initialize empty DB
     info!("Initializing..");
-    let mut kailua_db = KailuaDB::init(&anchor_state_registry).await?;
+    let mut kailua_db = KailuaDB::init(data_dir, &anchor_state_registry).await?;
     info!("KailuaTreasury({:?})", kailua_db.treasury.address);
     // Run the proposer loop to sync and post
     info!(
@@ -295,7 +283,7 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             };
             // check if proposal was made incorrectly or by an already eliminated player
             if dupe_proposal.is_correct().unwrap_or_default()
-                && !kailua_db.was_proposer_eliminated_before(dupe_proposal)
+                && !kailua_db.was_proposer_eliminated_before(&dupe_proposal)
             {
                 break None;
             }

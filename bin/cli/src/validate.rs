@@ -17,7 +17,7 @@ use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
 use crate::providers::beacon::BlobProvider;
 use crate::providers::optimism::OpNodeProvider;
-use crate::{stall::Stall, KAILUA_GAME_TYPE};
+use crate::{stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::IndexedBlobHash;
 use alloy::eips::BlockNumberOrTag;
 use alloy::network::primitives::BlockTransactionsKind;
@@ -34,8 +34,7 @@ use kailua_contracts::{IAnchorStateRegistry, IDisputeGameFactory, KailuaGame};
 use kailua_host::fetch_rollup_config;
 use op_alloy_protocol::BlockInfo;
 use risc0_zkvm::Receipt;
-use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::str::FromStr;
 use std::time::Duration;
@@ -48,38 +47,33 @@ use tracing::{debug, error, info, warn};
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct ValidateArgs {
-    #[arg(long, short, help = "Verbosity level (0-4)", action = clap::ArgAction::Count)]
-    pub v: u8,
+    #[clap(flatten)]
+    pub core: CoreArgs,
 
-    /// Address of OP-NODE endpoint to use
-    #[clap(long)]
-    pub op_node_address: String,
     /// Address of L2 JSON-RPC endpoint to use (eth and debug namespace required).
-    #[clap(long)]
+    #[clap(long, env)]
     pub l2_node_address: String,
-    /// Address of L1 JSON-RPC endpoint to use (eth namespace required)
-    #[clap(long)]
-    pub l1_node_address: String,
-    /// Address of the L1 Beacon API endpoint to use.
-    #[clap(long)]
-    pub l1_beacon_address: String,
 
-    /// Address of the L1 `AnchorStateRegistry` contract
-    #[clap(long)]
-    pub registry_contract: String,
+    /// Path to the kailua host binary to use for proving
+    #[clap(long, env)]
+    pub kailua_host: PathBuf,
 
     /// Secret key of L1 wallet to use for challenging and proving outputs
-    #[clap(long)]
+    #[clap(long, env)]
     pub validator_key: String,
 }
 
-pub async fn validate(args: ValidateArgs) -> anyhow::Result<()> {
+pub async fn validate(args: ValidateArgs, data_dir: PathBuf) -> anyhow::Result<()> {
     // We run two concurrent tasks, one for the chain, and one for the prover.
     // Both tasks communicate using the duplex channel
     let channel_pair = DuplexChannel::new_pair(4096);
 
-    let handle_proposals = spawn(handle_proposals(channel_pair.0, args.clone()));
-    let handle_proofs = spawn(handle_proofs(channel_pair.1, args));
+    let handle_proposals = spawn(handle_proposals(
+        channel_pair.0,
+        args.clone(),
+        data_dir.clone(),
+    ));
+    let handle_proofs = spawn(handle_proofs(channel_pair.1, args, data_dir));
 
     let (proposals_task, proofs_task) = try_join!(handle_proposals, handle_proofs)?;
     proposals_task.context("handle_proposals")?;
@@ -106,16 +100,18 @@ pub enum Message {
 pub async fn handle_proposals(
     mut channel: DuplexChannel<Message>,
     args: ValidateArgs,
+    data_dir: PathBuf,
 ) -> anyhow::Result<()> {
     // initialize blockchain connections
     info!("Initializing rpc connections.");
-    let op_node_provider =
-        OpNodeProvider(ProviderBuilder::new().on_http(args.op_node_address.as_str().try_into()?));
+    let op_node_provider = OpNodeProvider(
+        ProviderBuilder::new().on_http(args.core.op_node_address.as_str().try_into()?),
+    );
     let l1_node_provider =
-        ProviderBuilder::new().on_http(args.l1_node_address.as_str().try_into()?);
+        ProviderBuilder::new().on_http(args.core.l1_node_address.as_str().try_into()?);
     let l2_node_provider =
         ProviderBuilder::new().on_http(args.l2_node_address.as_str().try_into()?);
-    let cl_node_provider = BlobProvider::new(args.l1_beacon_address.as_str()).await?;
+    let cl_node_provider = BlobProvider::new(args.core.l1_beacon_address.as_str()).await?;
 
     // initialize validator wallet
     info!("Initializing validator wallet.");
@@ -125,12 +121,12 @@ pub async fn handle_proposals(
     let validator_provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .wallet(validator_wallet)
-        .on_http(args.l1_node_address.as_str().try_into()?);
+        .on_http(args.core.l1_node_address.as_str().try_into()?);
     info!("Validator address: {validator_address}");
 
     // Init registry and factory contracts
     let anchor_state_registry = IAnchorStateRegistry::new(
-        Address::from_str(&args.registry_contract)?,
+        Address::from_str(&args.core.registry_contract)?,
         &validator_provider,
     );
     info!("AnchorStateRegistry({:?})", anchor_state_registry.address());
@@ -161,7 +157,7 @@ pub async fn handle_proposals(
     }
     // Initialize empty DB
     info!("Initializing..");
-    let mut kailua_db = KailuaDB::init(&anchor_state_registry).await?;
+    let mut kailua_db = KailuaDB::init(data_dir, &anchor_state_registry).await?;
     info!("KailuaTreasury({:?})", kailua_db.treasury.address);
     // Run the validator loop
     info!(
@@ -227,8 +223,8 @@ pub async fn handle_proposals(
             if proof_status == 0 {
                 request_proof(
                     &mut channel,
-                    contender,
-                    proposal,
+                    &contender,
+                    &proposal,
                     &l1_node_provider,
                     &l2_node_provider,
                     &op_node_provider,
@@ -686,21 +682,13 @@ async fn request_proof(
 pub async fn handle_proofs(
     mut channel: DuplexChannel<Message>,
     args: ValidateArgs,
+    data_dir: PathBuf,
 ) -> anyhow::Result<()> {
     // Fetch rollup configuration
-    let l2_chain_id = fetch_rollup_config(&args.op_node_address, &args.l2_node_address, None)
+    let l2_chain_id = fetch_rollup_config(&args.core.op_node_address, &args.l2_node_address, None)
         .await?
         .l2_chain_id
         .to_string();
-    // Read executable paths from env vars
-    let kailua_host = env::var("KAILUA_HOST").unwrap_or_else(|_| {
-        warn!("KAILUA_HOST set to default ./target/debug/kailua-host");
-        String::from("./target/debug/kailua-host")
-    });
-    let data_dir = env::var("KAILUA_DATA").unwrap_or_else(|_| {
-        warn!("KAILUA_DATA set to default .localtestdata");
-        String::from(".localtestdata")
-    });
     // Run proof generator loop
     loop {
         // Dequeue messages
@@ -740,7 +728,7 @@ pub async fn handle_proofs(
         let claimed_l2_block_number = claimed_l2_block_number.to_string();
         let verbosity = [
             String::from("-"),
-            (0..args.v).map(|_| 'v').collect::<String>(),
+            (0..args.core.v).map(|_| 'v').collect::<String>(),
         ]
         .concat();
         let mut proving_args = vec![
@@ -757,15 +745,15 @@ pub async fn handle_proofs(
             String::from("--l2-chain-id"), // rollup chain id
             l2_chain_id.clone(),
             String::from("--l1-node-address"), // l1 el node
-            args.l1_node_address.clone(),
+            args.core.l1_node_address.clone(),
             String::from("--l1-beacon-address"), // l1 cl node
-            args.l1_beacon_address.clone(),
+            args.core.l1_beacon_address.clone(),
             String::from("--l2-node-address"), // l2 el node
             args.l2_node_address.clone(),
             String::from("--op-node-address"), // l2 cl node
-            args.op_node_address.clone(),
+            args.core.op_node_address.clone(),
             String::from("--data-dir"), // path to cache
-            data_dir.clone(),
+            data_dir.to_str().unwrap().to_string(),
             String::from("--native"), // run the client natively
         ];
         // precondition data
@@ -794,11 +782,11 @@ pub async fn handle_proofs(
             ]);
         }
         // verbosity level
-        if args.v > 0 {
+        if args.core.v > 0 {
             proving_args.push(verbosity);
         }
         // Prove via kailua-host (re dev mode/bonsai: env vars inherited!)
-        let mut kailua_host_command = Command::new(&kailua_host);
+        let mut kailua_host_command = Command::new(&args.kailua_host);
         // get fake receipts when building under devnet
         #[cfg(feature = "devnet")]
         kailua_host_command.env("RISC0_DEV_MODE", "1");
