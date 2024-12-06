@@ -23,6 +23,7 @@ use kailua_contracts::KailuaGame::KailuaGameInstance;
 #[derive(Clone, Debug, Default)]
 pub struct Config {
     pub treasury: Address,
+    pub game: Address,
     pub verifier: Address,
     pub image_id: B256,
     pub cfg_hash: B256,
@@ -46,6 +47,7 @@ impl Config {
             .stall()
             .await
             .treasury_;
+        let game = *kailua_game_implementation.address();
         let verifier = kailua_game_implementation
             .verifier()
             .stall()
@@ -110,6 +112,7 @@ impl Config {
             .to();
         Ok(Self {
             treasury,
+            game,
             verifier,
             image_id,
             cfg_hash,

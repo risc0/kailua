@@ -166,54 +166,64 @@ pub async fn handle_proposals(
     // Run the validator loop
     info!(
         "Starting from proposal at factory index {}",
-        kailua_db.next_factory_index
+        kailua_db.state.next_factory_index
     );
     loop {
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
-        // track last seen game
-        let last_proposal_index = kailua_db
-            .proposals
-            .last_key_value()
-            .map(|x| *x.0)
-            .unwrap_or_default();
         // fetch latest games
-        kailua_db
+        let loaded_proposals = kailua_db
             .load_proposals(&anchor_state_registry, &op_node_provider, &cl_node_provider)
             .await
             .context("load_proposals")?;
 
         // check new proposals for fault and queue potential responses
-        for (_, proposal) in kailua_db.proposals.range(last_proposal_index..u64::MAX) {
-            // skip seen before proposal
-            if proposal.index == last_proposal_index {
+        for proposal_index in loaded_proposals {
+            let Some(proposal) = kailua_db.get_local_proposal(&proposal_index) else {
+                error!("Proposal {proposal_index} missing from database.");
                 continue;
-            }
+            };
             // skip this proposal if it has no contender
             let Some(contender) = proposal.contender else {
                 continue;
             };
             // request a proof of the match results
-            let contender = kailua_db
-                .proposals
-                .get(&contender)
-                .expect("Missing contender from database.");
-
-            let proposal_parent = kailua_db.proposals.get(&proposal.parent).unwrap();
+            let Some(contender) = kailua_db.get_local_proposal(&contender) else {
+                error!("Contender {contender} missing from database.");
+                continue;
+            };
+            // Look up parent proposal
+            let Some(proposal_parent) = kailua_db.get_local_proposal(&proposal.parent) else {
+                error!(
+                    "Proposal {} parent {} missing from database.",
+                    proposal.index, proposal.parent
+                );
+                continue;
+            };
             let proposal_parent_contract =
                 proposal_parent.tournament_contract_instance(&validator_provider);
-            let u_index = proposal_parent
-                .child_index(contender.index)
-                .expect("Could not look up contender's index in parent tournament");
-            let v_index = proposal_parent
-                .child_index(proposal.index)
-                .expect("Could not look up contender's index in parent tournament");
+            // Look up indices of children in parent
+            let Some(u_index) = proposal_parent.child_index(contender.index) else {
+                error!(
+                    "Could not look up contender {} index in parent tournament {}",
+                    contender.index, proposal_parent.index
+                );
+                continue;
+            };
+            let Some(v_index) = proposal_parent.child_index(proposal.index) else {
+                error!(
+                    "Could not look up proposal {} index in parent tournament {}",
+                    proposal.index, proposal_parent.index
+                );
+                continue;
+            };
+            // Check that proof had not already been posted
             let proof_status = proposal_parent_contract
                 .proofStatus(U256::from(u_index), U256::from(v_index))
                 .stall()
                 .await
                 ._0;
-
+            // Prove if unproven
             if proof_status == 0 {
                 request_proof(
                     &mut channel,
@@ -241,14 +251,14 @@ pub async fn handle_proposals(
             else {
                 bail!("Unexpected message type.");
             };
-            let proposal = kailua_db.proposals.get(&proposal_index).unwrap();
-            let proposal_parent = kailua_db.proposals.get(&proposal.parent).unwrap();
+            let proposal = kailua_db.get_local_proposal(&proposal_index).unwrap();
+            let proposal_parent = kailua_db.get_local_proposal(&proposal.parent).unwrap();
             let proposal_parent_contract =
                 proposal_parent.tournament_contract_instance(&validator_provider);
             let proof_journal = ProofJournal::decode_packed(receipt.journal.as_ref())?;
             info!("Proof journal: {:?}", proof_journal);
             let contender_index = proposal.contender.unwrap();
-            let contender = kailua_db.proposals.get(&contender_index).unwrap();
+            let contender = kailua_db.get_local_proposal(&contender_index).unwrap();
 
             let u_index = proposal_parent
                 .child_index(contender_index)

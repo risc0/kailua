@@ -1,5 +1,4 @@
 use crate::db::config::Config;
-use crate::db::ProofStatus;
 use crate::providers::beacon::blob_fe_proof;
 use crate::providers::beacon::{blob_sidecar, BlobProvider};
 use crate::providers::optimism::OpNodeProvider;
@@ -18,7 +17,6 @@ use kailua_common::{hash_to_fe, intermediate_outputs};
 use kailua_contracts::KailuaGame::KailuaGameInstance;
 use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
 use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
-use std::collections::HashMap;
 use std::iter::repeat;
 use tracing::{error, info};
 
@@ -38,8 +36,6 @@ pub struct Proposal {
     pub l1_head: B256,
     // tournament data
     pub children: Vec<u64>,
-    pub proven: HashMap<u64, ProofStatus>,
-    pub prover: HashMap<u64, Address>,
     pub survivor: Option<u64>,
     pub contender: Option<u64>,
     // correctness
@@ -108,8 +104,6 @@ impl Proposal {
             output_block_number,
             l1_head,
             children: Default::default(),
-            proven: Default::default(),
-            prover: Default::default(),
             survivor: None,
             contender: None,
             correct_io: vec![],
@@ -178,8 +172,6 @@ impl Proposal {
             output_block_number,
             l1_head,
             children: Default::default(),
-            proven: Default::default(),
-            prover: Default::default(),
             survivor: None,
             contender: None,
             correct_io: repeat(None)
@@ -395,6 +387,15 @@ impl Proposal {
                 }
             }
         }
+    }
+
+    pub fn append_child(&mut self, child_index: u64) -> bool {
+        let should_insert = self.children.last().map_or(true, |i| i < &child_index);
+        // The assumption is that this is always sorted and out of order insertions are duplicates
+        if should_insert {
+            self.children.push(child_index);
+        }
+        should_insert
     }
 
     pub fn child_index(&self, proposal_index: u64) -> Option<u64> {

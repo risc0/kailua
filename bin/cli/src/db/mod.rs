@@ -14,6 +14,7 @@
 
 pub mod config;
 pub mod proposal;
+pub mod state;
 pub mod treasury;
 
 use crate::providers::beacon::BlobProvider;
@@ -24,6 +25,7 @@ use alloy::network::Network;
 use alloy::primitives::{Address, U256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
+use anyhow::bail;
 use config::Config;
 use kailua_contracts::IAnchorStateRegistry::IAnchorStateRegistryInstance;
 use kailua_contracts::IDisputeGameFactory::{gameAtIndexReturn, IDisputeGameFactoryInstance};
@@ -31,8 +33,9 @@ use kailua_contracts::KailuaGame::KailuaGameInstance;
 use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
 use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
 use proposal::Proposal;
+use state::State;
 use std::collections::hash_map::Entry;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use tracing::{error, info, warn};
 use treasury::Treasury;
 
@@ -50,9 +53,7 @@ pub struct KailuaDB {
     pub config: Config,
     pub treasury: Treasury,
     pub proposals: BTreeMap<u64, Proposal>,
-    pub eliminations: HashMap<Address, u64>,
-    pub next_factory_index: u64,
-    pub canonical_tip_index: Option<u64>,
+    pub state: State,
 }
 
 impl KailuaDB {
@@ -87,20 +88,21 @@ impl KailuaDB {
         anchor_state_registry: &IAnchorStateRegistryInstance<T, P, N>,
         op_node_provider: &OpNodeProvider,
         blob_provider: &BlobProvider,
-    ) -> anyhow::Result<usize> {
+    ) -> anyhow::Result<Vec<u64>> {
         let dispute_game_factory = IDisputeGameFactoryInstance::new(
             anchor_state_registry.disputeGameFactory().stall().await._0,
             anchor_state_registry.provider(),
         );
-        let initial_proposals = self.proposals.len();
         let game_count: u64 = dispute_game_factory
             .gameCount()
             .stall()
             .await
             .gameCount_
             .to();
-        while self.next_factory_index < game_count {
-            let factory_index = self.next_factory_index;
+        let mut proposals =
+            Vec::with_capacity((game_count - self.state.next_factory_index) as usize);
+        while self.state.next_factory_index < game_count {
+            let factory_index = self.state.next_factory_index;
             // process game
             let gameAtIndexReturn {
                 gameType_: game_type,
@@ -113,7 +115,7 @@ impl KailuaDB {
             // skip entries for other game types
             if game_type != KAILUA_GAME_TYPE {
                 info!("Skipping proposal of different game type {game_type} at factory index {factory_index}");
-                self.next_factory_index += 1;
+                self.state.next_factory_index += 1;
                 continue;
             }
             info!("Processing tournament proposal at factory index {factory_index}");
@@ -123,143 +125,202 @@ impl KailuaDB {
                 Proposal::load(&self.config, blob_provider, &tournament_instance).await?;
 
             // Determine inherited correctness
-            let is_correct_proposal = if proposal.has_parent() {
-                // Validate game instance data
-                info!("Assessing proposal correctness..");
-                let is_parent_correct = self
-                    .proposals
-                    .get(&proposal.parent)
-                    .expect("Attempted to process child before registering parent.")
-                    .is_correct()
-                    .expect("Attempted to process child before deciding parent correctness");
-                let is_correct_proposal = match proposal
-                    .assess_correctness(&self.config, op_node_provider, is_parent_correct)
-                    .await?
-                {
-                    None => {
-                        error!("Failed to assess correctness. Is op-node synced far enough?");
-                        break;
-                    }
-                    Some(correct) => {
-                        if correct {
-                            info!("Assessed proposal as {correct}.");
-                        } else {
-                            warn!("Assessed proposal as {correct}.");
-                        }
-                        correct
-                    }
-                };
-                // Append child to parent
-                let parent = self.proposals.get_mut(&proposal.parent).unwrap();
-                if parent.children.last().is_none()
-                    || parent.children.last().unwrap() < &proposal.index
-                {
-                    parent.children.push(proposal.index);
-                }
-                is_correct_proposal
-            } else {
-                // Accept treasury instance data
-                info!("Accepting initial treasury proposal as true.");
-                true
+            if let Err(e) = self
+                .determine_correctness(&mut proposal, op_node_provider)
+                .await
+            {
+                error!(
+                    "Failed to determine proposal {} correctness: {e:?}",
+                    proposal.index
+                );
+                break;
             };
 
             // Determine whether to follow or eliminate proposer
-            if is_correct_proposal && !self.was_proposer_eliminated_before(&proposal) {
-                // Consider updating canonical chain tip
-                let canon_height = self.canonical_tip_height();
-                if canon_height.is_none() || canon_height.unwrap() < proposal.output_block_number {
-                    info!(
-                        "Updating canonical proposal chain tip to game at index {}.",
-                        proposal.index
-                    );
-                    self.canonical_tip_index = Some(proposal.index);
-                    proposal.canonical = Some(true);
-                } else {
-                    proposal.canonical = Some(false);
-                }
-            } else {
-                // Set as non-canonical
-                proposal.canonical = Some(false);
-                // Record proposal as first elimination cause
-                if let Entry::Vacant(entry) = self.eliminations.entry(proposal.proposer) {
-                    entry.insert(proposal.index);
-                }
+            if self.determine_if_canonical(&mut proposal).is_none() {
+                error!(
+                    "Failed to determine if proposal {} is canonical (correctness: {:?}).",
+                    proposal.index,
+                    proposal.is_correct()
+                );
+                break;
             }
 
             // Determine tournament performance
-            if proposal.has_parent() {
-                let parent = self.proposals.get(&proposal.parent).unwrap();
-                // Ignore self-conflict
-                if parent
-                    .survivor
-                    .map(|contender| {
-                        self.proposals.get(&contender).unwrap().proposer == proposal.proposer
-                    })
-                    .unwrap_or_default()
-                {
-                    self.next_factory_index += 1;
-                    continue;
+            match self.determine_tournament_participation(&mut proposal) {
+                Ok(true) => {
+                    // Insert proposal in db
+                    proposals.push(proposal.index);
+                    self.proposals.insert(proposal.index, proposal);
                 }
-                // Participate in tournament only if this is a correct or first bad proposal
-                if self.was_proposer_eliminated_before(&proposal) {
-                    self.next_factory_index += 1;
-                    continue;
+                Ok(false) => {
+                    warn!(
+                        "Ignoring proposal {} (no tournament participation)",
+                        proposal.index
+                    );
                 }
-                // Skip non-canonical tournaments
-                if !parent.canonical.unwrap_or_default() {
-                    self.next_factory_index += 1;
-                    continue;
-                }
-                // Update the contender
-                proposal.contender = parent.survivor;
-                // Determine survivorship
-                if parent
-                    .survivor
-                    .map(|contender| {
-                        !self
-                            .proposals
-                            .get(&contender)
-                            .unwrap()
-                            .wins_against(&proposal)
-                    })
-                    .unwrap_or(true)
-                {
-                    // If the old survivor (if any) is defeated,
-                    // set this proposal as the new survivor
-                    let parent = self.proposals.get_mut(&proposal.parent).unwrap();
-                    parent.survivor = Some(proposal.index);
+                Err(e) => {
+                    error!(
+                        "Failed to determine proposal {} tournament participation: {e:?}",
+                        proposal.index
+                    );
+                    break;
                 }
             }
 
-            // Insert proposal in db
-            self.proposals.insert(proposal.index, proposal);
-
             // Update next game index
-            self.next_factory_index += 1;
+            self.state.next_factory_index += 1;
         }
 
-        Ok(self.proposals.len() - initial_proposals)
+        Ok(proposals)
+    }
+
+    pub async fn determine_correctness(
+        &mut self,
+        proposal: &mut Proposal,
+        op_node_provider: &OpNodeProvider,
+    ) -> anyhow::Result<bool> {
+        // Accept correctness of treasury instance data
+        if !proposal.has_parent() {
+            info!("Accepting initial treasury proposal as true.");
+            return Ok(true);
+        }
+
+        // Validate game instance data
+        info!("Assessing proposal correctness..");
+        let is_parent_correct = self
+            .get_local_proposal(&proposal.parent)
+            .expect("Attempted to process child before registering parent.")
+            .is_correct()
+            .expect("Attempted to process child before deciding parent correctness");
+        let is_correct_proposal = match proposal
+            .assess_correctness(&self.config, op_node_provider, is_parent_correct)
+            .await?
+        {
+            None => {
+                bail!("Failed to assess correctness. Is op-node synced far enough?");
+            }
+            Some(correct) => {
+                if correct {
+                    info!("Assessed proposal as {correct}.");
+                } else {
+                    warn!("Assessed proposal as {correct}.");
+                }
+                correct
+            }
+        };
+        // Append child to parent
+        let parent = self.proposals.get_mut(&proposal.parent).unwrap();
+        if !parent.append_child(proposal.index) {
+            warn!(
+                "Attempted out of order child {} insertion into parent {} ",
+                proposal.index, parent.index
+            );
+        }
+        Ok(is_correct_proposal)
+    }
+
+    pub fn determine_if_canonical(&mut self, proposal: &mut Proposal) -> Option<bool> {
+        if proposal.is_correct()? && !self.was_proposer_eliminated_before(proposal) {
+            // Consider updating canonical chain tip
+            if self
+                .canonical_tip_height()
+                .map_or(true, |h| h < proposal.output_block_number)
+            {
+                info!(
+                    "Updating canonical proposal chain tip to game at index {}.",
+                    proposal.index
+                );
+                self.state.canonical_tip_index = Some(proposal.index);
+                proposal.canonical = Some(true);
+            } else {
+                proposal.canonical = Some(false);
+            }
+        } else {
+            // Set as non-canonical
+            proposal.canonical = Some(false);
+            // Record proposal as first elimination cause
+            if let Entry::Vacant(entry) = self.state.eliminations.entry(proposal.proposer) {
+                entry.insert(proposal.index);
+            }
+        }
+        proposal.canonical
+    }
+
+    pub fn determine_tournament_participation(
+        &mut self,
+        proposal: &mut Proposal,
+    ) -> anyhow::Result<bool> {
+        if !proposal.has_parent() {
+            return Ok(true);
+        }
+
+        let parent = self.get_local_proposal(&proposal.parent).unwrap();
+        // Ignore self-conflict
+        if parent
+            .survivor
+            .map(|contender| {
+                self.get_local_proposal(&contender).unwrap().proposer == proposal.proposer
+            })
+            .unwrap_or_default()
+        {
+            return Ok(false);
+        }
+        // Participate in tournament only if this is a correct or first bad proposal
+        if self.was_proposer_eliminated_before(proposal) {
+            return Ok(false);
+        }
+        // Skip non-canonical tournaments
+        if !parent.canonical.unwrap_or_default() {
+            return Ok(false);
+        }
+        // Update the contender
+        proposal.contender = parent.survivor;
+        // Determine survivorship
+        if parent
+            .survivor
+            .map(|contender| {
+                !self
+                    .get_local_proposal(&contender)
+                    .unwrap()
+                    .wins_against(proposal)
+            })
+            .unwrap_or(true)
+        {
+            // If the old survivor (if any) is defeated,
+            // set this proposal as the new survivor
+            let parent = self.proposals.get_mut(&proposal.parent).unwrap();
+            parent.survivor = Some(proposal.index);
+        }
+        Ok(true)
+    }
+
+    pub fn get_local_proposal(&self, index: &u64) -> Option<&Proposal> {
+        self.proposals.get(index)
     }
 
     pub fn is_proposer_eliminated(&self, proposer: Address) -> bool {
-        self.eliminations.contains_key(&proposer)
+        self.state.eliminations.contains_key(&proposer)
     }
 
     pub fn was_proposer_eliminated_before(&self, proposal: &Proposal) -> bool {
-        self.eliminations
+        self.state
+            .eliminations
             .get(&proposal.proposer)
             .map(|p| p < &proposal.index)
             .unwrap_or_default()
     }
 
     pub fn canonical_tip(&self) -> Option<&Proposal> {
-        self.canonical_tip_index
-            .map(|i| self.proposals.get(&i).unwrap())
+        self.state
+            .canonical_tip_index
+            .map(|i| self.get_local_proposal(&i).unwrap())
     }
 
     pub fn canonical_tip_height(&self) -> Option<u64> {
-        self.canonical_tip_index
-            .map(|i| self.proposals.get(&i).unwrap().output_block_number)
+        self.state
+            .canonical_tip_index
+            .map(|i| self.get_local_proposal(&i).unwrap().output_block_number)
     }
 
     pub async fn unresolved_canonical_proposals<
@@ -271,11 +332,11 @@ impl KailuaDB {
         l1_node_provider: &P,
     ) -> anyhow::Result<Vec<u64>> {
         // Nothing to do without a canonical tip
-        if self.canonical_tip_index.is_none() {
+        if self.state.canonical_tip_index.is_none() {
             return Ok(Vec::new());
         }
         // traverse up chain starting from canonical tip
-        let mut unresolved_proposal_indices = vec![self.canonical_tip_index.unwrap()];
+        let mut unresolved_proposal_indices = vec![self.state.canonical_tip_index.unwrap()];
         loop {
             let proposal_index = *unresolved_proposal_indices.last().unwrap();
             let proposal = self.proposals.get_mut(&proposal_index).unwrap();

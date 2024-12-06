@@ -113,7 +113,7 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
     // Run the proposer loop to sync and post
     info!(
         "Starting from proposal at factory index {}",
-        kailua_db.next_factory_index
+        kailua_db.state.next_factory_index
     );
 
     loop {
@@ -137,8 +137,8 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
             );
         }
         while let Some(proposal_index) = unresolved_proposal_indices.pop() {
-            let proposal = kailua_db.proposals.get(&proposal_index).unwrap();
-            let parent = kailua_db.proposals.get(&proposal.parent).unwrap();
+            let proposal = kailua_db.get_local_proposal(&proposal_index).unwrap();
+            let parent = kailua_db.get_local_proposal(&proposal.parent).unwrap();
             let parent_contract = parent.tournament_contract_instance(&proposer_provider);
             info!("Parent Tournament Children:");
             for i in 0..u64::MAX {
@@ -289,7 +289,7 @@ pub async fn propose(args: ProposeArgs) -> anyhow::Result<()> {
                     .await
                     ._0
                     .to();
-            let Some(dupe_proposal) = kailua_db.proposals.get(&dupe_game_index) else {
+            let Some(dupe_proposal) = kailua_db.get_local_proposal(&dupe_game_index) else {
                 // we need to fetch this proposal's data
                 break None;
             };
