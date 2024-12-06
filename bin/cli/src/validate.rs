@@ -796,17 +796,23 @@ pub async fn handle_proofs(
         kailua_host_command.args(proving_args);
         debug!("kailua_host_command {:?}", &kailua_host_command);
         {
-            let proving_task = kailua_host_command
+            match kailua_host_command
                 .kill_on_drop(true)
                 .spawn()
                 .context("Invoking kailua-host")?
                 .wait()
-                // .output()
-                .await?;
-            if !proving_task.success() {
-                error!("Proving task failure.");
-            } else {
-                info!("Proving task successful.");
+                .await
+            {
+                Ok(proving_task) => {
+                    if !proving_task.success() {
+                        error!("Proving task failure.");
+                    } else {
+                        info!("Proving task successful.");
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to invoke kailua-host: {e:?}");
+                }
             }
         }
         sleep(Duration::from_secs(1)).await;
@@ -816,17 +822,32 @@ pub async fn handle_proofs(
         } else {
             info!("Found receipt file.");
         }
-        let mut receipt_file = File::open(proof_file_name.clone()).await?;
+        let mut receipt_file = match File::open(proof_file_name.clone()).await {
+            Ok(f) => f,
+            Err(e) => {
+                error!("Failed to open receipt file {proof_file_name}: {e:?}");
+                continue;
+            }
+        };
         info!("Opened receipt file {proof_file_name}.");
         let mut receipt_data = Vec::new();
-        receipt_file.read_to_end(&mut receipt_data).await?;
+        if let Err(e) = receipt_file.read_to_end(&mut receipt_data).await {
+            error!("Failed to read receipt file {proof_file_name}: {e:?}");
+            continue;
+        }
         info!("Read entire receipt file.");
-        let receipt: Receipt = bincode::deserialize(&receipt_data)?;
-        // Send proof via the channel
-        channel
-            .sender
-            .send(Message::Proof(proposal_index, receipt))
-            .await?;
-        info!("Proof for local index {proposal_index} complete.");
+        match bincode::deserialize::<Receipt>(&receipt_data) {
+            Ok(receipt) => {
+                // Send proof via the channel
+                channel
+                    .sender
+                    .send(Message::Proof(proposal_index, receipt))
+                    .await?;
+                info!("Proof for local index {proposal_index} complete.");
+            }
+            Err(e) => {
+                error!("Failed to deserialize receipt: {e:?}");
+            }
+        }
     }
 }

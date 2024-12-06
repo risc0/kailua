@@ -1772,10 +1772,7 @@ name = "kailua-fpvm"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
- "anyhow",
- "bincode",
  "c-kzg",
- "cfg-if",
  "kailua-common",
  "kona-proof",
  "risc0-zkvm",
