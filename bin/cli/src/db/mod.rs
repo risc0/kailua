@@ -328,7 +328,7 @@ impl KailuaDB {
         P: Provider<T, N>,
         N: Network,
     >(
-        &mut self,
+        &self,
         l1_node_provider: &P,
     ) -> anyhow::Result<Vec<u64>> {
         // Nothing to do without a canonical tip
@@ -339,11 +339,9 @@ impl KailuaDB {
         let mut unresolved_proposal_indices = vec![self.state.canonical_tip_index.unwrap()];
         loop {
             let proposal_index = *unresolved_proposal_indices.last().unwrap();
-            let proposal = self.proposals.get_mut(&proposal_index).unwrap();
-            // Update on-chain resolution status
-            proposal.fetch_finality(l1_node_provider).await?;
+            let proposal = self.get_local_proposal(&proposal_index).unwrap();
             // break if we reach a resolved game or a setup game
-            if proposal.finality.is_some() {
+            if proposal.fetch_finality(l1_node_provider).await?.is_some() {
                 unresolved_proposal_indices.pop();
                 break;
             } else if proposal.parent == proposal_index {

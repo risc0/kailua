@@ -44,7 +44,6 @@ pub struct Proposal {
     pub correct_parent: Option<bool>,
     // resolution
     pub canonical: Option<bool>,
-    pub finality: Option<bool>,
 }
 
 impl Proposal {
@@ -91,8 +90,7 @@ impl Proposal {
             .l2BlockNumber_
             .to();
         let l1_head = treasury_instance.l1Head().stall().await.l1Head_.0.into();
-        // finality
-        let mut proposal = Self {
+        Ok(Self {
             contract: *treasury_instance.address(),
             index,
             parent: index,
@@ -110,12 +108,7 @@ impl Proposal {
             correct_claim: Some(true),
             correct_parent: Some(true),
             canonical: None,
-            finality: None,
-        };
-        proposal
-            .fetch_finality(treasury_instance.provider())
-            .await?;
-        Ok(proposal)
+        })
     }
 
     async fn load_game<T: Transport + Clone, P: Provider<T, N>, N: Network>(
@@ -159,8 +152,7 @@ impl Proposal {
             .l2BlockNumber_
             .to();
         let l1_head = game_instance.l1Head().stall().await.l1Head_.0.into();
-        // finality
-        let mut proposal = Self {
+        Ok(Self {
             contract: *game_instance.address(),
             index,
             parent,
@@ -180,10 +172,7 @@ impl Proposal {
             correct_claim: None,
             correct_parent: None,
             canonical: None,
-            finality: None,
-        };
-        proposal.fetch_finality(game_instance.provider()).await?;
-        Ok(proposal)
+        })
     }
 
     pub async fn fetch_parent_tournament_survivor<
@@ -231,17 +220,16 @@ impl Proposal {
     }
 
     pub async fn fetch_finality<T: Transport + Clone, P: Provider<T, N>, N: Network>(
-        &mut self,
+        &self,
         provider: P,
     ) -> anyhow::Result<Option<bool>> {
-        self.finality = Self::parse_finality(
+        Ok(Self::parse_finality(
             self.tournament_contract_instance(provider)
                 .status()
                 .stall()
                 .await
                 ._0,
-        )?;
-        Ok(self.finality)
+        )?)
     }
 
     pub async fn fetch_current_challenger_duration<
@@ -249,7 +237,7 @@ impl Proposal {
         P: Provider<T, N>,
         N: Network,
     >(
-        &mut self,
+        &self,
         provider: P,
     ) -> anyhow::Result<u64> {
         let chain_time = provider
