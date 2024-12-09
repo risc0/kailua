@@ -13,25 +13,26 @@
 // limitations under the License.
 
 pub mod oracle;
-pub mod oracle_posix;
+pub mod witness;
 
-use crate::oracle_posix::{POSIXBlobProvider, POSIXHintWriterClient};
+use crate::witness::{BlobWitnessProvider, OracleWitnessProvider};
 use alloy_primitives::{keccak256, B256};
 use anyhow::Context;
 use clap::Parser;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
-use kailua_common::ProofJournal;
+use kailua_common::blobs::BlobWitnessData;
+use kailua_common::journal::ProofJournal;
+use kailua_common::oracle::OracleWitnessData;
+use kailua_common::witness::Witness;
 use kona_preimage::{HintWriterClient, PreimageOracleClient};
 use kona_proof::l1::OracleBlobProvider;
 use kona_proof::{BootInfo, CachingOracle};
-use oracle_posix::{POSIXCallbackHandle, POSIXPreimageOracleClient};
 use risc0_zkvm::{default_prover, ExecutorEnv, ProveInfo, ProverOpts};
 use serde::Serialize;
-use std::collections::VecDeque;
 use std::fmt::Debug;
-use std::io::BufReader;
+use std::ops::DerefMut;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::join;
@@ -66,7 +67,7 @@ where
 {
     // preload all data natively
     info!("Running native client.");
-    run_native_client(
+    let witness = run_native_client(
         oracle_client.clone(),
         hint_client.clone(),
         precondition_validation_data_hash,
@@ -75,13 +76,9 @@ where
     .expect("Failed to run native client.");
     // compute the receipt in the zkvm
     info!("Running zk client.");
-    let prove_info = run_zk_client(
-        oracle_client.clone(),
-        hint_client.clone(),
-        precondition_validation_data_hash,
-    )
-    .await
-    .expect("Failed to run zk client.");
+    let prove_info = run_zk_client(witness)
+        .await
+        .expect("Failed to run zk client.");
     // Prepare receipt file
     let proof_journal = ProofJournal::decode_packed(prove_info.receipt.journal.as_ref())
         .expect("Failed to decode receipt output");
@@ -113,15 +110,21 @@ pub async fn run_native_client<P, H>(
     oracle_client: P,
     hint_client: H,
     precondition_validation_data_hash: B256,
-) -> anyhow::Result<B256>
+) -> anyhow::Result<Witness>
 where
     P: PreimageOracleClient + Send + Sync + Debug + Clone,
     H: HintWriterClient + Send + Sync + Debug + Clone,
 {
+    let oracle_witness = Arc::new(Mutex::new(OracleWitnessData::default()));
+    let blobs_witness = Arc::new(Mutex::new(BlobWitnessData::default()));
     info!("Preamble");
     let oracle = Arc::new(CachingOracle::new(
         ORACLE_LRU_SIZE,
-        oracle_client,
+        OracleWitnessProvider {
+            preimage_oracle: oracle_client,
+            witness: oracle_witness.clone(),
+            cache: Default::default(),
+        },
         hint_client,
     ));
     let boot = Arc::new(
@@ -129,9 +132,13 @@ where
             .await
             .context("BootInfo::load")?,
     );
-    let beacon = OracleBlobProvider::new(oracle.clone());
+    let beacon = BlobWitnessProvider {
+        provider: OracleBlobProvider::new(oracle.clone()),
+        witness: blobs_witness.clone(),
+        cache: Default::default(),
+    };
     // Run client
-    let (precondition_hash, real_output_hash) = kailua_common::client::run_client(
+    let (_, real_output_hash) = kailua_common::client::run_client(
         precondition_validation_data_hash,
         oracle,
         boot.clone(),
@@ -145,58 +152,21 @@ where
         // We use the zero claim hash to denote that the data as of l1 head is insufficient
         assert_eq!(boot.claimed_l2_output_root, B256::ZERO);
     }
-    Ok(precondition_hash)
+    let witness = Witness {
+        oracle_witness: core::mem::take(oracle_witness.lock().unwrap().deref_mut()),
+        blobs_witness: core::mem::take(blobs_witness.lock().unwrap().deref_mut()),
+        precondition_validation_data_hash,
+    };
+    Ok(witness)
 }
 
-pub async fn run_zk_client<P, H>(
-    oracle_client: P,
-    hint_client: H,
-    precondition_output: B256,
-) -> anyhow::Result<ProveInfo>
-where
-    P: PreimageOracleClient + Send + Sync + Debug + Clone + 'static,
-    H: HintWriterClient + Send + Sync + Debug + Clone + 'static,
-{
+pub async fn run_zk_client(witness: Witness) -> anyhow::Result<ProveInfo> {
     let client_task = spawn_blocking(move || {
-        // Kona preimage oracle
-        let oracle = Arc::new(CachingOracle::new(
-            ORACLE_LRU_SIZE,
-            oracle_client,
-            hint_client,
-        ));
-        // Kailua preimage oracle reader
-        let oracle_posix = POSIXCallbackHandle::from(POSIXPreimageOracleClient {
-            oracle: oracle.clone(),
-            key: VecDeque::new(),
-            preimage: VecDeque::new(),
-        });
-        let oracle_posix_reader = BufReader::new(oracle_posix.clone());
-        // Kailua hint writer
-        let writer_posix = POSIXHintWriterClient {
-            writer: oracle.clone(),
-        };
-        // Kona blob provider
-        let provider = OracleBlobProvider::new(oracle.clone());
-        // Kailua blob posix
-        let provider_posix = POSIXCallbackHandle::from(POSIXBlobProvider {
-            provider,
-            request: Default::default(),
-            blob: Default::default(),
-        });
-        let provider_posix_reader = BufReader::new(provider_posix.clone());
         // Execution environment
         let env = ExecutorEnv::builder()
             .env_var("RUST_BACKTRACE", "full")
-            // Handle preimage reads via posix
-            .read_fd(100, oracle_posix_reader)
-            .write_fd(101, oracle_posix)
-            // Handle hint writes via posix
-            .write_fd(102, writer_posix)
-            // Handle blob reads via posix
-            .read_fd(104, provider_posix_reader)
-            .write_fd(105, provider_posix)
-            // Pass in precondition
-            .write(&precondition_output)?
+            // Pass in witness data
+            .write(&witness)?
             .build()?;
         let prover = default_prover();
         let prove_info = prover.prove_with_opts(env, KAILUA_FPVM_ELF, &ProverOpts::groth16())?;

@@ -3683,12 +3683,10 @@ version = "0.1.0"
 dependencies = [
  "alloy 0.7.2",
  "alloy-primitives",
- "alloy-rpc-types-beacon",
  "anyhow",
  "async-trait",
  "bincode",
  "bytemuck",
- "bytes",
  "c-kzg",
  "clap",
  "kailua-build",
@@ -3698,14 +3696,11 @@ dependencies = [
  "kona-preimage",
  "kona-proof",
  "kona-std-fpvm",
- "lru",
+ "op-alloy-protocol",
  "risc0-zkvm",
  "serde",
- "spin",
- "tempfile",
  "tokio",
  "tracing",
- "tracing-subscriber 0.3.19",
 ]
 
 [[package]]
@@ -3771,6 +3766,7 @@ dependencies = [
  "kona-preimage",
  "op-alloy-genesis",
  "op-alloy-protocol",
+ "op-alloy-registry",
  "risc0-zkvm",
  "serde",
  "serde_json",
@@ -3949,6 +3945,7 @@ dependencies = [
  "async-channel",
  "async-trait",
  "rkyv",
+ "serde",
  "thiserror 2.0.4",
  "tracing",
 ]

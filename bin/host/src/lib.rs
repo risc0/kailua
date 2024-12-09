@@ -21,7 +21,7 @@ use alloy_eips::eip4844::IndexedBlobHash;
 use anyhow::bail;
 use clap::Parser;
 use kailua_client::parse_b256;
-use kailua_common::oracle::BlobFetchRequest;
+use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
 use kona_host::fetcher::Fetcher;
 use kona_host::kv::SharedKeyValueStore;
@@ -29,6 +29,7 @@ use kona_host::start_native_preimage_server;
 use kona_preimage::{BidirectionalChannel, HintWriter, OracleReader, PreimageKey, PreimageKeyType};
 use op_alloy_genesis::RollupConfig;
 use op_alloy_protocol::BlockInfo;
+use op_alloy_registry::Registry;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::env::set_var;
@@ -137,21 +138,35 @@ pub async fn generate_rollup_config(
     match cfg.kona.read_rollup_config().ok() {
         Some(rollup_config) => Ok(rollup_config),
         None => {
-            info!("Fetching rollup config from nodes.");
+            let registry = Registry::from_chain_list();
             let tmp_cfg_file = tmp_dir.path().join("rollup-config.json");
-            fetch_rollup_config(
-                cfg.op_node_address
-                    .clone()
-                    .expect("Missing op-node-address")
-                    .as_str(),
-                cfg.kona
-                    .l2_node_address
-                    .clone()
-                    .expect("Missing l2-node-address")
-                    .as_str(),
-                Some(&tmp_cfg_file),
-            )
-            .await?;
+            if let Some(rollup_config) = cfg
+                .kona
+                .l2_chain_id
+                .map(|chain_id| registry.rollup_configs.get(&chain_id))
+            {
+                info!(
+                    "Loading config for rollup with chain id {} from registry",
+                    cfg.kona.l2_chain_id.unwrap()
+                );
+                let ser_config = serde_json::to_string(&rollup_config)?;
+                fs::write(&tmp_cfg_file, &ser_config).await?;
+            } else {
+                info!("Fetching rollup config from nodes.");
+                fetch_rollup_config(
+                    cfg.op_node_address
+                        .clone()
+                        .expect("Missing op-node-address")
+                        .as_str(),
+                    cfg.kona
+                        .l2_node_address
+                        .clone()
+                        .expect("Missing l2-node-address")
+                        .as_str(),
+                    Some(&tmp_cfg_file),
+                )
+                .await?;
+            }
             cfg.kona.rollup_config_path = Some(tmp_cfg_file);
             cfg.kona.read_rollup_config()
         }

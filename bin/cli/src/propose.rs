@@ -26,7 +26,7 @@ use alloy::providers::{Provider, ProviderBuilder};
 use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
 use anyhow::Context;
-use kailua_common::hash_to_fe;
+use kailua_common::blobs::hash_to_fe;
 use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
 use std::path::PathBuf;
 use std::process::exit;

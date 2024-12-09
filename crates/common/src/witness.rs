@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod blobs;
-pub mod client;
-pub mod journal;
-pub mod kzg;
-pub mod oracle;
-pub mod precondition;
-pub mod witness;
+use crate::blobs::BlobWitnessData;
+use crate::oracle::OracleWitnessData;
+use alloy_primitives::B256;
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct Witness {
+    pub oracle_witness: OracleWitnessData,
+    pub blobs_witness: BlobWitnessData,
+    pub precondition_validation_data_hash: B256,
+}

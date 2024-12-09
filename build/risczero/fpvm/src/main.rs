@@ -13,34 +13,29 @@
 // limitations under the License.
 
 use alloy_primitives::B256;
-use kailua_common::ProofJournal;
+use kailua_common::journal::ProofJournal;
 use kona_proof::BootInfo;
 use risc0_zkvm::guest::env;
 use std::sync::Arc;
+use kailua_common::blobs::PreloadedBlobProvider;
+use kailua_common::oracle::PreloadedOracle;
+use kailua_common::witness::Witness;
 
 fn main() {
-    let precondition_validation_data_hash = env::read();
-    let oracle = Arc::new(kailua_common::oracle::RISCZERO_POSIX_ORACLE);
+    let witness: Witness = env::read();
+    let oracle = Arc::new(PreloadedOracle::from(witness.oracle_witness));
     let boot = Arc::new(kona_proof::block_on(async {
         BootInfo::load(oracle.as_ref())
             .await
             .expect("Failed to load BootInfo")
     }));
-    // todo: bypass oracle using provider with preloaded data
-    // let l2_oracle_provider = OracleL2ChainProvider::new(boot.clone(), oracle.clone());
-    // let execution_provider = ExecutionProvider {
-    //     tries: Arc::new(Mutex::new(Default::default())),
-    //     contracts: Arc::new(Mutex::new(Default::default())),
-    //     headers: Arc::new(Mutex::new(Default::default())),
-    //     fallback: l2_oracle_provider,
-    // };
+    let beacon = PreloadedBlobProvider::from(witness.blobs_witness);
     // Attempt to recompute the output hash at the target block number using kona
     let (precondition_hash, real_output_hash) = kailua_common::client::run_client(
-        precondition_validation_data_hash,
+        witness.precondition_validation_data_hash,
         oracle.clone(),
         boot.clone(),
-        kailua_common::blobs::RISCZERO_POSIX_BLOB_PROVIDER,
-        // execution_provider,
+        beacon,
     )
     .expect("Failed to compute output hash.");
     // Validate the output root

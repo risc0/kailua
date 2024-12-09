@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::validate_precondition;
+use crate::blobs;
+use crate::precondition::PreconditionValidationData;
 use alloy_consensus::Header;
-use alloy_primitives::{Sealed, B256};
-use anyhow::bail;
+use alloy_eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
+use alloy_primitives::{Address, Sealed, B256};
+use anyhow::{bail, Context};
 use kona_derive::traits::BlobProvider;
 use kona_driver::Driver;
 use kona_executor::TrieDBProvider;
@@ -26,6 +28,8 @@ use kona_proof::l1::{OracleL1ChainProvider, OraclePipeline};
 use kona_proof::l2::OracleL2ChainProvider;
 use kona_proof::sync::new_pipeline_cursor;
 use kona_proof::{BootInfo, FlushableCache, HintType};
+use op_alloy_genesis::RollupConfig;
+use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -121,14 +125,11 @@ where
 
 /// Fetches the safe head of the L2 chain based on the agreed upon L2 output root in the
 /// [BootInfo].
-async fn fetch_safe_head<O>(
+async fn fetch_safe_head<O: CommsClient>(
     caching_oracle: &O,
     boot_info: &BootInfo,
     l2_chain_provider: &mut OracleL2ChainProvider<O>,
-) -> Result<Sealed<Header>, OracleProviderError>
-where
-    O: CommsClient,
-{
+) -> Result<Sealed<Header>, OracleProviderError> {
     caching_oracle
         .write(&HintType::StartingL2Output.encode_with(&[boot_info.agreed_l2_output_root.as_ref()]))
         .await
@@ -155,4 +156,200 @@ pub fn log(msg: &str) {
     risc0_zkvm::guest::env::log(msg);
     #[cfg(not(target_os = "zkvm"))]
     tracing::info!("{msg}");
+}
+
+fn safe_default<V: Debug + Eq>(opt: Option<V>, default: V) -> anyhow::Result<V> {
+    if let Some(v) = opt {
+        if v == default {
+            anyhow::bail!(format!("Unsafe value! {v:?}"))
+        }
+        Ok(v)
+    } else {
+        Ok(default)
+    }
+}
+
+pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
+    // todo: check whether we need to include this, or if it is loaded from the config address
+    let system_config_hash: [u8; 32] = rollup_config
+        .genesis
+        .system_config
+        .as_ref()
+        .map(|system_config| {
+            let fields = [
+                system_config.batcher_address.0.as_slice(),
+                system_config.overhead.to_be_bytes::<32>().as_slice(),
+                system_config.scalar.to_be_bytes::<32>().as_slice(),
+                system_config.gas_limit.to_be_bytes().as_slice(),
+                safe_default(system_config.base_fee_scalar, u64::MAX)
+                    .context("base_fee_scalar")?
+                    .to_be_bytes()
+                    .as_slice(),
+                safe_default(system_config.blob_base_fee_scalar, u64::MAX)
+                    .context("blob_base_fee_scalar")?
+                    .to_be_bytes()
+                    .as_slice(),
+            ]
+            .concat();
+            let digest = SHA2::hash_bytes(fields.as_slice());
+
+            Ok::<[u8; 32], anyhow::Error>(digest.as_bytes().try_into()?)
+        })
+        .unwrap_or(Ok([0u8; 32]))?;
+    let rollup_config_bytes = [
+        rollup_config.genesis.l1.hash.0.as_slice(),
+        rollup_config.genesis.l2.hash.0.as_slice(),
+        system_config_hash.as_slice(),
+        rollup_config.block_time.to_be_bytes().as_slice(),
+        rollup_config.max_sequencer_drift.to_be_bytes().as_slice(),
+        rollup_config.seq_window_size.to_be_bytes().as_slice(),
+        rollup_config.channel_timeout.to_be_bytes().as_slice(),
+        rollup_config
+            .granite_channel_timeout
+            .to_be_bytes()
+            .as_slice(),
+        rollup_config.l1_chain_id.to_be_bytes().as_slice(),
+        rollup_config.l2_chain_id.to_be_bytes().as_slice(),
+        rollup_config
+            .base_fee_params
+            .max_change_denominator
+            .to_be_bytes()
+            .as_slice(),
+        rollup_config
+            .base_fee_params
+            .elasticity_multiplier
+            .to_be_bytes()
+            .as_slice(),
+        rollup_config
+            .canyon_base_fee_params
+            .max_change_denominator
+            .to_be_bytes()
+            .as_slice(),
+        rollup_config
+            .canyon_base_fee_params
+            .elasticity_multiplier
+            .to_be_bytes()
+            .as_slice(),
+        safe_default(rollup_config.regolith_time, u64::MAX)
+            .context("regolith_time")?
+            .to_be_bytes()
+            .as_slice(),
+        safe_default(rollup_config.canyon_time, u64::MAX)
+            .context("canyon_time")?
+            .to_be_bytes()
+            .as_slice(),
+        safe_default(rollup_config.delta_time, u64::MAX)
+            .context("delta_time")?
+            .to_be_bytes()
+            .as_slice(),
+        safe_default(rollup_config.ecotone_time, u64::MAX)
+            .context("ecotone_time")?
+            .to_be_bytes()
+            .as_slice(),
+        safe_default(rollup_config.fjord_time, u64::MAX)
+            .context("fjord_time")?
+            .to_be_bytes()
+            .as_slice(),
+        safe_default(rollup_config.granite_time, u64::MAX)
+            .context("granite_time")?
+            .to_be_bytes()
+            .as_slice(),
+        safe_default(rollup_config.holocene_time, u64::MAX)
+            .context("holocene_time")?
+            .to_be_bytes()
+            .as_slice(),
+        safe_default(rollup_config.blobs_enabled_l1_timestamp, u64::MAX)
+            .context("blobs_enabled_timestmap")?
+            .to_be_bytes()
+            .as_slice(),
+        rollup_config.batch_inbox_address.0.as_slice(),
+        rollup_config.deposit_contract_address.0.as_slice(),
+        rollup_config.l1_system_config_address.0.as_slice(),
+        rollup_config.protocol_versions_address.0.as_slice(),
+        safe_default(rollup_config.superchain_config_address, Address::ZERO)
+            .context("superchain_config_address")?
+            .0
+            .as_slice(),
+        safe_default(rollup_config.da_challenge_address, Address::ZERO)
+            .context("da_challenge_address")?
+            .0
+            .as_slice(),
+    ]
+    .concat();
+    let digest = SHA2::hash_bytes(rollup_config_bytes.as_slice());
+    Ok::<[u8; 32], anyhow::Error>(digest.as_bytes().try_into()?)
+}
+
+pub async fn validate_precondition<
+    O: CommsClient + Send + Sync + Debug,
+    B: BlobProvider + Send + Sync + Debug + Clone,
+>(
+    precondition_data_hash: B256,
+    oracle: Arc<O>,
+    boot: Arc<BootInfo>,
+    beacon: &mut B,
+) -> anyhow::Result<B256>
+where
+    <B as BlobProvider>::Error: Debug,
+{
+    // There is no condition to validate at blob boundaries
+    if precondition_data_hash.is_zero() {
+        return Ok(B256::ZERO);
+    }
+    // Read the blob references to fetch
+    let precondition_validation_data: PreconditionValidationData = pot::from_slice(
+        &oracle
+            .get(PreimageKey::new(
+                *precondition_data_hash,
+                PreimageKeyType::Sha256,
+            ))
+            .await
+            .map_err(OracleProviderError::Preimage)?,
+    )?;
+    let precondition_hash = precondition_validation_data.precondition_hash();
+    // Read the blobs to validate
+    let mut blobs = Vec::new();
+    for request in precondition_validation_data.validated_blobs {
+        #[cfg(not(target_os = "zkvm"))]
+        let expected_hash = request.blob_hash.hash;
+
+        let response = beacon
+            .get_blobs(&request.block_ref, &[request.blob_hash])
+            .await
+            .unwrap();
+        let blob = *response[0];
+        #[cfg(not(target_os = "zkvm"))]
+        {
+            let settings = crate::kzg::kzg_settings();
+            let blob = c_kzg::Blob::new(blob.0);
+            let commitment = c_kzg::KzgCommitment::blob_to_kzg_commitment(&blob, settings)?;
+            let hash = alloy_eips::eip4844::kzg_to_versioned_hash(commitment.as_slice());
+            assert_eq!(hash, expected_hash);
+        }
+
+        blobs.push(blob);
+    }
+    // Check equivalence until divergence point
+    for i in 0..FIELD_ELEMENTS_PER_BLOB {
+        let index = 32 * i as usize;
+        if blobs[0][index..index + 32] != blobs[1][index..index + 32] {
+            let agreed_l2_output_root_fe = blobs::hash_to_fe(boot.agreed_l2_output_root);
+            if i == 0 {
+                bail!("Precondition validation failed at first element");
+            } else if &blobs[0][index - 32..index] != agreed_l2_output_root_fe.as_slice() {
+                bail!(
+                    "Agreed output {} not found in contender blob before sub-offset {i}",
+                    boot.agreed_l2_output_root
+                );
+            } else if &blobs[1][index - 32..index] != agreed_l2_output_root_fe.as_slice() {
+                bail!(
+                    "Agreed output {} not found in proposal before sub-offset {i}",
+                    boot.agreed_l2_output_root
+                );
+            }
+            break;
+        }
+    }
+    // Return the precondition hash
+    Ok(precondition_hash)
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::oracle::BlobFetchRequest;
+use crate::blobs::BlobFetchRequest;
 use alloy_primitives::B256;
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use serde::{Deserialize, Serialize};

@@ -50,6 +50,7 @@ alloy-rpc-types-beacon = "0.7.2"
 op-alloy-genesis = { version = "0.7.2", default-features = false }
 op-alloy-consensus = { version = "0.7.2", default-features = false }
 op-alloy-protocol = { version = "0.7.2", default-features = false }
+op-alloy-registry = { version = "0.7.2", default-features = false }
 
 # Kailua
 kailua-build = { path = "build/risczero" }

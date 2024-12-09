@@ -13,7 +13,7 @@ use alloy::providers::Provider;
 use alloy::transports::Transport;
 use alloy_rpc_types_beacon::sidecar::BlobData;
 use anyhow::{bail, Context};
-use kailua_common::{hash_to_fe, intermediate_outputs};
+use kailua_common::blobs::{hash_to_fe, intermediate_outputs};
 use kailua_contracts::KailuaGame::KailuaGameInstance;
 use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
 use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;

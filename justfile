@@ -141,6 +141,7 @@ prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data 
     --l2-node-address $L2_NODE_ADDRESS \
     --op-node-address $OP_NODE_ADDRESS \
     --data-dir {{data}} \
+    --native \
     {{verbosity}}
 
 prove-devnet block_number data verbosity="":
@@ -188,6 +189,7 @@ prove-offline block_number l2_claim l2_output_root l2_head l1_head l2_chain_id d
     --claimed-l2-block-number {{block_number}} \
     --l2-chain-id {{l2_chain_id}} \
     --data-dir {{data}} \
+    --native \
     {{verbosity}}
 
 test verbosity="":

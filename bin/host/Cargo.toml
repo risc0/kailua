@@ -22,6 +22,7 @@ alloy-chains.workspace = true
 alloy-eips.workspace = true
 op-alloy-genesis.workspace = true
 op-alloy-protocol.workspace = true
+op-alloy-registry.workspace = true
 
 # Kailua
 kailua-build.workspace = true
