@@ -13,13 +13,13 @@
 // limitations under the License.
 
 use alloy_primitives::B256;
+use kailua_common::blobs::PreloadedBlobProvider;
 use kailua_common::journal::ProofJournal;
+use kailua_common::oracle::PreloadedOracle;
+use kailua_common::witness::Witness;
 use kona_proof::BootInfo;
 use risc0_zkvm::guest::env;
 use std::sync::Arc;
-use kailua_common::blobs::PreloadedBlobProvider;
-use kailua_common::oracle::PreloadedOracle;
-use kailua_common::witness::Witness;
 
 fn main() {
     let witness: Witness = env::read();

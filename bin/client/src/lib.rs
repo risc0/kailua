@@ -118,15 +118,10 @@ where
     let oracle_witness = Arc::new(Mutex::new(OracleWitnessData::default()));
     let blobs_witness = Arc::new(Mutex::new(BlobWitnessData::default()));
     info!("Preamble");
-    let oracle = Arc::new(CachingOracle::new(
-        ORACLE_LRU_SIZE,
-        OracleWitnessProvider {
-            preimage_oracle: oracle_client,
-            witness: oracle_witness.clone(),
-            cache: Default::default(),
-        },
-        hint_client,
-    ));
+    let oracle = Arc::new(OracleWitnessProvider {
+        oracle: CachingOracle::new(ORACLE_LRU_SIZE, oracle_client, hint_client),
+        witness: oracle_witness.clone(),
+    });
     let boot = Arc::new(
         BootInfo::load(oracle.as_ref())
             .await
@@ -135,7 +130,6 @@ where
     let beacon = BlobWitnessProvider {
         provider: OracleBlobProvider::new(oracle.clone()),
         witness: blobs_witness.clone(),
-        cache: Default::default(),
     };
     // Run client
     let (_, real_output_hash) = kailua_common::client::run_client(

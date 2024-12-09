@@ -14,12 +14,12 @@
 
 use alloy_primitives::keccak256;
 use async_trait::async_trait;
-use hashbrown::HashMap;
 use kona_preimage::errors::PreimageOracleResult;
 use kona_preimage::{HintWriterClient, PreimageKey, PreimageKeyType, PreimageOracleClient};
 use kona_proof::FlushableCache;
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct OracleWitnessData {
@@ -27,35 +27,41 @@ pub struct OracleWitnessData {
     pub keys: Vec<PreimageKey>,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub type PreimageStore = Arc<Mutex<Vec<(PreimageKey, Vec<u8>)>>>;
+
+#[derive(Clone, Debug, Default)]
 pub struct PreloadedOracle {
-    preimages: HashMap<PreimageKey, Vec<u8>>,
+    preimages: PreimageStore,
 }
 
 impl From<OracleWitnessData> for PreloadedOracle {
     fn from(witness: OracleWitnessData) -> Self {
-        let mut preimages = HashMap::new();
-        for (key, value) in core::iter::zip(witness.keys, witness.data) {
-            let key_type = key.key_type();
-            let image = match key_type {
-                PreimageKeyType::Keccak256 => Some(keccak256(&value).0),
-                PreimageKeyType::Sha256 => {
-                    let x = SHA2::hash_bytes(&value);
-                    Some(x.as_bytes().try_into().unwrap())
+        let preimages = core::iter::zip(witness.keys, witness.data)
+            .rev()
+            .map(|(key, value)| {
+                let key_type = key.key_type();
+                let image = match key_type {
+                    PreimageKeyType::Keccak256 => Some(keccak256(&value).0),
+                    PreimageKeyType::Sha256 => {
+                        let x = SHA2::hash_bytes(&value);
+                        Some(x.as_bytes().try_into().unwrap())
+                    }
+                    PreimageKeyType::Precompile => {
+                        unimplemented!("Precompile acceleration not yet supported");
+                    }
+                    PreimageKeyType::Local
+                    | PreimageKeyType::GlobalGeneric
+                    | PreimageKeyType::Blob => None,
+                };
+                if let Some(image) = image {
+                    assert_eq!(key, PreimageKey::new(image, key_type));
                 }
-                PreimageKeyType::Precompile => {
-                    unimplemented!("Precompile acceleration not yet supported");
-                }
-                PreimageKeyType::Local | PreimageKeyType::GlobalGeneric | PreimageKeyType::Blob => {
-                    None
-                }
-            };
-            if let Some(image) = image {
-                assert_eq!(key, PreimageKey::new(image, key_type));
-            }
-            preimages.insert(key, value);
+                (key, value)
+            })
+            .collect();
+        Self {
+            preimages: Arc::new(Mutex::new(preimages)),
         }
-        Self { preimages }
     }
 }
 
@@ -66,11 +72,18 @@ impl FlushableCache for PreloadedOracle {
 #[async_trait]
 impl PreimageOracleClient for PreloadedOracle {
     async fn get(&self, key: PreimageKey) -> PreimageOracleResult<Vec<u8>> {
-        Ok(self.preimages.get(&key).cloned().unwrap())
+        let mut preimages = self.preimages.lock().unwrap();
+        loop {
+            let (k, v) = preimages.pop().unwrap();
+            if k == key {
+                break Ok(v);
+            }
+        }
     }
 
     async fn get_exact(&self, key: PreimageKey, buf: &mut [u8]) -> PreimageOracleResult<()> {
-        buf.copy_from_slice(self.preimages.get(&key).unwrap().as_slice());
+        let v = self.get(key).await?;
+        buf.copy_from_slice(v.as_slice());
         Ok(())
     }
 }

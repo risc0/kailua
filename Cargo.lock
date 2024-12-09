@@ -3697,6 +3697,7 @@ dependencies = [
  "kona-proof",
  "kona-std-fpvm",
  "op-alloy-protocol",
+ "pot",
  "risc0-zkvm",
  "serde",
  "tokio",

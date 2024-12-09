@@ -17,7 +17,6 @@ use alloy_primitives::B256;
 use alloy_rpc_types_beacon::sidecar::BlobData;
 use async_trait::async_trait;
 use c_kzg::Bytes48;
-use hashbrown::HashMap;
 use kona_derive::errors::BlobProviderError;
 use kona_derive::traits::BlobProvider;
 use op_alloy_protocol::BlockInfo;
@@ -36,9 +35,9 @@ pub struct BlobWitnessData {
     pub proofs: Vec<Bytes48>,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default)]
 pub struct PreloadedBlobProvider {
-    blobs: HashMap<B256, Blob>,
+    entries: Vec<(B256, Blob)>,
 }
 
 impl From<BlobWitnessData> for PreloadedBlobProvider {
@@ -60,14 +59,10 @@ impl From<BlobWitnessData> for PreloadedBlobProvider {
             .iter()
             .map(|c| kzg_to_versioned_hash(c.as_slice()))
             .collect::<Vec<_>>();
-        let entries = core::iter::zip(
-            hashes,
-            blobs.into_iter().map(|b| Blob::from(*b)),
-        )
-        .collect::<Vec<_>>();
-        Self {
-            blobs: HashMap::from_iter(entries),
-        }
+        let entries = core::iter::zip(hashes, blobs.into_iter().map(|b| Blob::from(*b)))
+            .rev()
+            .collect::<Vec<_>>();
+        Self { entries }
     }
 }
 
@@ -82,7 +77,10 @@ impl BlobProvider for PreloadedBlobProvider {
     ) -> Result<Vec<Box<Blob>>, Self::Error> {
         let mut blobs = Vec::with_capacity(blob_hashes.len());
         for hash in blob_hashes {
-            blobs.push(Box::new(*self.blobs.get(&hash.hash).unwrap()));
+            let (blob_hash, blob) = self.entries.pop().unwrap();
+            if hash.hash == blob_hash {
+                blobs.push(Box::new(blob));
+            }
         }
         Ok(blobs)
     }

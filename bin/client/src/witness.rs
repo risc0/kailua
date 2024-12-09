@@ -13,15 +13,16 @@
 // limitations under the License.
 
 use alloy::consensus::Blob;
-use alloy::eips::eip4844::{kzg_to_versioned_hash, IndexedBlobHash};
-use alloy_primitives::map::hash_set::HashSet;
-use alloy_primitives::B256;
+use alloy::eips::eip4844::IndexedBlobHash;
 use async_trait::async_trait;
 use kailua_common::blobs::BlobWitnessData;
 use kailua_common::oracle::OracleWitnessData;
 use kona_derive::prelude::BlobProvider;
 use kona_preimage::errors::PreimageOracleResult;
-use kona_preimage::{PreimageKey, PreimageOracleClient};
+use kona_preimage::{
+    CommsClient, HintWriterClient, PreimageKey, PreimageKeyType, PreimageOracleClient,
+};
+use kona_proof::FlushableCache;
 use op_alloy_protocol::BlockInfo;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
@@ -30,7 +31,6 @@ use std::sync::{Arc, Mutex};
 pub struct BlobWitnessProvider<T: BlobProvider> {
     pub provider: T,
     pub witness: Arc<Mutex<BlobWitnessData>>,
-    pub cache: HashSet<B256>,
 }
 
 #[async_trait]
@@ -49,11 +49,6 @@ impl<T: BlobProvider + Send> BlobProvider for BlobWitnessProvider<T> {
             let commitment =
                 c_kzg::KzgCommitment::blob_to_kzg_commitment(&c_kzg_blob, settings.get())
                     .expect("Failed to convert blob to commitment");
-            let hash = kzg_to_versioned_hash(commitment.as_slice());
-            if self.cache.contains(&hash) {
-                continue;
-            }
-            self.cache.insert(hash);
             let proof = c_kzg::KzgProof::compute_blob_kzg_proof(
                 &c_kzg_blob,
                 &commitment.to_bytes(),
@@ -70,42 +65,59 @@ impl<T: BlobProvider + Send> BlobProvider for BlobWitnessProvider<T> {
 }
 
 #[derive(Clone, Debug)]
-pub struct OracleWitnessProvider<P: PreimageOracleClient + Send + Sync + Debug + Clone> {
-    pub preimage_oracle: P,
+pub struct OracleWitnessProvider<P: CommsClient + FlushableCache + Send + Sync + Debug + Clone> {
+    pub oracle: P,
     pub witness: Arc<Mutex<OracleWitnessData>>,
-    pub cache: Arc<Mutex<HashSet<PreimageKey>>>,
 }
 
 impl<P> OracleWitnessProvider<P>
 where
-    P: PreimageOracleClient + Send + Sync + Debug + Clone,
+    P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
 {
     pub fn save(&self, key: PreimageKey, value: &[u8]) {
-        let mut cache = self.cache.lock().unwrap();
-        if !cache.contains(&key) {
-            cache.insert(key);
-            let mut witness = self.witness.lock().unwrap();
-            witness.keys.push(key);
-            witness.data.push(value.to_vec());
+        if matches!(key.key_type(), PreimageKeyType::Blob) {
+            return;
         }
+        let mut witness = self.witness.lock().unwrap();
+        witness.keys.push(key);
+        witness.data.push(value.to_vec());
     }
 }
 
 #[async_trait]
 impl<P> PreimageOracleClient for OracleWitnessProvider<P>
 where
-    P: PreimageOracleClient + Send + Sync + Debug + Clone,
+    P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
 {
     async fn get(&self, key: PreimageKey) -> PreimageOracleResult<Vec<u8>> {
-        let value = self.preimage_oracle.get(key).await?;
+        let value = self.oracle.get(key).await?;
         self.save(key, &value);
         Ok(value)
     }
 
     async fn get_exact(&self, key: PreimageKey, buf: &mut [u8]) -> PreimageOracleResult<()> {
-        self.preimage_oracle.get_exact(key, buf).await?;
+        self.oracle.get_exact(key, buf).await?;
         let value = buf.to_vec();
         self.save(key, &value);
         Ok(())
+    }
+}
+
+#[async_trait]
+impl<P> HintWriterClient for OracleWitnessProvider<P>
+where
+    P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
+{
+    async fn write(&self, hint: &str) -> PreimageOracleResult<()> {
+        self.oracle.write(hint).await
+    }
+}
+
+impl<P> FlushableCache for OracleWitnessProvider<P>
+where
+    P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
+{
+    fn flush(&self) {
+        self.oracle.flush();
     }
 }

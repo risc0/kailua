@@ -11,6 +11,7 @@ rustc-flags = ['--cfg', 'risc0_guest_allocator="embedded"']
 [dependencies]
 alloy-primitives = { version = "0.8", default-features = false, features = ["map-hashbrown"] }
 c-kzg = "=1.0.2"
+pot = "3.0.1"
 
 kailua-common = { path = "../../../crates/common" }
 
