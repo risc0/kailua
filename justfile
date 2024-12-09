@@ -4,8 +4,8 @@ set fallback := true
 default:
   @just --list
 
-build:
-  cargo build --release
+build +ARGS="--release":
+  cargo build {{ARGS}}
 
 clippy:
   RISC0_SKIP_BUILD=1 cargo clippy --workspace --all --all-features --all-targets -- -D warnings
@@ -51,7 +51,6 @@ devnet-reset:
 
   just devnet-up
 
-
 devnet-propose verbosity="-vv" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" rollup_node_rpc="http://127.0.0.1:7545" data_dir=".localtestdata/propose" registry="0xd801426328C609fCDe6E3B7a5623C27e8F607832" deployer="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba":
   ./target/debug/kailua-cli propose \
       --registry-contract {{registry}} \
@@ -74,7 +73,7 @@ devnet-fault verbosity="-vv" offset="1" parent="1" l1_rpc="http://127.0.0.1:8545
       {{verbosity}}
 
 devnet-validate verbosity="-vv" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" data_dir=".localtestdata/validate" kailua_host="./target/debug/kailua-host" registry="0xd801426328C609fCDe6E3B7a5623C27e8F607832" validator="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba":
-  RISC0_DEV_MODE=1 ./target/debug/kailua-cli validate \
+  ./target/debug/kailua-cli validate \
       --registry-contract {{registry}} \
       --l1-node-address {{l1_rpc}} \
       --l1-beacon-address {{l1_beacon_rpc}} \
@@ -86,7 +85,7 @@ devnet-validate verbosity="-vv" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="ht
       {{verbosity}}
 
 devnet-prove block_number verbosity="-vv" data=".localtestdata":
-  RISC0_DEV_MODE=1 just prove {{block_number}} http://localhost:8545 http://localhost:5052 http://localhost:9545 http://localhost:7545 {{data}} {{verbosity}}
+  just prove {{block_number}} http://localhost:8545 http://localhost:5052 http://localhost:9545 http://localhost:7545 {{data}} {{verbosity}}
 
 bench l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data start range count verbosity="-v":
     ./target/debug/kailua-cli benchmark \
@@ -200,7 +199,7 @@ test verbosity="":
 
 test-offline verbosity="":
     echo "Running offline proof for op-sepolia block 16491249 in dev-mode"
-    RISC0_DEV_MODE=1 just prove-offline 16491249 0x82da7204148ba4d8d59e587b6b3fdde5561dc31d9e726220f7974bf9f2158d75 0xa548f22e1aa590de7ed271e3eab5b66c6c3db9b8cb0e3f91618516ea9ececde4 0x09b298a83baf4c2e3c6a2e355bb09e27e3fdca435080e8754f8749233d7333b2 0x33a3e5721faa4dc6f25e75000d9810fd6c41320868f3befcc0c261a71da398e1 11155420 ./testdata/16491249 {{verbosity}}
+    just prove-offline 16491249 0x82da7204148ba4d8d59e587b6b3fdde5561dc31d9e726220f7974bf9f2158d75 0xa548f22e1aa590de7ed271e3eab5b66c6c3db9b8cb0e3f91618516ea9ececde4 0x09b298a83baf4c2e3c6a2e355bb09e27e3fdca435080e8754f8749233d7333b2 0x33a3e5721faa4dc6f25e75000d9810fd6c41320868f3befcc0c261a71da398e1 11155420 ./testdata/16491249 {{verbosity}}
 
 cleanup:
     echo "Cleanup: Removing any .fake receipt files in directory."

@@ -97,6 +97,7 @@ impl BlobProvider {
             .await
             .context(format!("blob_sidecars {slot}"))?;
 
+        let blob_count = blobs.len();
         for blob in blobs {
             let versioned_hash = kzg_to_versioned_hash(blob.kzg_commitment.as_slice());
             if versioned_hash == blob_hash {
@@ -104,7 +105,7 @@ impl BlobProvider {
             }
         }
 
-        bail!("Blob {blob_hash} not found in block {timestamp}!");
+        bail!("Blob {blob_hash} @ {timestamp} not found in slot ({blob_count} blobs found)!");
     }
 }
 

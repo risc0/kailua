@@ -19,7 +19,7 @@ use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
 use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
 use serde::{Deserialize, Serialize};
 use std::iter::repeat;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Proposal {
@@ -56,12 +56,14 @@ impl Proposal {
         let instance_address = *tournament_instance.address();
         let parent_address = tournament_instance.parentGame().stall().await.parentGame_;
         if parent_address == instance_address {
+            info!("Loading KailuaTreasury instance");
             Self::load_treasury(&KailuaTreasuryInstance::new(
                 instance_address,
                 tournament_instance.provider(),
             ))
             .await
         } else {
+            info!("Loading KailuaGame with parent {parent_address}");
             Self::load_game(
                 config,
                 blob_provider,
@@ -216,7 +218,15 @@ impl Proposal {
         provider: P,
     ) -> anyhow::Result<Option<bool>> {
         let survivor = self.fetch_parent_tournament_survivor(provider).await?;
-        info!("Survivor: {survivor:?} vs {}", self.contract);
+        let is_survivor_expected = survivor.map(|survivor| survivor == self.contract);
+        if !is_survivor_expected.unwrap_or_default() {
+            warn!(
+                "Current survivor: {survivor:?} (expecting {})",
+                self.contract
+            );
+        } else {
+            info!("Survivor: {}", self.contract);
+        }
         Ok(survivor.map(|survivor| survivor == self.contract))
     }
 

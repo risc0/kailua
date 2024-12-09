@@ -206,7 +206,7 @@ impl KailuaDB {
             info!("Skipping proposal of different game type {game_type} at factory index {index}");
             return Ok(false);
         }
-        info!("Processing tournament proposal at factory index {index}");
+        info!("Processing tournament {index} at {game_address}");
         let tournament_instance =
             KailuaTournamentInstance::new(game_address, anchor_state_registry.provider());
         let mut proposal =

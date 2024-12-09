@@ -33,7 +33,7 @@ use kailua_common::{hash_to_fe, ProofJournal};
 use kailua_contracts::{IAnchorStateRegistry, IDisputeGameFactory, KailuaGame};
 use kailua_host::fetch_rollup_config;
 use op_alloy_protocol::BlockInfo;
-use risc0_zkvm::Receipt;
+use risc0_zkvm::{is_dev_mode, Receipt};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::str::FromStr;
@@ -788,8 +788,9 @@ pub async fn handle_proofs(
         // Prove via kailua-host (re dev mode/bonsai: env vars inherited!)
         let mut kailua_host_command = Command::new(&args.kailua_host);
         // get fake receipts when building under devnet
-        #[cfg(feature = "devnet")]
-        kailua_host_command.env("RISC0_DEV_MODE", "1");
+        if is_dev_mode() {
+            kailua_host_command.env("RISC0_DEV_MODE", "1");
+        }
         // pass arguments to point at target block
         kailua_host_command.args(proving_args);
         debug!("kailua_host_command {:?}", &kailua_host_command);

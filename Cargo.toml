@@ -71,7 +71,7 @@ kona-std-fpvm = { git = "https://github.com/hashcashier/kona", branch = "kailua"
 
 # RISC Zero zkVM
 risc0-build = { version = "1.2.0" }
-risc0-ethereum-contracts = "1.1.0"
+risc0-ethereum-contracts = "1.2.0"
 risc0-zkvm = { version = "1.2.0", features = ["heap-embedded-alloc"] }
 risc0-zkvm-platform = { version = "1.2.0", features = ["heap-embedded-alloc"] }
 

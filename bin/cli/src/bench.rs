@@ -14,6 +14,7 @@
 
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::rpc::types::Block;
+use risc0_zkvm::is_dev_mode;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::fs::OpenOptions;
@@ -111,9 +112,11 @@ pub async fn benchmark(args: BenchArgs) -> anyhow::Result<()> {
         } else {
             String::new()
         };
-        Command::new("just")
-            .env("RISC0_DEV_MODE", "1")
-            .args(vec![
+        let mut cmd = Command::new("just");
+        if is_dev_mode() {
+            cmd.env("RISC0_DEV_MODE", "1");
+        }
+        cmd.args(vec![
                 "prove",
                 &block_number,
                 &args.l1_node_address,

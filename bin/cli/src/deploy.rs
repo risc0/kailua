@@ -16,7 +16,7 @@ use crate::providers::optimism::OpNodeProvider;
 use crate::stall::Stall;
 use crate::KAILUA_GAME_TYPE;
 use alloy::network::{EthereumWallet, TxSigner};
-use alloy::primitives::{Address, Bytes, Uint, U256};
+use alloy::primitives::{b256, Address, Bytes, Uint, U256};
 use alloy::providers::ProviderBuilder;
 use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
@@ -25,9 +25,10 @@ use kailua_build::KAILUA_FPVM_ID;
 use kailua_common::config_hash;
 use kailua_contracts::*;
 use kailua_host::fetch_rollup_config;
+use risc0_zkvm::is_dev_mode;
 use std::process::exit;
 use std::str::FromStr;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct DeployArgs {
@@ -145,19 +146,62 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
     info!("RollupConfigHash({})", hex::encode(rollup_config_hash));
 
-    // Deploy MockVerifier contract
-    info!("Deploying RiscZeroMockVerifier contract to L1.");
-    let mock_verifier_contract = RiscZeroMockVerifier::deploy(&deployer_provider, [0u8; 4].into())
+    // Deploy verifier router contract
+    info!("Deploying RiscZeroVerifierRouter contract to L1 under ownership of {owner_address}.");
+    let verifier_contract = RiscZeroVerifierRouter::deploy(&deployer_provider, owner_address)
         .await
-        .context("RiscZeroMockVerifier contract deployment error")?;
-    info!("{:?}", &mock_verifier_contract);
+        .context("RiscZeroVerifierRouter contract deployment error")?;
+    let verifier_contract =
+        RiscZeroVerifierRouter::new(*verifier_contract.address(), &owner_provider);
+
+    // Deploy RiscZeroGroth16Verifier contract
+    info!("Deploying RiscZeroGroth16Verifier contract to L1.");
+    // let a = ControlID::CONTROL_ROOT;
+    let groth16_verifier_contract = RiscZeroGroth16Verifier::deploy(
+        &deployer_provider,
+        b256!("8cdad9242664be3112aba377c5425a4df735eb1c6966472b561d2855932c0469"),
+        b256!("04446e66d300eb7fb45c9726bb53c793dda407a62e9601618bb43c5c14657ac0"),
+    )
+    .await
+    .context("RiscZeroGroth16Verifier contract deployment error")?;
+    info!("{:?}", &groth16_verifier_contract);
+    let selector = groth16_verifier_contract.SELECTOR().stall().await._0;
+    info!("Adding RiscZeroGroth16Verifier contract to RiscZeroVerifierRouter.");
+    verifier_contract
+        .addVerifier(selector, *groth16_verifier_contract.address())
+        .send()
+        .await
+        .context("addVerifier RiscZeroGroth16Verifier (send)")?
+        .get_receipt()
+        .await
+        .context("addVerifier RiscZeroGroth16Verifier (get_receipt)")?;
+
+    // Deploy mock verifier
+    if is_dev_mode() {
+        // Deploy MockVerifier contract
+        warn!("Deploying RiscZeroMockVerifier contract to L1. This will accept fake proofs which are not cryptographically secure!");
+        let mock_verifier_contract =
+            RiscZeroMockVerifier::deploy(&deployer_provider, [0u8; 4].into())
+                .await
+                .context("RiscZeroMockVerifier contract deployment error")?;
+        warn!("{:?}", &mock_verifier_contract);
+        warn!("Adding RiscZeroMockVerifier contract to RiscZeroVerifierRouter.");
+        verifier_contract
+            .addVerifier([0u8; 4].into(), *mock_verifier_contract.address())
+            .send()
+            .await
+            .context("addVerifier RiscZeroMockVerifier (send)")?
+            .get_receipt()
+            .await
+            .context("addVerifier RiscZeroMockVerifier (get_receipt)")?;
+    }
 
     // Deploy KailuaTreasury contract
     info!("Deploying KailuaTreasury contract to L1 rpc.");
     let fault_dispute_game_type = 254;
     let kailua_treasury_implementation = KailuaTreasury::deploy(
         &deployer_provider,
-        *mock_verifier_contract.address(),
+        *verifier_contract.address(),
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
         rollup_config_hash.into(),
         Uint::from(64),
@@ -283,7 +327,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     let kailua_game_contract = KailuaGame::deploy(
         &deployer_provider,
         *kailua_treasury_implementation.address(),
-        *mock_verifier_contract.address(),
+        *verifier_contract.address(),
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
         rollup_config_hash.into(),
         Uint::from(64),
@@ -316,6 +360,6 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         .context("setImplementation KailuaGame")?
         .get_receipt()
         .await?;
-    info!("KailuaGame installed.");
+    info!("Kailua upgrade complete.");
     Ok(())
 }
