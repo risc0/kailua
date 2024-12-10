@@ -158,12 +158,13 @@ pub async fn run_zk_client(witness: Witness) -> anyhow::Result<ProveInfo> {
     let client_task = spawn_blocking(move || {
         // Execution environment
         let env = ExecutorEnv::builder()
-            .env_var("RUST_BACKTRACE", "full")
             // Pass in witness data
             .write(&witness)?
             .build()?;
         let prover = default_prover();
-        let prove_info = prover.prove_with_opts(env, KAILUA_FPVM_ELF, &ProverOpts::groth16())?;
+        let prove_info = prover
+            .prove_with_opts(env, KAILUA_FPVM_ELF, &ProverOpts::groth16())
+            .context("prove_with_opts")?;
         println!(
             "Proof of {} total cycles ({} user cycles) computed.",
             prove_info.stats.total_cycles, prove_info.stats.user_cycles
