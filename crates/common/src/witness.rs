@@ -17,9 +17,23 @@ use crate::oracle::OracleWitnessData;
 use alloy_primitives::B256;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(
+    Clone, Debug, Default, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
+)]
 pub struct Witness {
     pub oracle_witness: OracleWitnessData,
     pub blobs_witness: BlobWitnessData,
+    #[rkyv(with = Arr)]
     pub precondition_validation_data_hash: B256,
+}
+
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(remote = B256)]
+#[rkyv(archived = ArchivedB256)]
+pub struct Arr(pub [u8; 32]);
+
+impl From<Arr> for B256 {
+    fn from(value: Arr) -> Self {
+        B256::new(value.0)
+    }
 }

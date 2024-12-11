@@ -12,12 +12,13 @@ rustc-flags = ['--cfg', 'risc0_guest_allocator="embedded"']
 alloy-primitives = { version = "0.8", default-features = false, features = ["map-hashbrown"] }
 c-kzg = "=1.0.2"
 pot = "3.0.1"
+rkyv = "0.8.9"
 
 kailua-common = { path = "../../../crates/common" }
 
 kona-proof = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
 
-risc0-zkvm = { version = "1.2.0", features = ["std", "heap-embedded-alloc"] }
+risc0-zkvm = { version = "1.2.0", features = ["std", "heap-embedded-alloc", "unstable"] }
 
 [patch.crates-io]
 crypto-bigint = { git = "https://github.com/risc0/RustCrypto-crypto-bigint", tag = "v0.5.5-risczero.0" }

@@ -21,7 +21,9 @@ use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(
+    Clone, Debug, Default, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
+)]
 pub struct OracleWitnessData {
     pub data: Vec<Vec<u8>>,
     pub keys: Vec<PreimageKey>,

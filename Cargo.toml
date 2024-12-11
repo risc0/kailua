@@ -30,6 +30,7 @@ hex = "0.4.3"
 lazy_static = "1.5.0"
 lru = "0.12.4"
 pot = "3.0.1"
+rkyv = "0.8.9"
 rocksdb = "0.22.0"
 semver = "1.0.23"
 serde = { version = "1.0", features = ["derive"] }
@@ -71,9 +72,10 @@ kona-proof = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
 kona-std-fpvm = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
 
 # RISC Zero zkVM
+bonsai-sdk = { version = "1.2.0", features = ["non_blocking"] }
 risc0-build = { version = "1.2.0" }
 risc0-ethereum-contracts = "1.2.0"
-risc0-zkvm = { version = "1.2.0", features = ["heap-embedded-alloc"] }
+risc0-zkvm = { version = "1.2.0", features = ["heap-embedded-alloc", "unstable"] }
 risc0-zkvm-platform = { version = "1.2.0", features = ["heap-embedded-alloc"] }
 
 # RISC Zero Zeth

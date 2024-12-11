@@ -36,6 +36,7 @@ kona-host.workspace = true
 kona-preimage.workspace = true
 
 # zkVM
+bonsai-sdk.workspace = true
 risc0-zkvm.workspace = true
 
 # Zeth

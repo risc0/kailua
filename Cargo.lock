@@ -2005,6 +2005,7 @@ dependencies = [
  "reqwest",
  "serde",
  "thiserror 1.0.67",
+ "tokio",
 ]
 
 [[package]]
@@ -3654,6 +3655,7 @@ dependencies = [
  "assert_cmd",
  "async-trait",
  "bincode",
+ "bonsai-sdk",
  "bytemuck",
  "c-kzg",
  "clap",
@@ -3686,6 +3688,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
+ "bonsai-sdk",
  "bytemuck",
  "c-kzg",
  "clap",
@@ -3699,6 +3702,7 @@ dependencies = [
  "op-alloy-protocol",
  "pot",
  "risc0-zkvm",
+ "rkyv",
  "serde",
  "tokio",
  "tracing",
@@ -3732,6 +3736,7 @@ dependencies = [
  "pot",
  "risc0-zkvm",
  "risc0-zkvm-platform",
+ "rkyv",
  "serde",
  "spin",
  "tracing",
@@ -3756,6 +3761,7 @@ dependencies = [
  "alloy-primitives",
  "anyhow",
  "bincode",
+ "bonsai-sdk",
  "clap",
  "hashbrown 0.15.0",
  "kailua-build",

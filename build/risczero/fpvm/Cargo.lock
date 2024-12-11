@@ -1762,6 +1762,7 @@ dependencies = [
  "pot",
  "risc0-zkvm",
  "risc0-zkvm-platform",
+ "rkyv",
  "serde",
  "spin",
  "tracing",
@@ -1777,6 +1778,7 @@ dependencies = [
  "kona-proof",
  "pot",
  "risc0-zkvm",
+ "rkyv",
 ]
 
 [[package]]

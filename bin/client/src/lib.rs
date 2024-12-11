@@ -35,7 +35,6 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use tokio::join;
 use tokio::task::spawn_blocking;
 use tracing::info;
 
@@ -155,28 +154,34 @@ where
 }
 
 pub async fn run_zk_client(witness: Witness) -> anyhow::Result<ProveInfo> {
-    let client_task = spawn_blocking(move || {
+    let prove_info = spawn_blocking(move || {
+        let data = rkyv::to_bytes::<rkyv::rancor::Error>(&witness)?.to_vec();
         // Execution environment
         let env = ExecutorEnv::builder()
             // Pass in witness data
-            .write(&witness)?
+            // .write(&witness)?
+            // .write_frame(&pot::to_vec(&witness)?)
+            .write_frame(&data)
             .build()?;
         let prover = default_prover();
         let prove_info = prover
             .prove_with_opts(env, KAILUA_FPVM_ELF, &ProverOpts::groth16())
             .context("prove_with_opts")?;
-        println!(
-            "Proof of {} total cycles ({} user cycles) computed.",
-            prove_info.stats.total_cycles, prove_info.stats.user_cycles
-        );
-        prove_info
-            .receipt
-            .verify(KAILUA_FPVM_ID)
-            .context("receipt verification")?;
-        println!("Receipt verified.");
         Ok::<_, anyhow::Error>(prove_info)
-    });
-    join!(client_task).0?
+    })
+    .await??;
+
+    println!(
+        "Proof of {} total cycles ({} user cycles) computed.",
+        prove_info.stats.total_cycles, prove_info.stats.user_cycles
+    );
+    prove_info
+        .receipt
+        .verify(KAILUA_FPVM_ID)
+        .context("receipt verification")?;
+    println!("Receipt verified.");
+
+    Ok(prove_info)
 }
 
 pub fn fpvm_proof_file_name(
