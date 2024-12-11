@@ -23,17 +23,17 @@ use serde::{Deserialize, Serialize};
 pub struct Witness {
     pub oracle_witness: OracleWitnessData,
     pub blobs_witness: BlobWitnessData,
-    #[rkyv(with = Arr)]
+    #[rkyv(with = B256Def)]
     pub precondition_validation_data_hash: B256,
 }
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 #[rkyv(remote = B256)]
 #[rkyv(archived = ArchivedB256)]
-pub struct Arr(pub [u8; 32]);
+pub struct B256Def(pub [u8; 32]);
 
-impl From<Arr> for B256 {
-    fn from(value: Arr) -> Self {
+impl From<B256Def> for B256 {
+    fn from(value: B256Def) -> Self {
         B256::new(value.0)
     }
 }
