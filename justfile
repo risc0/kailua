@@ -19,8 +19,7 @@ kurtosis-down:
 devnet-install:
   git clone --depth 1 --branch v1.9.1 --recursive https://github.com/ethereum-optimism/optimism.git
 
-devnet-build:
-  cargo build -F devnet
+devnet-build +ARGS="--release -F devnet": (build ARGS)
 
 devnet-up:
   make -C optimism devnet-up > devnet.log
@@ -79,7 +78,6 @@ devnet-validate verbosity="-vv" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="ht
       --l1-beacon-address {{l1_beacon_rpc}} \
       --l2-node-address {{l2_rpc}} \
       --op-node-address {{rollup_node_rpc}} \
-      --data-dir {{data_dir}} \
       --kailua-host {{kailua_host}} \
       --validator-key {{validator}} \
       {{verbosity}}

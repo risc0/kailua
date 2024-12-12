@@ -5,9 +5,6 @@ edition = "2021"
 
 [workspace]
 
-[package.metadata.risc0]
-rustc-flags = ['--cfg', 'risc0_guest_allocator="embedded"']
-
 [dependencies]
 alloy-primitives = { version = "0.8", default-features = false, features = ["map-hashbrown"] }
 c-kzg = "=1.0.2"

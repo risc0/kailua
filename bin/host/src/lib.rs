@@ -143,13 +143,13 @@ pub async fn generate_rollup_config(
             if let Some(rollup_config) = cfg
                 .kona
                 .l2_chain_id
-                .map(|chain_id| registry.rollup_configs.get(&chain_id))
+                .and_then(|chain_id| registry.rollup_configs.get(&chain_id))
             {
                 info!(
                     "Loading config for rollup with chain id {} from registry",
                     cfg.kona.l2_chain_id.unwrap()
                 );
-                let ser_config = serde_json::to_string(&rollup_config)?;
+                let ser_config = serde_json::to_string(rollup_config)?;
                 fs::write(&tmp_cfg_file, &ser_config).await?;
             } else {
                 info!("Fetching rollup config from nodes.");

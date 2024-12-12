@@ -270,7 +270,7 @@ pub async fn handle_proposals(
             // patch the receipt image id if in dev mode
             let expected_image_id = proposal_parent_contract.imageId().stall().await.imageId_.0;
             #[cfg(feature = "devnet")]
-            let receipt = {
+            let receipt = if is_dev_mode() {
                 let mut receipt = receipt;
                 let risc0_zkvm::InnerReceipt::Fake(fake_inner_receipt) = &mut receipt.inner else {
                     bail!("Found real receipt under devmode");
@@ -280,6 +280,8 @@ pub async fn handle_proposals(
                 };
                 warn!("DEVNET-ONLY: Patching fake receipt image id to match game contract.");
                 claim.pre = risc0_zkvm::MaybePruned::Pruned(expected_image_id.into());
+                receipt
+            } else {
                 receipt
             };
 
