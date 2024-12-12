@@ -36,6 +36,7 @@ pub const KAILUA_GAME_TYPE: u32 = 1337;
 #[command(name = "kailua-cli")]
 #[command(bin_name = "kailua-cli")]
 #[command(author, version, about, long_about = None)]
+#[allow(clippy::large_enum_variant)]
 pub enum Cli {
     Deploy(deploy::DeployArgs),
     Propose(propose::ProposeArgs),

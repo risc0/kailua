@@ -36,13 +36,11 @@ use std::sync::Arc;
 pub fn run_client<
     O: CommsClient + FlushableCache + Send + Sync + Debug,
     B: BlobProvider + Send + Sync + Debug + Clone,
-    // T: TrieProvider + TrieHinter + Send + Sync + Debug + Clone + 'static,
 >(
     precondition_validation_data_hash: B256,
     oracle: Arc<O>,
     boot: Arc<BootInfo>,
     mut beacon: B,
-    // execution_provider: T, // todo: skip oracle using provider
 ) -> anyhow::Result<(B256, Option<B256>)>
 where
     <B as BlobProvider>::Error: Debug,

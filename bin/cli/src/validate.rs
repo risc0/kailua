@@ -26,7 +26,9 @@ use alloy::primitives::{Address, FixedBytes, U256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy::signers::local::LocalSigner;
 use anyhow::{anyhow, bail, Context};
-use kailua_client::fpvm_proof_file_name;
+use boundless_market::storage::StorageProviderType;
+use kailua_client::proof::{fpvm_proof_file_name, Proof};
+use kailua_client::BoundlessArgs;
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::journal::ProofJournal;
@@ -34,7 +36,7 @@ use kailua_common::precondition::{precondition_hash, PreconditionValidationData}
 use kailua_contracts::{IAnchorStateRegistry, IDisputeGameFactory, KailuaGame};
 use kailua_host::fetch_rollup_config;
 use op_alloy_protocol::BlockInfo;
-use risc0_zkvm::{is_dev_mode, Receipt};
+use risc0_zkvm::is_dev_mode;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::str::FromStr;
@@ -62,6 +64,9 @@ pub struct ValidateArgs {
     /// Secret key of L1 wallet to use for challenging and proving outputs
     #[clap(long, env)]
     pub validator_key: String,
+
+    #[clap(flatten)]
+    pub boundless_args: Option<BoundlessArgs>,
 }
 
 pub async fn validate(args: ValidateArgs, data_dir: PathBuf) -> anyhow::Result<()> {
@@ -84,6 +89,7 @@ pub async fn validate(args: ValidateArgs, data_dir: PathBuf) -> anyhow::Result<(
 }
 
 #[derive(Clone, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum Message {
     // The proposal and its parent
     Proposal {
@@ -95,7 +101,7 @@ pub enum Message {
         claimed_l2_block_number: u64,
         claimed_l2_output_root: FixedBytes<32>,
     },
-    Proof(u64, Receipt),
+    Proof(u64, Proof),
 }
 
 pub async fn handle_proposals(
@@ -240,7 +246,7 @@ pub async fn handle_proposals(
 
         // publish computed proofs and resolve proven challenges
         while !channel.receiver.is_empty() {
-            let Message::Proof(proposal_index, receipt) = channel
+            let Message::Proof(proposal_index, proof) = channel
                 .receiver
                 .recv()
                 .await
@@ -252,7 +258,7 @@ pub async fn handle_proposals(
             let proposal_parent = kailua_db.get_local_proposal(&proposal.parent).unwrap();
             let proposal_parent_contract =
                 proposal_parent.tournament_contract_instance(&validator_provider);
-            let proof_journal = ProofJournal::decode_packed(receipt.journal.as_ref())?;
+            let proof_journal = ProofJournal::decode_packed(proof.journal().as_ref())?;
             info!("Proof journal: {:?}", proof_journal);
             let contender_index = proposal.contender.unwrap();
             let contender = kailua_db.get_local_proposal(&contender_index).unwrap();
@@ -269,27 +275,31 @@ pub async fn handle_proposals(
 
             // patch the receipt image id if in dev mode
             let expected_image_id = proposal_parent_contract.imageId().stall().await.imageId_.0;
+
             #[cfg(feature = "devnet")]
-            let receipt = if is_dev_mode() {
-                let mut receipt = receipt;
-                let risc0_zkvm::InnerReceipt::Fake(fake_inner_receipt) = &mut receipt.inner else {
-                    bail!("Found real receipt under devmode");
-                };
-                let risc0_zkvm::MaybePruned::Value(claim) = &mut fake_inner_receipt.claim else {
-                    bail!("Fake receipt claim is pruned.");
-                };
-                warn!("DEVNET-ONLY: Patching fake receipt image id to match game contract.");
-                claim.pre = risc0_zkvm::MaybePruned::Pruned(expected_image_id.into());
-                receipt
+            let proof = if is_dev_mode() {
+                let mut proof = proof;
+                if let Some(receipt) = proof.as_receipt_mut() {
+                    if let risc0_zkvm::InnerReceipt::Fake(fake_inner_receipt) = &mut receipt.inner {
+                        if let risc0_zkvm::MaybePruned::Value(claim) = &mut fake_inner_receipt.claim
+                        {
+                            warn!("DEVNET-ONLY: Patching fake receipt image id to match game contract.");
+                            claim.pre = risc0_zkvm::MaybePruned::Pruned(expected_image_id.into());
+                        }
+                    }
+                }
+                proof
             } else {
-                receipt
+                proof
             };
 
-            // verify that the receipt is valid
-            if receipt.verify(expected_image_id).is_err() {
-                error!("Could not verify receipt against image id in contract.");
-            } else {
-                info!("Receipt validated.");
+            // verify that the zkvm receipt is valid
+            if let Some(receipt) = proof.as_receipt() {
+                if let Err(e) = receipt.verify(expected_image_id) {
+                    error!("Could not verify receipt against image id in contract: {e:?}");
+                } else {
+                    info!("Receipt validated.");
+                }
             }
 
             let contender_output = contender.output_at(challenge_position);
@@ -334,7 +344,7 @@ pub async fn handle_proposals(
                 info!("Proof status: {proof_status}");
             }
 
-            let encoded_seal = risc0_ethereum_contracts::encode_seal(&receipt)?;
+            let encoded_seal = proof.encoded_seal()?;
 
             // create kzg proofs
             let mut proofs = [vec![], vec![]];
@@ -784,6 +794,81 @@ pub async fn handle_proofs(
                     .to_string(),
             ]);
         }
+        // boundless args
+        if let Some(boundless_args) = &args.boundless_args {
+            proving_args.extend(vec![
+                String::from("--boundless-rpc-url"),
+                boundless_args.boundless_rpc_url.to_string(),
+                String::from("--boundless-wallet-key"),
+                boundless_args.boundless_wallet_key.to_bytes().to_string(),
+                String::from("--boundless-set-verifier-address"),
+                boundless_args.boundless_set_verifier_address.to_string(),
+                String::from("--boundless-market-address"),
+                boundless_args.boundless_market_address.to_string(),
+            ]);
+            if boundless_args.boundless_offchain {
+                proving_args.push(String::from("--boundless-offchain"));
+            }
+            if let Some(url) = &boundless_args.boundless_order_stream_url {
+                proving_args.extend(vec![
+                    String::from("--boundless-order-stream-url"),
+                    url.to_string(),
+                ]);
+            }
+            if let Some(storage_cfg) = &boundless_args.boundless_storage_config {
+                match &storage_cfg.storage_provider {
+                    StorageProviderType::S3 => {
+                        proving_args.extend(vec![
+                            String::from("--storage-provider"),
+                            String::from("s3"),
+                            String::from("--s3-access-key"),
+                            storage_cfg.s3_access_key.clone().unwrap(),
+                            String::from("--s3-secret-key"),
+                            storage_cfg.s3_secret_key.clone().unwrap(),
+                            String::from("--s3-bucket"),
+                            storage_cfg.s3_bucket.clone().unwrap(),
+                            String::from("--s3-url"),
+                            storage_cfg.s3_url.clone().unwrap(),
+                            String::from("--aws-region"),
+                            storage_cfg.aws_region.clone().unwrap(),
+                        ]);
+                    }
+                    StorageProviderType::Pinata => {
+                        proving_args.extend(vec![
+                            String::from("--storage-provider"),
+                            String::from("pinata"),
+                            String::from("--pinata-jwt"),
+                            storage_cfg.pinata_jwt.clone().unwrap(),
+                        ]);
+                        if let Some(pinata_api_url) = &storage_cfg.pinata_api_url {
+                            proving_args.extend(vec![
+                                String::from("--pinata-api-url"),
+                                pinata_api_url.to_string(),
+                            ]);
+                        }
+                        if let Some(ipfs_gateway_url) = &storage_cfg.ipfs_gateway_url {
+                            proving_args.extend(vec![
+                                String::from("--ipfs-gateway-url"),
+                                ipfs_gateway_url.to_string(),
+                            ]);
+                        }
+                    }
+                    StorageProviderType::File => {
+                        proving_args.extend(vec![
+                            String::from("--storage-provider"),
+                            String::from("file"),
+                        ]);
+                        if let Some(file_path) = &storage_cfg.file_path {
+                            proving_args.extend(vec![
+                                String::from("--file-path"),
+                                file_path.to_str().unwrap().to_string(),
+                            ]);
+                        }
+                    }
+                    _ => unimplemented!("Unknown storage provider."),
+                }
+            }
+        }
         // verbosity level
         if args.core.v > 0 {
             proving_args.push(verbosity);
@@ -820,35 +905,35 @@ pub async fn handle_proofs(
         sleep(Duration::from_secs(1)).await;
         // Read receipt file
         if !Path::new(&proof_file_name).exists() {
-            error!("Receipt file {proof_file_name} not found.");
+            error!("Proof file {proof_file_name} not found.");
         } else {
-            info!("Found receipt file.");
+            info!("Found proof file.");
         }
-        let mut receipt_file = match File::open(proof_file_name.clone()).await {
+        let mut proof_file = match File::open(proof_file_name.clone()).await {
             Ok(f) => f,
             Err(e) => {
-                error!("Failed to open receipt file {proof_file_name}: {e:?}");
+                error!("Failed to open proof file {proof_file_name}: {e:?}");
                 continue;
             }
         };
-        info!("Opened receipt file {proof_file_name}.");
-        let mut receipt_data = Vec::new();
-        if let Err(e) = receipt_file.read_to_end(&mut receipt_data).await {
-            error!("Failed to read receipt file {proof_file_name}: {e:?}");
+        info!("Opened proof file {proof_file_name}.");
+        let mut proof_data = Vec::new();
+        if let Err(e) = proof_file.read_to_end(&mut proof_data).await {
+            error!("Failed to read proof file {proof_file_name}: {e:?}");
             continue;
         }
-        info!("Read entire receipt file.");
-        match bincode::deserialize::<Receipt>(&receipt_data) {
-            Ok(receipt) => {
+        info!("Read entire proof file.");
+        match bincode::deserialize::<Proof>(&proof_data) {
+            Ok(proof) => {
                 // Send proof via the channel
                 channel
                     .sender
-                    .send(Message::Proof(proposal_index, receipt))
+                    .send(Message::Proof(proposal_index, proof))
                     .await?;
                 info!("Proof for local index {proposal_index} complete.");
             }
             Err(e) => {
-                error!("Failed to deserialize receipt: {e:?}");
+                error!("Failed to deserialize proof: {e:?}");
             }
         }
     }

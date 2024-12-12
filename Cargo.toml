@@ -40,6 +40,7 @@ tempfile = "3.10.1"
 tokio = { version = "1.39.1", features = ["full"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2.5.4"
 
 # Alloy
 alloy = { version = "0.7.2", default-features = false, features = ["json"] }
@@ -73,7 +74,8 @@ kona-std-fpvm = { git = "https://github.com/hashcashier/kona", branch = "kailua"
 
 # RISC Zero zkVM
 bonsai-sdk = { version = "1.2.0", features = ["non_blocking"] }
-risc0-build = { version = "1.2.0" }
+boundless-market = "0.4.1"
+risc0-build = "1.2.0"
 risc0-ethereum-contracts = "1.2.0"
 risc0-zkvm = { version = "1.2.0", features = ["heap-embedded-alloc", "unstable"] }
 risc0-zkvm-platform = { version = "1.2.0", features = ["heap-embedded-alloc"] }

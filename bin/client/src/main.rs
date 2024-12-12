@@ -18,12 +18,13 @@ use kailua_client::KailuaClientCli;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let cfg = KailuaClientCli::parse();
-    kona_host::init_tracing_subscriber(cfg.kailua_verbosity)?;
+    let args = KailuaClientCli::parse();
+    kona_host::init_tracing_subscriber(args.kailua_verbosity)?;
     let precondition_validation_data_hash =
-        cfg.precondition_validation_data_hash.unwrap_or_default();
+        args.precondition_validation_data_hash.unwrap_or_default();
 
     kailua_client::run_client(
+        args.boundless_args,
         ORACLE_READER,
         HINT_WRITER,
         precondition_validation_data_hash,

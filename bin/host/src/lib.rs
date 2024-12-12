@@ -20,7 +20,7 @@ use alloy_chains::NamedChain;
 use alloy_eips::eip4844::IndexedBlobHash;
 use anyhow::bail;
 use clap::Parser;
-use kailua_client::parse_b256;
+use kailua_client::{parse_b256, BoundlessArgs};
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
 use kona_host::fetcher::Fetcher;
@@ -30,7 +30,6 @@ use kona_preimage::{BidirectionalChannel, HintWriter, OracleReader, PreimageKey,
 use op_alloy_genesis::RollupConfig;
 use op_alloy_protocol::BlockInfo;
 use op_alloy_registry::Registry;
-use serde::Serialize;
 use serde_json::{json, Value};
 use std::env::set_var;
 use std::path::PathBuf;
@@ -47,7 +46,7 @@ use zeth_preflight::client::PreflightClient;
 use zeth_preflight_optimism::OpRethPreflightClient;
 
 /// The host binary CLI application arguments.
-#[derive(Parser, Serialize, Clone, Debug)]
+#[derive(Parser, Clone, Debug)]
 pub struct KailuaHostCli {
     #[clap(flatten)]
     pub kona: kona_host::HostCli,
@@ -55,26 +54,24 @@ pub struct KailuaHostCli {
     /// Address of OP-NODE endpoint to use
     #[clap(long, env)]
     pub op_node_address: Option<String>,
+    /// Whether to skip running the zeth preflight engine
+    #[clap(long, default_value_t = false, env)]
+    pub skip_zeth_preflight: bool,
 
     #[clap(long, default_value_t = 1, env)]
     /// Number of blocks to build in a single proof
     pub block_count: u64,
-
-    /// Address of OP-NODE endpoint to use
-    #[clap(long, default_value_t = false, env)]
-    pub skip_zeth_preflight: bool,
-
     #[clap(long, value_parser = parse_b256, env)]
     pub u_block_hash: Option<B256>,
-
     #[clap(long, value_parser = parse_b256, env)]
     pub u_blob_kzg_hash: Option<B256>,
-
     #[clap(long, value_parser = parse_b256, env)]
     pub v_block_hash: Option<B256>,
-
     #[clap(long, value_parser = parse_b256, env)]
     pub v_blob_kzg_hash: Option<B256>,
+
+    #[clap(flatten)]
+    pub boundless_args: Option<BoundlessArgs>,
 }
 
 /// Starts the [PreimageServer] and the client program in separate threads. The client program is
@@ -88,20 +85,20 @@ pub struct KailuaHostCli {
 /// - `Err(_)` if the client program failed to execute, was killed by a signal, or the host program
 ///   exited first.
 pub async fn start_server_and_native_client(
-    cfg: kona_host::cli::HostCli,
+    args: KailuaHostCli,
     precondition_validation_data_hash: B256,
 ) -> anyhow::Result<i32> {
     let hint_chan = BidirectionalChannel::new()?;
     let preimage_chan = BidirectionalChannel::new()?;
-    let kv_store = cfg.construct_kv_store();
-    let fetcher = if !cfg.is_offline() {
-        let (l1_provider, blob_provider, l2_provider) = cfg.create_providers().await?;
+    let kv_store = args.kona.construct_kv_store();
+    let fetcher = if !args.kona.is_offline() {
+        let (l1_provider, blob_provider, l2_provider) = args.kona.create_providers().await?;
         Some(Arc::new(RwLock::new(Fetcher::new(
             kv_store.clone(),
             l1_provider,
             blob_provider,
             l2_provider,
-            cfg.agreed_l2_head_hash,
+            args.kona.agreed_l2_head_hash,
         ))))
     } else {
         None
@@ -117,6 +114,7 @@ pub async fn start_server_and_native_client(
 
     // Start the client program in a separate child process.
     let program_task = task::spawn(kailua_client::run_client(
+        args.boundless_args,
         OracleReader::new(preimage_chan.client),
         HintWriter::new(hint_chan.client),
         precondition_validation_data_hash,
