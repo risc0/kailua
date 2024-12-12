@@ -15,6 +15,235 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
+// ../lib/openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol
+
+// OpenZeppelin Contracts (last updated v5.0.0) (utils/cryptography/MerkleProof.sol)
+
+/**
+ * @dev These functions deal with verification of Merkle Tree proofs.
+ *
+ * The tree and the proofs can be generated using our
+ * https://github.com/OpenZeppelin/merkle-tree[JavaScript library].
+ * You will find a quickstart guide in the readme.
+ *
+ * WARNING: You should avoid using leaf values that are 64 bytes long prior to
+ * hashing, or use a hash function other than keccak256 for hashing leaves.
+ * This is because the concatenation of a sorted pair of internal nodes in
+ * the Merkle tree could be reinterpreted as a leaf value.
+ * OpenZeppelin's JavaScript library generates Merkle trees that are safe
+ * against this attack out of the box.
+ */
+library MerkleProof {
+    /**
+     * @dev The multiproof provided is not valid.
+     */
+    error MerkleProofInvalidMultiproof();
+
+    /**
+     * @dev Returns true if a `leaf` can be proved to be a part of a Merkle tree
+     * defined by `root`. For this, a `proof` must be provided, containing
+     * sibling hashes on the branch from the leaf to the root of the tree. Each
+     * pair of leaves and each pair of pre-images are assumed to be sorted.
+     */
+    function verify(bytes32[] memory proof, bytes32 root, bytes32 leaf) internal pure returns (bool) {
+        return processProof(proof, leaf) == root;
+    }
+
+    /**
+     * @dev Calldata version of {verify}
+     */
+    function verifyCalldata(bytes32[] calldata proof, bytes32 root, bytes32 leaf) internal pure returns (bool) {
+        return processProofCalldata(proof, leaf) == root;
+    }
+
+    /**
+     * @dev Returns the rebuilt hash obtained by traversing a Merkle tree up
+     * from `leaf` using `proof`. A `proof` is valid if and only if the rebuilt
+     * hash matches the root of the tree. When processing the proof, the pairs
+     * of leafs & pre-images are assumed to be sorted.
+     */
+    function processProof(bytes32[] memory proof, bytes32 leaf) internal pure returns (bytes32) {
+        bytes32 computedHash = leaf;
+        for (uint256 i = 0; i < proof.length; i++) {
+            computedHash = _hashPair(computedHash, proof[i]);
+        }
+        return computedHash;
+    }
+
+    /**
+     * @dev Calldata version of {processProof}
+     */
+    function processProofCalldata(bytes32[] calldata proof, bytes32 leaf) internal pure returns (bytes32) {
+        bytes32 computedHash = leaf;
+        for (uint256 i = 0; i < proof.length; i++) {
+            computedHash = _hashPair(computedHash, proof[i]);
+        }
+        return computedHash;
+    }
+
+    /**
+     * @dev Returns true if the `leaves` can be simultaneously proven to be a part of a Merkle tree defined by
+     * `root`, according to `proof` and `proofFlags` as described in {processMultiProof}.
+     *
+     * CAUTION: Not all Merkle trees admit multiproofs. See {processMultiProof} for details.
+     */
+    function multiProofVerify(bytes32[] memory proof, bool[] memory proofFlags, bytes32 root, bytes32[] memory leaves)
+        internal
+        pure
+        returns (bool)
+    {
+        return processMultiProof(proof, proofFlags, leaves) == root;
+    }
+
+    /**
+     * @dev Calldata version of {multiProofVerify}
+     *
+     * CAUTION: Not all Merkle trees admit multiproofs. See {processMultiProof} for details.
+     */
+    function multiProofVerifyCalldata(
+        bytes32[] calldata proof,
+        bool[] calldata proofFlags,
+        bytes32 root,
+        bytes32[] memory leaves
+    ) internal pure returns (bool) {
+        return processMultiProofCalldata(proof, proofFlags, leaves) == root;
+    }
+
+    /**
+     * @dev Returns the root of a tree reconstructed from `leaves` and sibling nodes in `proof`. The reconstruction
+     * proceeds by incrementally reconstructing all inner nodes by combining a leaf/inner node with either another
+     * leaf/inner node or a proof sibling node, depending on whether each `proofFlags` item is true or false
+     * respectively.
+     *
+     * CAUTION: Not all Merkle trees admit multiproofs. To use multiproofs, it is sufficient to ensure that: 1) the tree
+     * is complete (but not necessarily perfect), 2) the leaves to be proven are in the opposite order they are in the
+     * tree (i.e., as seen from right to left starting at the deepest layer and continuing at the next layer).
+     */
+    function processMultiProof(bytes32[] memory proof, bool[] memory proofFlags, bytes32[] memory leaves)
+        internal
+        pure
+        returns (bytes32 merkleRoot)
+    {
+        // This function rebuilds the root hash by traversing the tree up from the leaves. The root is rebuilt by
+        // consuming and producing values on a queue. The queue starts with the `leaves` array, then goes onto the
+        // `hashes` array. At the end of the process, the last hash in the `hashes` array should contain the root of
+        // the Merkle tree.
+        uint256 leavesLen = leaves.length;
+        uint256 proofLen = proof.length;
+        uint256 totalHashes = proofFlags.length;
+
+        // Check proof validity.
+        if (leavesLen + proofLen != totalHashes + 1) {
+            revert MerkleProofInvalidMultiproof();
+        }
+
+        // The xxxPos values are "pointers" to the next value to consume in each array. All accesses are done using
+        // `xxx[xxxPos++]`, which return the current value and increment the pointer, thus mimicking a queue's "pop".
+        bytes32[] memory hashes = new bytes32[](totalHashes);
+        uint256 leafPos = 0;
+        uint256 hashPos = 0;
+        uint256 proofPos = 0;
+        // At each step, we compute the next hash using two values:
+        // - a value from the "main queue". If not all leaves have been consumed, we get the next leaf, otherwise we
+        //   get the next hash.
+        // - depending on the flag, either another value from the "main queue" (merging branches) or an element from the
+        //   `proof` array.
+        for (uint256 i = 0; i < totalHashes; i++) {
+            bytes32 a = leafPos < leavesLen ? leaves[leafPos++] : hashes[hashPos++];
+            bytes32 b =
+                proofFlags[i] ? (leafPos < leavesLen ? leaves[leafPos++] : hashes[hashPos++]) : proof[proofPos++];
+            hashes[i] = _hashPair(a, b);
+        }
+
+        if (totalHashes > 0) {
+            if (proofPos != proofLen) {
+                revert MerkleProofInvalidMultiproof();
+            }
+            unchecked {
+                return hashes[totalHashes - 1];
+            }
+        } else if (leavesLen > 0) {
+            return leaves[0];
+        } else {
+            return proof[0];
+        }
+    }
+
+    /**
+     * @dev Calldata version of {processMultiProof}.
+     *
+     * CAUTION: Not all Merkle trees admit multiproofs. See {processMultiProof} for details.
+     */
+    function processMultiProofCalldata(bytes32[] calldata proof, bool[] calldata proofFlags, bytes32[] memory leaves)
+        internal
+        pure
+        returns (bytes32 merkleRoot)
+    {
+        // This function rebuilds the root hash by traversing the tree up from the leaves. The root is rebuilt by
+        // consuming and producing values on a queue. The queue starts with the `leaves` array, then goes onto the
+        // `hashes` array. At the end of the process, the last hash in the `hashes` array should contain the root of
+        // the Merkle tree.
+        uint256 leavesLen = leaves.length;
+        uint256 proofLen = proof.length;
+        uint256 totalHashes = proofFlags.length;
+
+        // Check proof validity.
+        if (leavesLen + proofLen != totalHashes + 1) {
+            revert MerkleProofInvalidMultiproof();
+        }
+
+        // The xxxPos values are "pointers" to the next value to consume in each array. All accesses are done using
+        // `xxx[xxxPos++]`, which return the current value and increment the pointer, thus mimicking a queue's "pop".
+        bytes32[] memory hashes = new bytes32[](totalHashes);
+        uint256 leafPos = 0;
+        uint256 hashPos = 0;
+        uint256 proofPos = 0;
+        // At each step, we compute the next hash using two values:
+        // - a value from the "main queue". If not all leaves have been consumed, we get the next leaf, otherwise we
+        //   get the next hash.
+        // - depending on the flag, either another value from the "main queue" (merging branches) or an element from the
+        //   `proof` array.
+        for (uint256 i = 0; i < totalHashes; i++) {
+            bytes32 a = leafPos < leavesLen ? leaves[leafPos++] : hashes[hashPos++];
+            bytes32 b =
+                proofFlags[i] ? (leafPos < leavesLen ? leaves[leafPos++] : hashes[hashPos++]) : proof[proofPos++];
+            hashes[i] = _hashPair(a, b);
+        }
+
+        if (totalHashes > 0) {
+            if (proofPos != proofLen) {
+                revert MerkleProofInvalidMultiproof();
+            }
+            unchecked {
+                return hashes[totalHashes - 1];
+            }
+        } else if (leavesLen > 0) {
+            return leaves[0];
+        } else {
+            return proof[0];
+        }
+    }
+
+    /**
+     * @dev Sorts the pair (a, b) and hashes the result.
+     */
+    function _hashPair(bytes32 a, bytes32 b) private pure returns (bytes32) {
+        return a < b ? _efficientHash(a, b) : _efficientHash(b, a);
+    }
+
+    /**
+     * @dev Implementation of keccak256(abi.encode(a, b)) that doesn't allocate or expand memory.
+     */
+    function _efficientHash(bytes32 a, bytes32 b) private pure returns (bytes32 value) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(0x00, a)
+            mstore(0x20, b)
+            value := keccak256(0x00, 0x40)
+        }
+    }
+}
+
 // ../lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol
 
 // OpenZeppelin Contracts (last updated v5.0.0) (utils/math/SafeCast.sol)
@@ -1880,6 +2109,44 @@ abstract contract Ownable2Step is Ownable {
     }
 }
 
+// src/IRiscZeroSetVerifier.sol
+// Copyright 2024 RISC Zero, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+/// Seal of the SetInclusionReceipt.
+struct Seal_0 {
+    /// Merkle path to the leaf.
+    bytes32[] path;
+    /// Root seal.
+    bytes rootSeal;
+}
+
+interface IRiscZeroSetVerifier is IRiscZeroVerifier {
+    /// A new root has been added to the set.
+    event VerifiedRoot(bytes32 root);
+
+    /// Publishes a new root of a proof aggregation.
+    function submitMerkleRoot(bytes32 root, bytes calldata seal) external;
+
+    /// Returns whether `root` has been submitted.
+    function containsRoot(bytes32 root) external view returns (bool);
+
+    /// Returns the set builder imageId and its url.
+    function imageInfo() external view returns (bytes32, string memory);
+}
+
 // src/StructHash.sol
 // Copyright 2024 RISC Zero, Inc.
 //
@@ -2020,6 +2287,129 @@ contract RiscZeroMockVerifier is IRiscZeroVerifier {
     }
 }
 
+// src/RiscZeroSetVerifier.sol
+// Copyright 2024 RISC Zero, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+library RiscZeroSetVerifierLib {
+    function selector(bytes32 imageId) internal pure returns (bytes4) {
+        return bytes4(
+            sha256(
+                abi.encodePacked(
+                    // tag
+                    sha256("risc0.SetInclusionReceiptVerifierParameters"),
+                    // down
+                    imageId,
+                    // down length
+                    uint16(1) << 8
+                )
+            )
+        );
+    }
+}
+
+/// @notice RiscZeroSetVerifier verifier contract for RISC Zero receipts of execution.
+contract RiscZeroSetVerifier is IRiscZeroSetVerifier {
+    using ReceiptClaimLib for ReceiptClaim;
+
+    /// Semantic version of the the RISC Zero Set Verifier.
+    string public constant VERSION = "0.1.0";
+
+    IRiscZeroVerifier public immutable VERIFIER;
+
+    /// @notice A short key attached to the seal to select the correct verifier implementation.
+    /// @dev The selector is taken from the hash of the verifier parameters including the Groth16
+    ///      verification key and the control IDs that commit to the RISC Zero circuits. If two
+    ///      receipts have different selectors (i.e. different verifier parameters), then it can
+    ///      generally be assumed that they need distinct verifier implementations. This is used as
+    ///      part of the RISC Zero versioning mechanism.
+    ///
+    ///      A selector is not intended to be collision resistant, in that it is possible to find
+    ///      two preimages that result in the same selector. This is acceptable since it's purpose
+    ///      to a route a request among a set of trusted verifiers, and to make errors of sending a
+    ///      receipt to a mismatching verifiers easier to debug. It is analogous to the ABI
+    ///      function selectors.
+    bytes4 public immutable SELECTOR;
+
+    bytes32 private immutable IMAGE_ID;
+    string private imageUrl;
+
+    mapping(bytes32 => bool) private merkleRoots;
+
+    constructor(IRiscZeroVerifier verifier, bytes32 imageId, string memory _imageUrl) {
+        VERIFIER = verifier;
+        IMAGE_ID = imageId;
+        imageUrl = _imageUrl;
+
+        SELECTOR = RiscZeroSetVerifierLib.selector(imageId);
+    }
+
+    /// @inheritdoc IRiscZeroVerifier
+    function verify(bytes calldata seal, bytes32 imageId, bytes32 journalDigest) public view {
+        _verifyIntegrity(seal, ReceiptClaimLib.ok(imageId, journalDigest).digest());
+    }
+
+    /// @inheritdoc IRiscZeroVerifier
+    function verifyIntegrity(Receipt calldata receipt) public view {
+        _verifyIntegrity(receipt.seal, receipt.claimDigest);
+    }
+
+    /// @notice internal implementation of verifyIntegrity, factored to avoid copying calldata bytes to memory.
+    function _verifyIntegrity(bytes calldata seal, bytes32 claimDigest) internal view {
+        Seal_0 memory setVerifierSeal;
+
+        // Check that the seal has a matching selector. Mismatch generally  indicates that the
+        // prover and this verifier are using different parameters, and so the verification
+        // will not succeed.
+        if (SELECTOR != bytes4(seal[:4])) {
+            revert SelectorMismatch({received: bytes4(seal[:4]), expected: SELECTOR});
+        }
+
+        // Check if the seal is not empty and decode it, otherwise use an empty array
+        // TODO(victor): Can we verify the Merkle inclusion without abi decoding into memory?
+        if (seal.length > 4) {
+            setVerifierSeal = abi.decode(seal[4:], (Seal_0));
+        }
+
+        // Compute the root and verify it against the stored Merkle roots if a
+        // root seal was not provided, or validate the root seal.
+        // NOTE: If an invalid root seal was provided, the verify will fail
+        // even if the root was already verified earlier and stored in state.
+        bytes32 root = MerkleProof.processProof(setVerifierSeal.path, claimDigest);
+        if (setVerifierSeal.rootSeal.length > 0) {
+            VERIFIER.verify(setVerifierSeal.rootSeal, IMAGE_ID, sha256(abi.encode(IMAGE_ID, root)));
+        } else if (!merkleRoots[root]) {
+            revert VerificationFailed();
+        }
+    }
+
+    function submitMerkleRoot(bytes32 root, bytes calldata seal) external {
+        VERIFIER.verify(seal, IMAGE_ID, sha256(abi.encode(IMAGE_ID, root)));
+        merkleRoots[root] = true;
+
+        emit VerifiedRoot(root);
+    }
+
+    function containsRoot(bytes32 root) external view returns (bool) {
+        return merkleRoots[root];
+    }
+
+    function imageInfo() external view returns (bytes32, string memory) {
+        return (IMAGE_ID, imageUrl);
+    }
+}
+
 // src/RiscZeroVerifierRouter.sol
 // Copyright 2024 RISC Zero, Inc.
 //
@@ -2133,7 +2523,7 @@ contract RiscZeroVerifierRouter is IRiscZeroVerifier, Ownable2Step {
 //
 
 /// @notice A Groth16 seal over the claimed receipt claim.
-struct Seal {
+struct Seal_1 {
     uint256[2] a;
     uint256[2][2] b;
     uint256[2] c;
@@ -2252,7 +2642,7 @@ contract RiscZeroGroth16Verifier is IRiscZeroVerifier, IRiscZeroSelectable, Grot
 
         // Run the Groth16 verify procedure.
         (bytes16 claim0, bytes16 claim1) = splitDigest(claimDigest);
-        Seal memory decodedSeal = abi.decode(seal[4:], (Seal));
+        Seal_1 memory decodedSeal = abi.decode(seal[4:], (Seal_1));
         bool verified = this.verifyProof(
             decodedSeal.a,
             decodedSeal.b,

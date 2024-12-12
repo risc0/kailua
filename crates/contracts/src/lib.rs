@@ -48,6 +48,12 @@ sol!(
 
 sol!(
     #[sol(rpc)]
+    RiscZeroSetVerifier,
+    "foundry/out/FlatR0ImportV1.2.0.sol/RiscZeroSetVerifier.json"
+);
+
+sol!(
+    #[sol(rpc)]
     RiscZeroGroth16Verifier,
     "foundry/out/FlatR0ImportV1.2.0.sol/RiscZeroGroth16Verifier.json"
 );
