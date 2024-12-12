@@ -25,7 +25,7 @@ use std::path::Path;
 use tempfile::tempdir;
 use tracing::info;
 
-#[tokio::main(flavor = "multi_thread")]
+#[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let mut cfg = KailuaHostCli::parse();
     init_tracing_subscriber(cfg.kona.v)?;
