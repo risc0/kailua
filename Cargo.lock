@@ -4534,6 +4534,7 @@ dependencies = [
  "kona-derive",
  "kona-host",
  "op-alloy-protocol",
+ "risc0-aggregation",
  "risc0-ethereum-contracts",
  "risc0-zkvm",
  "rocksdb",

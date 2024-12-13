@@ -75,6 +75,7 @@ kona-std-fpvm = { git = "https://github.com/hashcashier/kona", branch = "kailua"
 # RISC Zero zkVM
 bonsai-sdk = { version = "1.2.0", features = ["non_blocking"] }
 boundless-market = "0.4.1"
+risc0-aggregation = "0.1.0"
 risc0-build = "1.2.0"
 risc0-ethereum-contracts = "1.2.0"
 risc0-zkvm = { version = "1.2.0", features = ["heap-embedded-alloc", "unstable"] }

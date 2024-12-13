@@ -95,3 +95,13 @@ sol! {
         function guardian() public view returns (address);
     }
 }
+
+sol! {
+    #[sol(rpc)]
+    struct SetVerifierSeal {
+        /// Merkle path to the leaf.
+        bytes32[] path;
+        /// Root seal.
+        bytes rootSeal;
+    }
+}

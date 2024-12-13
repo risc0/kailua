@@ -368,7 +368,8 @@ pub async fn run_boundless_client(
             Offer::default()
                 .with_min_price_per_mcycle(parse_ether("0.001")?, mcycles_count)
                 .with_max_price_per_mcycle(parse_ether("0.002")?, mcycles_count)
-                .with_timeout(1000),
+                .with_ramp_up_period(10)
+                .with_timeout(1500),
         );
 
     // Send the request and wait for it to be completed.

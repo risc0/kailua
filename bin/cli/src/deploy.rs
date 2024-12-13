@@ -14,9 +14,9 @@
 
 use crate::providers::optimism::OpNodeProvider;
 use crate::stall::Stall;
-use crate::KAILUA_GAME_TYPE;
+use crate::{BN254_CONTROL_ID, CONTROL_ROOT, KAILUA_GAME_TYPE, SET_BUILDER_ID};
 use alloy::network::{EthereumWallet, Network, TxSigner};
-use alloy::primitives::{b256, Address, Bytes, Uint, B256, U256};
+use alloy::primitives::{Address, Bytes, Uint, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
@@ -30,13 +30,6 @@ use risc0_zkvm::is_dev_mode;
 use std::process::exit;
 use std::str::FromStr;
 use tracing::{error, info, warn};
-
-const CONTROL_ROOT: B256 =
-    b256!("8cdad9242664be3112aba377c5425a4df735eb1c6966472b561d2855932c0469");
-const BN254_CONTROL_ID: B256 =
-    b256!("04446e66d300eb7fb45c9726bb53c793dda407a62e9601618bb43c5c14657ac0");
-const SET_BUILDER_ID: B256 =
-    b256!("744cca56cde6933dea72752c78b4a6ca894ed620e8af6437ab05fad53bcec40a");
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct DeployArgs {
