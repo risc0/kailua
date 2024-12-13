@@ -4575,6 +4575,7 @@ dependencies = [
  "risc0-zkvm",
  "rkyv",
  "serde",
+ "sha2",
  "tokio",
  "tracing",
  "url",

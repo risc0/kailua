@@ -18,7 +18,6 @@ use alloy::primitives::{b256, Address, Uint, B256, U256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
 use kailua_contracts::Safe::SafeInstance;
-use sha2::Digest;
 use std::path::PathBuf;
 
 // pub mod bench;
@@ -134,12 +133,4 @@ pub async fn exec_safe_txn<
     .get_receipt()
     .await?;
     Ok(())
-}
-
-pub fn set_verifier_selector(image_id: B256) -> [u8; 4] {
-    let tag = sha2::Sha256::digest("risc0.SetInclusionReceiptVerifierParameters");
-    let len = (1u16 << 8).to_be_bytes();
-    let input = [tag.as_slice(), image_id.as_slice(), len.as_slice()].concat();
-    let digest = sha2::Sha256::digest(&input);
-    digest.as_slice()[..4].try_into().unwrap()
 }

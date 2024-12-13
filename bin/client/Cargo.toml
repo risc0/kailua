@@ -13,6 +13,7 @@ clap.workspace = true
 pot.workspace = true
 rkyv.workspace = true
 serde.workspace = true
+sha2.workspace = true
 tracing.workspace = true
 tokio.workspace = true
 url.workspace = true

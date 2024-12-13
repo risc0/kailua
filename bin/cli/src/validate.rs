@@ -302,12 +302,7 @@ pub async fn handle_proposals(
                     }
                     Proof::BoundlessSeal(seal_data, journal) => {
                         // Amend the seal with a fake proof for the set root
-                        dbg!(Bytes::from(seal_data.clone()));
-                        dbg!(Bytes::from(journal.bytes.clone()));
-                        match kailua_contracts::SetVerifierSeal::abi_decode(
-                            seal_data.as_slice(),
-                            true,
-                        ) {
+                        match kailua_contracts::SetVerifierSeal::abi_decode(&seal_data[4..], true) {
                             Ok(mut seal) => {
                                 if seal.rootSeal.is_empty() {
                                     // build the claim for the fpvm
@@ -356,10 +351,8 @@ pub async fn handle_proposals(
                                     warn!(
                                         "DEVNET-ONLY: Patching proof with faux set verifier seal."
                                     );
-                                    dbg!(&seal.rootSeal);
-                                    dbg!(&seal.path);
                                     let selector =
-                                        crate::set_verifier_selector(crate::SET_BUILDER_ID);
+                                        kailua_client::set_verifier_selector(crate::SET_BUILDER_ID);
                                     *seal_data =
                                         [selector.as_slice(), seal.abi_encode().as_slice()]
                                             .concat();
@@ -642,7 +635,6 @@ pub async fn handle_proposals(
                     }
                 },
                 Err(e) => {
-                    dbg!(&encoded_seal);
                     error!("Failed to send proof txn: {e:?}");
                 }
             }

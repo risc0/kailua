@@ -18,11 +18,13 @@ pub mod witness;
 
 use crate::proof::Proof;
 use crate::witness::{BlobWitnessProvider, OracleWitnessProvider};
+use alloy::signers::k256::ecdsa::signature::digest::Digest;
 use alloy::sol_types::SolValue;
 use alloy::transports::http::reqwest::Url;
 use alloy_primitives::utils::parse_ether;
-use alloy_primitives::{Address, B256};
+use alloy_primitives::{Address, B256, U160, U256};
 use anyhow::{ensure, Context};
+use boundless_market::alloy::providers::Provider;
 use boundless_market::alloy::signers::local::PrivateKeySigner;
 use boundless_market::client::ClientBuilder;
 use boundless_market::contracts::{Input, Offer, Predicate, ProofRequest, Requirements};
@@ -43,6 +45,7 @@ use std::ops::DerefMut;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use boundless_market::input::InputBuilder;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::task::spawn_blocking;
@@ -92,6 +95,10 @@ pub struct BoundlessArgs {
     #[clap(long, env)]
     #[arg(required = false)]
     pub boundless_market_address: Address,
+    /// Number of transactions to lookback at
+    #[clap(long, env)]
+    #[arg(required = false, default_value_t = 5)]
+    pub boundless_lookback: u64,
 }
 
 impl BoundlessArgs {
@@ -321,33 +328,7 @@ pub async fn run_boundless_client(
     witness: Witness,
 ) -> anyhow::Result<Proof> {
     info!("Running boundless client.");
-    let input = rkyv::to_bytes::<rkyv::rancor::Error>(&witness)?.to_vec();
     let proof_journal = Journal::new(journal.encode_packed());
-
-    // ad-hoc boundless dev mode
-    if is_dev_mode() {
-        warn!("DEV MODE: Generating fake boundless network proof.");
-        let seal = kailua_contracts::SetVerifierSeal {
-            path: vec![],
-            rootSeal: Default::default(),
-        }
-        .abi_encode();
-        return Ok(Proof::BoundlessSeal(seal, proof_journal));
-    }
-
-    // Preflight execution to get cycle count
-    info!("Preflighting execution.");
-    let env = ExecutorEnv::builder()
-        // Pass in witness data
-        .write_frame(&input)
-        .build()?;
-    let session_info = default_executor().execute(env, KAILUA_FPVM_ELF)?;
-    let mcycles_count = session_info
-        .segments
-        .iter()
-        .map(|segment| 1 << segment.po2)
-        .sum::<u64>()
-        .div_ceil(1_000_000);
 
     // Instantiate client
     let boundless_client = ClientBuilder::default()
@@ -363,24 +344,111 @@ pub async fn run_boundless_client(
         .with_private_key(args.boundless_wallet_key)
         .build()
         .await?;
+
+    // ad-hoc boundless dev mode
+    if is_dev_mode() {
+        warn!("DEV MODE: Generating fake boundless network proof.");
+        let seal = kailua_contracts::SetVerifierSeal {
+            path: vec![],
+            rootSeal: Default::default(),
+        }
+        .abi_encode();
+        let image_id = boundless_client
+            .set_verifier
+            .image_info()
+            .await
+            .context("Failed to get image info")?
+            .0;
+        let selector = set_verifier_selector(image_id);
+        let encoded_seal = [selector.as_slice(), seal.as_slice()].concat();
+        return Ok(Proof::BoundlessSeal(encoded_seal, proof_journal));
+    }
+
+    // Set the proof request requirements
+    let requirements = Requirements::new(
+        KAILUA_FPVM_ID,
+        Predicate::digest_match(proof_journal.digest()),
+    );
+
+    // Check if an unexpired request had already been made recently
+    let boundless_wallet_address = boundless_client.signer.address();
+    let boundless_wallet_nonce = boundless_client
+        .provider()
+        .get_transaction_count(boundless_wallet_address)
+        .await
+        .context("get_transaction_count boundless_wallet_address")?;
+
+    // Look back at prior transactions to avoid repeated requests
+    for i in 0..args.boundless_lookback {
+        if i > boundless_wallet_nonce {
+            break;
+        }
+        let nonce = boundless_wallet_nonce.saturating_sub(i + 1) as u32;
+        info!("Looking back at txn w/ nonce {nonce} ");
+        let request_id = request_id(
+            &boundless_wallet_address,
+            nonce,
+        );
+
+        let Ok((request, _)) = boundless_client
+            .boundless_market
+            .get_submitted_request(request_id, None)
+            .await
+            .context("get_submitted_request")
+        else {
+            // No request for that nonce
+            continue;
+        };
+
+        // todo: fix this faulty comparison
+        if request.requirements != requirements {
+            // Skip unrelated request
+            continue;
+        }
+
+        info!("Waiting for 0x{request_id:x} to be fulfilled");
+        let (_journal, seal) = boundless_client
+            .wait_for_request_fulfillment(request_id, Duration::from_secs(5), request.expires_at())
+            .await?;
+        info!("Request 0x{request_id:x} fulfilled");
+
+        return Ok(Proof::BoundlessSeal(seal.to_vec(), proof_journal));
+    }
+
+    // Preflight execution to get cycle count
+    info!("Preflighting execution.");
+    let input_frame = rkyv::to_bytes::<rkyv::rancor::Error>(&witness)?.to_vec();
+    let env = ExecutorEnv::builder()
+        // Pass in witness data
+        .write_frame(&input_frame)
+        .build()?;
+    let session_info = default_executor().execute(env, KAILUA_FPVM_ELF)?;
+    let mcycles_count = session_info
+        .segments
+        .iter()
+        .map(|segment| 1 << segment.po2)
+        .sum::<u64>()
+        .div_ceil(1_000_000);
+
+    // todo: remember this storage location to avoid duplicate uploads
     // Upload the ELF to the storage provider so that it can be fetched by the market.
     ensure!(
         boundless_client.storage_provider.is_some(),
-        "a storage provider is required to upload the zkVM guest ELF"
+        "A storage provider is required to host the FPVM program and input."
     );
     let image_url = boundless_client.upload_image(KAILUA_FPVM_ELF).await?;
     info!("Uploaded image to {}", image_url);
     // Upload input
+    let input = InputBuilder::new()
+        .write_frame(&input_frame)
+        .build();
     let input_url = boundless_client.upload_input(&input).await?;
     info!("Uploaded input to {input_url}");
     let request_input = Input::url(input_url);
     let request = ProofRequest::default()
         .with_image_url(&image_url)
         .with_input(request_input)
-        .with_requirements(Requirements::new(
-            KAILUA_FPVM_ID,
-            Predicate::digest_match(proof_journal.digest()),
-        ))
+        .with_requirements(requirements)
         .with_offer(
             Offer::default()
                 .with_min_price_per_mcycle(parse_ether("0.001")?, mcycles_count)
@@ -392,6 +460,7 @@ pub async fn run_boundless_client(
     // Send the request and wait for it to be completed.
     let (request_id, expires_at) = boundless_client.submit_request(&request).await?;
     info!("Boundless request 0x{request_id:x} submitted");
+
     // Wait for the request to be fulfilled by the market, returning the journal and seal.
     info!("Waiting for 0x{request_id:x} to be fulfilled");
     let (_journal, seal) = boundless_client
@@ -400,4 +469,17 @@ pub async fn run_boundless_client(
     info!("Request 0x{request_id:x} fulfilled");
 
     Ok(Proof::BoundlessSeal(seal.to_vec(), proof_journal))
+}
+
+pub fn request_id(addr: &Address, id: u32) -> U256 {
+    let addr = U160::from_be_bytes(addr.0.0);
+    (U256::from(addr) << 32) | U256::from(id)
+}
+
+pub fn set_verifier_selector(image_id: B256) -> [u8; 4] {
+    let tag = sha2::Sha256::digest("risc0.SetInclusionReceiptVerifierParameters");
+    let len = (1u16 << 8).to_be_bytes();
+    let input = [tag.as_slice(), image_id.as_slice(), len.as_slice()].concat();
+    let digest = sha2::Sha256::digest(&input);
+    digest.as_slice()[..4].try_into().unwrap()
 }
