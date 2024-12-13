@@ -43,3 +43,6 @@ assert_cmd = "2.0.16"
 
 [features]
 devnet = []
+prove = [
+    "risc0-zkvm/prove"
+]

@@ -26,7 +26,6 @@ use alloy::primitives::{Address, FixedBytes, U256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy::signers::local::LocalSigner;
 use anyhow::{anyhow, bail, Context};
-use boundless_market::storage::StorageProviderType;
 use kailua_client::proof::{fpvm_proof_file_name, Proof};
 use kailua_client::BoundlessArgs;
 use kailua_common::blobs::hash_to_fe;
@@ -796,78 +795,7 @@ pub async fn handle_proofs(
         }
         // boundless args
         if let Some(boundless_args) = &args.boundless_args {
-            proving_args.extend(vec![
-                String::from("--boundless-rpc-url"),
-                boundless_args.boundless_rpc_url.to_string(),
-                String::from("--boundless-wallet-key"),
-                boundless_args.boundless_wallet_key.to_bytes().to_string(),
-                String::from("--boundless-set-verifier-address"),
-                boundless_args.boundless_set_verifier_address.to_string(),
-                String::from("--boundless-market-address"),
-                boundless_args.boundless_market_address.to_string(),
-            ]);
-            if boundless_args.boundless_offchain {
-                proving_args.push(String::from("--boundless-offchain"));
-            }
-            if let Some(url) = &boundless_args.boundless_order_stream_url {
-                proving_args.extend(vec![
-                    String::from("--boundless-order-stream-url"),
-                    url.to_string(),
-                ]);
-            }
-            if let Some(storage_cfg) = &boundless_args.boundless_storage_config {
-                match &storage_cfg.storage_provider {
-                    StorageProviderType::S3 => {
-                        proving_args.extend(vec![
-                            String::from("--storage-provider"),
-                            String::from("s3"),
-                            String::from("--s3-access-key"),
-                            storage_cfg.s3_access_key.clone().unwrap(),
-                            String::from("--s3-secret-key"),
-                            storage_cfg.s3_secret_key.clone().unwrap(),
-                            String::from("--s3-bucket"),
-                            storage_cfg.s3_bucket.clone().unwrap(),
-                            String::from("--s3-url"),
-                            storage_cfg.s3_url.clone().unwrap(),
-                            String::from("--aws-region"),
-                            storage_cfg.aws_region.clone().unwrap(),
-                        ]);
-                    }
-                    StorageProviderType::Pinata => {
-                        proving_args.extend(vec![
-                            String::from("--storage-provider"),
-                            String::from("pinata"),
-                            String::from("--pinata-jwt"),
-                            storage_cfg.pinata_jwt.clone().unwrap(),
-                        ]);
-                        if let Some(pinata_api_url) = &storage_cfg.pinata_api_url {
-                            proving_args.extend(vec![
-                                String::from("--pinata-api-url"),
-                                pinata_api_url.to_string(),
-                            ]);
-                        }
-                        if let Some(ipfs_gateway_url) = &storage_cfg.ipfs_gateway_url {
-                            proving_args.extend(vec![
-                                String::from("--ipfs-gateway-url"),
-                                ipfs_gateway_url.to_string(),
-                            ]);
-                        }
-                    }
-                    StorageProviderType::File => {
-                        proving_args.extend(vec![
-                            String::from("--storage-provider"),
-                            String::from("file"),
-                        ]);
-                        if let Some(file_path) = &storage_cfg.file_path {
-                            proving_args.extend(vec![
-                                String::from("--file-path"),
-                                file_path.to_str().unwrap().to_string(),
-                            ]);
-                        }
-                    }
-                    _ => unimplemented!("Unknown storage provider."),
-                }
-            }
+            proving_args.extend(boundless_args.to_arg_vec());
         }
         // verbosity level
         if args.core.v > 0 {

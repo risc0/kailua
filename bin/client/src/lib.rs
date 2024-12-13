@@ -25,7 +25,7 @@ use anyhow::{ensure, Context};
 use boundless_market::alloy::signers::local::PrivateKeySigner;
 use boundless_market::client::ClientBuilder;
 use boundless_market::contracts::{Input, Offer, Predicate, ProofRequest, Requirements};
-use boundless_market::storage::StorageProviderConfig;
+use boundless_market::storage::{StorageProviderConfig, StorageProviderType};
 use clap::Parser;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use kailua_common::blobs::BlobWitnessData;
@@ -64,15 +64,18 @@ pub struct KailuaClientCli {
 }
 
 #[derive(Parser, Debug, Clone)]
+#[group(requires_all = ["boundless_rpc_url", "boundless_wallet_key", "boundless_set_verifier_address", "boundless_market_address"])]
 pub struct BoundlessArgs {
     /// URL of the Ethereum RPC endpoint.
-    #[clap(short, long, env)]
+    #[clap(long, env)]
+    #[arg(required = false)]
     pub boundless_rpc_url: Url,
     /// Private key used to interact with the EvenNumber contract.
-    #[clap(short, long, env)]
+    #[clap(long, env)]
+    #[arg(required = false)]
     pub boundless_wallet_key: PrivateKeySigner,
     /// Submit the request offchain via the provided order stream service url.
-    #[clap(short, long, requires = "order_stream_url")]
+    #[clap(long, requires = "boundless_order_stream_url")]
     pub boundless_offchain: bool,
     /// Offchain order stream service URL to submit offchain requests to.
     #[clap(long, env)]
@@ -81,11 +84,92 @@ pub struct BoundlessArgs {
     #[clap(flatten)]
     pub boundless_storage_config: Option<StorageProviderConfig>,
     /// Address of the RiscZeroSetVerifier contract.
-    #[clap(short, long, env)]
+    #[clap(long, env)]
+    #[arg(required = false)]
     pub boundless_set_verifier_address: Address,
     /// Address of the BoundlessMarket contract.
-    #[clap(short, long, env)]
+    #[clap(long, env)]
+    #[arg(required = false)]
     pub boundless_market_address: Address,
+}
+
+impl BoundlessArgs {
+    pub fn to_arg_vec(&self) -> Vec<String> {
+        let mut proving_args = Vec::new();
+        proving_args.extend(vec![
+            String::from("--boundless-rpc-url"),
+            self.boundless_rpc_url.to_string(),
+            String::from("--boundless-wallet-key"),
+            self.boundless_wallet_key.to_bytes().to_string(),
+            String::from("--boundless-set-verifier-address"),
+            self.boundless_set_verifier_address.to_string(),
+            String::from("--boundless-market-address"),
+            self.boundless_market_address.to_string(),
+        ]);
+        if self.boundless_offchain {
+            proving_args.push(String::from("--boundless-offchain"));
+        }
+        if let Some(url) = &self.boundless_order_stream_url {
+            proving_args.extend(vec![
+                String::from("--boundless-order-stream-url"),
+                url.to_string(),
+            ]);
+        }
+        if let Some(storage_cfg) = &self.boundless_storage_config {
+            match &storage_cfg.storage_provider {
+                StorageProviderType::S3 => {
+                    proving_args.extend(vec![
+                        String::from("--storage-provider"),
+                        String::from("s3"),
+                        String::from("--s3-access-key"),
+                        storage_cfg.s3_access_key.clone().unwrap(),
+                        String::from("--s3-secret-key"),
+                        storage_cfg.s3_secret_key.clone().unwrap(),
+                        String::from("--s3-bucket"),
+                        storage_cfg.s3_bucket.clone().unwrap(),
+                        String::from("--s3-url"),
+                        storage_cfg.s3_url.clone().unwrap(),
+                        String::from("--aws-region"),
+                        storage_cfg.aws_region.clone().unwrap(),
+                    ]);
+                }
+                StorageProviderType::Pinata => {
+                    proving_args.extend(vec![
+                        String::from("--storage-provider"),
+                        String::from("pinata"),
+                        String::from("--pinata-jwt"),
+                        storage_cfg.pinata_jwt.clone().unwrap(),
+                    ]);
+                    if let Some(pinata_api_url) = &storage_cfg.pinata_api_url {
+                        proving_args.extend(vec![
+                            String::from("--pinata-api-url"),
+                            pinata_api_url.to_string(),
+                        ]);
+                    }
+                    if let Some(ipfs_gateway_url) = &storage_cfg.ipfs_gateway_url {
+                        proving_args.extend(vec![
+                            String::from("--ipfs-gateway-url"),
+                            ipfs_gateway_url.to_string(),
+                        ]);
+                    }
+                }
+                StorageProviderType::File => {
+                    proving_args.extend(vec![
+                        String::from("--storage-provider"),
+                        String::from("file"),
+                    ]);
+                    if let Some(file_path) = &storage_cfg.file_path {
+                        proving_args.extend(vec![
+                            String::from("--file-path"),
+                            file_path.to_str().unwrap().to_string(),
+                        ]);
+                    }
+                }
+                _ => unimplemented!("Unknown storage provider."),
+            }
+        }
+        proving_args
+    }
 }
 
 pub fn parse_b256(s: &str) -> Result<B256, String> {
