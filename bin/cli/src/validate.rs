@@ -22,7 +22,7 @@ use alloy::eips::eip4844::IndexedBlobHash;
 use alloy::eips::BlockNumberOrTag;
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::network::EthereumWallet;
-use alloy::primitives::{Address, FixedBytes, U256};
+use alloy::primitives::{Address, Bytes, FixedBytes, U256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy::signers::local::LocalSigner;
 use anyhow::{anyhow, bail, Context};
@@ -302,6 +302,8 @@ pub async fn handle_proposals(
                     }
                     Proof::BoundlessSeal(seal_data, journal) => {
                         // Amend the seal with a fake proof for the set root
+                        dbg!(Bytes::from(seal_data.clone()));
+                        dbg!(Bytes::from(journal.bytes.clone()));
                         match kailua_contracts::SetVerifierSeal::abi_decode(
                             seal_data.as_slice(),
                             true,
@@ -351,7 +353,16 @@ pub async fn handle_proposals(
                                     // replace empty root seal with constructed fake proof
                                     seal.rootSeal = set_builder_seal.into();
                                     // amend proof
-                                    *seal_data = seal.abi_encode();
+                                    warn!(
+                                        "DEVNET-ONLY: Patching proof with faux set verifier seal."
+                                    );
+                                    dbg!(&seal.rootSeal);
+                                    dbg!(&seal.path);
+                                    let selector =
+                                        crate::set_verifier_selector(crate::SET_BUILDER_ID);
+                                    *seal_data =
+                                        [selector.as_slice(), seal.abi_encode().as_slice()]
+                                            .concat();
                                 }
                             }
                             Err(e) => {
@@ -416,7 +427,7 @@ pub async fn handle_proposals(
                 info!("Proof status: {proof_status}");
             }
 
-            let encoded_seal = proof.encoded_seal()?;
+            let encoded_seal = Bytes::from(proof.encoded_seal()?);
 
             // create kzg proofs
             let mut proofs = [vec![], vec![]];
@@ -599,7 +610,7 @@ pub async fn handle_proposals(
             match proposal_parent_contract
                 .prove(
                     [u_index, v_index, challenge_position],
-                    encoded_seal.into(),
+                    encoded_seal.clone(),
                     proof_journal.agreed_l2_output_root,
                     [
                         contender.output_at(challenge_position),
@@ -631,6 +642,7 @@ pub async fn handle_proposals(
                     }
                 },
                 Err(e) => {
+                    dbg!(&encoded_seal);
                     error!("Failed to send proof txn: {e:?}");
                 }
             }

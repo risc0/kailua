@@ -18,6 +18,7 @@ pub mod witness;
 
 use crate::proof::Proof;
 use crate::witness::{BlobWitnessProvider, OracleWitnessProvider};
+use alloy::sol_types::SolValue;
 use alloy::transports::http::reqwest::Url;
 use alloy_primitives::utils::parse_ether;
 use alloy_primitives::{Address, B256};
@@ -36,7 +37,7 @@ use kona_preimage::{HintWriterClient, PreimageOracleClient};
 use kona_proof::l1::OracleBlobProvider;
 use kona_proof::{BootInfo, CachingOracle};
 use risc0_zkvm::sha::Digestible;
-use risc0_zkvm::{default_executor, default_prover, ExecutorEnv, ProverOpts};
+use risc0_zkvm::{default_executor, default_prover, is_dev_mode, ExecutorEnv, Journal, ProverOpts};
 use std::fmt::Debug;
 use std::ops::DerefMut;
 use std::str::FromStr;
@@ -45,7 +46,7 @@ use std::time::Duration;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::task::spawn_blocking;
-use tracing::info;
+use tracing::{info, warn};
 
 /// The size of the LRU cache in the oracle.
 pub const ORACLE_LRU_SIZE: usize = 1024;
@@ -192,7 +193,7 @@ where
 {
     // preload all data natively
     info!("Running native client.");
-    let (_, witness) = run_native_client(
+    let (journal, witness) = run_native_client(
         oracle_client.clone(),
         hint_client.clone(),
         precondition_validation_data_hash,
@@ -201,7 +202,7 @@ where
     .expect("Failed to run native client.");
     // compute the receipt in the zkvm
     let proof = match boundless_args {
-        Some(args) => run_boundless_client(args, boundless_storage_config, witness)
+        Some(args) => run_boundless_client(args, boundless_storage_config, journal, witness)
             .await
             .context("Failed to run boundless client.")?,
         None => run_zkvm_client(witness)
@@ -238,7 +239,7 @@ pub async fn run_native_client<P, H>(
     oracle_client: P,
     hint_client: H,
     precondition_validation_data_hash: B256,
-) -> anyhow::Result<(B256, Witness)>
+) -> anyhow::Result<(ProofJournal, Witness)>
 where
     P: PreimageOracleClient + Send + Sync + Debug + Clone,
     H: HintWriterClient + Send + Sync + Debug + Clone,
@@ -279,7 +280,8 @@ where
         blobs_witness: core::mem::take(blobs_witness.lock().unwrap().deref_mut()),
         precondition_validation_data_hash,
     };
-    Ok((precondition_hash, witness))
+    let journal_output = ProofJournal::new(precondition_hash, boot.as_ref());
+    Ok((journal_output, witness))
 }
 
 pub async fn run_zkvm_client(witness: Witness) -> anyhow::Result<Proof> {
@@ -315,11 +317,26 @@ pub async fn run_zkvm_client(witness: Witness) -> anyhow::Result<Proof> {
 pub async fn run_boundless_client(
     args: BoundlessArgs,
     storage: Option<StorageProviderConfig>,
+    journal: ProofJournal,
     witness: Witness,
 ) -> anyhow::Result<Proof> {
     info!("Running boundless client.");
     let input = rkyv::to_bytes::<rkyv::rancor::Error>(&witness)?.to_vec();
-    // Preflight execution to get journal
+    let proof_journal = Journal::new(journal.encode_packed());
+
+    // ad-hoc boundless dev mode
+    if is_dev_mode() {
+        warn!("DEV MODE: Generating fake boundless network proof.");
+        let seal = kailua_contracts::SetVerifierSeal {
+            path: vec![],
+            rootSeal: Default::default(),
+        }
+        .abi_encode();
+        return Ok(Proof::BoundlessSeal(seal, proof_journal));
+    }
+
+    // Preflight execution to get cycle count
+    info!("Preflighting execution.");
     let env = ExecutorEnv::builder()
         // Pass in witness data
         .write_frame(&input)
@@ -331,7 +348,7 @@ pub async fn run_boundless_client(
         .map(|segment| 1 << segment.po2)
         .sum::<u64>()
         .div_ceil(1_000_000);
-    let journal = session_info.journal;
+
     // Instantiate client
     let boundless_client = ClientBuilder::default()
         .with_rpc_url(args.boundless_rpc_url)
@@ -355,14 +372,14 @@ pub async fn run_boundless_client(
     info!("Uploaded image to {}", image_url);
     // Upload input
     let input_url = boundless_client.upload_input(&input).await?;
-    tracing::info!("Uploaded input to {input_url}");
+    info!("Uploaded input to {input_url}");
     let request_input = Input::url(input_url);
     let request = ProofRequest::default()
         .with_image_url(&image_url)
         .with_input(request_input)
         .with_requirements(Requirements::new(
             KAILUA_FPVM_ID,
-            Predicate::digest_match(journal.digest()),
+            Predicate::digest_match(proof_journal.digest()),
         ))
         .with_offer(
             Offer::default()
@@ -382,5 +399,5 @@ pub async fn run_boundless_client(
         .await?;
     info!("Request 0x{request_id:x} fulfilled");
 
-    Ok(Proof::BoundlessSeal(seal.to_vec(), journal))
+    Ok(Proof::BoundlessSeal(seal.to_vec(), proof_journal))
 }
