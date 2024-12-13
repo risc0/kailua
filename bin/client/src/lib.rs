@@ -61,6 +61,9 @@ pub struct KailuaClientCli {
 
     #[clap(flatten)]
     pub boundless_args: Option<BoundlessArgs>,
+    /// Storage provider to use for elf and input
+    #[clap(flatten)]
+    pub boundless_storage_config: Option<StorageProviderConfig>,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -75,14 +78,11 @@ pub struct BoundlessArgs {
     #[arg(required = false)]
     pub boundless_wallet_key: PrivateKeySigner,
     /// Submit the request offchain via the provided order stream service url.
-    #[clap(long, requires = "boundless_order_stream_url")]
+    #[clap(long, requires = "boundless_order_stream_url", default_value_t = false)]
     pub boundless_offchain: bool,
     /// Offchain order stream service URL to submit offchain requests to.
     #[clap(long, env)]
     pub boundless_order_stream_url: Option<Url>,
-    /// Storage provider to use
-    #[clap(flatten)]
-    pub boundless_storage_config: Option<StorageProviderConfig>,
     /// Address of the RiscZeroSetVerifier contract.
     #[clap(long, env)]
     #[arg(required = false)]
@@ -94,7 +94,10 @@ pub struct BoundlessArgs {
 }
 
 impl BoundlessArgs {
-    pub fn to_arg_vec(&self) -> Vec<String> {
+    pub fn to_arg_vec(
+        &self,
+        storage_provider_config: &Option<StorageProviderConfig>,
+    ) -> Vec<String> {
         let mut proving_args = Vec::new();
         proving_args.extend(vec![
             String::from("--boundless-rpc-url"),
@@ -115,7 +118,7 @@ impl BoundlessArgs {
                 url.to_string(),
             ]);
         }
-        if let Some(storage_cfg) = &self.boundless_storage_config {
+        if let Some(storage_cfg) = storage_provider_config {
             match &storage_cfg.storage_provider {
                 StorageProviderType::S3 => {
                     proving_args.extend(vec![
@@ -178,6 +181,7 @@ pub fn parse_b256(s: &str) -> Result<B256, String> {
 
 pub async fn run_client<P, H>(
     boundless_args: Option<BoundlessArgs>,
+    boundless_storage_config: Option<StorageProviderConfig>,
     oracle_client: P,
     hint_client: H,
     precondition_validation_data_hash: B256,
@@ -196,14 +200,13 @@ where
     .await
     .expect("Failed to run native client.");
     // compute the receipt in the zkvm
-    info!("Running zk client.");
     let proof = match boundless_args {
+        Some(args) => run_boundless_client(args, boundless_storage_config, witness)
+            .await
+            .context("Failed to run boundless client.")?,
         None => run_zkvm_client(witness)
             .await
             .context("Failed to run zkvm client.")?,
-        Some(args) => run_boundless_client(args, witness)
-            .await
-            .context("Failed to run boundless client.")?,
     };
     // Prepare proof file
     let proof_journal = ProofJournal::decode_packed(proof.journal().as_ref())
@@ -280,6 +283,7 @@ where
 }
 
 pub async fn run_zkvm_client(witness: Witness) -> anyhow::Result<Proof> {
+    info!("Running zkvm client.");
     let prove_info = spawn_blocking(move || {
         let data = rkyv::to_bytes::<rkyv::rancor::Error>(&witness)?.to_vec();
         // Execution environment
@@ -308,7 +312,12 @@ pub async fn run_zkvm_client(witness: Witness) -> anyhow::Result<Proof> {
     Ok(Proof::ZKVMReceipt(Box::new(prove_info.receipt)))
 }
 
-pub async fn run_boundless_client(args: BoundlessArgs, witness: Witness) -> anyhow::Result<Proof> {
+pub async fn run_boundless_client(
+    args: BoundlessArgs,
+    storage: Option<StorageProviderConfig>,
+    witness: Witness,
+) -> anyhow::Result<Proof> {
+    info!("Running boundless client.");
     let input = rkyv::to_bytes::<rkyv::rancor::Error>(&witness)?.to_vec();
     // Preflight execution to get journal
     let env = ExecutorEnv::builder()
@@ -333,7 +342,7 @@ pub async fn run_boundless_client(args: BoundlessArgs, witness: Witness) -> anyh
                 .then_some(args.boundless_order_stream_url)
                 .flatten(),
         )
-        .with_storage_provider_config(args.boundless_storage_config)
+        .with_storage_provider_config(storage)
         .with_private_key(args.boundless_wallet_key)
         .build()
         .await?;

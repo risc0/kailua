@@ -25,6 +25,7 @@ async fn main() -> anyhow::Result<()> {
 
     kailua_client::run_client(
         args.boundless_args,
+        args.boundless_storage_config,
         ORACLE_READER,
         HINT_WRITER,
         precondition_validation_data_hash,

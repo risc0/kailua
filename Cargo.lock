@@ -4631,6 +4631,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "bonsai-sdk",
+ "boundless-market",
  "clap",
  "hashbrown 0.15.0",
  "kailua-build",

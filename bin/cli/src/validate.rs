@@ -26,6 +26,7 @@ use alloy::primitives::{Address, FixedBytes, U256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy::signers::local::LocalSigner;
 use anyhow::{anyhow, bail, Context};
+use boundless_market::storage::StorageProviderConfig;
 use kailua_client::proof::{fpvm_proof_file_name, Proof};
 use kailua_client::BoundlessArgs;
 use kailua_common::blobs::hash_to_fe;
@@ -66,6 +67,9 @@ pub struct ValidateArgs {
 
     #[clap(flatten)]
     pub boundless_args: Option<BoundlessArgs>,
+    /// Storage provider to use for elf and input
+    #[clap(flatten)]
+    pub boundless_storage_config: Option<StorageProviderConfig>,
 }
 
 pub async fn validate(args: ValidateArgs, data_dir: PathBuf) -> anyhow::Result<()> {
@@ -795,7 +799,7 @@ pub async fn handle_proofs(
         }
         // boundless args
         if let Some(boundless_args) = &args.boundless_args {
-            proving_args.extend(boundless_args.to_arg_vec());
+            proving_args.extend(boundless_args.to_arg_vec(&args.boundless_storage_config));
         }
         // verbosity level
         if args.core.v > 0 {
