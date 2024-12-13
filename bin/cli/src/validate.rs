@@ -280,7 +280,7 @@ pub async fn handle_proposals(
 
             // patch the proof if in dev mode
             #[cfg(feature = "devnet")]
-            let proof = if is_dev_mode() {
+            let proof = if is_dev_mode() || needs_selector_patch(&proof) {
                 use alloy::sol_types::SolValue;
                 use risc0_zkvm::sha::Digestible;
 
@@ -940,6 +940,16 @@ pub async fn handle_proofs(
             Err(e) => {
                 error!("Failed to deserialize proof: {e:?}");
             }
+        }
+    }
+}
+
+#[cfg(feature = "devnet")]
+fn needs_selector_patch(proof: &Proof) -> bool {
+    match proof {
+        Proof::ZKVMReceipt(_) => false,
+        Proof::BoundlessSeal(seal, _) => {
+            &seal[..4] != kailua_client::set_verifier_selector(crate::SET_BUILDER_ID).as_slice()
         }
     }
 }

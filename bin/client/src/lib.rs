@@ -28,6 +28,7 @@ use boundless_market::alloy::providers::Provider;
 use boundless_market::alloy::signers::local::PrivateKeySigner;
 use boundless_market::client::ClientBuilder;
 use boundless_market::contracts::{Input, Offer, Predicate, ProofRequest, Requirements};
+use boundless_market::input::InputBuilder;
 use boundless_market::storage::{StorageProviderConfig, StorageProviderType};
 use clap::Parser;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
@@ -45,7 +46,6 @@ use std::ops::DerefMut;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use boundless_market::input::InputBuilder;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::task::spawn_blocking;
@@ -384,11 +384,9 @@ pub async fn run_boundless_client(
             break;
         }
         let nonce = boundless_wallet_nonce.saturating_sub(i + 1) as u32;
-        info!("Looking back at txn w/ nonce {nonce} ");
-        let request_id = request_id(
-            &boundless_wallet_address,
-            nonce,
-        );
+
+        let request_id = request_id(&boundless_wallet_address, nonce);
+        info!("Looking back at txn w/ nonce {nonce} | request: {request_id:x}");
 
         let Ok((request, _)) = boundless_client
             .boundless_market
@@ -400,9 +398,8 @@ pub async fn run_boundless_client(
             continue;
         };
 
-        // todo: fix this faulty comparison
+        // Skip unrelated request
         if request.requirements != requirements {
-            // Skip unrelated request
             continue;
         }
 
@@ -439,23 +436,29 @@ pub async fn run_boundless_client(
     let image_url = boundless_client.upload_image(KAILUA_FPVM_ELF).await?;
     info!("Uploaded image to {}", image_url);
     // Upload input
-    let input = InputBuilder::new()
-        .write_frame(&input_frame)
-        .build();
+    let input = InputBuilder::new().write_frame(&input_frame).build();
     let input_url = boundless_client.upload_input(&input).await?;
     info!("Uploaded input to {input_url}");
     let request_input = Input::url(input_url);
-    let request = ProofRequest::default()
-        .with_image_url(&image_url)
-        .with_input(request_input)
-        .with_requirements(requirements)
-        .with_offer(
-            Offer::default()
-                .with_min_price_per_mcycle(parse_ether("0.001")?, mcycles_count)
-                .with_max_price_per_mcycle(parse_ether("0.002")?, mcycles_count)
-                .with_ramp_up_period(10)
-                .with_timeout(1500),
-        );
+    let request = {
+        let mut req = ProofRequest::default()
+            .with_image_url(&image_url)
+            .with_input(request_input)
+            .with_requirements(requirements)
+            .with_offer(
+                Offer::default()
+                    .with_min_price_per_mcycle(parse_ether("0.001")?, mcycles_count)
+                    .with_max_price_per_mcycle(parse_ether("0.002")?, mcycles_count)
+                    .with_ramp_up_period(10)
+                    .with_timeout(1500),
+            );
+        req.id = boundless_client
+            .boundless_market
+            .request_id_from_nonce()
+            .await
+            .context("request_id_from_nonce")?;
+        req
+    };
 
     // Send the request and wait for it to be completed.
     let (request_id, expires_at) = boundless_client.submit_request(&request).await?;
@@ -472,7 +475,7 @@ pub async fn run_boundless_client(
 }
 
 pub fn request_id(addr: &Address, id: u32) -> U256 {
-    let addr = U160::from_be_bytes(addr.0.0);
+    let addr = U160::from_be_bytes(addr.0 .0);
     (U256::from(addr) << 32) | U256::from(id)
 }
 

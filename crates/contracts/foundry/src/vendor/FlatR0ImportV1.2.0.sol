@@ -2228,6 +2228,7 @@ library StructHash {
 // limitations under the License.
 //
 
+//0xb8b38d4c
 /// @notice Error raised when this verifier receives a receipt with a selector that does not match
 ///         its own. The selector value is calculated from the verifier parameters, and so this
 ///         usually indicates a mismatch between the version of the prover and this verifier.
@@ -2437,6 +2438,7 @@ contract RiscZeroVerifierRouter is IRiscZeroVerifier, Ownable2Step {
     /// @notice A "tombstone" value used to mark verifier entries that have been removed from the mapping.
     IRiscZeroVerifier internal constant TOMBSTONE = IRiscZeroVerifier(address(1));
 
+    //0xe4ea6542
     /// @notice Error raised when attempting to verify a receipt with a selector that is not
     ///         registered on this router. Generally, this indicates a version mismatch where the
     ///         prover generated a receipt with version of the zkVM that does not match any

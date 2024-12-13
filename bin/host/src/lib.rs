@@ -232,7 +232,6 @@ pub async fn fetch_rollup_config(
         }
     }
     // export
-    // dbg!(&rollup_config);
     let ser_config = serde_json::to_string(&rollup_config)?;
     if let Some(json_file_path) = json_file_path {
         fs::write(json_file_path, &ser_config).await?;
