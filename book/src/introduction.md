@@ -59,24 +59,3 @@ transaction fees.
 
 > Kailua operates under constant collateral requirements for honest parties, and places no restrictions on proving
 > times, enabling honest parties to successfully defend against attacks of any size at a pre-determined maximum cost.
-
-[//]: # ()
-[//]: # (```mermaid)
-
-[//]: # ()
-[//]: # ( graph LR;)
-
-[//]: # ()
-[//]: # (     A-->B;)
-
-[//]: # ()
-[//]: # (     B-->C;)
-
-[//]: # ()
-[//]: # (     C-->D;)
-
-[//]: # ()
-[//]: # (     D-->E;)
-
-[//]: # ()
-[//]: # (```)

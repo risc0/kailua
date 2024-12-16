@@ -18,44 +18,6 @@ proposal.
 
 <div style="text-align: center;">
 
-[//]: # (```mermaid)
-
-[//]: # (---)
-
-[//]: # (title: Sequencing Proposal Comparison)
-
-[//]: # (config:)
-
-[//]: # (  class:)
-
-[//]: # (    hideEmptyMembersBox: true)
-
-[//]: # (---)
-
-[//]: # (classDiagram)
-
-[//]: # (    class Kailua{)
-
-[//]: # (        +bytes32[] intermediateRoots)
-
-[//]: # (        +bytes32 proposedSequencingRoot)
-
-[//]: # (        +disprove&#40;&#41;)
-
-[//]: # (    })
-
-[//]: # (    class Standard{)
-
-[//]: # (        +bytes32 proposedSequencingRoot)
-
-[//]: # (        +query&#40;&#41;)
-
-[//]: # (        +respond&#40;&#41;)
-
-[//]: # (    })
-
-[//]: # (```)
-
 ```mermaid
 ---
 title: Example Kailua Sequencing Proposal
@@ -134,6 +96,6 @@ The following two invalid proposals created no challenges:
 2. `E'` was made after the timeout period for `E` had expired, and was automatically eliminated.
 
 In this scenario, `B` can only be finalized once two proofs are submitted to resolve its disputes against `B'` and `B''`.
-Proposal `C` can only be finalized once a proof resolves its dispute against `C'`, and its parent `B` is finalized
+Proposal `C` can only be finalized once a proof resolves its dispute against `C'`, and its parent `B` is finalized.
 `D` has no contenders and can be finalized once its parent `C` is finalized.
 The timeout period for `E` had passed before `E'` was introduced, and therefore `E` can be finalized once its parent `D` is finalized.
