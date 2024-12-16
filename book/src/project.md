@@ -35,10 +35,13 @@ The contracts directory is a foundry project comprised of the following main con
 * `KailuaGame.sol`: Logic for introducing new sequencing proposals.
 * `KailuaLib.sol`: Misc. utilities.
 
+The `kailua-contracts` crate builds and exports these contracts in Rust.
+
 ## FPVM
 
-Kailua executes Optimism's `Kona` inside the RISC Zero zkVM to create fault proofs.
-The following project components enable this:
+The Kailua FPVM executes Optimism's `Kona` inside the RISC Zero zkVM to derive and execute optimism blocks and create fault proofs.
+The following project components work together to enable this functionality:
 * `bin/host`: A modified version of `Kona`'s host binary, which acts as an oracle for the witness data required to create a fault proof.
 * `bin/client`: A modified version of `Kona`'s client binary, which executes the `fpvm` while querying the host for the necessary chain data.
-* `build/risczero/fpvm`: The zkVM wrapper around `Kona` to create ZK fault proofs.
+* `build/risczero/fpvm`: The zkVM binary to create ZK fault proofs with `Kona`.
+* `crates/common`: A wrapper crate around `Kona` with utilities for efficient ZK fault proving.
