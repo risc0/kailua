@@ -1,0 +1,18 @@
+[book]
+authors = ["hashcashier"]
+language = "en"
+multilingual = false
+src = "src"
+title = "The Kailua Book"
+
+[preprocessor]
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
+
+[output.html]
+default-theme = "ayu"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/risc0/kailua"
+edit-url-template = "https://github.com/risc0/kailua/edit/main/book/{path}"
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
