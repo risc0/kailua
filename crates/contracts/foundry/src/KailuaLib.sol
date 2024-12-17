@@ -27,9 +27,8 @@ enum ProofStatus {
     U_WIN_V_LOSE
 }
 
-// 0x295a81c1
-/// @notice Thrown when an unauthorized address attempts to interact with the game.
-error Unauthorized(address source, address expected);
+/// @notice Thrown when a blacklisted address attempts to interact with the game.
+error Blacklisted(address source, address expected);
 
 // 0x9d3e7d24
 /// @notice Thrown when a child from an unknown source appends itself to a tournament

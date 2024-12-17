@@ -14,9 +14,10 @@ use alloy::transports::Transport;
 use alloy_rpc_types_beacon::sidecar::BlobData;
 use anyhow::{bail, Context};
 use kailua_common::blobs::{hash_to_fe, intermediate_outputs};
-use kailua_contracts::KailuaGame::KailuaGameInstance;
-use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
-use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
+use kailua_contracts::{
+    KailuaGame::KailuaGameInstance, KailuaTournament::KailuaTournamentInstance,
+    KailuaTreasury::KailuaTreasuryInstance, *,
+};
 use serde::{Deserialize, Serialize};
 use std::iter::repeat;
 use tracing::{error, info, warn};
@@ -57,7 +58,7 @@ impl Proposal {
         let parent_address = tournament_instance.parentGame().stall().await.parentGame_;
         if parent_address == instance_address {
             info!("Loading KailuaTreasury instance");
-            Self::load_treasury(&KailuaTreasuryInstance::new(
+            Self::load_treasury(&KailuaTreasury::new(
                 instance_address,
                 tournament_instance.provider(),
             ))
@@ -67,7 +68,7 @@ impl Proposal {
             Self::load_game(
                 config,
                 blob_provider,
-                &KailuaGameInstance::new(instance_address, tournament_instance.provider()),
+                &KailuaGame::new(instance_address, tournament_instance.provider()),
             )
             .await
         }
@@ -195,8 +196,7 @@ impl Proposal {
             .stall()
             .await
             .parentGame_;
-        let parent_tournament_instance =
-            KailuaTournamentInstance::new(parent_tournament, &provider);
+        let parent_tournament_instance = KailuaTournament::new(parent_tournament, &provider);
         let survivor = parent_tournament_instance
             .pruneChildren()
             .call()
@@ -336,7 +336,7 @@ impl Proposal {
         &self,
         provider: P,
     ) -> KailuaTournamentInstance<T, P, N> {
-        KailuaTournamentInstance::new(self.contract, provider)
+        KailuaTournament::new(self.contract, provider)
     }
 
     pub async fn resolve<T: Transport + Clone, P: Provider<T, N>, N: Network>(

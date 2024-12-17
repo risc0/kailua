@@ -21,7 +21,7 @@ use alloy::providers::{Provider, ProviderBuilder};
 use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
 use alloy::transports::Transport;
-use anyhow::Context;
+use anyhow::{bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_common::client::config_hash;
 use kailua_contracts::*;
@@ -32,39 +32,39 @@ use std::str::FromStr;
 use tracing::{error, info, warn};
 
 #[derive(clap::Args, Debug, Clone)]
-pub struct DeployArgs {
+pub struct FastTrackArgs {
     #[arg(long, short, help = "Verbosity level (0-4)", action = clap::ArgAction::Count)]
     pub v: u8,
 
-    /// Address of OP-NODE endpoint to use
+    /// Address of the OP-NODE endpoint to use
     #[clap(long, env)]
-    pub op_node_address: String,
-    /// Address of L2 JSON-RPC endpoint to use (eth and debug namespace required).
+    pub op_node_url: String,
+    /// Address of the OP-GETH endpoint to use (eth and debug namespace required).
     #[clap(long, env)]
-    pub l2_node_address: String,
-    /// Address of L1 JSON-RPC endpoint to use (eth namespace required)
+    pub op_geth_url: String,
+    /// Address of the ethereum rpc endpoint to use (eth namespace required)
     #[clap(long, env)]
-    pub l1_node_address: String,
+    pub eth_rpc_url: String,
 
-    /// Address of the L1 `AnchorStateRegistry` contract
+    /// The l2 block number to start sequencing since
     #[clap(long, env)]
-    pub registry_contract: String,
-    /// Address of the L1 `OptimismPortal` contract
-    #[clap(long, env)]
-    pub portal_contract: String,
-    /// Address of the existing L1 `RiscZeroVerifier` contract to use
-    #[clap(long, env)]
-    pub verifier_contract: Option<String>,
-
+    pub starting_block_number: u64,
     /// The number of blocks that a proposal must cover
     #[clap(long, env)]
-    pub blocks_per_proposal: u64,
+    pub proposal_block_span: u64,
     /// The time gap before a proposal can be made
     #[clap(long, env)]
     pub proposal_time_gap: u64,
+
+    /// The collateral (wei) that must be locked up by a sequencer to propose
+    #[clap(long, env)]
+    pub collateral_amount: u128,
+    /// Address of the existing L1 `RiscZeroVerifier` contract to use
+    #[clap(long, env)]
+    pub verifier_contract: Option<String>,
     /// The timeout after which a counter-proposal can not be made
     #[clap(long, env)]
-    pub challenge_period: u64,
+    pub challenge_timeout: u64,
 
     /// Secret key of L1 wallet to use for deploying contracts
     #[clap(long, env)]
@@ -75,32 +75,29 @@ pub struct DeployArgs {
     /// Secret key of L1 guardian wallet
     #[clap(long, env)]
     pub guardian_key: String,
+
+    /// Whether to set Kailua as the OptimismPortal's respected game type
+    #[clap(long, env)]
+    pub respect_kailua_proposals: bool,
 }
 
-pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
+pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     let op_node_provider =
-        OpNodeProvider(ProviderBuilder::new().on_http(args.op_node_address.as_str().try_into()?));
+        OpNodeProvider(ProviderBuilder::new().on_http(args.op_node_url.as_str().try_into()?));
+    let eth_rpc_provider = ProviderBuilder::new().on_http(args.eth_rpc_url.as_str().try_into()?);
 
-    // initialize guardian wallet
-    info!("Initializing guardian wallet.");
-    let guardian_signer = LocalSigner::from_str(&args.guardian_key)?;
-    let guardian_address = guardian_signer.address();
-    let guardian_wallet = EthereumWallet::from(guardian_signer);
-    let guardian_provider = ProviderBuilder::new()
-        .with_recommended_fillers()
-        .wallet(&guardian_wallet)
-        .on_http(args.l1_node_address.as_str().try_into()?);
-    let optimism_portal = OptimismPortal::new(
-        Address::from_str(&args.portal_contract)?,
-        &guardian_provider,
-    );
-    let portal_guardian_address = optimism_portal.guardian().stall().await._0;
-    if portal_guardian_address != guardian_address {
-        error!(
-            "OptimismPortal Guardian is {portal_guardian_address}. Provided private key has account address {guardian_address}."
-        );
-        exit(3);
-    }
+    info!("Fetching rollup configuration from rpc endpoints.");
+    // fetch rollup config
+    let config = fetch_rollup_config(&args.op_node_url, &args.op_geth_url, None)
+        .await
+        .context("fetch_rollup_config")?;
+    let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
+    info!("RollupConfigHash({})", hex::encode(rollup_config_hash));
+
+    // load system config
+    let system_config = SystemConfig::new(config.l1_system_config_address, &eth_rpc_provider);
+    let portal_address = system_config.optimismPortal().stall().await.addr_;
+    let dgf_address = system_config.disputeGameFactory().stall().await.addr_;
 
     // initialize owner wallet
     info!("Initializing owner wallet.");
@@ -109,23 +106,14 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     let owner_provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .wallet(&owner_wallet)
-        .on_http(args.l1_node_address.as_str().try_into()?);
+        .on_http(args.eth_rpc_url.as_str().try_into()?);
 
-    // Init registry and factory contracts
-    let anchor_state_registry =
-        IAnchorStateRegistry::new(Address::from_str(&args.registry_contract)?, &owner_provider);
-    info!("AnchorStateRegistry({:?})", anchor_state_registry.address());
-    let dispute_game_factory = IDisputeGameFactory::new(
-        anchor_state_registry.disputeGameFactory().stall().await._0,
-        &owner_provider,
-    );
+    // Init factory contract
+    let dispute_game_factory = IDisputeGameFactory::new(dgf_address, &owner_provider);
     info!("DisputeGameFactory({:?})", dispute_game_factory.address());
     let game_count = dispute_game_factory.gameCount().stall().await.gameCount_;
     info!("There have been {game_count} games created using DisputeGameFactory");
-    let dispute_game_factory_ownable = OwnableUpgradeable::new(
-        anchor_state_registry.disputeGameFactory().stall().await._0,
-        &owner_provider,
-    );
+    let dispute_game_factory_ownable = OwnableUpgradeable::new(dgf_address, &owner_provider);
     let factory_owner_address = dispute_game_factory_ownable.owner().stall().await._0;
     let factory_owner_safe = Safe::new(factory_owner_address, &owner_provider);
     info!("Safe({:?})", factory_owner_safe.address());
@@ -147,15 +135,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     let deployer_provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .wallet(&deployer_wallet)
-        .on_http(args.l1_node_address.as_str().try_into()?);
-
-    info!("Fetching rollup configuration from L2 nodes.");
-    // fetch rollup config
-    let config = fetch_rollup_config(&args.op_node_address, &args.l2_node_address, None)
-        .await
-        .context("fetch_rollup_config")?;
-    let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
-    info!("RollupConfigHash({})", hex::encode(rollup_config_hash));
+        .on_http(args.eth_rpc_url.as_str().try_into()?);
 
     // Deploy or reuse existing RISCZeroVerifier contracts
     let verifier_contract_address = match &args.verifier_contract {
@@ -167,15 +147,14 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
 
     // Deploy KailuaTreasury contract
     info!("Deploying KailuaTreasury contract to L1 rpc.");
-    let fault_dispute_game_type = 254;
     let kailua_treasury_implementation = KailuaTreasury::deploy(
         &deployer_provider,
         verifier_contract_address,
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
         rollup_config_hash.into(),
-        Uint::from(args.blocks_per_proposal),
+        Uint::from(args.proposal_block_span),
         KAILUA_GAME_TYPE,
-        Address::from_str(&args.registry_contract)?,
+        dgf_address,
     )
     .await
     .context("KailuaTreasury implementation contract deployment error")?;
@@ -198,7 +177,7 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
             .bond_,
         U256::ZERO
     );
-    info!("Setting KailuaTreasury particpation bond value to 1 wei.");
+    info!("Setting KailuaTreasury participation bond value to 1 wei.");
     let bond_value = U256::from(1);
     crate::exec_safe_txn(
         kailua_treasury_implementation.setParticipationBond(bond_value),
@@ -234,17 +213,14 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         *kailua_treasury_implementation.address()
     );
 
-    // Create new treasury instance
-    let fault_dispute_anchor = anchor_state_registry
-        .anchors(fault_dispute_game_type)
-        .stall()
-        .await;
-    let root_claim_number: u64 = fault_dispute_anchor._1.to();
-    let root_claim = op_node_provider.output_at_block(root_claim_number).await?;
-    let extra_data = Bytes::from(root_claim_number.abi_encode_packed());
+    // Create new treasury instance from target block number
+    let root_claim = op_node_provider
+        .output_at_block(args.starting_block_number)
+        .await?;
+    let extra_data = Bytes::from(args.starting_block_number.abi_encode_packed());
     info!(
         "Creating new KailuaTreasury game instance from {} ({}).",
-        fault_dispute_anchor._1, root_claim
+        args.starting_block_number, root_claim
     );
     dispute_game_factory
         .create(KAILUA_GAME_TYPE, root_claim, extra_data.clone())
@@ -285,13 +261,13 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
         verifier_contract_address,
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
         rollup_config_hash.into(),
-        Uint::from(args.blocks_per_proposal),
+        Uint::from(args.proposal_block_span),
         KAILUA_GAME_TYPE,
-        Address::from_str(&args.registry_contract)?,
+        dgf_address,
         U256::from(config.genesis.l2_time),
         U256::from(config.block_time),
         U256::from(args.proposal_time_gap),
-        args.challenge_period,
+        args.challenge_timeout,
     )
     .await
     .context("KailuaGame contract deployment error")?;
@@ -306,15 +282,34 @@ pub async fn deploy(args: DeployArgs) -> anyhow::Result<()> {
     )
     .await
     .context("setImplementation KailuaGame")?;
+
     // Update the respectedGameType as the guardian
-    info!("Setting respectedGameType in OptimismPortal.");
-    optimism_portal
-        .setRespectedGameType(KAILUA_GAME_TYPE)
-        .send()
-        .await
-        .context("setImplementation KailuaGame")?
-        .get_receipt()
-        .await?;
+    if args.respect_kailua_proposals {
+        // initialize guardian wallet
+        info!("Initializing guardian wallet.");
+        let guardian_signer = LocalSigner::from_str(&args.guardian_key)?;
+        let guardian_address = guardian_signer.address();
+        let guardian_wallet = EthereumWallet::from(guardian_signer);
+        let guardian_provider = ProviderBuilder::new()
+            .with_recommended_fillers()
+            .wallet(&guardian_wallet)
+            .on_http(args.eth_rpc_url.as_str().try_into()?);
+        let optimism_portal = OptimismPortal2::new(portal_address, &guardian_provider);
+        let portal_guardian_address = optimism_portal.guardian().stall().await._0;
+        if portal_guardian_address != guardian_address {
+            bail!("OptimismPortal2 Guardian is {portal_guardian_address}. Provided private key has account address {guardian_address}.");
+        }
+
+        info!("Setting respectedGameType in OptimismPortal2.");
+        optimism_portal
+            .setRespectedGameType(KAILUA_GAME_TYPE)
+            .send()
+            .await
+            .context("setImplementation KailuaGame")?
+            .get_receipt()
+            .await?;
+    }
+
     info!("Kailua upgrade complete.");
     Ok(())
 }

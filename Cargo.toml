@@ -83,10 +83,10 @@ risc0-zkvm = { version = "1.2.0", features = ["heap-embedded-alloc", "unstable"]
 risc0-zkvm-platform = { version = "1.2.0", features = ["heap-embedded-alloc"] }
 
 # RISC Zero Zeth
-zeth-core = { git = "https://github.com/risc0/zeth", branch = "rkhalil/reth" }
-zeth-core-optimism = { git = "https://github.com/risc0/zeth", branch = "rkhalil/reth" }
-zeth-preflight = { git = "https://github.com/risc0/zeth", branch = "rkhalil/reth" }
-zeth-preflight-optimism = { git = "https://github.com/risc0/zeth", branch = "rkhalil/reth" }
+zeth-core = { git = "https://github.com/risc0/zeth", rev = "cecf5ec" }
+zeth-core-optimism = { git = "https://github.com/risc0/zeth", rev = "cecf5ec" }
+zeth-preflight = { git = "https://github.com/risc0/zeth", rev = "cecf5ec" }
+zeth-preflight-optimism = { git = "https://github.com/risc0/zeth", rev = "cecf5ec" }
 
 [profile.dev]
 opt-level = 3

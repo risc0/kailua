@@ -17,7 +17,7 @@ use alloy::network::Network;
 use alloy::primitives::{Address, U256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
-use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
+use kailua_contracts::{KailuaTreasury::KailuaTreasuryInstance, *};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
@@ -49,7 +49,7 @@ impl Treasury {
         &self,
         provider: P,
     ) -> KailuaTreasuryInstance<T, P, N> {
-        KailuaTreasuryInstance::new(self.address, provider)
+        KailuaTreasury::new(self.address, provider)
     }
 
     pub async fn fetch_bond<T: Transport + Clone, P: Provider<T, N>, N: Network>(

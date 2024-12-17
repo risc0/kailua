@@ -22,7 +22,7 @@ use alloy::eips::eip4844::IndexedBlobHash;
 use alloy::eips::BlockNumberOrTag;
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::network::EthereumWallet;
-use alloy::primitives::{Address, Bytes, FixedBytes, U256};
+use alloy::primitives::{Bytes, FixedBytes, U256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy::signers::local::LocalSigner;
 use anyhow::{anyhow, bail, Context};
@@ -31,9 +31,10 @@ use kailua_client::proof::{fpvm_proof_file_name, Proof};
 use kailua_client::BoundlessArgs;
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::blobs::BlobFetchRequest;
+use kailua_common::client::config_hash;
 use kailua_common::journal::ProofJournal;
 use kailua_common::precondition::{precondition_hash, PreconditionValidationData};
-use kailua_contracts::{IAnchorStateRegistry, IDisputeGameFactory, KailuaGame};
+use kailua_contracts::*;
 use kailua_host::fetch_rollup_config;
 use op_alloy_protocol::BlockInfo;
 use risc0_zkvm::is_dev_mode;
@@ -52,10 +53,6 @@ use tracing::{debug, error, info, warn};
 pub struct ValidateArgs {
     #[clap(flatten)]
     pub core: CoreArgs,
-
-    /// Address of L2 JSON-RPC endpoint to use (eth and debug namespace required).
-    #[clap(long, env)]
-    pub l2_node_address: String,
 
     /// Path to the kailua host binary to use for proving
     #[clap(long, env)]
@@ -114,14 +111,25 @@ pub async fn handle_proposals(
 ) -> anyhow::Result<()> {
     // initialize blockchain connections
     info!("Initializing rpc connections.");
-    let op_node_provider = OpNodeProvider(
-        ProviderBuilder::new().on_http(args.core.op_node_address.as_str().try_into()?),
-    );
-    let l1_node_provider =
-        ProviderBuilder::new().on_http(args.core.l1_node_address.as_str().try_into()?);
-    let l2_node_provider =
-        ProviderBuilder::new().on_http(args.l2_node_address.as_str().try_into()?);
-    let cl_node_provider = BlobProvider::new(args.core.l1_beacon_address.as_str()).await?;
+    let op_node_provider =
+        OpNodeProvider(ProviderBuilder::new().on_http(args.core.op_node_url.as_str().try_into()?));
+    let eth_rpc_provider =
+        ProviderBuilder::new().on_http(args.core.eth_rpc_url.as_str().try_into()?);
+    let op_geth_provider =
+        ProviderBuilder::new().on_http(args.core.op_geth_url.as_str().try_into()?);
+    let cl_node_provider = BlobProvider::new(args.core.beacon_rpc_url.as_str()).await?;
+
+    info!("Fetching rollup configuration from rpc endpoints.");
+    // fetch rollup config
+    let config = fetch_rollup_config(&args.core.op_node_url, &args.core.op_geth_url, None)
+        .await
+        .context("fetch_rollup_config")?;
+    let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
+    info!("RollupConfigHash({})", hex::encode(rollup_config_hash));
+
+    // load system config
+    let system_config = SystemConfig::new(config.l1_system_config_address, &eth_rpc_provider);
+    let dgf_address = system_config.disputeGameFactory().stall().await.addr_;
 
     // initialize validator wallet
     info!("Initializing validator wallet.");
@@ -131,19 +139,11 @@ pub async fn handle_proposals(
     let validator_provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .wallet(validator_wallet)
-        .on_http(args.core.l1_node_address.as_str().try_into()?);
+        .on_http(args.core.eth_rpc_url.as_str().try_into()?);
     info!("Validator address: {validator_address}");
 
-    // Init registry and factory contracts
-    let anchor_state_registry = IAnchorStateRegistry::new(
-        Address::from_str(&args.core.registry_contract)?,
-        &validator_provider,
-    );
-    info!("AnchorStateRegistry({:?})", anchor_state_registry.address());
-    let dispute_game_factory = IDisputeGameFactory::new(
-        anchor_state_registry.disputeGameFactory().stall().await._0,
-        &validator_provider,
-    );
+    // Init factory contract
+    let dispute_game_factory = IDisputeGameFactory::new(dgf_address, &validator_provider);
     info!("DisputeGameFactory({:?})", dispute_game_factory.address());
     let game_count: u64 = dispute_game_factory
         .gameCount()
@@ -167,7 +167,7 @@ pub async fn handle_proposals(
     }
     // Initialize empty DB
     info!("Initializing..");
-    let mut kailua_db = KailuaDB::init(data_dir, &anchor_state_registry).await?;
+    let mut kailua_db = KailuaDB::init(data_dir, &dispute_game_factory).await?;
     info!("KailuaTreasury({:?})", kailua_db.treasury.address);
     // Run the validator loop
     info!(
@@ -179,7 +179,7 @@ pub async fn handle_proposals(
         sleep(Duration::from_secs(1)).await;
         // fetch latest games
         let loaded_proposals = kailua_db
-            .load_proposals(&anchor_state_registry, &op_node_provider, &cl_node_provider)
+            .load_proposals(&dispute_game_factory, &op_node_provider, &cl_node_provider)
             .await
             .context("load_proposals")?;
 
@@ -235,8 +235,8 @@ pub async fn handle_proposals(
                     &mut channel,
                     &contender,
                     &proposal,
-                    &l1_node_provider,
-                    &l2_node_provider,
+                    &eth_rpc_provider,
+                    &op_geth_provider,
                     &op_node_provider,
                 )
                 .await?;
@@ -774,7 +774,7 @@ pub async fn handle_proofs(
     data_dir: PathBuf,
 ) -> anyhow::Result<()> {
     // Fetch rollup configuration
-    let l2_chain_id = fetch_rollup_config(&args.core.op_node_address, &args.l2_node_address, None)
+    let l2_chain_id = fetch_rollup_config(&args.core.op_node_url, &args.core.op_geth_url, None)
         .await?
         .l2_chain_id
         .to_string();
@@ -834,13 +834,13 @@ pub async fn handle_proofs(
             String::from("--l2-chain-id"), // rollup chain id
             l2_chain_id.clone(),
             String::from("--l1-node-address"), // l1 el node
-            args.core.l1_node_address.clone(),
+            args.core.eth_rpc_url.clone(),
             String::from("--l1-beacon-address"), // l1 cl node
-            args.core.l1_beacon_address.clone(),
+            args.core.beacon_rpc_url.clone(),
             String::from("--l2-node-address"), // l2 el node
-            args.l2_node_address.clone(),
+            args.core.op_geth_url.clone(),
             String::from("--op-node-address"), // l2 cl node
-            args.core.op_node_address.clone(),
+            args.core.op_node_url.clone(),
             String::from("--data-dir"), // path to cache
             data_dir.to_str().unwrap().to_string(),
             String::from("--native"), // run the client natively

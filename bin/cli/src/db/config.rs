@@ -17,7 +17,6 @@ use alloy::network::Network;
 use alloy::primitives::{Address, B256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
-use kailua_contracts::IAnchorStateRegistry::IAnchorStateRegistryInstance;
 use kailua_contracts::KailuaGame::KailuaGameInstance;
 
 #[derive(Clone, Debug, Default)]
@@ -30,7 +29,6 @@ pub struct Config {
     pub proposal_block_count: u64,
     pub proposal_blobs: u64,
     pub game_type: u8,
-    pub registry: Address,
     pub factory: Address,
     pub timeout: u64,
     pub genesis_time: u64,
@@ -76,17 +74,11 @@ impl Config {
             .stall()
             .await
             .gameType_ as u8;
-        let registry = kailua_game_implementation
-            .anchorStateRegistry()
+        let factory = kailua_game_implementation
+            .disputeGameFactory()
             .stall()
             .await
-            .registry_;
-        let factory =
-            IAnchorStateRegistryInstance::new(registry, kailua_game_implementation.provider())
-                .disputeGameFactory()
-                .stall()
-                .await
-                ._0;
+            .factory_;
         let timeout = kailua_game_implementation
             .maxClockDuration()
             .stall()
@@ -119,7 +111,6 @@ impl Config {
             proposal_block_count,
             proposal_blobs,
             game_type,
-            registry,
             factory,
             timeout,
             genesis_time,

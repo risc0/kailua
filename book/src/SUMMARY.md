@@ -7,13 +7,13 @@
 - [Project](./project.md)
 
 # Migration Guide
-- [Deployment]()
+- [Setup](./setup.md)
+- [On-chain](./upgrade.md)
   - [Proof Verification]()
   - [Dispute Resolution]()
-- [Integration]()
   - [State Anchoring]()
-  - [Game Factory]()
-- [Operation]()
+  - [Sequencing Proposal]()
+- [Off-chain]()
   - [Proposer]()
   - [Validator]()
     - [Proving]()

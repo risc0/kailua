@@ -6567,7 +6567,7 @@ dependencies = [
 [[package]]
 name = "reth-ethereum-consensus"
 version = "1.1.0"
-source = "git+https://github.com/risc0/reth?branch=p1.1.0_zstd#3bbb3f13af096e4d63c10bc975bfe47df62a56a1"
+source = "git+https://github.com/risc0/reth?branch=p1.1.0_zstd#760183fd601f61a3f4a1713cec27d89ace215f04"
 dependencies = [
  "alloy-primitives",
  "reth-chainspec",
@@ -6619,7 +6619,7 @@ dependencies = [
 [[package]]
 name = "reth-evm-ethereum"
 version = "1.1.0"
-source = "git+https://github.com/risc0/reth?branch=p1.1.0_zstd#3bbb3f13af096e4d63c10bc975bfe47df62a56a1"
+source = "git+https://github.com/risc0/reth?branch=p1.1.0_zstd#760183fd601f61a3f4a1713cec27d89ace215f04"
 dependencies = [
  "alloy-eips 0.4.2",
  "alloy-primitives",
@@ -9549,7 +9549,7 @@ dependencies = [
 [[package]]
 name = "zeth-core"
 version = "0.1.0"
-source = "git+https://github.com/risc0/zeth?branch=rkhalil%2Freth#08362984c43287ed762da35f2b7b121ca3bdaea3"
+source = "git+https://github.com/risc0/zeth?rev=cecf5ec#cecf5ec8982ba111b22a27ef80ddf9a1005288d3"
 dependencies = [
  "alloy-consensus 0.4.2",
  "alloy-primitives",
@@ -9573,7 +9573,7 @@ dependencies = [
 [[package]]
 name = "zeth-core-optimism"
 version = "0.1.0"
-source = "git+https://github.com/risc0/zeth?branch=rkhalil%2Freth#08362984c43287ed762da35f2b7b121ca3bdaea3"
+source = "git+https://github.com/risc0/zeth?rev=cecf5ec#cecf5ec8982ba111b22a27ef80ddf9a1005288d3"
 dependencies = [
  "anyhow",
  "reth-chainspec",
@@ -9592,7 +9592,7 @@ dependencies = [
 [[package]]
 name = "zeth-preflight"
 version = "0.1.0"
-source = "git+https://github.com/risc0/zeth?branch=rkhalil%2Freth#08362984c43287ed762da35f2b7b121ca3bdaea3"
+source = "git+https://github.com/risc0/zeth?rev=cecf5ec#cecf5ec8982ba111b22a27ef80ddf9a1005288d3"
 dependencies = [
  "alloy 0.4.2",
  "anyhow",
@@ -9617,7 +9617,7 @@ dependencies = [
 [[package]]
 name = "zeth-preflight-optimism"
 version = "0.1.0"
-source = "git+https://github.com/risc0/zeth?branch=rkhalil%2Freth#08362984c43287ed762da35f2b7b121ca3bdaea3"
+source = "git+https://github.com/risc0/zeth?rev=cecf5ec#cecf5ec8982ba111b22a27ef80ddf9a1005288d3"
 dependencies = [
  "alloy 0.4.2",
  "op-alloy-consensus 0.4.0",

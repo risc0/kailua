@@ -27,11 +27,10 @@ use alloy::providers::Provider;
 use alloy::transports::Transport;
 use anyhow::{bail, Context};
 use config::Config;
-use kailua_contracts::IAnchorStateRegistry::IAnchorStateRegistryInstance;
-use kailua_contracts::IDisputeGameFactory::{gameAtIndexReturn, IDisputeGameFactoryInstance};
-use kailua_contracts::KailuaGame::KailuaGameInstance;
-use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
-use kailua_contracts::KailuaTreasury::KailuaTreasuryInstance;
+use kailua_contracts::{
+    IDisputeGameFactory::{gameAtIndexReturn, IDisputeGameFactoryInstance},
+    *,
+};
 use proposal::Proposal;
 use state::State;
 use std::collections::hash_map::Entry;
@@ -71,23 +70,19 @@ impl KailuaDB {
 
     pub async fn init<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         mut data_dir: PathBuf,
-        anchor_state_registry: &IAnchorStateRegistryInstance<T, P, N>,
+        dispute_game_factory: &IDisputeGameFactoryInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
-        let dispute_game_factory = IDisputeGameFactoryInstance::new(
-            anchor_state_registry.disputeGameFactory().stall().await._0,
-            anchor_state_registry.provider(),
-        );
-        let game_implementation = KailuaGameInstance::new(
+        let game_implementation = KailuaGame::new(
             dispute_game_factory
                 .gameImpls(KAILUA_GAME_TYPE)
                 .stall()
                 .await
                 .impl_,
-            anchor_state_registry.provider(),
+            dispute_game_factory.provider(),
         );
         let config = Config::load(&game_implementation).await?;
         let treasury_implementation =
-            KailuaTreasuryInstance::new(config.treasury, anchor_state_registry.provider());
+            KailuaTreasury::new(config.treasury, dispute_game_factory.provider());
         let treasury = Treasury::init(&treasury_implementation).await?;
 
         data_dir.push(config.cfg_hash.to_string());
@@ -102,14 +97,10 @@ impl KailuaDB {
 
     pub async fn load_proposals<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         &mut self,
-        anchor_state_registry: &IAnchorStateRegistryInstance<T, P, N>,
+        dispute_game_factory: &IDisputeGameFactoryInstance<T, P, N>,
         op_node_provider: &OpNodeProvider,
         blob_provider: &BlobProvider,
     ) -> anyhow::Result<Vec<u64>> {
-        let dispute_game_factory = IDisputeGameFactoryInstance::new(
-            anchor_state_registry.disputeGameFactory().stall().await._0,
-            anchor_state_registry.provider(),
-        );
         let canonical_start = self.state.canonical_tip_index;
         let game_count: u64 = dispute_game_factory
             .gameCount()
@@ -125,7 +116,7 @@ impl KailuaDB {
                 None => {
                     match self
                         .load_game_at_index(
-                            anchor_state_registry,
+                            dispute_game_factory,
                             op_node_provider,
                             blob_provider,
                             self.state.next_factory_index,
@@ -183,15 +174,11 @@ impl KailuaDB {
 
     pub async fn load_game_at_index<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         &mut self,
-        anchor_state_registry: &IAnchorStateRegistryInstance<T, P, N>,
+        dispute_game_factory: &IDisputeGameFactoryInstance<T, P, N>,
         op_node_provider: &OpNodeProvider,
         blob_provider: &BlobProvider,
         index: u64,
     ) -> anyhow::Result<bool> {
-        let dispute_game_factory = IDisputeGameFactoryInstance::new(
-            anchor_state_registry.disputeGameFactory().stall().await._0,
-            anchor_state_registry.provider(),
-        );
         // process game
         let gameAtIndexReturn {
             gameType_: game_type,
@@ -208,7 +195,7 @@ impl KailuaDB {
         }
         info!("Processing tournament {index} at {game_address}");
         let tournament_instance =
-            KailuaTournamentInstance::new(game_address, anchor_state_registry.provider());
+            KailuaTournament::new(game_address, dispute_game_factory.provider());
         let mut proposal =
             Proposal::load(&self.config, blob_provider, &tournament_instance).await?;
 
