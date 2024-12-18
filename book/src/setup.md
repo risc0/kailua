@@ -47,7 +47,7 @@ to double-check verifier availability.
 
 ```admonish warning
 Make sure that your `FPVM_IMAGE_ID` matches the value above.
-This value determines the exact fault proof program used to prove faults.
+This value determines the exact program used to prove faults.
 ```
 
 Once you have these values you'll need to save them for later use during contract deployment.
