@@ -18,6 +18,7 @@ use kailua_build::KAILUA_FPVM_ID;
 use kailua_common::client::config_hash;
 use kailua_host::fetch_rollup_config;
 use risc0_zkvm::sha::Digest;
+use crate::{BN254_CONTROL_ID, CONTROL_ROOT, SET_BUILDER_ID};
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct ConfigArgs {
@@ -76,6 +77,20 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
         verifier_address
             .map(|a| hex::encode_upper(a.as_slice()))
             .unwrap_or_default()
+    );
+    // Report expected Boundless verifier parameters
+    println!(
+        "SET_BUILDER_ID: 0x{}",
+        hex::encode_upper(SET_BUILDER_ID.as_slice())
+    );
+    // Report expected Groth16 verifier parameters
+    println!(
+        "CONTROL_ROOT: 0x{}",
+        hex::encode_upper(CONTROL_ROOT.as_slice()),
+    );
+    println!(
+        "CONTROL_ID: 0x{}",
+        hex::encode_upper(BN254_CONTROL_ID.as_slice()),
     );
 
     Ok(())

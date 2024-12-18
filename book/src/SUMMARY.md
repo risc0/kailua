@@ -9,8 +9,8 @@
 # Migration Guide
 - [Setup](./setup.md)
 - [On-chain](./upgrade.md)
-  - [Proof Verification]()
-  - [Dispute Resolution]()
+  - [Proof Verification](./verifier.md)
+  - [Dispute Resolution](./dispute.md)
   - [State Anchoring]()
   - [Sequencing Proposal]()
 - [Off-chain]()

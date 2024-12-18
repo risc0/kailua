@@ -20,7 +20,6 @@ tokio.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
 
-
 alloy = { workspace = true, features = ["full", "kzg"] }
 alloy-rpc-types-beacon.workspace = true
 op-alloy-protocol.workspace = true

@@ -26,10 +26,9 @@ use kailua_build::KAILUA_FPVM_ID;
 use kailua_common::client::config_hash;
 use kailua_contracts::*;
 use kailua_host::fetch_rollup_config;
-use risc0_zkvm::is_dev_mode;
 use std::process::exit;
 use std::str::FromStr;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct FastTrackArgs {
@@ -73,8 +72,8 @@ pub struct FastTrackArgs {
     #[clap(long, env)]
     pub owner_key: String,
     /// Secret key of L1 guardian wallet
-    #[clap(long, env)]
-    pub guardian_key: String,
+    #[clap(long, env, required_if_eq("respect_kailua_proposals", "true"))]
+    pub guardian_key: Option<String>,
 
     /// Whether to set Kailua as the OptimismPortal's respected game type
     #[clap(long, env)]
@@ -287,7 +286,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     if args.respect_kailua_proposals {
         // initialize guardian wallet
         info!("Initializing guardian wallet.");
-        let guardian_signer = LocalSigner::from_str(&args.guardian_key)?;
+        let guardian_signer = LocalSigner::from_str(&args.guardian_key.unwrap())?;
         let guardian_address = guardian_signer.address();
         let guardian_wallet = EthereumWallet::from(guardian_signer);
         let guardian_provider = ProviderBuilder::new()
@@ -373,15 +372,16 @@ pub async fn deploy_verifier<
         .context("addVerifier RiscZeroSetVerifier (get_receipt)")?;
 
     // Deploy mock verifier
-    if is_dev_mode() {
+    #[cfg(feature = "devnet")]
+    if risc0_zkvm::is_dev_mode() {
         // Deploy MockVerifier contract
-        warn!("Deploying RiscZeroMockVerifier contract to L1. This will accept fake proofs which are not cryptographically secure!");
+        tracing::warn!("Deploying RiscZeroMockVerifier contract to L1. This will accept fake proofs which are not cryptographically secure!");
         let mock_verifier_contract =
             RiscZeroMockVerifier::deploy(&deployer_provider, [0u8; 4].into())
                 .await
                 .context("RiscZeroMockVerifier contract deployment error")?;
-        warn!("{:?}", &mock_verifier_contract);
-        warn!("Adding RiscZeroMockVerifier contract to RiscZeroVerifierRouter.");
+        tracing::warn!("{:?}", &mock_verifier_contract);
+        tracing::warn!("Adding RiscZeroMockVerifier contract to RiscZeroVerifierRouter.");
         verifier_contract
             .addVerifier([0u8; 4].into(), *mock_verifier_contract.address())
             .send()

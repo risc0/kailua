@@ -4,9 +4,8 @@ In order to utilize Kailua, you'll need to deploy the Kailua dispute contracts, 
 This process will require access to your rollup's 'Owner' and 'Guardian' wallets.
 
 ```admonish tip
-The Kailua CLI has a `deploy` command for automating the L1 transactions required to migrate to Kailua.
-If your 'Owner' and 'Guardian' wallets are each controlled by one private key,
-the `deploy` command can fast-track your on-chain migration.
+The Kailua CLI has a `fast-track` command for automating the L1 transactions required to migrate to Kailua.
+If the command does not yet support your configuration, you'll need to follow the manual steps in the next sub-sections.
 ```
 
 ## Fast-track Migration
@@ -20,7 +19,13 @@ As the tool is improved to accommodate more setups, these requirements will be r
 
 1. The "Owner" account must be a "Safe" contract instance controlled by a single private-key controlled wallet (EOA).
 2. The "Guardian" account must be a private-key controlled wallet (EOA).
-3. You must have access to the raw private keys above.
+3. You must have access to the raw private key(s) above.
+
+```admonish tip
+You can skip the guardian key/account requirements if you do not wish to enable withdrawals against sequencing proposals
+made by Kailua as part of the fast-track process via the `respect-kailua-proposals` flag.
+You can enable withdrawals manually later using the `OptimismPortal2` contract.
+```
 
 ### Usage
 
@@ -46,6 +51,7 @@ kailua-cli fast-track \
 \
       --respect-kailua-proposals
 ```
+All the parameters above are configurable as described below:
 
 #### Endpoints
 The first three parameters to this command are the L1 and L2 RPC endpoints:
@@ -68,7 +74,7 @@ The next three parameters configure fault proving:
 * `collateral-amount`: The amount of collateral (in wei) a sequencer has to stake before publishing proposals.
 * `verifier-contract`: (Optional) The address of the existing RISC Zero verifier contract to use. If this argument is omitted, a new set of verifier contracts will be deployed.
   * If you wish to use an already existing verifier, you must provide this argument, even if the `config` command had located a verifier.
-  * If you are deploying a new verifier contract and wish to support fake proofs generated in dev mode (insecure), make sure to set `RISC0_DEV_MODE=1` in your environment before invoking the `deploy` command.
+  * If you are deploying a new verifier contract and wish to support fake proofs generated in dev mode (insecure), make sure to set `RISC0_DEV_MODE=1` in your environment before invoking the `fast-track` command.
 * `challenge-timeout`: The timeout (in seconds) for a sequencing proposal to be contradicted.
 
 #### Ethereum Transactions
@@ -78,14 +84,14 @@ The next three parameters are the private keys for the respective parent chain w
 * `guardian-key`: Private key for the EOA used as the "Guardian" of the optimism portal.
 
 #### Withdrawals
-The final argument configures withdrawals in your rollup:
-* `respect-kailua-proposals`: (if present) will allow withdrawals using sequencing proposals finalized by Kailua.
-
-```admonish tip
-Skip this flag if you only wish to test Kailua out with no effect on your users.
-```
-
 ```admonish bug
 Changing the respected game type to Kailua may crash the `op-proposer` provided by optimism.
 This should be inconsequential because you'll need to run the Kailua proposer for further sequencing to take place anyway.
+```
+
+The final argument configures withdrawals in your rollup:
+* `respect-kailua-proposals`: (if present) will allow withdrawals using sequencing proposals finalized by Kailua.
+
+```admonish done
+If you've successfully completed fast-track migration using the tool, you may now skip to the "Off-chain" page.
 ```
