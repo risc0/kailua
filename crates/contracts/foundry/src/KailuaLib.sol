@@ -163,7 +163,7 @@ library KailuaLib {
         hash = ((sha256(blobCommitment) << 8) >> 8) | KZG_COMMITMENT_VERSION;
     }
 
-    function hashToFe(bytes32 hash) internal returns (bytes32 fe) {
+    function hashToFe(bytes32 hash) internal pure returns (bytes32 fe) {
         fe = ((hash << 2) >> 2);
     }
 

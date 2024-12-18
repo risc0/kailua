@@ -110,10 +110,9 @@ pub async fn exec_safe_txn<
     from: Address,
 ) -> anyhow::Result<()> {
     let req = txn.into_transaction_request();
-    let value = req.value().unwrap_or_default();
     safe.execTransaction(
         req.to().unwrap(),
-        value,
+        req.value().unwrap_or_default(),
         req.input().cloned().unwrap_or_default(),
         0,
         Uint::from(req.gas_limit().unwrap_or_default()),

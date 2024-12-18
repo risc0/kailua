@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::stall::Stall;
+use crate::{BN254_CONTROL_ID, CONTROL_ROOT, KAILUA_GAME_TYPE, SET_BUILDER_ID};
 use alloy::primitives::address;
+use alloy::providers::ProviderBuilder;
 use anyhow::Context;
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_common::client::config_hash;
+use kailua_contracts::SystemConfig;
 use kailua_host::fetch_rollup_config;
 use risc0_zkvm::sha::Digest;
-use crate::{BN254_CONTROL_ID, CONTROL_ROOT, SET_BUILDER_ID};
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct ConfigArgs {
@@ -31,18 +34,37 @@ pub struct ConfigArgs {
     /// URL of OP-GETH endpoint to use (eth and debug namespace required).
     #[clap(long, env)]
     pub op_geth_url: String,
+    /// Address of the ethereum rpc endpoint to use (eth namespace required)
+    #[clap(long, env)]
+    pub eth_rpc_url: String,
 }
 
 pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
-    // report rollup config hash
     let config = fetch_rollup_config(&args.op_node_url, &args.op_geth_url, None)
         .await
         .context("fetch_rollup_config")?;
+    let eth_rpc_provider = ProviderBuilder::new().on_http(args.eth_rpc_url.as_str().try_into()?);
+    // load system config
+    let system_config = SystemConfig::new(config.l1_system_config_address, &eth_rpc_provider);
+    let dgf_address = system_config.disputeGameFactory().stall().await.addr_;
+
+    // report genesis time
+    println!("GENESIS_TIMESTAMP: {}", config.genesis.l2_time);
+    // report inter-block time
+    println!("BLOCK_TIME: {}", config.block_time);
+    // report rollup config hash
     let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
     println!(
         "ROLLUP_CONFIG_HASH: 0x{}",
         hex::encode_upper(rollup_config_hash)
     );
+    // report factory address
+    println!(
+        "DISPUTE_GAME_FACTORY: 0x{}",
+        hex::encode_upper(dgf_address.as_slice())
+    );
+    // report game type
+    println!("KAILUA_GAME_TYPE: {}", KAILUA_GAME_TYPE);
     // report fpvm image id
     println!(
         "FPVM_IMAGE_ID: 0x{}",

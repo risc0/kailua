@@ -90,16 +90,16 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
 
     /// @inheritdoc KailuaTournament
     function verifyIntermediateOutput(
-        uint64 outputNumber,
-        bytes32 outputHash,
-        bytes calldata blobCommitment,
-        bytes calldata kzgProof
-    ) external override returns (bool success) {
+        uint64,
+        bytes32,
+        bytes calldata,
+        bytes calldata
+    ) external pure override returns (bool success) {
         success = false;
     }
 
     /// @inheritdoc KailuaTournament
-    function getChallengerDuration(uint256 asOfTimestamp) public view override returns (Duration duration_) {
+    function getChallengerDuration(uint256) public pure override returns (Duration duration_) {
         duration_ = Duration.wrap(0);
     }
 
@@ -119,8 +119,8 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     mapping(address => address) public proposerOf;
 
     /// @inheritdoc IKailuaTreasury
-    function eliminate(address child, address prover) external {
-        KailuaTournament child = KailuaTournament(child);
+    function eliminate(address _child, address prover) external {
+        KailuaTournament child = KailuaTournament(_child);
 
         // INVARIANT: Only the child's parent may call this
         KailuaTournament parent = child.parentGame();
@@ -175,7 +175,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     bool public isProposing;
 
     /// @notice Checks the proposer's bonded amount and creates a new proposal through the factory
-    function propose(Claim rootClaim, bytes calldata extraData)
+    function propose(Claim _rootClaim, bytes calldata _extraData)
         external
         payable
         returns (KailuaTournament gameContract)
@@ -195,7 +195,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         // Create proposal
         isProposing = true;
         gameContract = KailuaTournament(
-            address(DISPUTE_GAME_FACTORY.create(GAME_TYPE, rootClaim, extraData))
+            address(DISPUTE_GAME_FACTORY.create(GAME_TYPE, _rootClaim, _extraData))
         );
         isProposing = false;
         // Record proposer

@@ -159,7 +159,7 @@ contract KailuaGame is KailuaTournament {
         // Register this new game in the parent game's contract
         parentGame().appendChild();
 
-        // Do not permit proposals of l2 blocks inside the gap
+        // Do not permit proposals of l2 block is still inside the gap
         if (block.timestamp <= GENESIS_TIME_STAMP + thisL2BlockNumber * L2_BLOCK_TIME + PROPOSAL_TIME_GAP) {
             revert ClockTimeExceeded();
         }

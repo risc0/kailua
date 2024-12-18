@@ -383,8 +383,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     }
 
     function isChildEliminated(KailuaTournament child) internal returns (bool) {
-        address proposer = KAILUA_TREASURY.proposerOf(address(child));
-        uint256 eliminationRound = KAILUA_TREASURY.eliminationRound(proposer);
+        address _proposer = KAILUA_TREASURY.proposerOf(address(child));
+        uint256 eliminationRound = KAILUA_TREASURY.eliminationRound(_proposer);
         if (eliminationRound == 0 || eliminationRound > child.gameIndex()) {
             // This proposer has not been eliminated as of their proposal at gameIndex
             return false;
