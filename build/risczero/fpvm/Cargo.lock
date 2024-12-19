@@ -737,25 +737,16 @@ dependencies = [
 
 [[package]]
 name = "c-kzg"
-version = "1.0.2"
-source = "git+https://github.com/risc0/c-kzg-4844.git?branch=risc0#dbb247496ddee47c509b192d9b70f9c43b60b6cb"
+version = "1.0.3"
+source = "git+https://github.com/risc0/c-kzg-4844.git?branch=p1.0.3#a42f908740c7e7d66b2d8b9846eeab67cf5fb76c"
 dependencies = [
  "blst",
- "c-kzg-risc0-alloc",
  "cc",
  "glob",
  "hex",
  "libc",
+ "once_cell",
  "serde",
-]
-
-[[package]]
-name = "c-kzg-risc0-alloc"
-version = "0.1.0"
-source = "git+https://github.com/risc0/c-kzg-4844.git?branch=risc0#dbb247496ddee47c509b192d9b70f9c43b60b6cb"
-dependencies = [
- "quote",
- "syn 2.0.87",
 ]
 
 [[package]]
@@ -1627,7 +1618,6 @@ dependencies = [
  "c-kzg",
  "kailua-common",
  "kona-proof",
- "pot",
  "risc0-zkvm",
  "rkyv",
 ]
