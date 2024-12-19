@@ -16,7 +16,7 @@ use alloy_eips::eip4844::{kzg_to_versioned_hash, Blob, IndexedBlobHash, BYTES_PE
 use alloy_primitives::B256;
 use alloy_rpc_types_beacon::sidecar::BlobData;
 use async_trait::async_trait;
-use c_kzg::Bytes48;
+use c_kzg::{ethereum_kzg_settings, Bytes48};
 use kona_derive::errors::BlobProviderError;
 use kona_derive::traits::BlobProvider;
 use op_alloy_protocol::BlockInfo;
@@ -87,7 +87,7 @@ impl From<BlobWitnessData> for PreloadedBlobProvider {
             blobs.as_slice(),
             value.commitments.as_slice(),
             value.proofs.as_slice(),
-            crate::kzg::kzg_settings(),
+            ethereum_kzg_settings(),
         )
         .expect("Failed to batch validate kzg proofs");
         let hashes = value

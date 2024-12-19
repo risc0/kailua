@@ -15,7 +15,6 @@
 pub mod blobs;
 pub mod client;
 pub mod journal;
-pub mod kzg;
 pub mod oracle;
 pub mod precondition;
 pub mod witness;

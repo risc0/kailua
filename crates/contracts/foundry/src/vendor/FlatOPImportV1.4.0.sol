@@ -1,3 +1,11 @@
+//import { SuperchainConfig } from "./L1/SuperchainConfig.sol";
+//import { SystemConfig } from "./L1/SystemConfig.sol";
+//import { OptimismPortal2 } from "./L1/OptimismPortal2.sol";
+//import { DisputeGameFactory } from "./dispute/DisputeGameFactory.sol";
+//import { AnchorStateRegistry } from "./dispute/AnchorStateRegistry.sol";
+//import { Safe } from "../lib/safe-contracts/contracts/Safe.sol";
+//import { Clone } from "@solady/utils/Clone.sol";
+
 // The below code is copied as is from various files under https://github.com/ethereum-optimism/optimism/tree/op-contracts/v1.4.0/packages/contracts-bedrock
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
@@ -212,6 +220,267 @@ library Address {
             } else {
                 revert(errorMessage);
             }
+        }
+    }
+}
+
+// lib/openzeppelin-contracts/contracts/utils/math/Math.sol
+
+// OpenZeppelin Contracts (last updated v4.7.0) (utils/math/Math.sol)
+
+/**
+ * @dev Standard math utilities missing in the Solidity language.
+ */
+library Math {
+    enum Rounding {
+        Down, // Toward negative infinity
+        Up, // Toward infinity
+        Zero // Toward zero
+
+    }
+
+    /**
+     * @dev Returns the largest of two numbers.
+     */
+    function max(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a >= b ? a : b;
+    }
+
+    /**
+     * @dev Returns the smallest of two numbers.
+     */
+    function min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a < b ? a : b;
+    }
+
+    /**
+     * @dev Returns the average of two numbers. The result is rounded towards
+     * zero.
+     */
+    function average(uint256 a, uint256 b) internal pure returns (uint256) {
+        // (a + b) / 2 can overflow.
+        return (a & b) + (a ^ b) / 2;
+    }
+
+    /**
+     * @dev Returns the ceiling of the division of two numbers.
+     *
+     * This differs from standard division with `/` in that it rounds up instead
+     * of rounding down.
+     */
+    function ceilDiv(uint256 a, uint256 b) internal pure returns (uint256) {
+        // (a + b - 1) / b can overflow on addition, so we distribute.
+        return a == 0 ? 0 : (a - 1) / b + 1;
+    }
+
+    /**
+     * @notice Calculates floor(x * y / denominator) with full precision. Throws if result overflows a uint256 or denominator == 0
+     * @dev Original credit to Remco Bloemen under MIT license (https://xn--2-umb.com/21/muldiv)
+     * with further edits by Uniswap Labs also under MIT license.
+     */
+    function mulDiv(uint256 x, uint256 y, uint256 denominator) internal pure returns (uint256 result) {
+        unchecked {
+            // 512-bit multiply [prod1 prod0] = x * y. Compute the product mod 2^256 and mod 2^256 - 1, then use
+            // use the Chinese Remainder Theorem to reconstruct the 512 bit result. The result is stored in two 256
+            // variables such that product = prod1 * 2^256 + prod0.
+            uint256 prod0; // Least significant 256 bits of the product
+            uint256 prod1; // Most significant 256 bits of the product
+            assembly {
+                let mm := mulmod(x, y, not(0))
+                prod0 := mul(x, y)
+                prod1 := sub(sub(mm, prod0), lt(mm, prod0))
+            }
+
+            // Handle non-overflow cases, 256 by 256 division.
+            if (prod1 == 0) {
+                return prod0 / denominator;
+            }
+
+            // Make sure the result is less than 2^256. Also prevents denominator == 0.
+            require(denominator > prod1);
+
+            ///////////////////////////////////////////////
+            // 512 by 256 division.
+            ///////////////////////////////////////////////
+
+            // Make division exact by subtracting the remainder from [prod1 prod0].
+            uint256 remainder;
+            assembly {
+                // Compute remainder using mulmod.
+                remainder := mulmod(x, y, denominator)
+
+                // Subtract 256 bit number from 512 bit number.
+                prod1 := sub(prod1, gt(remainder, prod0))
+                prod0 := sub(prod0, remainder)
+            }
+
+            // Factor powers of two out of denominator and compute largest power of two divisor of denominator. Always >= 1.
+            // See https://cs.stackexchange.com/q/138556/92363.
+
+            // Does not overflow because the denominator cannot be zero at this stage in the function.
+            uint256 twos = denominator & (~denominator + 1);
+            assembly {
+                // Divide denominator by twos.
+                denominator := div(denominator, twos)
+
+                // Divide [prod1 prod0] by twos.
+                prod0 := div(prod0, twos)
+
+                // Flip twos such that it is 2^256 / twos. If twos is zero, then it becomes one.
+                twos := add(div(sub(0, twos), twos), 1)
+            }
+
+            // Shift in bits from prod1 into prod0.
+            prod0 |= prod1 * twos;
+
+            // Invert denominator mod 2^256. Now that denominator is an odd number, it has an inverse modulo 2^256 such
+            // that denominator * inv = 1 mod 2^256. Compute the inverse by starting with a seed that is correct for
+            // four bits. That is, denominator * inv = 1 mod 2^4.
+            uint256 inverse = (3 * denominator) ^ 2;
+
+            // Use the Newton-Raphson iteration to improve the precision. Thanks to Hensel's lifting lemma, this also works
+            // in modular arithmetic, doubling the correct bits in each step.
+            inverse *= 2 - denominator * inverse; // inverse mod 2^8
+            inverse *= 2 - denominator * inverse; // inverse mod 2^16
+            inverse *= 2 - denominator * inverse; // inverse mod 2^32
+            inverse *= 2 - denominator * inverse; // inverse mod 2^64
+            inverse *= 2 - denominator * inverse; // inverse mod 2^128
+            inverse *= 2 - denominator * inverse; // inverse mod 2^256
+
+            // Because the division is now exact we can divide by multiplying with the modular inverse of denominator.
+            // This will give us the correct result modulo 2^256. Since the preconditions guarantee that the outcome is
+            // less than 2^256, this is the final result. We don't need to compute the high bits of the result and prod1
+            // is no longer required.
+            result = prod0 * inverse;
+            return result;
+        }
+    }
+
+    /**
+     * @notice Calculates x * y / denominator with full precision, following the selected rounding direction.
+     */
+    function mulDiv(uint256 x, uint256 y, uint256 denominator, Rounding rounding) internal pure returns (uint256) {
+        uint256 result = mulDiv(x, y, denominator);
+        if (rounding == Rounding.Up && mulmod(x, y, denominator) > 0) {
+            result += 1;
+        }
+        return result;
+    }
+
+    /**
+     * @dev Returns the square root of a number. It the number is not a perfect square, the value is rounded down.
+     *
+     * Inspired by Henry S. Warren, Jr.'s "Hacker's Delight" (Chapter 11).
+     */
+    function sqrt(uint256 a) internal pure returns (uint256) {
+        if (a == 0) {
+            return 0;
+        }
+
+        // For our first guess, we get the biggest power of 2 which is smaller than the square root of the target.
+        // We know that the "msb" (most significant bit) of our target number `a` is a power of 2 such that we have
+        // `msb(a) <= a < 2*msb(a)`.
+        // We also know that `k`, the position of the most significant bit, is such that `msb(a) = 2**k`.
+        // This gives `2**k < a <= 2**(k+1)` → `2**(k/2) <= sqrt(a) < 2 ** (k/2+1)`.
+        // Using an algorithm similar to the msb conmputation, we are able to compute `result = 2**(k/2)` which is a
+        // good first aproximation of `sqrt(a)` with at least 1 correct bit.
+        uint256 result = 1;
+        uint256 x = a;
+        if (x >> 128 > 0) {
+            x >>= 128;
+            result <<= 64;
+        }
+        if (x >> 64 > 0) {
+            x >>= 64;
+            result <<= 32;
+        }
+        if (x >> 32 > 0) {
+            x >>= 32;
+            result <<= 16;
+        }
+        if (x >> 16 > 0) {
+            x >>= 16;
+            result <<= 8;
+        }
+        if (x >> 8 > 0) {
+            x >>= 8;
+            result <<= 4;
+        }
+        if (x >> 4 > 0) {
+            x >>= 4;
+            result <<= 2;
+        }
+        if (x >> 2 > 0) {
+            result <<= 1;
+        }
+
+        // At this point `result` is an estimation with one bit of precision. We know the true value is a uint128,
+        // since it is the square root of a uint256. Newton's method converges quadratically (precision doubles at
+        // every iteration). We thus need at most 7 iteration to turn our partial result with one bit of precision
+        // into the expected uint128 result.
+        unchecked {
+            result = (result + a / result) >> 1;
+            result = (result + a / result) >> 1;
+            result = (result + a / result) >> 1;
+            result = (result + a / result) >> 1;
+            result = (result + a / result) >> 1;
+            result = (result + a / result) >> 1;
+            result = (result + a / result) >> 1;
+            return min(result, a / result);
+        }
+    }
+
+    /**
+     * @notice Calculates sqrt(a), following the selected rounding direction.
+     */
+    function sqrt(uint256 a, Rounding rounding) internal pure returns (uint256) {
+        uint256 result = sqrt(a);
+        if (rounding == Rounding.Up && result * result < a) {
+            result += 1;
+        }
+        return result;
+    }
+}
+
+// lib/openzeppelin-contracts/contracts/utils/math/SignedMath.sol
+
+// OpenZeppelin Contracts (last updated v4.5.0) (utils/math/SignedMath.sol)
+
+/**
+ * @dev Standard signed math utilities missing in the Solidity language.
+ */
+library SignedMath {
+    /**
+     * @dev Returns the largest of two signed numbers.
+     */
+    function max(int256 a, int256 b) internal pure returns (int256) {
+        return a >= b ? a : b;
+    }
+
+    /**
+     * @dev Returns the smallest of two signed numbers.
+     */
+    function min(int256 a, int256 b) internal pure returns (int256) {
+        return a < b ? a : b;
+    }
+
+    /**
+     * @dev Returns the average of two signed numbers without overflow.
+     * The result is rounded towards zero.
+     */
+    function average(int256 a, int256 b) internal pure returns (int256) {
+        // Formula from the book "Hacker's Delight"
+        int256 x = (a & b) + ((a ^ b) >> 1);
+        return x + (int256(uint256(x) >> 255) & (a ^ b));
+    }
+
+    /**
+     * @dev Returns the absolute unsigned value of a signed value.
+     */
+    function abs(int256 n) internal pure returns (uint256) {
+        unchecked {
+            // must be unchecked in order to support `n = type(int256).min`
+            return uint256(n >= 0 ? n : -n);
         }
     }
 }
@@ -1063,1072 +1332,6 @@ abstract contract Clone {
     }
 }
 
-// lib/solady/src/utils/FixedPointMathLib.sol
-
-/// @notice Arithmetic library with operations for fixed-point numbers.
-/// @author Solady (https://github.com/vectorized/solady/blob/main/src/utils/FixedPointMathLib.sol)
-/// @author Modified from Solmate (https://github.com/transmissions11/solmate/blob/main/src/utils/FixedPointMathLib.sol)
-library FixedPointMathLib {
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*                       CUSTOM ERRORS                        */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    /// @dev The operation failed, as the output exceeds the maximum value of uint256.
-    error ExpOverflow();
-
-    /// @dev The operation failed, as the output exceeds the maximum value of uint256.
-    error FactorialOverflow();
-
-    /// @dev The operation failed, due to an overflow.
-    error RPowOverflow();
-
-    /// @dev The mantissa is too big to fit.
-    error MantissaOverflow();
-
-    /// @dev The operation failed, due to an multiplication overflow.
-    error MulWadFailed();
-
-    /// @dev The operation failed, due to an multiplication overflow.
-    error SMulWadFailed();
-
-    /// @dev The operation failed, either due to a multiplication overflow, or a division by a zero.
-    error DivWadFailed();
-
-    /// @dev The operation failed, either due to a multiplication overflow, or a division by a zero.
-    error SDivWadFailed();
-
-    /// @dev The operation failed, either due to a multiplication overflow, or a division by a zero.
-    error MulDivFailed();
-
-    /// @dev The division failed, as the denominator is zero.
-    error DivFailed();
-
-    /// @dev The full precision multiply-divide operation failed, either due
-    /// to the result being larger than 256 bits, or a division by a zero.
-    error FullMulDivFailed();
-
-    /// @dev The output is undefined, as the input is less-than-or-equal to zero.
-    error LnWadUndefined();
-
-    /// @dev The input outside the acceptable domain.
-    error OutOfDomain();
-
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*                         CONSTANTS                          */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    /// @dev The scalar of ETH and most ERC20s.
-    uint256 internal constant WAD = 1e18;
-
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*              SIMPLIFIED FIXED POINT OPERATIONS             */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    /// @dev Equivalent to `(x * y) / WAD` rounded down.
-    function mulWad(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            // Equivalent to `require(y == 0 || x <= type(uint256).max / y)`.
-            if mul(y, gt(x, div(not(0), y))) {
-                mstore(0x00, 0xbac65e5b) // `MulWadFailed()`.
-                revert(0x1c, 0x04)
-            }
-            z := div(mul(x, y), WAD)
-        }
-    }
-
-    /// @dev Equivalent to `(x * y) / WAD` rounded down.
-    function sMulWad(int256 x, int256 y) internal pure returns (int256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := mul(x, y)
-            // Equivalent to `require((x == 0 || z / x == y) && !(x == -1 && y == type(int256).min))`.
-            if iszero(gt(or(iszero(x), eq(sdiv(z, x), y)), lt(not(x), eq(y, shl(255, 1))))) {
-                mstore(0x00, 0xedcd4dd4) // `SMulWadFailed()`.
-                revert(0x1c, 0x04)
-            }
-            z := sdiv(z, WAD)
-        }
-    }
-
-    /// @dev Equivalent to `(x * y) / WAD` rounded down, but without overflow checks.
-    function rawMulWad(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := div(mul(x, y), WAD)
-        }
-    }
-
-    /// @dev Equivalent to `(x * y) / WAD` rounded down, but without overflow checks.
-    function rawSMulWad(int256 x, int256 y) internal pure returns (int256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := sdiv(mul(x, y), WAD)
-        }
-    }
-
-    /// @dev Equivalent to `(x * y) / WAD` rounded up.
-    function mulWadUp(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            // Equivalent to `require(y == 0 || x <= type(uint256).max / y)`.
-            if mul(y, gt(x, div(not(0), y))) {
-                mstore(0x00, 0xbac65e5b) // `MulWadFailed()`.
-                revert(0x1c, 0x04)
-            }
-            z := add(iszero(iszero(mod(mul(x, y), WAD))), div(mul(x, y), WAD))
-        }
-    }
-
-    /// @dev Equivalent to `(x * y) / WAD` rounded up, but without overflow checks.
-    function rawMulWadUp(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := add(iszero(iszero(mod(mul(x, y), WAD))), div(mul(x, y), WAD))
-        }
-    }
-
-    /// @dev Equivalent to `(x * WAD) / y` rounded down.
-    function divWad(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            // Equivalent to `require(y != 0 && (WAD == 0 || x <= type(uint256).max / WAD))`.
-            if iszero(mul(y, iszero(mul(WAD, gt(x, div(not(0), WAD)))))) {
-                mstore(0x00, 0x7c5f487d) // `DivWadFailed()`.
-                revert(0x1c, 0x04)
-            }
-            z := div(mul(x, WAD), y)
-        }
-    }
-
-    /// @dev Equivalent to `(x * WAD) / y` rounded down.
-    function sDivWad(int256 x, int256 y) internal pure returns (int256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := mul(x, WAD)
-            // Equivalent to `require(y != 0 && ((x * WAD) / WAD == x))`.
-            if iszero(and(iszero(iszero(y)), eq(sdiv(z, WAD), x))) {
-                mstore(0x00, 0x5c43740d) // `SDivWadFailed()`.
-                revert(0x1c, 0x04)
-            }
-            z := sdiv(mul(x, WAD), y)
-        }
-    }
-
-    /// @dev Equivalent to `(x * WAD) / y` rounded down, but without overflow and divide by zero checks.
-    function rawDivWad(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := div(mul(x, WAD), y)
-        }
-    }
-
-    /// @dev Equivalent to `(x * WAD) / y` rounded down, but without overflow and divide by zero checks.
-    function rawSDivWad(int256 x, int256 y) internal pure returns (int256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := sdiv(mul(x, WAD), y)
-        }
-    }
-
-    /// @dev Equivalent to `(x * WAD) / y` rounded up.
-    function divWadUp(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            // Equivalent to `require(y != 0 && (WAD == 0 || x <= type(uint256).max / WAD))`.
-            if iszero(mul(y, iszero(mul(WAD, gt(x, div(not(0), WAD)))))) {
-                mstore(0x00, 0x7c5f487d) // `DivWadFailed()`.
-                revert(0x1c, 0x04)
-            }
-            z := add(iszero(iszero(mod(mul(x, WAD), y))), div(mul(x, WAD), y))
-        }
-    }
-
-    /// @dev Equivalent to `(x * WAD) / y` rounded up, but without overflow and divide by zero checks.
-    function rawDivWadUp(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := add(iszero(iszero(mod(mul(x, WAD), y))), div(mul(x, WAD), y))
-        }
-    }
-
-    /// @dev Equivalent to `x` to the power of `y`.
-    /// because `x ** y = (e ** ln(x)) ** y = e ** (ln(x) * y)`.
-    function powWad(int256 x, int256 y) internal pure returns (int256) {
-        // Using `ln(x)` means `x` must be greater than 0.
-        return expWad((lnWad(x) * y) / int256(WAD));
-    }
-
-    /// @dev Returns `exp(x)`, denominated in `WAD`.
-    /// Credit to Remco Bloemen under MIT license: https://2π.com/21/exp-ln
-    function expWad(int256 x) internal pure returns (int256 r) {
-        unchecked {
-            // When the result is less than 0.5 we return zero.
-            // This happens when `x <= floor(log(0.5e18) * 1e18) ≈ -42e18`.
-            if (x <= -41446531673892822313) return r;
-
-            /// @solidity memory-safe-assembly
-            assembly {
-                // When the result is greater than `(2**255 - 1) / 1e18` we can not represent it as
-                // an int. This happens when `x >= floor(log((2**255 - 1) / 1e18) * 1e18) ≈ 135`.
-                if iszero(slt(x, 135305999368893231589)) {
-                    mstore(0x00, 0xa37bfec9) // `ExpOverflow()`.
-                    revert(0x1c, 0x04)
-                }
-            }
-
-            // `x` is now in the range `(-42, 136) * 1e18`. Convert to `(-42, 136) * 2**96`
-            // for more intermediate precision and a binary basis. This base conversion
-            // is a multiplication by 1e18 / 2**96 = 5**18 / 2**78.
-            x = (x << 78) / 5 ** 18;
-
-            // Reduce range of x to (-½ ln 2, ½ ln 2) * 2**96 by factoring out powers
-            // of two such that exp(x) = exp(x') * 2**k, where k is an integer.
-            // Solving this gives k = round(x / log(2)) and x' = x - k * log(2).
-            int256 k = ((x << 96) / 54916777467707473351141471128 + 2 ** 95) >> 96;
-            x = x - k * 54916777467707473351141471128;
-
-            // `k` is in the range `[-61, 195]`.
-
-            // Evaluate using a (6, 7)-term rational approximation.
-            // `p` is made monic, we'll multiply by a scale factor later.
-            int256 y = x + 1346386616545796478920950773328;
-            y = ((y * x) >> 96) + 57155421227552351082224309758442;
-            int256 p = y + x - 94201549194550492254356042504812;
-            p = ((p * y) >> 96) + 28719021644029726153956944680412240;
-            p = p * x + (4385272521454847904659076985693276 << 96);
-
-            // We leave `p` in `2**192` basis so we don't need to scale it back up for the division.
-            int256 q = x - 2855989394907223263936484059900;
-            q = ((q * x) >> 96) + 50020603652535783019961831881945;
-            q = ((q * x) >> 96) - 533845033583426703283633433725380;
-            q = ((q * x) >> 96) + 3604857256930695427073651918091429;
-            q = ((q * x) >> 96) - 14423608567350463180887372962807573;
-            q = ((q * x) >> 96) + 26449188498355588339934803723976023;
-
-            /// @solidity memory-safe-assembly
-            assembly {
-                // Div in assembly because solidity adds a zero check despite the unchecked.
-                // The q polynomial won't have zeros in the domain as all its roots are complex.
-                // No scaling is necessary because p is already `2**96` too large.
-                r := sdiv(p, q)
-            }
-
-            // r should be in the range `(0.09, 0.25) * 2**96`.
-
-            // We now need to multiply r by:
-            // - The scale factor `s ≈ 6.031367120`.
-            // - The `2**k` factor from the range reduction.
-            // - The `1e18 / 2**96` factor for base conversion.
-            // We do this all at once, with an intermediate result in `2**213`
-            // basis, so the final right shift is always by a positive amount.
-            r = int256((uint256(r) * 3822833074963236453042738258902158003155416615667) >> uint256(195 - k));
-        }
-    }
-
-    /// @dev Returns `ln(x)`, denominated in `WAD`.
-    /// Credit to Remco Bloemen under MIT license: https://2π.com/21/exp-ln
-    function lnWad(int256 x) internal pure returns (int256 r) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            // We want to convert `x` from `10**18` fixed point to `2**96` fixed point.
-            // We do this by multiplying by `2**96 / 10**18`. But since
-            // `ln(x * C) = ln(x) + ln(C)`, we can simply do nothing here
-            // and add `ln(2**96 / 10**18)` at the end.
-
-            // Compute `k = log2(x) - 96`, `r = 159 - k = 255 - log2(x) = 255 ^ log2(x)`.
-            r := shl(7, lt(0xffffffffffffffffffffffffffffffff, x))
-            r := or(r, shl(6, lt(0xffffffffffffffff, shr(r, x))))
-            r := or(r, shl(5, lt(0xffffffff, shr(r, x))))
-            r := or(r, shl(4, lt(0xffff, shr(r, x))))
-            r := or(r, shl(3, lt(0xff, shr(r, x))))
-            // We place the check here for more optimal stack operations.
-            if iszero(sgt(x, 0)) {
-                mstore(0x00, 0x1615e638) // `LnWadUndefined()`.
-                revert(0x1c, 0x04)
-            }
-            // forgefmt: disable-next-item
-            r := xor(r, byte(and(0x1f, shr(shr(r, x), 0x8421084210842108cc6318c6db6d54be)),
-                0xf8f9f9faf9fdfafbf9fdfcfdfafbfcfef9fafdfafcfcfbfefafafcfbffffffff))
-
-            // Reduce range of x to (1, 2) * 2**96
-            // ln(2^k * x) = k * ln(2) + ln(x)
-            x := shr(159, shl(r, x))
-
-            // Evaluate using a (8, 8)-term rational approximation.
-            // `p` is made monic, we will multiply by a scale factor later.
-            // forgefmt: disable-next-item
-            let p := sub( // This heavily nested expression is to avoid stack-too-deep for via-ir.
-                sar(96, mul(add(43456485725739037958740375743393,
-                    sar(96, mul(add(24828157081833163892658089445524,
-                        sar(96, mul(add(3273285459638523848632254066296,
-                            x), x))), x))), x)), 11111509109440967052023855526967)
-            p := sub(sar(96, mul(p, x)), 45023709667254063763336534515857)
-            p := sub(sar(96, mul(p, x)), 14706773417378608786704636184526)
-            p := sub(mul(p, x), shl(96, 795164235651350426258249787498))
-            // We leave `p` in `2**192` basis so we don't need to scale it back up for the division.
-
-            // `q` is monic by convention.
-            let q := add(5573035233440673466300451813936, x)
-            q := add(71694874799317883764090561454958, sar(96, mul(x, q)))
-            q := add(283447036172924575727196451306956, sar(96, mul(x, q)))
-            q := add(401686690394027663651624208769553, sar(96, mul(x, q)))
-            q := add(204048457590392012362485061816622, sar(96, mul(x, q)))
-            q := add(31853899698501571402653359427138, sar(96, mul(x, q)))
-            q := add(909429971244387300277376558375, sar(96, mul(x, q)))
-
-            // `p / q` is in the range `(0, 0.125) * 2**96`.
-
-            // Finalization, we need to:
-            // - Multiply by the scale factor `s = 5.549…`.
-            // - Add `ln(2**96 / 10**18)`.
-            // - Add `k * ln(2)`.
-            // - Multiply by `10**18 / 2**96 = 5**18 >> 78`.
-
-            // The q polynomial is known not to have zeros in the domain.
-            // No scaling required because p is already `2**96` too large.
-            p := sdiv(p, q)
-            // Multiply by the scaling factor: `s * 5**18 * 2**96`, base is now `5**18 * 2**192`.
-            p := mul(1677202110996718588342820967067443963516166, p)
-            // Add `ln(2) * k * 5**18 * 2**192`.
-            // forgefmt: disable-next-item
-            p := add(mul(16597577552685614221487285958193947469193820559219878177908093499208371, sub(159, r)), p)
-            // Add `ln(2**96 / 10**18) * 5**18 * 2**192`.
-            p := add(600920179829731861736702779321621459595472258049074101567377883020018308, p)
-            // Base conversion: mul `2**18 / 2**192`.
-            r := sar(174, p)
-        }
-    }
-
-    /// @dev Returns `W_0(x)`, denominated in `WAD`.
-    /// See: https://en.wikipedia.org/wiki/Lambert_W_function
-    /// a.k.a. Product log function. This is an approximation of the principal branch.
-    function lambertW0Wad(int256 x) internal pure returns (int256 w) {
-        // forgefmt: disable-next-item
-        unchecked {
-            if ((w = x) <= -367879441171442322) revert OutOfDomain(); // `x` less than `-1/e`.
-            int256 wad = int256(WAD);
-            int256 p = x;
-            uint256 c; // Whether we need to avoid catastrophic cancellation.
-            uint256 i = 4; // Number of iterations.
-            if (w <= 0x1ffffffffffff) {
-                if (-0x4000000000000 <= w) {
-                    i = 1; // Inputs near zero only take one step to converge.
-                } else if (w <= -0x3ffffffffffffff) {
-                    i = 32; // Inputs near `-1/e` take very long to converge.
-                }
-            } else if (w >> 63 == 0) {
-                /// @solidity memory-safe-assembly
-                assembly {
-                // Inline log2 for more performance, since the range is small.
-                    let v := shr(49, w)
-                    let l := shl(3, lt(0xff, v))
-                    l := add(or(l, byte(and(0x1f, shr(shr(l, v), 0x8421084210842108cc6318c6db6d54be)),
-                        0x0706060506020504060203020504030106050205030304010505030400000000)), 49)
-                    w := sdiv(shl(l, 7), byte(sub(l, 31), 0x0303030303030303040506080c13))
-                    c := gt(l, 60)
-                    i := add(2, add(gt(l, 53), c))
-                }
-            } else {
-                int256 ll = lnWad(w = lnWad(w));
-                /// @solidity memory-safe-assembly
-                assembly {
-                // `w = ln(x) - ln(ln(x)) + b * ln(ln(x)) / ln(x)`.
-                    w := add(sdiv(mul(ll, 1023715080943847266), w), sub(w, ll))
-                    i := add(3, iszero(shr(68, x)))
-                    c := iszero(shr(143, x))
-                }
-                if (c == 0) {
-                    do { // If `x` is big, use Newton's so that intermediate values won't overflow.
-                        int256 e = expWad(w);
-                        /// @solidity memory-safe-assembly
-                        assembly {
-                            let t := mul(w, div(e, wad))
-                            w := sub(w, sdiv(sub(t, x), div(add(e, t), wad)))
-                        }
-                        if (p <= w) break;
-                        p = w;
-                    } while (--i != 0);
-                    /// @solidity memory-safe-assembly
-                    assembly {
-                        w := sub(w, sgt(w, 2))
-                    }
-                    return w;
-                }
-            }
-            do { // Otherwise, use Halley's for faster convergence.
-                int256 e = expWad(w);
-                /// @solidity memory-safe-assembly
-                assembly {
-                    let t := add(w, wad)
-                    let s := sub(mul(w, e), mul(x, wad))
-                    w := sub(w, sdiv(mul(s, wad), sub(mul(e, t), sdiv(mul(add(t, wad), s), add(t, t)))))
-                }
-                if (p <= w) break;
-                p = w;
-            } while (--i != c);
-        /// @solidity memory-safe-assembly
-            assembly {
-                w := sub(w, sgt(w, 2))
-            }
-        // For certain ranges of `x`, we'll use the quadratic-rate recursive formula of
-        // R. Iacono and J.P. Boyd for the last iteration, to avoid catastrophic cancellation.
-            if (c != 0) {
-                int256 t = w | 1;
-                /// @solidity memory-safe-assembly
-                assembly {
-                    x := sdiv(mul(x, wad), t)
-                }
-                x = (t * (wad + lnWad(x)));
-                /// @solidity memory-safe-assembly
-                assembly {
-                    w := sdiv(x, add(wad, t))
-                }
-            }
-        }
-    }
-
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*                  GENERAL NUMBER UTILITIES                  */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    /// @dev Calculates `floor(a * b / d)` with full precision.
-    /// Throws if result overflows a uint256 or when `d` is zero.
-    /// Credit to Remco Bloemen under MIT license: https://2π.com/21/muldiv
-    function fullMulDiv(uint256 x, uint256 y, uint256 d) internal pure returns (uint256 result) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            for {} 1 {} {
-                // 512-bit multiply `[p1 p0] = x * y`.
-                // Compute the product mod `2**256` and mod `2**256 - 1`
-                // then use the Chinese Remainder Theorem to reconstruct
-                // the 512 bit result. The result is stored in two 256
-                // variables such that `product = p1 * 2**256 + p0`.
-
-                // Least significant 256 bits of the product.
-                result := mul(x, y) // Temporarily use `result` as `p0` to save gas.
-                let mm := mulmod(x, y, not(0))
-                // Most significant 256 bits of the product.
-                let p1 := sub(mm, add(result, lt(mm, result)))
-
-                // Handle non-overflow cases, 256 by 256 division.
-                if iszero(p1) {
-                    if iszero(d) {
-                        mstore(0x00, 0xae47f702) // `FullMulDivFailed()`.
-                        revert(0x1c, 0x04)
-                    }
-                    result := div(result, d)
-                    break
-                }
-
-                // Make sure the result is less than `2**256`. Also prevents `d == 0`.
-                if iszero(gt(d, p1)) {
-                    mstore(0x00, 0xae47f702) // `FullMulDivFailed()`.
-                    revert(0x1c, 0x04)
-                }
-
-                /*------------------- 512 by 256 division --------------------*/
-
-                // Make division exact by subtracting the remainder from `[p1 p0]`.
-                // Compute remainder using mulmod.
-                let r := mulmod(x, y, d)
-                // `t` is the least significant bit of `d`.
-                // Always greater or equal to 1.
-                let t := and(d, sub(0, d))
-                // Divide `d` by `t`, which is a power of two.
-                d := div(d, t)
-                // Invert `d mod 2**256`
-                // Now that `d` is an odd number, it has an inverse
-                // modulo `2**256` such that `d * inv = 1 mod 2**256`.
-                // Compute the inverse by starting with a seed that is correct
-                // correct for four bits. That is, `d * inv = 1 mod 2**4`.
-                let inv := xor(2, mul(3, d))
-                // Now use Newton-Raphson iteration to improve the precision.
-                // Thanks to Hensel's lifting lemma, this also works in modular
-                // arithmetic, doubling the correct bits in each step.
-                inv := mul(inv, sub(2, mul(d, inv))) // inverse mod 2**8
-                inv := mul(inv, sub(2, mul(d, inv))) // inverse mod 2**16
-                inv := mul(inv, sub(2, mul(d, inv))) // inverse mod 2**32
-                inv := mul(inv, sub(2, mul(d, inv))) // inverse mod 2**64
-                inv := mul(inv, sub(2, mul(d, inv))) // inverse mod 2**128
-                result :=
-                    mul(
-                        // Divide [p1 p0] by the factors of two.
-                        // Shift in bits from `p1` into `p0`. For this we need
-                        // to flip `t` such that it is `2**256 / t`.
-                        or(mul(sub(p1, gt(r, result)), add(div(sub(0, t), t), 1)), div(sub(result, r), t)),
-                        // inverse mod 2**256
-                        mul(inv, sub(2, mul(d, inv)))
-                    )
-                break
-            }
-        }
-    }
-
-    /// @dev Calculates `floor(x * y / d)` with full precision, rounded up.
-    /// Throws if result overflows a uint256 or when `d` is zero.
-    /// Credit to Uniswap-v3-core under MIT license:
-    /// https://github.com/Uniswap/v3-core/blob/contracts/libraries/FullMath.sol
-    function fullMulDivUp(uint256 x, uint256 y, uint256 d) internal pure returns (uint256 result) {
-        result = fullMulDiv(x, y, d);
-        /// @solidity memory-safe-assembly
-        assembly {
-            if mulmod(x, y, d) {
-                result := add(result, 1)
-                if iszero(result) {
-                    mstore(0x00, 0xae47f702) // `FullMulDivFailed()`.
-                    revert(0x1c, 0x04)
-                }
-            }
-        }
-    }
-
-    /// @dev Returns `floor(x * y / d)`.
-    /// Reverts if `x * y` overflows, or `d` is zero.
-    function mulDiv(uint256 x, uint256 y, uint256 d) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            // Equivalent to require(d != 0 && (y == 0 || x <= type(uint256).max / y))
-            if iszero(mul(d, iszero(mul(y, gt(x, div(not(0), y)))))) {
-                mstore(0x00, 0xad251c27) // `MulDivFailed()`.
-                revert(0x1c, 0x04)
-            }
-            z := div(mul(x, y), d)
-        }
-    }
-
-    /// @dev Returns `ceil(x * y / d)`.
-    /// Reverts if `x * y` overflows, or `d` is zero.
-    function mulDivUp(uint256 x, uint256 y, uint256 d) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            // Equivalent to require(d != 0 && (y == 0 || x <= type(uint256).max / y))
-            if iszero(mul(d, iszero(mul(y, gt(x, div(not(0), y)))))) {
-                mstore(0x00, 0xad251c27) // `MulDivFailed()`.
-                revert(0x1c, 0x04)
-            }
-            z := add(iszero(iszero(mod(mul(x, y), d))), div(mul(x, y), d))
-        }
-    }
-
-    /// @dev Returns `ceil(x / d)`.
-    /// Reverts if `d` is zero.
-    function divUp(uint256 x, uint256 d) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            if iszero(d) {
-                mstore(0x00, 0x65244e4e) // `DivFailed()`.
-                revert(0x1c, 0x04)
-            }
-            z := add(iszero(iszero(mod(x, d))), div(x, d))
-        }
-    }
-
-    /// @dev Returns `max(0, x - y)`.
-    function zeroFloorSub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := mul(gt(x, y), sub(x, y))
-        }
-    }
-
-    /// @dev Exponentiate `x` to `y` by squaring, denominated in base `b`.
-    /// Reverts if the computation overflows.
-    function rpow(uint256 x, uint256 y, uint256 b) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := mul(b, iszero(y)) // `0 ** 0 = 1`. Otherwise, `0 ** n = 0`.
-            if x {
-                z := xor(b, mul(xor(b, x), and(y, 1))) // `z = isEven(y) ? scale : x`
-                let half := shr(1, b) // Divide `b` by 2.
-                // Divide `y` by 2 every iteration.
-                for { y := shr(1, y) } y { y := shr(1, y) } {
-                    let xx := mul(x, x) // Store x squared.
-                    let xxRound := add(xx, half) // Round to the nearest number.
-                    // Revert if `xx + half` overflowed, or if `x ** 2` overflows.
-                    if or(lt(xxRound, xx), shr(128, x)) {
-                        mstore(0x00, 0x49f7642b) // `RPowOverflow()`.
-                        revert(0x1c, 0x04)
-                    }
-                    x := div(xxRound, b) // Set `x` to scaled `xxRound`.
-                    // If `y` is odd:
-                    if and(y, 1) {
-                        let zx := mul(z, x) // Compute `z * x`.
-                        let zxRound := add(zx, half) // Round to the nearest number.
-                        // If `z * x` overflowed or `zx + half` overflowed:
-                        if or(xor(div(zx, x), z), lt(zxRound, zx)) {
-                            // Revert if `x` is non-zero.
-                            if iszero(iszero(x)) {
-                                mstore(0x00, 0x49f7642b) // `RPowOverflow()`.
-                                revert(0x1c, 0x04)
-                            }
-                        }
-                        z := div(zxRound, b) // Return properly scaled `zxRound`.
-                    }
-                }
-            }
-        }
-    }
-
-    /// @dev Returns the square root of `x`.
-    function sqrt(uint256 x) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            // `floor(sqrt(2**15)) = 181`. `sqrt(2**15) - 181 = 2.84`.
-            z := 181 // The "correct" value is 1, but this saves a multiplication later.
-
-            // This segment is to get a reasonable initial estimate for the Babylonian method. With a bad
-            // start, the correct # of bits increases ~linearly each iteration instead of ~quadratically.
-
-            // Let `y = x / 2**r`. We check `y >= 2**(k + 8)`
-            // but shift right by `k` bits to ensure that if `x >= 256`, then `y >= 256`.
-            let r := shl(7, lt(0xffffffffffffffffffffffffffffffffff, x))
-            r := or(r, shl(6, lt(0xffffffffffffffffff, shr(r, x))))
-            r := or(r, shl(5, lt(0xffffffffff, shr(r, x))))
-            r := or(r, shl(4, lt(0xffffff, shr(r, x))))
-            z := shl(shr(1, r), z)
-
-            // Goal was to get `z*z*y` within a small factor of `x`. More iterations could
-            // get y in a tighter range. Currently, we will have y in `[256, 256*(2**16))`.
-            // We ensured `y >= 256` so that the relative difference between `y` and `y+1` is small.
-            // That's not possible if `x < 256` but we can just verify those cases exhaustively.
-
-            // Now, `z*z*y <= x < z*z*(y+1)`, and `y <= 2**(16+8)`, and either `y >= 256`, or `x < 256`.
-            // Correctness can be checked exhaustively for `x < 256`, so we assume `y >= 256`.
-            // Then `z*sqrt(y)` is within `sqrt(257)/sqrt(256)` of `sqrt(x)`, or about 20bps.
-
-            // For `s` in the range `[1/256, 256]`, the estimate `f(s) = (181/1024) * (s+1)`
-            // is in the range `(1/2.84 * sqrt(s), 2.84 * sqrt(s))`,
-            // with largest error when `s = 1` and when `s = 256` or `1/256`.
-
-            // Since `y` is in `[256, 256*(2**16))`, let `a = y/65536`, so that `a` is in `[1/256, 256)`.
-            // Then we can estimate `sqrt(y)` using
-            // `sqrt(65536) * 181/1024 * (a + 1) = 181/4 * (y + 65536)/65536 = 181 * (y + 65536)/2**18`.
-
-            // There is no overflow risk here since `y < 2**136` after the first branch above.
-            z := shr(18, mul(z, add(shr(r, x), 65536))) // A `mul()` is saved from starting `z` at 181.
-
-            // Given the worst case multiplicative error of 2.84 above, 7 iterations should be enough.
-            z := shr(1, add(z, div(x, z)))
-            z := shr(1, add(z, div(x, z)))
-            z := shr(1, add(z, div(x, z)))
-            z := shr(1, add(z, div(x, z)))
-            z := shr(1, add(z, div(x, z)))
-            z := shr(1, add(z, div(x, z)))
-            z := shr(1, add(z, div(x, z)))
-
-            // If `x+1` is a perfect square, the Babylonian method cycles between
-            // `floor(sqrt(x))` and `ceil(sqrt(x))`. This statement ensures we return floor.
-            // See: https://en.wikipedia.org/wiki/Integer_square_root#Using_only_integer_division
-            z := sub(z, lt(div(x, z), z))
-        }
-    }
-
-    /// @dev Returns the cube root of `x`.
-    /// Credit to bout3fiddy and pcaversaccio under AGPLv3 license:
-    /// https://github.com/pcaversaccio/snekmate/blob/main/src/utils/Math.vy
-    function cbrt(uint256 x) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            let r := shl(7, lt(0xffffffffffffffffffffffffffffffff, x))
-            r := or(r, shl(6, lt(0xffffffffffffffff, shr(r, x))))
-            r := or(r, shl(5, lt(0xffffffff, shr(r, x))))
-            r := or(r, shl(4, lt(0xffff, shr(r, x))))
-            r := or(r, shl(3, lt(0xff, shr(r, x))))
-
-            z := div(shl(div(r, 3), shl(lt(0xf, shr(r, x)), 0xf)), xor(7, mod(r, 3)))
-
-            z := div(add(add(div(x, mul(z, z)), z), z), 3)
-            z := div(add(add(div(x, mul(z, z)), z), z), 3)
-            z := div(add(add(div(x, mul(z, z)), z), z), 3)
-            z := div(add(add(div(x, mul(z, z)), z), z), 3)
-            z := div(add(add(div(x, mul(z, z)), z), z), 3)
-            z := div(add(add(div(x, mul(z, z)), z), z), 3)
-            z := div(add(add(div(x, mul(z, z)), z), z), 3)
-
-            z := sub(z, lt(div(x, mul(z, z)), z))
-        }
-    }
-
-    /// @dev Returns the square root of `x`, denominated in `WAD`.
-    function sqrtWad(uint256 x) internal pure returns (uint256 z) {
-        unchecked {
-            z = 10 ** 9;
-            if (x <= type(uint256).max / 10 ** 36 - 1) {
-                x *= 10 ** 18;
-                z = 1;
-            }
-            z *= sqrt(x);
-        }
-    }
-
-    /// @dev Returns the cube root of `x`, denominated in `WAD`.
-    function cbrtWad(uint256 x) internal pure returns (uint256 z) {
-        unchecked {
-            z = 10 ** 12;
-            if (x <= (type(uint256).max / 10 ** 36) * 10 ** 18 - 1) {
-                if (x >= type(uint256).max / 10 ** 36) {
-                    x *= 10 ** 18;
-                    z = 10 ** 6;
-                } else {
-                    x *= 10 ** 36;
-                    z = 1;
-                }
-            }
-            z *= cbrt(x);
-        }
-    }
-
-    /// @dev Returns the factorial of `x`.
-    function factorial(uint256 x) internal pure returns (uint256 result) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            if iszero(lt(x, 58)) {
-                mstore(0x00, 0xaba0f2a2) // `FactorialOverflow()`.
-                revert(0x1c, 0x04)
-            }
-            for { result := 1 } x { x := sub(x, 1) } { result := mul(result, x) }
-        }
-    }
-
-    /// @dev Returns the log2 of `x`.
-    /// Equivalent to computing the index of the most significant bit (MSB) of `x`.
-    /// Returns 0 if `x` is zero.
-    function log2(uint256 x) internal pure returns (uint256 r) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            r := shl(7, lt(0xffffffffffffffffffffffffffffffff, x))
-            r := or(r, shl(6, lt(0xffffffffffffffff, shr(r, x))))
-            r := or(r, shl(5, lt(0xffffffff, shr(r, x))))
-            r := or(r, shl(4, lt(0xffff, shr(r, x))))
-            r := or(r, shl(3, lt(0xff, shr(r, x))))
-            // forgefmt: disable-next-item
-            r := or(r, byte(and(0x1f, shr(shr(r, x), 0x8421084210842108cc6318c6db6d54be)),
-                0x0706060506020504060203020504030106050205030304010505030400000000))
-        }
-    }
-
-    /// @dev Returns the log2 of `x`, rounded up.
-    /// Returns 0 if `x` is zero.
-    function log2Up(uint256 x) internal pure returns (uint256 r) {
-        r = log2(x);
-        /// @solidity memory-safe-assembly
-        assembly {
-            r := add(r, lt(shl(r, 1), x))
-        }
-    }
-
-    /// @dev Returns the log10 of `x`.
-    /// Returns 0 if `x` is zero.
-    function log10(uint256 x) internal pure returns (uint256 r) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            if iszero(lt(x, 100000000000000000000000000000000000000)) {
-                x := div(x, 100000000000000000000000000000000000000)
-                r := 38
-            }
-            if iszero(lt(x, 100000000000000000000)) {
-                x := div(x, 100000000000000000000)
-                r := add(r, 20)
-            }
-            if iszero(lt(x, 10000000000)) {
-                x := div(x, 10000000000)
-                r := add(r, 10)
-            }
-            if iszero(lt(x, 100000)) {
-                x := div(x, 100000)
-                r := add(r, 5)
-            }
-            r := add(r, add(gt(x, 9), add(gt(x, 99), add(gt(x, 999), gt(x, 9999)))))
-        }
-    }
-
-    /// @dev Returns the log10 of `x`, rounded up.
-    /// Returns 0 if `x` is zero.
-    function log10Up(uint256 x) internal pure returns (uint256 r) {
-        r = log10(x);
-        /// @solidity memory-safe-assembly
-        assembly {
-            r := add(r, lt(exp(10, r), x))
-        }
-    }
-
-    /// @dev Returns the log256 of `x`.
-    /// Returns 0 if `x` is zero.
-    function log256(uint256 x) internal pure returns (uint256 r) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            r := shl(7, lt(0xffffffffffffffffffffffffffffffff, x))
-            r := or(r, shl(6, lt(0xffffffffffffffff, shr(r, x))))
-            r := or(r, shl(5, lt(0xffffffff, shr(r, x))))
-            r := or(r, shl(4, lt(0xffff, shr(r, x))))
-            r := or(shr(3, r), lt(0xff, shr(r, x)))
-        }
-    }
-
-    /// @dev Returns the log256 of `x`, rounded up.
-    /// Returns 0 if `x` is zero.
-    function log256Up(uint256 x) internal pure returns (uint256 r) {
-        r = log256(x);
-        /// @solidity memory-safe-assembly
-        assembly {
-            r := add(r, lt(shl(shl(3, r), 1), x))
-        }
-    }
-
-    /// @dev Returns the scientific notation format `mantissa * 10 ** exponent` of `x`.
-    /// Useful for compressing prices (e.g. using 25 bit mantissa and 7 bit exponent).
-    function sci(uint256 x) internal pure returns (uint256 mantissa, uint256 exponent) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            mantissa := x
-            if mantissa {
-                if iszero(mod(mantissa, 1000000000000000000000000000000000)) {
-                    mantissa := div(mantissa, 1000000000000000000000000000000000)
-                    exponent := 33
-                }
-                if iszero(mod(mantissa, 10000000000000000000)) {
-                    mantissa := div(mantissa, 10000000000000000000)
-                    exponent := add(exponent, 19)
-                }
-                if iszero(mod(mantissa, 1000000000000)) {
-                    mantissa := div(mantissa, 1000000000000)
-                    exponent := add(exponent, 12)
-                }
-                if iszero(mod(mantissa, 1000000)) {
-                    mantissa := div(mantissa, 1000000)
-                    exponent := add(exponent, 6)
-                }
-                if iszero(mod(mantissa, 10000)) {
-                    mantissa := div(mantissa, 10000)
-                    exponent := add(exponent, 4)
-                }
-                if iszero(mod(mantissa, 100)) {
-                    mantissa := div(mantissa, 100)
-                    exponent := add(exponent, 2)
-                }
-                if iszero(mod(mantissa, 10)) {
-                    mantissa := div(mantissa, 10)
-                    exponent := add(exponent, 1)
-                }
-            }
-        }
-    }
-
-    /// @dev Convenience function for packing `x` into a smaller number using `sci`.
-    /// The `mantissa` will be in bits [7..255] (the upper 249 bits).
-    /// The `exponent` will be in bits [0..6] (the lower 7 bits).
-    /// Use `SafeCastLib` to safely ensure that the `packed` number is small
-    /// enough to fit in the desired unsigned integer type:
-    /// ```
-    ///     uint32 packed = SafeCastLib.toUint32(FixedPointMathLib.packSci(777 ether));
-    /// ```
-    function packSci(uint256 x) internal pure returns (uint256 packed) {
-        (x, packed) = sci(x); // Reuse for `mantissa` and `exponent`.
-        /// @solidity memory-safe-assembly
-        assembly {
-            if shr(249, x) {
-                mstore(0x00, 0xce30380c) // `MantissaOverflow()`.
-                revert(0x1c, 0x04)
-            }
-            packed := or(shl(7, x), packed)
-        }
-    }
-
-    /// @dev Convenience function for unpacking a packed number from `packSci`.
-    function unpackSci(uint256 packed) internal pure returns (uint256 unpacked) {
-        unchecked {
-            unpacked = (packed >> 7) * 10 ** (packed & 0x7f);
-        }
-    }
-
-    /// @dev Returns the average of `x` and `y`.
-    function avg(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        unchecked {
-            z = (x & y) + ((x ^ y) >> 1);
-        }
-    }
-
-    /// @dev Returns the average of `x` and `y`.
-    function avg(int256 x, int256 y) internal pure returns (int256 z) {
-        unchecked {
-            z = (x >> 1) + (y >> 1) + (((x & 1) + (y & 1)) >> 1);
-        }
-    }
-
-    /// @dev Returns the absolute value of `x`.
-    function abs(int256 x) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := xor(sub(0, shr(255, x)), add(sub(0, shr(255, x)), x))
-        }
-    }
-
-    /// @dev Returns the absolute distance between `x` and `y`.
-    function dist(int256 x, int256 y) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := xor(mul(xor(sub(y, x), sub(x, y)), sgt(x, y)), sub(y, x))
-        }
-    }
-
-    /// @dev Returns the minimum of `x` and `y`.
-    function min(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := xor(x, mul(xor(x, y), lt(y, x)))
-        }
-    }
-
-    /// @dev Returns the minimum of `x` and `y`.
-    function min(int256 x, int256 y) internal pure returns (int256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := xor(x, mul(xor(x, y), slt(y, x)))
-        }
-    }
-
-    /// @dev Returns the maximum of `x` and `y`.
-    function max(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := xor(x, mul(xor(x, y), gt(y, x)))
-        }
-    }
-
-    /// @dev Returns the maximum of `x` and `y`.
-    function max(int256 x, int256 y) internal pure returns (int256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := xor(x, mul(xor(x, y), sgt(y, x)))
-        }
-    }
-
-    /// @dev Returns `x`, bounded to `minValue` and `maxValue`.
-    function clamp(uint256 x, uint256 minValue, uint256 maxValue) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := xor(x, mul(xor(x, minValue), gt(minValue, x)))
-            z := xor(z, mul(xor(z, maxValue), lt(maxValue, z)))
-        }
-    }
-
-    /// @dev Returns `x`, bounded to `minValue` and `maxValue`.
-    function clamp(int256 x, int256 minValue, int256 maxValue) internal pure returns (int256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := xor(x, mul(xor(x, minValue), sgt(minValue, x)))
-            z := xor(z, mul(xor(z, maxValue), slt(maxValue, z)))
-        }
-    }
-
-    /// @dev Returns greatest common divisor of `x` and `y`.
-    function gcd(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            for { z := x } y {} {
-                let t := y
-                y := mod(z, y)
-                z := t
-            }
-        }
-    }
-
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*                   RAW NUMBER OPERATIONS                    */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    /// @dev Returns `x + y`, without checking for overflow.
-    function rawAdd(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        unchecked {
-            z = x + y;
-        }
-    }
-
-    /// @dev Returns `x + y`, without checking for overflow.
-    function rawAdd(int256 x, int256 y) internal pure returns (int256 z) {
-        unchecked {
-            z = x + y;
-        }
-    }
-
-    /// @dev Returns `x - y`, without checking for underflow.
-    function rawSub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        unchecked {
-            z = x - y;
-        }
-    }
-
-    /// @dev Returns `x - y`, without checking for underflow.
-    function rawSub(int256 x, int256 y) internal pure returns (int256 z) {
-        unchecked {
-            z = x - y;
-        }
-    }
-
-    /// @dev Returns `x * y`, without checking for overflow.
-    function rawMul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        unchecked {
-            z = x * y;
-        }
-    }
-
-    /// @dev Returns `x * y`, without checking for overflow.
-    function rawMul(int256 x, int256 y) internal pure returns (int256 z) {
-        unchecked {
-            z = x * y;
-        }
-    }
-
-    /// @dev Returns `x / y`, returning 0 if `y` is zero.
-    function rawDiv(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := div(x, y)
-        }
-    }
-
-    /// @dev Returns `x / y`, returning 0 if `y` is zero.
-    function rawSDiv(int256 x, int256 y) internal pure returns (int256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := sdiv(x, y)
-        }
-    }
-
-    /// @dev Returns `x % y`, returning 0 if `y` is zero.
-    function rawMod(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := mod(x, y)
-        }
-    }
-
-    /// @dev Returns `x % y`, returning 0 if `y` is zero.
-    function rawSMod(int256 x, int256 y) internal pure returns (int256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := smod(x, y)
-        }
-    }
-
-    /// @dev Returns `(x + y) % d`, return 0 if `d` if zero.
-    function rawAddMod(uint256 x, uint256 y, uint256 d) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := addmod(x, y, d)
-        }
-    }
-
-    /// @dev Returns `(x * y) % d`, return 0 if `d` if zero.
-    function rawMulMod(uint256 x, uint256 y, uint256 d) internal pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := mulmod(x, y, d)
-        }
-    }
-}
-
 // lib/solady/src/utils/LibClone.sol
 
 /// @notice Minimal proxy library.
@@ -2918,77 +2121,346 @@ library LibClone {
     }
 }
 
-// src/cannon/interfaces/IPreimageOracle.sol
+// lib/solmate/src/utils/FixedPointMathLib.sol
 
-/// @title IPreimageOracle
-/// @notice Interface for a preimage oracle.
-interface IPreimageOracle {
-    /// @notice Reads a preimage from the oracle.
-    /// @param _key The key of the preimage to read.
-    /// @param _offset The offset of the preimage to read.
-    /// @return dat_ The preimage data.
-    /// @return datLen_ The length of the preimage data.
-    function readPreimage(bytes32 _key, uint256 _offset) external view returns (bytes32 dat_, uint256 datLen_);
+/// @notice Arithmetic library with operations for fixed-point numbers.
+/// @author Solmate (https://github.com/Rari-Capital/solmate/blob/main/src/utils/FixedPointMathLib.sol)
+library FixedPointMathLib {
+    /*//////////////////////////////////////////////////////////////
+                    SIMPLIFIED FIXED POINT OPERATIONS
+    //////////////////////////////////////////////////////////////*/
 
-    /// @notice Loads of local data part into the preimage oracle.
-    /// @param _ident The identifier of the local data.
-    /// @param _localContext The local key context for the preimage oracle. Optionally, can be set as a constant
-    ///                      if the caller only requires one set of local keys.
-    /// @param _word The local data word.
-    /// @param _size The number of bytes in `_word` to load.
-    /// @param _partOffset The offset of the local data part to write to the oracle.
-    /// @dev The local data parts are loaded into the preimage oracle under the context
-    ///      of the caller - no other account can write to the caller's context
-    ///      specific data.
-    ///
-    ///      There are 5 local data identifiers:
-    ///      ┌────────────┬────────────────────────┐
-    ///      │ Identifier │      Data              │
-    ///      ├────────────┼────────────────────────┤
-    ///      │          1 │ L1 Head Hash (bytes32) │
-    ///      │          2 │ Output Root (bytes32)  │
-    ///      │          3 │ Root Claim (bytes32)   │
-    ///      │          4 │ L2 Block Number (u64)  │
-    ///      │          5 │ Chain ID (u64)         │
-    ///      └────────────┴────────────────────────┘
-    function loadLocalData(uint256 _ident, bytes32 _localContext, bytes32 _word, uint256 _size, uint256 _partOffset)
-        external
-        returns (bytes32 key_);
+    uint256 internal constant WAD = 1e18; // The scalar of ETH and most ERC20s.
 
-    /// @notice Prepares a preimage to be read by keccak256 key, starting at the given offset and up to 32 bytes
-    ///         (clipped at preimage length, if out of data).
-    /// @param _partOffset The offset of the preimage to read.
-    /// @param _preimage The preimage data.
-    function loadKeccak256PreimagePart(uint256 _partOffset, bytes calldata _preimage) external;
+    function mulWadDown(uint256 x, uint256 y) internal pure returns (uint256) {
+        return mulDivDown(x, y, WAD); // Equivalent to (x * y) / WAD rounded down.
+    }
 
-    /// @notice Prepares a preimage to be read by sha256 key, starting at the given offset and up to 32 bytes
-    ///         (clipped at preimage length, if out of data).
-    /// @param _partOffset The offset of the preimage to read.
-    /// @param _preimage The preimage data.
-    function loadSha256PreimagePart(uint256 _partOffset, bytes calldata _preimage) external;
+    function mulWadUp(uint256 x, uint256 y) internal pure returns (uint256) {
+        return mulDivUp(x, y, WAD); // Equivalent to (x * y) / WAD rounded up.
+    }
 
-    /// @notice Verifies that `p(_z) = _y` given `_commitment` that corresponds to the polynomial `p(x)` and a KZG
-    //          proof. The value `y` is the pre-image, and the preimage key is `5 ++ keccak256(_commitment ++ z)[1:]`.
-    /// @param _z Big endian point value. Part of the preimage key.
-    /// @param _y Big endian point value. The preimage for the key.
-    /// @param _commitment The commitment to the polynomial. 48 bytes, part of the preimage key.
-    /// @param _proof The KZG proof, part of the preimage key.
-    /// @param _partOffset The offset of the preimage to store.
-    function loadBlobPreimagePart(
-        uint256 _z,
-        uint256 _y,
-        bytes calldata _commitment,
-        bytes calldata _proof,
-        uint256 _partOffset
-    ) external;
+    function divWadDown(uint256 x, uint256 y) internal pure returns (uint256) {
+        return mulDivDown(x, WAD, y); // Equivalent to (x * WAD) / y rounded down.
+    }
 
-    /// @notice Prepares a precompile result to be read by a precompile key for the specified offset.
-    ///         The precompile result data is a concatenation of the precompile call status byte and its return data.
-    ///         The preimage key is `6 ++ keccak256(precompile ++ input)[1:]`.
-    /// @param _partOffset The offset of the precompile result being loaded.
-    /// @param _precompile The precompile address
-    /// @param _input The input to the precompile call.
-    function loadPrecompilePreimagePart(uint256 _partOffset, address _precompile, bytes calldata _input) external;
+    function divWadUp(uint256 x, uint256 y) internal pure returns (uint256) {
+        return mulDivUp(x, WAD, y); // Equivalent to (x * WAD) / y rounded up.
+    }
+
+    function powWad(int256 x, int256 y) internal pure returns (int256) {
+        // Equivalent to x to the power of y because x ** y = (e ** ln(x)) ** y = e ** (ln(x) * y)
+        return expWad((lnWad(x) * y) / int256(WAD)); // Using ln(x) means x must be greater than 0.
+    }
+
+    function expWad(int256 x) internal pure returns (int256 r) {
+        unchecked {
+            // When the result is < 0.5 we return zero. This happens when
+            // x <= floor(log(0.5e18) * 1e18) ~ -42e18
+            if (x <= -42139678854452767551) return 0;
+
+            // When the result is > (2**255 - 1) / 1e18 we can not represent it as an
+            // int. This happens when x >= floor(log((2**255 - 1) / 1e18) * 1e18) ~ 135.
+            if (x >= 135305999368893231589) revert("EXP_OVERFLOW");
+
+            // x is now in the range (-42, 136) * 1e18. Convert to (-42, 136) * 2**96
+            // for more intermediate precision and a binary basis. This base conversion
+            // is a multiplication by 1e18 / 2**96 = 5**18 / 2**78.
+            x = (x << 78) / 5 ** 18;
+
+            // Reduce range of x to (-½ ln 2, ½ ln 2) * 2**96 by factoring out powers
+            // of two such that exp(x) = exp(x') * 2**k, where k is an integer.
+            // Solving this gives k = round(x / log(2)) and x' = x - k * log(2).
+            int256 k = ((x << 96) / 54916777467707473351141471128 + 2 ** 95) >> 96;
+            x = x - k * 54916777467707473351141471128;
+
+            // k is in the range [-61, 195].
+
+            // Evaluate using a (6, 7)-term rational approximation.
+            // p is made monic, we'll multiply by a scale factor later.
+            int256 y = x + 1346386616545796478920950773328;
+            y = ((y * x) >> 96) + 57155421227552351082224309758442;
+            int256 p = y + x - 94201549194550492254356042504812;
+            p = ((p * y) >> 96) + 28719021644029726153956944680412240;
+            p = p * x + (4385272521454847904659076985693276 << 96);
+
+            // We leave p in 2**192 basis so we don't need to scale it back up for the division.
+            int256 q = x - 2855989394907223263936484059900;
+            q = ((q * x) >> 96) + 50020603652535783019961831881945;
+            q = ((q * x) >> 96) - 533845033583426703283633433725380;
+            q = ((q * x) >> 96) + 3604857256930695427073651918091429;
+            q = ((q * x) >> 96) - 14423608567350463180887372962807573;
+            q = ((q * x) >> 96) + 26449188498355588339934803723976023;
+
+            assembly {
+                // Div in assembly because solidity adds a zero check despite the unchecked.
+                // The q polynomial won't have zeros in the domain as all its roots are complex.
+                // No scaling is necessary because p is already 2**96 too large.
+                r := sdiv(p, q)
+            }
+
+            // r should be in the range (0.09, 0.25) * 2**96.
+
+            // We now need to multiply r by:
+            // * the scale factor s = ~6.031367120.
+            // * the 2**k factor from the range reduction.
+            // * the 1e18 / 2**96 factor for base conversion.
+            // We do this all at once, with an intermediate result in 2**213
+            // basis, so the final right shift is always by a positive amount.
+            r = int256((uint256(r) * 3822833074963236453042738258902158003155416615667) >> uint256(195 - k));
+        }
+    }
+
+    function lnWad(int256 x) internal pure returns (int256 r) {
+        unchecked {
+            require(x > 0, "UNDEFINED");
+
+            // We want to convert x from 10**18 fixed point to 2**96 fixed point.
+            // We do this by multiplying by 2**96 / 10**18. But since
+            // ln(x * C) = ln(x) + ln(C), we can simply do nothing here
+            // and add ln(2**96 / 10**18) at the end.
+
+            // Reduce range of x to (1, 2) * 2**96
+            // ln(2^k * x) = k * ln(2) + ln(x)
+            int256 k = int256(log2(uint256(x))) - 96;
+            x <<= uint256(159 - k);
+            x = int256(uint256(x) >> 159);
+
+            // Evaluate using a (8, 8)-term rational approximation.
+            // p is made monic, we will multiply by a scale factor later.
+            int256 p = x + 3273285459638523848632254066296;
+            p = ((p * x) >> 96) + 24828157081833163892658089445524;
+            p = ((p * x) >> 96) + 43456485725739037958740375743393;
+            p = ((p * x) >> 96) - 11111509109440967052023855526967;
+            p = ((p * x) >> 96) - 45023709667254063763336534515857;
+            p = ((p * x) >> 96) - 14706773417378608786704636184526;
+            p = p * x - (795164235651350426258249787498 << 96);
+
+            // We leave p in 2**192 basis so we don't need to scale it back up for the division.
+            // q is monic by convention.
+            int256 q = x + 5573035233440673466300451813936;
+            q = ((q * x) >> 96) + 71694874799317883764090561454958;
+            q = ((q * x) >> 96) + 283447036172924575727196451306956;
+            q = ((q * x) >> 96) + 401686690394027663651624208769553;
+            q = ((q * x) >> 96) + 204048457590392012362485061816622;
+            q = ((q * x) >> 96) + 31853899698501571402653359427138;
+            q = ((q * x) >> 96) + 909429971244387300277376558375;
+            assembly {
+                // Div in assembly because solidity adds a zero check despite the unchecked.
+                // The q polynomial is known not to have zeros in the domain.
+                // No scaling required because p is already 2**96 too large.
+                r := sdiv(p, q)
+            }
+
+            // r is in the range (0, 0.125) * 2**96
+
+            // Finalization, we need to:
+            // * multiply by the scale factor s = 5.549…
+            // * add ln(2**96 / 10**18)
+            // * add k * ln(2)
+            // * multiply by 10**18 / 2**96 = 5**18 >> 78
+
+            // mul s * 5e18 * 2**96, base is now 5**18 * 2**192
+            r *= 1677202110996718588342820967067443963516166;
+            // add ln(2) * k * 5e18 * 2**192
+            r += 16597577552685614221487285958193947469193820559219878177908093499208371 * k;
+            // add ln(2**96 / 10**18) * 5e18 * 2**192
+            r += 600920179829731861736702779321621459595472258049074101567377883020018308;
+            // base conversion: mul 2**18 / 2**192
+            r >>= 174;
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    LOW LEVEL FIXED POINT OPERATIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function mulDivDown(uint256 x, uint256 y, uint256 denominator) internal pure returns (uint256 z) {
+        assembly {
+            // Store x * y in z for now.
+            z := mul(x, y)
+
+            // Equivalent to require(denominator != 0 && (x == 0 || (x * y) / x == y))
+            if iszero(and(iszero(iszero(denominator)), or(iszero(x), eq(div(z, x), y)))) { revert(0, 0) }
+
+            // Divide z by the denominator.
+            z := div(z, denominator)
+        }
+    }
+
+    function mulDivUp(uint256 x, uint256 y, uint256 denominator) internal pure returns (uint256 z) {
+        assembly {
+            // Store x * y in z for now.
+            z := mul(x, y)
+
+            // Equivalent to require(denominator != 0 && (x == 0 || (x * y) / x == y))
+            if iszero(and(iszero(iszero(denominator)), or(iszero(x), eq(div(z, x), y)))) { revert(0, 0) }
+
+            // First, divide z - 1 by the denominator and add 1.
+            // We allow z - 1 to underflow if z is 0, because we multiply the
+            // end result by 0 if z is zero, ensuring we return 0 if z is zero.
+            z := mul(iszero(iszero(z)), add(div(sub(z, 1), denominator), 1))
+        }
+    }
+
+    function rpow(uint256 x, uint256 n, uint256 scalar) internal pure returns (uint256 z) {
+        assembly {
+            switch x
+            case 0 {
+                switch n
+                case 0 {
+                    // 0 ** 0 = 1
+                    z := scalar
+                }
+                default {
+                    // 0 ** n = 0
+                    z := 0
+                }
+            }
+            default {
+                switch mod(n, 2)
+                case 0 {
+                    // If n is even, store scalar in z for now.
+                    z := scalar
+                }
+                default {
+                    // If n is odd, store x in z for now.
+                    z := x
+                }
+
+                // Shifting right by 1 is like dividing by 2.
+                let half := shr(1, scalar)
+
+                for {
+                    // Shift n right by 1 before looping to halve it.
+                    n := shr(1, n)
+                } n {
+                    // Shift n right by 1 each iteration to halve it.
+                    n := shr(1, n)
+                } {
+                    // Revert immediately if x ** 2 would overflow.
+                    // Equivalent to iszero(eq(div(xx, x), x)) here.
+                    if shr(128, x) { revert(0, 0) }
+
+                    // Store x squared.
+                    let xx := mul(x, x)
+
+                    // Round to the nearest number.
+                    let xxRound := add(xx, half)
+
+                    // Revert if xx + half overflowed.
+                    if lt(xxRound, xx) { revert(0, 0) }
+
+                    // Set x to scaled xxRound.
+                    x := div(xxRound, scalar)
+
+                    // If n is even:
+                    if mod(n, 2) {
+                        // Compute z * x.
+                        let zx := mul(z, x)
+
+                        // If z * x overflowed:
+                        if iszero(eq(div(zx, x), z)) {
+                            // Revert if x is non-zero.
+                            if iszero(iszero(x)) { revert(0, 0) }
+                        }
+
+                        // Round to the nearest number.
+                        let zxRound := add(zx, half)
+
+                        // Revert if zx + half overflowed.
+                        if lt(zxRound, zx) { revert(0, 0) }
+
+                        // Return properly scaled zxRound.
+                        z := div(zxRound, scalar)
+                    }
+                }
+            }
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        GENERAL NUMBER UTILITIES
+    //////////////////////////////////////////////////////////////*/
+
+    function sqrt(uint256 x) internal pure returns (uint256 z) {
+        assembly {
+            let y := x // We start y at x, which will help us make our initial estimate.
+
+            z := 181 // The "correct" value is 1, but this saves a multiplication later.
+
+            // This segment is to get a reasonable initial estimate for the Babylonian method. With a bad
+            // start, the correct # of bits increases ~linearly each iteration instead of ~quadratically.
+
+            // We check y >= 2^(k + 8) but shift right by k bits
+            // each branch to ensure that if x >= 256, then y >= 256.
+            if iszero(lt(y, 0x10000000000000000000000000000000000)) {
+                y := shr(128, y)
+                z := shl(64, z)
+            }
+            if iszero(lt(y, 0x1000000000000000000)) {
+                y := shr(64, y)
+                z := shl(32, z)
+            }
+            if iszero(lt(y, 0x10000000000)) {
+                y := shr(32, y)
+                z := shl(16, z)
+            }
+            if iszero(lt(y, 0x1000000)) {
+                y := shr(16, y)
+                z := shl(8, z)
+            }
+
+            // Goal was to get z*z*y within a small factor of x. More iterations could
+            // get y in a tighter range. Currently, we will have y in [256, 256*2^16).
+            // We ensured y >= 256 so that the relative difference between y and y+1 is small.
+            // That's not possible if x < 256 but we can just verify those cases exhaustively.
+
+            // Now, z*z*y <= x < z*z*(y+1), and y <= 2^(16+8), and either y >= 256, or x < 256.
+            // Correctness can be checked exhaustively for x < 256, so we assume y >= 256.
+            // Then z*sqrt(y) is within sqrt(257)/sqrt(256) of sqrt(x), or about 20bps.
+
+            // For s in the range [1/256, 256], the estimate f(s) = (181/1024) * (s+1) is in the range
+            // (1/2.84 * sqrt(s), 2.84 * sqrt(s)), with largest error when s = 1 and when s = 256 or 1/256.
+
+            // Since y is in [256, 256*2^16), let a = y/65536, so that a is in [1/256, 256). Then we can estimate
+            // sqrt(y) using sqrt(65536) * 181/1024 * (a + 1) = 181/4 * (y + 65536)/65536 = 181 * (y + 65536)/2^18.
+
+            // There is no overflow risk here since y < 2^136 after the first branch above.
+            z := shr(18, mul(z, add(y, 65536))) // A mul() is saved from starting z at 181.
+
+            // Given the worst case multiplicative error of 2.84 above, 7 iterations should be enough.
+            z := shr(1, add(z, div(x, z)))
+            z := shr(1, add(z, div(x, z)))
+            z := shr(1, add(z, div(x, z)))
+            z := shr(1, add(z, div(x, z)))
+            z := shr(1, add(z, div(x, z)))
+            z := shr(1, add(z, div(x, z)))
+            z := shr(1, add(z, div(x, z)))
+
+            // If x+1 is a perfect square, the Babylonian method cycles between
+            // floor(sqrt(x)) and ceil(sqrt(x)). This statement ensures we return floor.
+            // See: https://en.wikipedia.org/wiki/Integer_square_root#Using_only_integer_division
+            // Since the ceil is rare, we save gas on the assignment and repeat division in the rare case.
+            // If you don't care whether the floor or ceil square root is returned, you can remove this statement.
+            z := sub(z, lt(div(x, z), z))
+        }
+    }
+
+    function log2(uint256 x) internal pure returns (uint256 r) {
+        require(x > 0, "UNDEFINED");
+
+        assembly {
+            r := shl(7, lt(0xffffffffffffffffffffffffffffffff, x))
+            r := or(r, shl(6, lt(0xffffffffffffffff, shr(r, x))))
+            r := or(r, shl(5, lt(0xffffffff, shr(r, x))))
+            r := or(r, shl(4, lt(0xffff, shr(r, x))))
+            r := or(r, shl(3, lt(0xff, shr(r, x))))
+            r := or(r, shl(2, lt(0xf, shr(r, x))))
+            r := or(r, shl(1, lt(0x3, shr(r, x))))
+            r := or(r, lt(0x1, shr(r, x)))
+        }
+    }
 }
 
 // src/dispute/interfaces/IInitializable.sol
@@ -2999,87 +2471,6 @@ interface IInitializable {
     /// @notice Initializes the contract.
     /// @dev This function may only be called once.
     function initialize() external payable;
-}
-
-// src/dispute/interfaces/IWETH.sol
-
-/// @title IWETH
-/// @notice Interface for WETH9.
-interface IWETH {
-    /// @notice Emitted when an approval is made.
-    /// @param src The address that approved the transfer.
-    /// @param guy The address that was approved to transfer.
-    /// @param wad The amount that was approved to transfer.
-    event Approval(address indexed src, address indexed guy, uint256 wad);
-
-    /// @notice Emitted when a transfer is made.
-    /// @param src The address that transferred the WETH.
-    /// @param dst The address that received the WETH.
-    /// @param wad The amount of WETH that was transferred.
-    event Transfer(address indexed src, address indexed dst, uint256 wad);
-
-    /// @notice Emitted when a deposit is made.
-    /// @param dst The address that deposited the WETH.
-    /// @param wad The amount of WETH that was deposited.
-    event Deposit(address indexed dst, uint256 wad);
-
-    /// @notice Emitted when a withdrawal is made.
-    /// @param src The address that withdrew the WETH.
-    /// @param wad The amount of WETH that was withdrawn.
-    event Withdrawal(address indexed src, uint256 wad);
-
-    /// @notice Returns the name of the token.
-    /// @return The name of the token.
-    function name() external view returns (string memory);
-
-    /// @notice Returns the symbol of the token.
-    /// @return The symbol of the token.
-    function symbol() external view returns (string memory);
-
-    /// @notice Returns the number of decimals the token uses.
-    /// @return The number of decimals the token uses.
-    function decimals() external pure returns (uint8);
-
-    /// @notice Returns the balance of the given address.
-    /// @param owner The address to query the balance of.
-    /// @return The balance of the given address.
-    function balanceOf(address owner) external view returns (uint256);
-
-    /// @notice Returns the amount of WETH that the spender can transfer on behalf of the owner.
-    /// @param owner The address that owns the WETH.
-    /// @param spender The address that is approved to transfer the WETH.
-    /// @return The amount of WETH that the spender can transfer on behalf of the owner.
-    function allowance(address owner, address spender) external view returns (uint256);
-
-    /// @notice Allows WETH to be deposited by sending ether to the contract.
-    function deposit() external payable;
-
-    /// @notice Withdraws an amount of ETH.
-    /// @param wad The amount of ETH to withdraw.
-    function withdraw(uint256 wad) external;
-
-    /// @notice Returns the total supply of WETH.
-    /// @return The total supply of WETH.
-    function totalSupply() external view returns (uint256);
-
-    /// @notice Approves the given address to transfer the WETH on behalf of the caller.
-    /// @param guy The address that is approved to transfer the WETH.
-    /// @param wad The amount that is approved to transfer.
-    /// @return True if the approval was successful.
-    function approve(address guy, uint256 wad) external returns (bool);
-
-    /// @notice Transfers the given amount of WETH to the given address.
-    /// @param dst The address to transfer the WETH to.
-    /// @param wad The amount of WETH to transfer.
-    /// @return True if the transfer was successful.
-    function transfer(address dst, uint256 wad) external returns (bool);
-
-    /// @notice Transfers the given amount of WETH from the given address to the given address.
-    /// @param src The address to transfer the WETH from.
-    /// @param dst The address to transfer the WETH to.
-    /// @param wad The amount of WETH to transfer.
-    /// @return True if the transfer was successful.
-    function transferFrom(address src, address dst, uint256 wad) external returns (bool);
 }
 
 // src/dispute/lib/LibPosition.sol
@@ -3279,6 +2670,429 @@ library LibPosition {
     function raw(Position _position) internal pure returns (uint128 raw_) {
         assembly {
             raw_ := _position
+        }
+    }
+}
+
+// src/libraries/Burn.sol
+
+/// @title Burn
+/// @notice Utilities for burning stuff.
+library Burn {
+    /// @notice Burns a given amount of ETH.
+    /// @param _amount Amount of ETH to burn.
+    function eth(uint256 _amount) internal {
+        new Burner{value: _amount}();
+    }
+
+    /// @notice Burns a given amount of gas.
+    /// @param _amount Amount of gas to burn.
+    function gas(uint256 _amount) internal view {
+        uint256 i = 0;
+        uint256 initialGas = gasleft();
+        while (initialGas - gasleft() < _amount) {
+            ++i;
+        }
+    }
+}
+
+/// @title Burner
+/// @notice Burner self-destructs on creation and sends all ETH to itself, removing all ETH given to
+///         the contract from the circulating supply. Self-destructing is the only way to remove ETH
+///         from the circulating supply.
+contract Burner {
+    constructor() payable {
+        selfdestruct(payable(address(this)));
+    }
+}
+
+// src/libraries/Bytes.sol
+
+/// @title Bytes
+/// @notice Bytes is a library for manipulating byte arrays.
+library Bytes {
+    /// @custom:attribution https://github.com/GNSPS/solidity-bytes-utils
+    /// @notice Slices a byte array with a given starting index and length. Returns a new byte array
+    ///         as opposed to a pointer to the original array. Will throw if trying to slice more
+    ///         bytes than exist in the array.
+    /// @param _bytes Byte array to slice.
+    /// @param _start Starting index of the slice.
+    /// @param _length Length of the slice.
+    /// @return Slice of the input byte array.
+    function slice(bytes memory _bytes, uint256 _start, uint256 _length) internal pure returns (bytes memory) {
+        unchecked {
+            require(_length + 31 >= _length, "slice_overflow");
+            require(_start + _length >= _start, "slice_overflow");
+            require(_bytes.length >= _start + _length, "slice_outOfBounds");
+        }
+
+        bytes memory tempBytes;
+
+        assembly {
+            switch iszero(_length)
+            case 0 {
+                // Get a location of some free memory and store it in tempBytes as
+                // Solidity does for memory variables.
+                tempBytes := mload(0x40)
+
+                // The first word of the slice result is potentially a partial
+                // word read from the original array. To read it, we calculate
+                // the length of that partial word and start copying that many
+                // bytes into the array. The first word we copy will start with
+                // data we don't care about, but the last `lengthmod` bytes will
+                // land at the beginning of the contents of the new array. When
+                // we're done copying, we overwrite the full first word with
+                // the actual length of the slice.
+                let lengthmod := and(_length, 31)
+
+                // The multiplication in the next line is necessary
+                // because when slicing multiples of 32 bytes (lengthmod == 0)
+                // the following copy loop was copying the origin's length
+                // and then ending prematurely not copying everything it should.
+                let mc := add(add(tempBytes, lengthmod), mul(0x20, iszero(lengthmod)))
+                let end := add(mc, _length)
+
+                for {
+                    // The multiplication in the next line has the same exact purpose
+                    // as the one above.
+                    let cc := add(add(add(_bytes, lengthmod), mul(0x20, iszero(lengthmod))), _start)
+                } lt(mc, end) {
+                    mc := add(mc, 0x20)
+                    cc := add(cc, 0x20)
+                } { mstore(mc, mload(cc)) }
+
+                mstore(tempBytes, _length)
+
+                //update free-memory pointer
+                //allocating the array padded to 32 bytes like the compiler does now
+                mstore(0x40, and(add(mc, 31), not(31)))
+            }
+            //if we want a zero-length slice let's just return a zero-length array
+            default {
+                tempBytes := mload(0x40)
+
+                //zero out the 32 bytes slice we are about to return
+                //we need to do it because Solidity does not garbage collect
+                mstore(tempBytes, 0)
+
+                mstore(0x40, add(tempBytes, 0x20))
+            }
+        }
+
+        return tempBytes;
+    }
+
+    /// @notice Slices a byte array with a given starting index up to the end of the original byte
+    ///         array. Returns a new array rathern than a pointer to the original.
+    /// @param _bytes Byte array to slice.
+    /// @param _start Starting index of the slice.
+    /// @return Slice of the input byte array.
+    function slice(bytes memory _bytes, uint256 _start) internal pure returns (bytes memory) {
+        if (_start >= _bytes.length) {
+            return bytes("");
+        }
+        return slice(_bytes, _start, _bytes.length - _start);
+    }
+
+    /// @notice Converts a byte array into a nibble array by splitting each byte into two nibbles.
+    ///         Resulting nibble array will be exactly twice as long as the input byte array.
+    /// @param _bytes Input byte array to convert.
+    /// @return Resulting nibble array.
+    function toNibbles(bytes memory _bytes) internal pure returns (bytes memory) {
+        bytes memory _nibbles;
+        assembly {
+            // Grab a free memory offset for the new array
+            _nibbles := mload(0x40)
+
+            // Load the length of the passed bytes array from memory
+            let bytesLength := mload(_bytes)
+
+            // Calculate the length of the new nibble array
+            // This is the length of the input array times 2
+            let nibblesLength := shl(0x01, bytesLength)
+
+            // Update the free memory pointer to allocate memory for the new array.
+            // To do this, we add the length of the new array + 32 bytes for the array length
+            // rounded up to the nearest 32 byte boundary to the current free memory pointer.
+            mstore(0x40, add(_nibbles, and(not(0x1F), add(nibblesLength, 0x3F))))
+
+            // Store the length of the new array in memory
+            mstore(_nibbles, nibblesLength)
+
+            // Store the memory offset of the _bytes array's contents on the stack
+            let bytesStart := add(_bytes, 0x20)
+
+            // Store the memory offset of the nibbles array's contents on the stack
+            let nibblesStart := add(_nibbles, 0x20)
+
+            // Loop through each byte in the input array
+            for { let i := 0x00 } lt(i, bytesLength) { i := add(i, 0x01) } {
+                // Get the starting offset of the next 2 bytes in the nibbles array
+                let offset := add(nibblesStart, shl(0x01, i))
+                // Load the byte at the current index within the `_bytes` array
+                let b := byte(0x00, mload(add(bytesStart, i)))
+
+                // Pull out the first nibble and store it in the new array
+                mstore8(offset, shr(0x04, b))
+                // Pull out the second nibble and store it in the new array
+                mstore8(add(offset, 0x01), and(b, 0x0F))
+            }
+        }
+        return _nibbles;
+    }
+
+    /// @notice Compares two byte arrays by comparing their keccak256 hashes.
+    /// @param _bytes First byte array to compare.
+    /// @param _other Second byte array to compare.
+    /// @return True if the two byte arrays are equal, false otherwise.
+    function equal(bytes memory _bytes, bytes memory _other) internal pure returns (bool) {
+        return keccak256(_bytes) == keccak256(_other);
+    }
+}
+
+// src/libraries/PortalErrors.sol
+
+/// @notice Error for when a deposit or withdrawal is to a bad target.
+error BadTarget();
+/// @notice Error for when a deposit has too much calldata.
+error LargeCalldata();
+/// @notice Error for when a deposit has too small of a gas limit.
+error SmallGasLimit();
+/// @notice Error for when a withdrawal transfer fails.
+error TransferFailed();
+/// @notice Error for when a method is called that only works when using a custom gas token.
+error OnlyCustomGasToken();
+/// @notice Error for when a method cannot be called with non zero CALLVALUE.
+error NoValue();
+/// @notice Error for an unauthorized CALLER.
+error Unauthorized();
+/// @notice Error for when a method cannot be called when paused. This could be renamed
+///         to `Paused` in the future, but it collides with the `Paused` event.
+error CallPaused();
+/// @notice Error for special gas estimation.
+error GasEstimation();
+
+// src/libraries/SafeCall.sol
+
+/// @title SafeCall
+/// @notice Perform low level safe calls
+library SafeCall {
+    /// @notice Performs a low level call without copying any returndata.
+    /// @dev Passes no calldata to the call context.
+    /// @param _target   Address to call
+    /// @param _gas      Amount of gas to pass to the call
+    /// @param _value    Amount of value to pass to the call
+    function send(address _target, uint256 _gas, uint256 _value) internal returns (bool) {
+        bool _success;
+        assembly {
+            _success :=
+                call(
+                    _gas, // gas
+                    _target, // recipient
+                    _value, // ether value
+                    0, // inloc
+                    0, // inlen
+                    0, // outloc
+                    0 // outlen
+                )
+        }
+        return _success;
+    }
+
+    /// @notice Perform a low level call without copying any returndata
+    /// @param _target   Address to call
+    /// @param _gas      Amount of gas to pass to the call
+    /// @param _value    Amount of value to pass to the call
+    /// @param _calldata Calldata to pass to the call
+    function call(address _target, uint256 _gas, uint256 _value, bytes memory _calldata) internal returns (bool) {
+        bool _success;
+        assembly {
+            _success :=
+                call(
+                    _gas, // gas
+                    _target, // recipient
+                    _value, // ether value
+                    add(_calldata, 32), // inloc
+                    mload(_calldata), // inlen
+                    0, // outloc
+                    0 // outlen
+                )
+        }
+        return _success;
+    }
+
+    /// @notice Helper function to determine if there is sufficient gas remaining within the context
+    ///         to guarantee that the minimum gas requirement for a call will be met as well as
+    ///         optionally reserving a specified amount of gas for after the call has concluded.
+    /// @param _minGas      The minimum amount of gas that may be passed to the target context.
+    /// @param _reservedGas Optional amount of gas to reserve for the caller after the execution
+    ///                     of the target context.
+    /// @return `true` if there is enough gas remaining to safely supply `_minGas` to the target
+    ///         context as well as reserve `_reservedGas` for the caller after the execution of
+    ///         the target context.
+    /// @dev !!!!! FOOTGUN ALERT !!!!!
+    ///      1.) The 40_000 base buffer is to account for the worst case of the dynamic cost of the
+    ///          `CALL` opcode's `address_access_cost`, `positive_value_cost`, and
+    ///          `value_to_empty_account_cost` factors with an added buffer of 5,700 gas. It is
+    ///          still possible to self-rekt by initiating a withdrawal with a minimum gas limit
+    ///          that does not account for the `memory_expansion_cost` & `code_execution_cost`
+    ///          factors of the dynamic cost of the `CALL` opcode.
+    ///      2.) This function should *directly* precede the external call if possible. There is an
+    ///          added buffer to account for gas consumed between this check and the call, but it
+    ///          is only 5,700 gas.
+    ///      3.) Because EIP-150 ensures that a maximum of 63/64ths of the remaining gas in the call
+    ///          frame may be passed to a subcontext, we need to ensure that the gas will not be
+    ///          truncated.
+    ///      4.) Use wisely. This function is not a silver bullet.
+    function hasMinGas(uint256 _minGas, uint256 _reservedGas) internal view returns (bool) {
+        bool _hasMinGas;
+        assembly {
+            // Equation: gas × 63 ≥ minGas × 64 + 63(40_000 + reservedGas)
+            _hasMinGas := iszero(lt(mul(gas(), 63), add(mul(_minGas, 64), mul(add(40000, _reservedGas), 63))))
+        }
+        return _hasMinGas;
+    }
+
+    /// @notice Perform a low level call without copying any returndata. This function
+    ///         will revert if the call cannot be performed with the specified minimum
+    ///         gas.
+    /// @param _target   Address to call
+    /// @param _minGas   The minimum amount of gas that may be passed to the call
+    /// @param _value    Amount of value to pass to the call
+    /// @param _calldata Calldata to pass to the call
+    function callWithMinGas(address _target, uint256 _minGas, uint256 _value, bytes memory _calldata)
+        internal
+        returns (bool)
+    {
+        bool _success;
+        bool _hasMinGas = hasMinGas(_minGas, 0);
+        assembly {
+            // Assertion: gasleft() >= (_minGas * 64) / 63 + 40_000
+            if iszero(_hasMinGas) {
+                // Store the "Error(string)" selector in scratch space.
+                mstore(0, 0x08c379a0)
+                // Store the pointer to the string length in scratch space.
+                mstore(32, 32)
+                // Store the string.
+                //
+                // SAFETY:
+                // - We pad the beginning of the string with two zero bytes as well as the
+                // length (24) to ensure that we override the free memory pointer at offset
+                // 0x40. This is necessary because the free memory pointer is likely to
+                // be greater than 1 byte when this function is called, but it is incredibly
+                // unlikely that it will be greater than 3 bytes. As for the data within
+                // 0x60, it is ensured that it is 0 due to 0x60 being the zero offset.
+                // - It's fine to clobber the free memory pointer, we're reverting.
+                mstore(88, 0x0000185361666543616c6c3a204e6f7420656e6f75676820676173)
+
+                // Revert with 'Error("SafeCall: Not enough gas")'
+                revert(28, 100)
+            }
+
+            // The call will be supplied at least ((_minGas * 64) / 63) gas due to the
+            // above assertion. This ensures that, in all circumstances (except for when the
+            // `_minGas` does not account for the `memory_expansion_cost` and `code_execution_cost`
+            // factors of the dynamic cost of the `CALL` opcode), the call will receive at least
+            // the minimum amount of gas specified.
+            _success :=
+                call(
+                    gas(), // gas
+                    _target, // recipient
+                    _value, // ether value
+                    add(_calldata, 32), // inloc
+                    mload(_calldata), // inlen
+                    0x00, // outloc
+                    0x00 // outlen
+                )
+        }
+        return _success;
+    }
+}
+
+// src/libraries/Storage.sol
+
+/// @title Storage
+/// @notice Storage handles reading and writing to arbitary storage locations
+library Storage {
+    /// @notice Returns an address stored in an arbitrary storage slot.
+    ///         These storage slots decouple the storage layout from
+    ///         solc's automation.
+    /// @param _slot The storage slot to retrieve the address from.
+    function getAddress(bytes32 _slot) internal view returns (address addr_) {
+        assembly {
+            addr_ := sload(_slot)
+        }
+    }
+
+    /// @notice Stores an address in an arbitrary storage slot, `_slot`.
+    /// @param _slot The storage slot to store the address in.
+    /// @param _address The protocol version to store
+    /// @dev WARNING! This function must be used cautiously, as it allows for overwriting addresses
+    ///      in arbitrary storage slots.
+    function setAddress(bytes32 _slot, address _address) internal {
+        assembly {
+            sstore(_slot, _address)
+        }
+    }
+
+    /// @notice Returns a uint256 stored in an arbitrary storage slot.
+    ///         These storage slots decouple the storage layout from
+    ///         solc's automation.
+    /// @param _slot The storage slot to retrieve the address from.
+    function getUint(bytes32 _slot) internal view returns (uint256 value_) {
+        assembly {
+            value_ := sload(_slot)
+        }
+    }
+
+    /// @notice Stores a value in an arbitrary storage slot, `_slot`.
+    /// @param _slot The storage slot to store the address in.
+    /// @param _value The protocol version to store
+    /// @dev WARNING! This function must be used cautiously, as it allows for overwriting values
+    ///      in arbitrary storage slots.
+    function setUint(bytes32 _slot, uint256 _value) internal {
+        assembly {
+            sstore(_slot, _value)
+        }
+    }
+
+    /// @notice Returns a bytes32 stored in an arbitrary storage slot.
+    ///         These storage slots decouple the storage layout from
+    ///         solc's automation.
+    /// @param _slot The storage slot to retrieve the address from.
+    function getBytes32(bytes32 _slot) internal view returns (bytes32 value_) {
+        assembly {
+            value_ := sload(_slot)
+        }
+    }
+
+    /// @notice Stores a bytes32 value in an arbitrary storage slot, `_slot`.
+    /// @param _slot The storage slot to store the address in.
+    /// @param _value The bytes32 value to store.
+    /// @dev WARNING! This function must be used cautiously, as it allows for overwriting values
+    ///      in arbitrary storage slots.
+    function setBytes32(bytes32 _slot, bytes32 _value) internal {
+        assembly {
+            sstore(_slot, _value)
+        }
+    }
+
+    /// @notice Stores a bool value in an arbitrary storage slot, `_slot`.
+    /// @param _slot The storage slot to store the bool in.
+    /// @param _value The bool value to store
+    /// @dev WARNING! This function must be used cautiously, as it allows for overwriting values
+    ///      in arbitrary storage slots.
+    function setBool(bytes32 _slot, bool _value) internal {
+        assembly {
+            sstore(_slot, _value)
+        }
+    }
+
+    /// @notice Returns a bool stored in an arbitrary storage slot.
+    /// @param _slot The storage slot to retrieve the bool from.
+    function getBool(bytes32 _slot) internal view returns (bool value_) {
+        assembly {
+            value_ := sload(_slot)
         }
     }
 }
@@ -3549,6 +3363,184 @@ interface ISemver {
     function version() external view returns (string memory);
 }
 
+// src/vendor/AddressAliasHelper.sol
+
+/*
+ * Copyright 2019-2021, Offchain Labs, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+library AddressAliasHelper {
+    uint160 constant offset = uint160(0x1111000000000000000000000000000000001111);
+
+    /// @notice Utility function that converts the address in the L1 that submitted a tx to
+    /// the inbox to the msg.sender viewed in the L2
+    /// @param l1Address the address in the L1 that triggered the tx to L2
+    /// @return l2Address L2 address as viewed in msg.sender
+    function applyL1ToL2Alias(address l1Address) internal pure returns (address l2Address) {
+        unchecked {
+            l2Address = address(uint160(l1Address) + offset);
+        }
+    }
+
+    /// @notice Utility function that converts the msg.sender viewed in the L2 to the
+    /// address in the L1 that submitted a tx to the inbox
+    /// @param l2Address L2 address as viewed in msg.sender
+    /// @return l1Address the address in the L1 that triggered the tx to L2
+    function undoL1ToL2Alias(address l2Address) internal pure returns (address l1Address) {
+        unchecked {
+            l1Address = address(uint160(l2Address) - offset);
+        }
+    }
+}
+
+// lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol
+
+// OpenZeppelin Contracts (last updated v4.7.0) (proxy/utils/Initializable.sol)
+
+/**
+ * @dev This is a base contract to aid in writing upgradeable contracts, or any kind of contract that will be deployed
+ * behind a proxy. Since proxied contracts do not make use of a constructor, it's common to move constructor logic to an
+ * external initializer function, usually called `initialize`. It then becomes necessary to protect this initializer
+ * function so it can only be called once. The {initializer} modifier provided by this contract will have this effect.
+ *
+ * The initialization functions use a version number. Once a version number is used, it is consumed and cannot be
+ * reused. This mechanism prevents re-execution of each "step" but allows the creation of new initialization steps in
+ * case an upgrade adds a module that needs to be initialized.
+ *
+ * For example:
+ *
+ * [.hljs-theme-light.nopadding]
+ * ```
+ * contract MyToken is ERC20Upgradeable {
+ *     function initialize() initializer public {
+ *         __ERC20_init("MyToken", "MTK");
+ *     }
+ * }
+ * contract MyTokenV2 is MyToken, ERC20PermitUpgradeable {
+ *     function initializeV2() reinitializer(2) public {
+ *         __ERC20Permit_init("MyToken");
+ *     }
+ * }
+ * ```
+ *
+ * TIP: To avoid leaving the proxy in an uninitialized state, the initializer function should be called as early as
+ * possible by providing the encoded function call as the `_data` argument to {ERC1967Proxy-constructor}.
+ *
+ * CAUTION: When used with inheritance, manual care must be taken to not invoke a parent initializer twice, or to ensure
+ * that all initializers are idempotent. This is not verified automatically as constructors are by Solidity.
+ *
+ * [CAUTION]
+ * ====
+ * Avoid leaving a contract uninitialized.
+ *
+ * An uninitialized contract can be taken over by an attacker. This applies to both a proxy and its implementation
+ * contract, which may impact the proxy. To prevent the implementation contract from being used, you should invoke
+ * the {_disableInitializers} function in the constructor to automatically lock it when it is deployed:
+ *
+ * [.hljs-theme-light.nopadding]
+ * ```
+ * /// @custom:oz-upgrades-unsafe-allow constructor
+ * constructor() {
+ *     _disableInitializers();
+ * }
+ * ```
+ * ====
+ */
+abstract contract Initializable_0 {
+    /**
+     * @dev Indicates that the contract has been initialized.
+     * @custom:oz-retyped-from bool
+     */
+    uint8 private _initialized;
+
+    /**
+     * @dev Indicates that the contract is in the process of being initialized.
+     */
+    bool private _initializing;
+
+    /**
+     * @dev Triggered when the contract has been initialized or reinitialized.
+     */
+    event Initialized(uint8 version);
+
+    /**
+     * @dev A modifier that defines a protected initializer function that can be invoked at most once. In its scope,
+     * `onlyInitializing` functions can be used to initialize parent contracts. Equivalent to `reinitializer(1)`.
+     */
+    modifier initializer() {
+        bool isTopLevelCall = !_initializing;
+        require(
+            (isTopLevelCall && _initialized < 1) || (!Address.isContract(address(this)) && _initialized == 1),
+            "Initializable: contract is already initialized"
+        );
+        _initialized = 1;
+        if (isTopLevelCall) {
+            _initializing = true;
+        }
+        _;
+        if (isTopLevelCall) {
+            _initializing = false;
+            emit Initialized(1);
+        }
+    }
+
+    /**
+     * @dev A modifier that defines a protected reinitializer function that can be invoked at most once, and only if the
+     * contract hasn't been initialized to a greater version before. In its scope, `onlyInitializing` functions can be
+     * used to initialize parent contracts.
+     *
+     * `initializer` is equivalent to `reinitializer(1)`, so a reinitializer may be used after the original
+     * initialization step. This is essential to configure modules that are added through upgrades and that require
+     * initialization.
+     *
+     * Note that versions can jump in increments greater than 1; this implies that if multiple reinitializers coexist in
+     * a contract, executing them in the right order is up to the developer or operator.
+     */
+    modifier reinitializer(uint8 version) {
+        require(!_initializing && _initialized < version, "Initializable: contract is already initialized");
+        _initialized = version;
+        _initializing = true;
+        _;
+        _initializing = false;
+        emit Initialized(version);
+    }
+
+    /**
+     * @dev Modifier to protect an initialization function so that it can only be invoked by functions with the
+     * {initializer} and {reinitializer} modifiers, directly or indirectly.
+     */
+    modifier onlyInitializing() {
+        require(_initializing, "Initializable: contract is not initializing");
+        _;
+    }
+
+    /**
+     * @dev Locks the contract, preventing any future reinitialization. This cannot be part of an initializer call.
+     * Calling this in the constructor of a contract will prevent that contract from being initialized or reinitialized
+     * to any version. It is recommended to use this to lock implementation contracts that are designed to be called
+     * through proxies.
+     */
+    function _disableInitializers() internal virtual {
+        require(!_initializing, "Initializable: contract is initializing");
+        if (_initialized < type(uint8).max) {
+            _initialized = type(uint8).max;
+            emit Initialized(type(uint8).max);
+        }
+    }
+}
+
 // lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol
 
 // OpenZeppelin Contracts (last updated v4.7.0) (proxy/utils/Initializable.sol)
@@ -3602,7 +3594,7 @@ interface ISemver {
  * ```
  * ====
  */
-abstract contract Initializable {
+abstract contract Initializable_1 {
     /**
      * @dev Indicates that the contract has been initialized.
      * @custom:oz-retyped-from bool
@@ -3959,91 +3951,6 @@ abstract contract OwnerManager is SelfAuthorized {
         }
         return array;
     }
-}
-
-// src/dispute/interfaces/IBigStepper.sol
-
-/// @title IBigStepper
-/// @notice Describes a state machine that can perform a single instruction step, provided a prestate and an optional
-///         proof.
-/// ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-/// ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣼⠶⢅⠒⢄⢔⣶⡦⣤⡤⠄⣀⠀⠀⠀⠀⠀⠀⠀
-/// ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠨⡏⠀⠀⠈⠢⣙⢯⣄⠀⢨⠯⡺⡘⢄⠀⠀⠀⠀⠀
-/// ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣶⡆⠀⠀⠀⠀⠈⠓⠬⡒⠡⣀⢙⡜⡀⠓⠄⠀⠀⠀
-/// ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡷⠿⣧⣀⡀⠀⠀⠀⠀⠀⠀⠉⠣⣞⠩⠥⠀⠼⢄⠀⠀
-/// ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠉⢹⣶⠒⠒⠂⠈⠉⠁⠘⡆⠀⣿⣿⠫⡄⠀
-/// ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⢶⣤⣀⡀⠀⠀⢸⡿⠀⠀⠀⠀⠀⢀⠞⠀⠀⢡⢨⢀⡄⠀
-/// ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⡒⣿⢿⡤⠝⡣⠉⠁⠚⠛⠀⠤⠤⣄⡰⠁⠀⠀⠀⠉⠙⢸⠀⠀
-/// ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡤⢯⡌⡿⡇⠘⡷⠀⠁⠀⠀⢀⣰⠢⠲⠛⣈⣸⠦⠤⠶⠴⢬⣐⣊⡂⠀
-/// ⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣤⡪⡗⢫⠞⠀⠆⣀⠻⠤⠴⠐⠚⣉⢀⠦⠂⠋⠁⠀⠁⠀⠀⠀⠀⢋⠉⠇⠀
-/// ⠀⠀⠀⠀⣀⡤⠐⠒⠘⡹⠉⢸⠇⠸⠀⠀⠀⠀⣀⣤⠴⠚⠉⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠼⠀⣾⠀
-/// ⠀⠀⠀⡰⠀⠉⠉⠀⠁⠀⠀⠈⢇⠈⠒⠒⠘⠈⢀⢡⡂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⠀⢸⡄
-/// ⠀⠀⠸⣿⣆⠤⢀⡀⠀⠀⠀⠀⢘⡌⠀⠀⣀⣀⣀⡈⣤⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⢸⡇
-/// ⠀⠀⢸⣀⠀⠉⠒⠐⠛⠋⠭⠭⠍⠉⠛⠒⠒⠒⠀⠒⠚⠛⠛⠛⠩⠭⠭⠭⠭⠤⠤⠤⠤⠤⠭⠭⠉⠓⡆
-/// ⠀⠀⠘⠿⣷⣶⣤⣤⣀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣤⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇
-/// ⠀⠀⠀⠀⠀⠉⠙⠛⠛⠻⠿⢿⣿⣿⣷⣶⣶⣶⣤⣤⣀⣁⣛⣃⣒⠿⠿⠿⠤⠠⠄⠤⠤⢤⣛⣓⣂⣻⡇
-/// ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠉⠉⠙⠛⠻⠿⠿⠿⢿⣿⣿⣿⣷⣶⣶⣾⣿⣿⣿⣿⠿⠟⠁
-/// ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠈⠉⠉⠉⠉⠁⠀⠀⠀⠀⠀
-interface IBigStepper {
-    /// @notice Performs the state transition from a given prestate and returns the hash of the post state witness.
-    /// @param _stateData The raw opaque prestate data.
-    /// @param _proof Opaque proof data, can be used to prove things about the prestate in relation to the state of the
-    ///               interface's implementation.
-    /// @param _localContext The local key context for the preimage oracle. Optional, can be set as a constant if the
-    ///                      implementation only requires one set of local keys.
-    /// @return postState_ The hash of the post state witness after the state transition.
-    function step(bytes calldata _stateData, bytes calldata _proof, bytes32 _localContext)
-        external
-        returns (bytes32 postState_);
-
-    /// @notice Returns the preimage oracle used by the state machine.
-    function oracle() external view returns (IPreimageOracle oracle_);
-}
-
-// src/dispute/interfaces/IDelayedWETH.sol
-
-/// @title IDelayedWETH
-/// @notice Interface for the DelayedWETH contract.
-interface IDelayedWETH is IWETH {
-    /// @notice Represents a withdrawal request.
-    struct WithdrawalRequest {
-        uint256 amount;
-        uint256 timestamp;
-    }
-
-    /// @notice Emitted when an unwrap is started.
-    /// @param src The address that started the unwrap.
-    /// @param wad The amount of WETH that was unwrapped.
-    event Unwrap(address indexed src, uint256 wad);
-
-    /// @notice Returns the withdrawal delay in seconds.
-    /// @return The withdrawal delay in seconds.
-    function delay() external view returns (uint256);
-
-    /// @notice Returns a withdrawal request for the given address.
-    /// @param _owner The address to query the withdrawal request of.
-    /// @param _guy Sub-account to query the withdrawal request of.
-    /// @return The withdrawal request for the given address-subaccount pair.
-    function withdrawals(address _owner, address _guy) external view returns (uint256, uint256);
-
-    /// @notice Unlocks withdrawals for the sender's account, after a time delay.
-    /// @param _guy Sub-account to unlock.
-    /// @param _wad The amount of WETH to unlock.
-    function unlock(address _guy, uint256 _wad) external;
-
-    /// @notice Extension to withdrawal, must provide a sub-account to withdraw from.
-    /// @param _guy Sub-account to withdraw from.
-    /// @param _wad The amount of WETH to withdraw.
-    function withdraw(address _guy, uint256 _wad) external;
-
-    /// @notice Allows the owner to recover from error cases by pulling ETH out of the contract.
-    /// @param _wad The amount of WETH to recover.
-    function recover(uint256 _wad) external;
-
-    /// @notice Allows the owner to recover from error cases by pulling ETH from a specific owner.
-    /// @param _guy The address to recover the WETH from.
-    /// @param _wad The amount of WETH to recover.
-    function hold(address _guy, uint256 _wad) external;
 }
 
 // src/dispute/lib/LibUDT.sol
@@ -4526,7 +4433,7 @@ library RLPReader {
  *
  * This contract is only required for intermediate, library-like contracts.
  */
-abstract contract ContextUpgradeable is Initializable {
+abstract contract ContextUpgradeable is Initializable_1 {
     function __Context_init() internal onlyInitializing {}
 
     function __Context_init_unchained() internal onlyInitializing {}
@@ -4553,12 +4460,10 @@ abstract contract ContextUpgradeable is Initializable {
 //                `DisputeGameFactory` Errors                 //
 ////////////////////////////////////////////////////////////////
 
-// 0x031c6de4
 /// @notice Thrown when a dispute game is attempted to be created with an unsupported game type.
 /// @param gameType The unsupported game type.
 error NoImplementation(GameType gameType);
 
-// 0x014f6fe5
 /// @notice Thrown when a dispute game that already exists is attempted to be created.
 /// @param uuid The UUID of the dispute game that already exists.
 error GameAlreadyExists(Hash uuid);
@@ -4596,12 +4501,10 @@ error ClaimAlreadyExists();
 /// @notice Thrown when a disputed claim does not match its index in the game.
 error InvalidDisputedClaimIndex();
 
-// 0x67fe1950
 /// @notice Thrown when an action that requires the game to be `IN_PROGRESS` is invoked when
 ///         the game is not in progress.
 error GameNotInProgress();
 
-// 0x3381d114
 /// @notice Thrown when a move is attempted to be made after the clock has timed out.
 error ClockTimeExceeded();
 
@@ -4671,7 +4574,6 @@ error L2BlockNumberChallenged();
 //              `PermissionedDisputeGame` Errors              //
 ////////////////////////////////////////////////////////////////
 
-// 0xd386ef3e
 /// @notice Thrown when an unauthorized address attempts to interact with the game.
 error BadAuth();
 
@@ -4747,6 +4649,31 @@ library LocalPreimageKey {
     uint256 internal constant CHAIN_ID = 0x05;
 }
 
+// src/libraries/Arithmetic.sol
+
+/// @title Arithmetic
+/// @notice Even more math than before.
+library Arithmetic {
+    /// @notice Clamps a value between a minimum and maximum.
+    /// @param _value The value to clamp.
+    /// @param _min   The minimum value.
+    /// @param _max   The maximum value.
+    /// @return The clamped value.
+    function clamp(int256 _value, int256 _min, int256 _max) internal pure returns (int256) {
+        return SignedMath.min(SignedMath.max(_value, _min), _max);
+    }
+
+    /// @notice (c)oefficient (d)enominator (exp)onentiation function.
+    ///         Returns the result of: c * (1 - 1/d)^exp.
+    /// @param _coefficient Coefficient of the function.
+    /// @param _denominator Fractional denominator.
+    /// @param _exponent    Power function exponent.
+    /// @return Result of c * (1 - 1/d)^exp.
+    function cdexp(int256 _coefficient, int256 _denominator, int256 _exponent) internal pure returns (int256) {
+        return (_coefficient * (FixedPointMathLib.powWad(1e18 - (1e18 / _denominator), _exponent * 1e18))) / 1e18;
+    }
+}
+
 // lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol
 
 // OpenZeppelin Contracts (last updated v4.7.0) (access/Ownable.sol)
@@ -4763,7 +4690,7 @@ library LocalPreimageKey {
  * `onlyOwner`, which can be applied to your functions to restrict their use to
  * the owner.
  */
-abstract contract OwnableUpgradeable is Initializable, ContextUpgradeable {
+abstract contract OwnableUpgradeable is Initializable_1, ContextUpgradeable {
     address private _owner;
 
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
@@ -5409,6 +5336,308 @@ library Hashing {
     }
 }
 
+// src/libraries/trie/MerkleTrie.sol
+
+/// @title MerkleTrie
+/// @notice MerkleTrie is a small library for verifying standard Ethereum Merkle-Patricia trie
+///         inclusion proofs. By default, this library assumes a hexary trie. One can change the
+///         trie radix constant to support other trie radixes.
+library MerkleTrie {
+    /// @notice Struct representing a node in the trie.
+    /// @custom:field encoded The RLP-encoded node.
+    /// @custom:field decoded The RLP-decoded node.
+    struct TrieNode {
+        bytes encoded;
+        RLPReader.RLPItem[] decoded;
+    }
+
+    /// @notice Determines the number of elements per branch node.
+    uint256 internal constant TREE_RADIX = 16;
+
+    /// @notice Branch nodes have TREE_RADIX elements and one value element.
+    uint256 internal constant BRANCH_NODE_LENGTH = TREE_RADIX + 1;
+
+    /// @notice Leaf nodes and extension nodes have two elements, a `path` and a `value`.
+    uint256 internal constant LEAF_OR_EXTENSION_NODE_LENGTH = 2;
+
+    /// @notice Prefix for even-nibbled extension node paths.
+    uint8 internal constant PREFIX_EXTENSION_EVEN = 0;
+
+    /// @notice Prefix for odd-nibbled extension node paths.
+    uint8 internal constant PREFIX_EXTENSION_ODD = 1;
+
+    /// @notice Prefix for even-nibbled leaf node paths.
+    uint8 internal constant PREFIX_LEAF_EVEN = 2;
+
+    /// @notice Prefix for odd-nibbled leaf node paths.
+    uint8 internal constant PREFIX_LEAF_ODD = 3;
+
+    /// @notice Verifies a proof that a given key/value pair is present in the trie.
+    /// @param _key   Key of the node to search for, as a hex string.
+    /// @param _value Value of the node to search for, as a hex string.
+    /// @param _proof Merkle trie inclusion proof for the desired node. Unlike traditional Merkle
+    ///               trees, this proof is executed top-down and consists of a list of RLP-encoded
+    ///               nodes that make a path down to the target node.
+    /// @param _root  Known root of the Merkle trie. Used to verify that the included proof is
+    ///               correctly constructed.
+    /// @return valid_ Whether or not the proof is valid.
+    function verifyInclusionProof(bytes memory _key, bytes memory _value, bytes[] memory _proof, bytes32 _root)
+        internal
+        pure
+        returns (bool valid_)
+    {
+        valid_ = Bytes.equal(_value, get(_key, _proof, _root));
+    }
+
+    /// @notice Retrieves the value associated with a given key.
+    /// @param _key   Key to search for, as hex bytes.
+    /// @param _proof Merkle trie inclusion proof for the key.
+    /// @param _root  Known root of the Merkle trie.
+    /// @return value_ Value of the key if it exists.
+    function get(bytes memory _key, bytes[] memory _proof, bytes32 _root) internal pure returns (bytes memory value_) {
+        require(_key.length > 0, "MerkleTrie: empty key");
+
+        TrieNode[] memory proof = _parseProof(_proof);
+        bytes memory key = Bytes.toNibbles(_key);
+        bytes memory currentNodeID = abi.encodePacked(_root);
+        uint256 currentKeyIndex = 0;
+
+        // Proof is top-down, so we start at the first element (root).
+        for (uint256 i = 0; i < proof.length; i++) {
+            TrieNode memory currentNode = proof[i];
+
+            // Key index should never exceed total key length or we'll be out of bounds.
+            require(currentKeyIndex <= key.length, "MerkleTrie: key index exceeds total key length");
+
+            if (currentKeyIndex == 0) {
+                // First proof element is always the root node.
+                require(
+                    Bytes.equal(abi.encodePacked(keccak256(currentNode.encoded)), currentNodeID),
+                    "MerkleTrie: invalid root hash"
+                );
+            } else if (currentNode.encoded.length >= 32) {
+                // Nodes 32 bytes or larger are hashed inside branch nodes.
+                require(
+                    Bytes.equal(abi.encodePacked(keccak256(currentNode.encoded)), currentNodeID),
+                    "MerkleTrie: invalid large internal hash"
+                );
+            } else {
+                // Nodes smaller than 32 bytes aren't hashed.
+                require(Bytes.equal(currentNode.encoded, currentNodeID), "MerkleTrie: invalid internal node hash");
+            }
+
+            if (currentNode.decoded.length == BRANCH_NODE_LENGTH) {
+                if (currentKeyIndex == key.length) {
+                    // Value is the last element of the decoded list (for branch nodes). There's
+                    // some ambiguity in the Merkle trie specification because bytes(0) is a
+                    // valid value to place into the trie, but for branch nodes bytes(0) can exist
+                    // even when the value wasn't explicitly placed there. Geth treats a value of
+                    // bytes(0) as "key does not exist" and so we do the same.
+                    value_ = RLPReader.readBytes(currentNode.decoded[TREE_RADIX]);
+                    require(value_.length > 0, "MerkleTrie: value length must be greater than zero (branch)");
+
+                    // Extra proof elements are not allowed.
+                    require(i == proof.length - 1, "MerkleTrie: value node must be last node in proof (branch)");
+
+                    return value_;
+                } else {
+                    // We're not at the end of the key yet.
+                    // Figure out what the next node ID should be and continue.
+                    uint8 branchKey = uint8(key[currentKeyIndex]);
+                    RLPReader.RLPItem memory nextNode = currentNode.decoded[branchKey];
+                    currentNodeID = _getNodeID(nextNode);
+                    currentKeyIndex += 1;
+                }
+            } else if (currentNode.decoded.length == LEAF_OR_EXTENSION_NODE_LENGTH) {
+                bytes memory path = _getNodePath(currentNode);
+                uint8 prefix = uint8(path[0]);
+                uint8 offset = 2 - (prefix % 2);
+                bytes memory pathRemainder = Bytes.slice(path, offset);
+                bytes memory keyRemainder = Bytes.slice(key, currentKeyIndex);
+                uint256 sharedNibbleLength = _getSharedNibbleLength(pathRemainder, keyRemainder);
+
+                // Whether this is a leaf node or an extension node, the path remainder MUST be a
+                // prefix of the key remainder (or be equal to the key remainder) or the proof is
+                // considered invalid.
+                require(
+                    pathRemainder.length == sharedNibbleLength,
+                    "MerkleTrie: path remainder must share all nibbles with key"
+                );
+
+                if (prefix == PREFIX_LEAF_EVEN || prefix == PREFIX_LEAF_ODD) {
+                    // Prefix of 2 or 3 means this is a leaf node. For the leaf node to be valid,
+                    // the key remainder must be exactly equal to the path remainder. We already
+                    // did the necessary byte comparison, so it's more efficient here to check that
+                    // the key remainder length equals the shared nibble length, which implies
+                    // equality with the path remainder (since we already did the same check with
+                    // the path remainder and the shared nibble length).
+                    require(
+                        keyRemainder.length == sharedNibbleLength,
+                        "MerkleTrie: key remainder must be identical to path remainder"
+                    );
+
+                    // Our Merkle Trie is designed specifically for the purposes of the Ethereum
+                    // state trie. Empty values are not allowed in the state trie, so we can safely
+                    // say that if the value is empty, the key should not exist and the proof is
+                    // invalid.
+                    value_ = RLPReader.readBytes(currentNode.decoded[1]);
+                    require(value_.length > 0, "MerkleTrie: value length must be greater than zero (leaf)");
+
+                    // Extra proof elements are not allowed.
+                    require(i == proof.length - 1, "MerkleTrie: value node must be last node in proof (leaf)");
+
+                    return value_;
+                } else if (prefix == PREFIX_EXTENSION_EVEN || prefix == PREFIX_EXTENSION_ODD) {
+                    // Prefix of 0 or 1 means this is an extension node. We move onto the next node
+                    // in the proof and increment the key index by the length of the path remainder
+                    // which is equal to the shared nibble length.
+                    currentNodeID = _getNodeID(currentNode.decoded[1]);
+                    currentKeyIndex += sharedNibbleLength;
+                } else {
+                    revert("MerkleTrie: received a node with an unknown prefix");
+                }
+            } else {
+                revert("MerkleTrie: received an unparseable node");
+            }
+        }
+
+        revert("MerkleTrie: ran out of proof elements");
+    }
+
+    /// @notice Parses an array of proof elements into a new array that contains both the original
+    ///         encoded element and the RLP-decoded element.
+    /// @param _proof Array of proof elements to parse.
+    /// @return proof_ Proof parsed into easily accessible structs.
+    function _parseProof(bytes[] memory _proof) private pure returns (TrieNode[] memory proof_) {
+        uint256 length = _proof.length;
+        proof_ = new TrieNode[](length);
+        for (uint256 i = 0; i < length;) {
+            proof_[i] = TrieNode({encoded: _proof[i], decoded: RLPReader.readList(_proof[i])});
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @notice Picks out the ID for a node. Node ID is referred to as the "hash" within the
+    ///         specification, but nodes < 32 bytes are not actually hashed.
+    /// @param _node Node to pull an ID for.
+    /// @return id_ ID for the node, depending on the size of its contents.
+    function _getNodeID(RLPReader.RLPItem memory _node) private pure returns (bytes memory id_) {
+        id_ = _node.length < 32 ? RLPReader.readRawBytes(_node) : RLPReader.readBytes(_node);
+    }
+
+    /// @notice Gets the path for a leaf or extension node.
+    /// @param _node Node to get a path for.
+    /// @return nibbles_ Node path, converted to an array of nibbles.
+    function _getNodePath(TrieNode memory _node) private pure returns (bytes memory nibbles_) {
+        nibbles_ = Bytes.toNibbles(RLPReader.readBytes(_node.decoded[0]));
+    }
+
+    /// @notice Utility; determines the number of nibbles shared between two nibble arrays.
+    /// @param _a First nibble array.
+    /// @param _b Second nibble array.
+    /// @return shared_ Number of shared nibbles.
+    function _getSharedNibbleLength(bytes memory _a, bytes memory _b) private pure returns (uint256 shared_) {
+        uint256 max = (_a.length < _b.length) ? _a.length : _b.length;
+        for (; shared_ < max && _a[shared_] == _b[shared_];) {
+            unchecked {
+                ++shared_;
+            }
+        }
+    }
+}
+
+// src/L1/SuperchainConfig.sol
+
+/// @custom:audit none This contracts is not yet audited.
+/// @title SuperchainConfig
+/// @notice The SuperchainConfig contract is used to manage configuration of global superchain values.
+contract SuperchainConfig is Initializable_0, ISemver {
+    /// @notice Enum representing different types of updates.
+    /// @custom:value GUARDIAN            Represents an update to the guardian.
+    enum UpdateType {
+        GUARDIAN
+    }
+
+    /// @notice Whether or not the Superchain is paused.
+    bytes32 public constant PAUSED_SLOT = bytes32(uint256(keccak256("superchainConfig.paused")) - 1);
+
+    /// @notice The address of the guardian, which can pause withdrawals from the System.
+    ///         It can only be modified by an upgrade.
+    bytes32 public constant GUARDIAN_SLOT = bytes32(uint256(keccak256("superchainConfig.guardian")) - 1);
+
+    /// @notice Emitted when the pause is triggered.
+    /// @param identifier A string helping to identify provenance of the pause transaction.
+    event Paused(string identifier);
+
+    /// @notice Emitted when the pause is lifted.
+    event Unpaused();
+
+    /// @notice Emitted when configuration is updated.
+    /// @param updateType Type of update.
+    /// @param data       Encoded update data.
+    event ConfigUpdate(UpdateType indexed updateType, bytes data);
+
+    /// @notice Semantic version.
+    /// @custom:semver 1.1.0
+    string public constant version = "1.1.0";
+
+    /// @notice Constructs the SuperchainConfig contract.
+    constructor() {
+        initialize({_guardian: address(0), _paused: false});
+    }
+
+    /// @notice Initializer.
+    /// @param _guardian    Address of the guardian, can pause the OptimismPortal.
+    /// @param _paused      Initial paused status.
+    function initialize(address _guardian, bool _paused) public initializer {
+        _setGuardian(_guardian);
+        if (_paused) {
+            _pause("Initializer paused");
+        }
+    }
+
+    /// @notice Getter for the guardian address.
+    function guardian() public view returns (address guardian_) {
+        guardian_ = Storage.getAddress(GUARDIAN_SLOT);
+    }
+
+    /// @notice Getter for the current paused status.
+    function paused() public view returns (bool paused_) {
+        paused_ = Storage.getBool(PAUSED_SLOT);
+    }
+
+    /// @notice Pauses withdrawals.
+    /// @param _identifier (Optional) A string to identify provenance of the pause transaction.
+    function pause(string memory _identifier) external {
+        require(msg.sender == guardian(), "SuperchainConfig: only guardian can pause");
+        _pause(_identifier);
+    }
+
+    /// @notice Pauses withdrawals.
+    /// @param _identifier (Optional) A string to identify provenance of the pause transaction.
+    function _pause(string memory _identifier) internal {
+        Storage.setBool(PAUSED_SLOT, true);
+        emit Paused(_identifier);
+    }
+
+    /// @notice Unpauses withdrawals.
+    function unpause() external {
+        require(msg.sender == guardian(), "SuperchainConfig: only guardian can unpause");
+        Storage.setBool(PAUSED_SLOT, false);
+        emit Unpaused();
+    }
+
+    /// @notice Sets the guardian address. This is only callable during initialization, so an upgrade
+    ///         will be required to change the guardian.
+    /// @param _guardian The new guardian address.
+    function _setGuardian(address _guardian) internal {
+        Storage.setAddress(GUARDIAN_SLOT, _guardian);
+        emit ConfigUpdate(UpdateType.GUARDIAN, abi.encode(_guardian));
+    }
+}
+
 // src/dispute/interfaces/IDisputeGame.sol
 
 /// @title IDisputeGame
@@ -5472,6 +5701,48 @@ interface IDisputeGame is IInitializable {
     /// @return rootClaim_ The root claim of the DisputeGame.
     /// @return extraData_ Any extra data supplied to the dispute game contract by the creator.
     function gameData() external view returns (GameType gameType_, Claim rootClaim_, bytes memory extraData_);
+}
+
+// src/libraries/trie/SecureMerkleTrie.sol
+
+/// @title SecureMerkleTrie
+/// @notice SecureMerkleTrie is a thin wrapper around the MerkleTrie library that hashes the input
+///         keys. Ethereum's state trie hashes input keys before storing them.
+library SecureMerkleTrie {
+    /// @notice Verifies a proof that a given key/value pair is present in the Merkle trie.
+    /// @param _key   Key of the node to search for, as a hex string.
+    /// @param _value Value of the node to search for, as a hex string.
+    /// @param _proof Merkle trie inclusion proof for the desired node. Unlike traditional Merkle
+    ///               trees, this proof is executed top-down and consists of a list of RLP-encoded
+    ///               nodes that make a path down to the target node.
+    /// @param _root  Known root of the Merkle trie. Used to verify that the included proof is
+    ///               correctly constructed.
+    /// @return valid_ Whether or not the proof is valid.
+    function verifyInclusionProof(bytes memory _key, bytes memory _value, bytes[] memory _proof, bytes32 _root)
+        internal
+        pure
+        returns (bool valid_)
+    {
+        bytes memory key = _getSecureKey(_key);
+        valid_ = MerkleTrie.verifyInclusionProof(key, _value, _proof, _root);
+    }
+
+    /// @notice Retrieves the value associated with a given key.
+    /// @param _key   Key to search for, as hex bytes.
+    /// @param _proof Merkle trie inclusion proof for the key.
+    /// @param _root  Known root of the Merkle trie.
+    /// @return value_ Value of the key if it exists.
+    function get(bytes memory _key, bytes[] memory _proof, bytes32 _root) internal pure returns (bytes memory value_) {
+        bytes memory key = _getSecureKey(_key);
+        value_ = MerkleTrie.get(key, _proof, _root);
+    }
+
+    /// @notice Computes the hashed version of the input key.
+    /// @param _key Key to hash.
+    /// @return hash_ Hashed version of the key.
+    function _getSecureKey(bytes memory _key) private pure returns (bytes memory hash_) {
+        hash_ = abi.encodePacked(keccak256(_key));
+    }
 }
 
 // src/dispute/interfaces/IDisputeGameFactory.sol
@@ -5591,196 +5862,205 @@ interface IDisputeGameFactory {
         returns (GameSearchResult[] memory games_);
 }
 
-// src/dispute/interfaces/IFaultDisputeGame.sol
+// src/L1/ResourceMetering.sol
 
-/// @title IFaultDisputeGame
-/// @notice The interface for a fault proof backed dispute game.
-interface IFaultDisputeGame is IDisputeGame {
-    /// @notice The `ClaimData` struct represents the data associated with a Claim.
-    struct ClaimData {
-        uint32 parentIndex;
-        address counteredBy;
-        address claimant;
-        uint128 bond;
-        Claim claim;
-        Position position;
-        Clock clock;
+/// @custom:upgradeable
+/// @title ResourceMetering
+/// @notice ResourceMetering implements an EIP-1559 style resource metering system where pricing
+///         updates automatically based on current demand.
+abstract contract ResourceMetering is Initializable_0 {
+    /// @notice Error returned when too much gas resource is consumed.
+    error OutOfGas();
+
+    /// @notice Represents the various parameters that control the way in which resources are
+    ///         metered. Corresponds to the EIP-1559 resource metering system.
+    /// @custom:field prevBaseFee   Base fee from the previous block(s).
+    /// @custom:field prevBoughtGas Amount of gas bought so far in the current block.
+    /// @custom:field prevBlockNum  Last block number that the base fee was updated.
+    struct ResourceParams {
+        uint128 prevBaseFee;
+        uint64 prevBoughtGas;
+        uint64 prevBlockNum;
     }
 
-    /// @notice The `ResolutionCheckpoint` struct represents the data associated with an in-progress claim resolution.
-    struct ResolutionCheckpoint {
-        bool initialCheckpointComplete;
-        uint32 subgameIndex;
-        Position leftmostPosition;
-        address counteredBy;
+    /// @notice Represents the configuration for the EIP-1559 based curve for the deposit gas
+    ///         market. These values should be set with care as it is possible to set them in
+    ///         a way that breaks the deposit gas market. The target resource limit is defined as
+    ///         maxResourceLimit / elasticityMultiplier. This struct was designed to fit within a
+    ///         single word. There is additional space for additions in the future.
+    /// @custom:field maxResourceLimit             Represents the maximum amount of deposit gas that
+    ///                                            can be purchased per block.
+    /// @custom:field elasticityMultiplier         Determines the target resource limit along with
+    ///                                            the resource limit.
+    /// @custom:field baseFeeMaxChangeDenominator  Determines max change on fee per block.
+    /// @custom:field minimumBaseFee               The min deposit base fee, it is clamped to this
+    ///                                            value.
+    /// @custom:field systemTxMaxGas               The amount of gas supplied to the system
+    ///                                            transaction. This should be set to the same
+    ///                                            number that the op-node sets as the gas limit
+    ///                                            for the system transaction.
+    /// @custom:field maximumBaseFee               The max deposit base fee, it is clamped to this
+    ///                                            value.
+    struct ResourceConfig {
+        uint32 maxResourceLimit;
+        uint8 elasticityMultiplier;
+        uint8 baseFeeMaxChangeDenominator;
+        uint32 minimumBaseFee;
+        uint32 systemTxMaxGas;
+        uint128 maximumBaseFee;
     }
 
-    /// @notice Emitted when a new claim is added to the DAG by `claimant`
-    /// @param parentIndex The index within the `claimData` array of the parent claim
-    /// @param claim The claim being added
-    /// @param claimant The address of the claimant
-    event Move(uint256 indexed parentIndex, Claim indexed claim, address indexed claimant);
+    /// @notice EIP-1559 style gas parameters.
+    ResourceParams public params;
 
-    /// @notice Attack a disagreed upon `Claim`.
-    /// @param _disputed The `Claim` being attacked.
-    /// @param _parentIndex Index of the `Claim` to attack in the `claimData` array. This must match the `_disputed`
-    /// claim.
-    /// @param _claim The `Claim` at the relative attack position.
-    function attack(Claim _disputed, uint256 _parentIndex, Claim _claim) external payable;
+    /// @notice Reserve extra slots (to a total of 50) in the storage layout for future upgrades.
+    uint256[48] private __gap;
 
-    /// @notice Defend an agreed upon `Claim`.
-    /// @notice _disputed The `Claim` being defended.
-    /// @param _parentIndex Index of the claim to defend in the `claimData` array. This must match the `_disputed`
-    /// claim.
-    /// @param _claim The `Claim` at the relative defense position.
-    function defend(Claim _disputed, uint256 _parentIndex, Claim _claim) external payable;
+    /// @notice Meters access to a function based an amount of a requested resource.
+    /// @param _amount Amount of the resource requested.
+    modifier metered(uint64 _amount) {
+        // Record initial gas amount so we can refund for it later.
+        uint256 initialGas = gasleft();
 
-    /// @notice Perform an instruction step via an on-chain fault proof processor.
-    /// @dev This function should point to a fault proof processor in order to execute
-    ///      a step in the fault proof program on-chain. The interface of the fault proof
-    ///      processor contract should adhere to the `IBigStepper` interface.
-    /// @param _claimIndex The index of the challenged claim within `claimData`.
-    /// @param _isAttack Whether or not the step is an attack or a defense.
-    /// @param _stateData The stateData of the step is the preimage of the claim at the given
-    ///        prestate, which is at `_stateIndex` if the move is an attack and `_claimIndex` if
-    ///        the move is a defense. If the step is an attack on the first instruction, it is
-    ///        the absolute prestate of the fault proof VM.
-    /// @param _proof Proof to access memory nodes in the VM's merkle state tree.
-    function step(uint256 _claimIndex, bool _isAttack, bytes calldata _stateData, bytes calldata _proof) external;
+        // Run the underlying function.
+        _;
 
-    /// @notice Posts the requested local data to the VM's `PreimageOralce`.
-    /// @param _ident The local identifier of the data to post.
-    /// @param _execLeafIdx The index of the leaf claim in an execution subgame that requires the local data for a step.
-    /// @param _partOffset The offset of the data to post.
-    function addLocalData(uint256 _ident, uint256 _execLeafIdx, uint256 _partOffset) external;
+        // Run the metering function.
+        _metered(_amount, initialGas);
+    }
 
-    /// @notice Resolves the subgame rooted at the given claim index. `_numToResolve` specifies how many children of
-    ///         the subgame will be checked in this call. If `_numToResolve` is less than the number of children, an
-    ///         internal cursor will be updated and this function may be called again to complete resolution of the
-    ///         subgame.
-    /// @dev This function must be called bottom-up in the DAG
-    ///      A subgame is a tree of claims that has a maximum depth of 1.
-    ///      A subgame root claims is valid if, and only if, all of its child claims are invalid.
-    ///      At the deepest level in the DAG, a claim is invalid if there's a successful step against it.
-    /// @param _claimIndex The index of the subgame root claim to resolve.
-    /// @param _numToResolve The number of subgames to resolve in this call. If the input is `0`, and this is the first
-    ///                      page, this function will attempt to check all of the subgame's children at once.
-    function resolveClaim(uint256 _claimIndex, uint256 _numToResolve) external;
+    /// @notice An internal function that holds all of the logic for metering a resource.
+    /// @param _amount     Amount of the resource requested.
+    /// @param _initialGas The amount of gas before any modifier execution.
+    function _metered(uint64 _amount, uint256 _initialGas) internal {
+        // Update block number and base fee if necessary.
+        uint256 blockDiff = block.number - params.prevBlockNum;
 
-    /// @notice Returns the number of children that still need to be resolved in order to fully resolve a subgame rooted
-    ///         at `_claimIndex`.
-    /// @param _claimIndex The subgame root claim's index within `claimData`.
-    /// @return numRemainingChildren_ The number of children that still need to be checked to resolve the subgame.
-    function getNumToResolve(uint256 _claimIndex) external view returns (uint256 numRemainingChildren_);
+        ResourceConfig memory config = _resourceConfig();
+        int256 targetResourceLimit =
+            int256(uint256(config.maxResourceLimit)) / int256(uint256(config.elasticityMultiplier));
 
-    /// @notice The l2BlockNumber of the disputed output root in the `L2OutputOracle`.
-    function l2BlockNumber() external view returns (uint256 l2BlockNumber_);
+        if (blockDiff > 0) {
+            // Handle updating EIP-1559 style gas parameters. We use EIP-1559 to restrict the rate
+            // at which deposits can be created and therefore limit the potential for deposits to
+            // spam the L2 system. Fee scheme is very similar to EIP-1559 with minor changes.
+            int256 gasUsedDelta = int256(uint256(params.prevBoughtGas)) - targetResourceLimit;
+            int256 baseFeeDelta = (int256(uint256(params.prevBaseFee)) * gasUsedDelta)
+                / (targetResourceLimit * int256(uint256(config.baseFeeMaxChangeDenominator)));
 
-    /// @notice Starting output root and block number of the game.
-    function startingOutputRoot() external view returns (Hash startingRoot_, uint256 l2BlockNumber_);
+            // Update base fee by adding the base fee delta and clamp the resulting value between
+            // min and max.
+            int256 newBaseFee = Arithmetic.clamp({
+                _value: int256(uint256(params.prevBaseFee)) + baseFeeDelta,
+                _min: int256(uint256(config.minimumBaseFee)),
+                _max: int256(uint256(config.maximumBaseFee))
+            });
 
-    /// @notice Only the starting block number of the game.
-    function startingBlockNumber() external view returns (uint256 startingBlockNumber_);
+            // If we skipped more than one block, we also need to account for every empty block.
+            // Empty block means there was no demand for deposits in that block, so we should
+            // reflect this lack of demand in the fee.
+            if (blockDiff > 1) {
+                // Update the base fee by repeatedly applying the exponent 1-(1/change_denominator)
+                // blockDiff - 1 times. Simulates multiple empty blocks. Clamp the resulting value
+                // between min and max.
+                newBaseFee = Arithmetic.clamp({
+                    _value: Arithmetic.cdexp({
+                        _coefficient: newBaseFee,
+                        _denominator: int256(uint256(config.baseFeeMaxChangeDenominator)),
+                        _exponent: int256(blockDiff - 1)
+                    }),
+                    _min: int256(uint256(config.minimumBaseFee)),
+                    _max: int256(uint256(config.maximumBaseFee))
+                });
+            }
 
-    /// @notice Only the starting output root of the game.
-    function startingRootHash() external view returns (Hash startingRootHash_);
+            // Update new base fee, reset bought gas, and update block number.
+            params.prevBaseFee = uint128(uint256(newBaseFee));
+            params.prevBoughtGas = 0;
+            params.prevBlockNum = uint64(block.number);
+        }
+
+        // Make sure we can actually buy the resource amount requested by the user.
+        params.prevBoughtGas += _amount;
+        if (int256(uint256(params.prevBoughtGas)) > int256(uint256(config.maxResourceLimit))) {
+            revert OutOfGas();
+        }
+
+        // Determine the amount of ETH to be paid.
+        uint256 resourceCost = uint256(_amount) * uint256(params.prevBaseFee);
+
+        // We currently charge for this ETH amount as an L1 gas burn, so we convert the ETH amount
+        // into gas by dividing by the L1 base fee. We assume a minimum base fee of 1 gwei to avoid
+        // division by zero for L1s that don't support 1559 or to avoid excessive gas burns during
+        // periods of extremely low L1 demand. One-day average gas fee hasn't dipped below 1 gwei
+        // during any 1 day period in the last 5 years, so should be fine.
+        uint256 gasCost = resourceCost / Math.max(block.basefee, 1 gwei);
+
+        // Give the user a refund based on the amount of gas they used to do all of the work up to
+        // this point. Since we're at the end of the modifier, this should be pretty accurate. Acts
+        // effectively like a dynamic stipend (with a minimum value).
+        uint256 usedGas = _initialGas - gasleft();
+        if (gasCost > usedGas) {
+            Burn.gas(gasCost - usedGas);
+        }
+    }
+
+    /// @notice Virtual function that returns the resource config.
+    ///         Contracts that inherit this contract must implement this function.
+    /// @return ResourceConfig
+    function _resourceConfig() internal virtual returns (ResourceConfig memory);
+
+    /// @notice Sets initial resource parameter values.
+    ///         This function must either be called by the initializer function of an upgradeable
+    ///         child contract.
+    function __ResourceMetering_init() internal onlyInitializing {
+        if (params.prevBlockNum == 0) {
+            params = ResourceParams({prevBaseFee: 1 gwei, prevBoughtGas: 0, prevBlockNum: uint64(block.number)});
+        }
+    }
 }
 
-// src/dispute/interfaces/IAnchorStateRegistry.sol
+// src/libraries/Constants.sol
 
-/// @title IAnchorStateRegistry
-/// @notice Describes a contract that stores the anchor state for each game type.
-interface IAnchorStateRegistry {
-    /// @notice Returns the anchor state for the given game type.
-    /// @param _gameType The game type to get the anchor state for.
-    /// @return The anchor state for the given game type.
-    function anchors(GameType _gameType) external view returns (Hash, uint256);
+/// @title Constants
+/// @notice Constants is a library for storing constants. Simple! Don't put everything in here, just
+///         the stuff used in multiple contracts. Constants that only apply to a single contract
+///         should be defined in that contract instead.
+library Constants {
+    /// @notice Special address to be used as the tx origin for gas estimation calls in the
+    ///         OptimismPortal and CrossDomainMessenger calls. You only need to use this address if
+    ///         the minimum gas limit specified by the user is not actually enough to execute the
+    ///         given message and you're attempting to estimate the actual necessary gas limit. We
+    ///         use address(1) because it's the ecrecover precompile and therefore guaranteed to
+    ///         never have any code on any EVM chain.
+    address internal constant ESTIMATION_ADDRESS = address(1);
 
-    /// @notice Returns the DisputeGameFactory address.
-    /// @return DisputeGameFactory address.
-    function disputeGameFactory() external view returns (IDisputeGameFactory);
+    /// @notice Value used for the L2 sender storage slot in both the OptimismPortal and the
+    ///         CrossDomainMessenger contracts before an actual sender is set. This value is
+    ///         non-zero to reduce the gas cost of message passing transactions.
+    address internal constant DEFAULT_L2_SENDER = 0x000000000000000000000000000000000000dEaD;
 
-    /// @notice Callable by FaultDisputeGame contracts to update the anchor state. Pulls the anchor state directly from
-    ///         the FaultDisputeGame contract and stores it in the registry if the new anchor state is valid and the
-    ///         state is newer than the current anchor state.
-    function tryUpdateAnchorState() external;
-}
+    /// @notice The storage slot that holds the address of a proxy implementation.
+    /// @dev `bytes32(uint256(keccak256('eip1967.proxy.implementation')) - 1)`
+    bytes32 internal constant PROXY_IMPLEMENTATION_ADDRESS =
+        0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
-// src/dispute/AnchorStateRegistry.sol
+    /// @notice The storage slot that holds the address of the owner.
+    /// @dev `bytes32(uint256(keccak256('eip1967.proxy.admin')) - 1)`
+    bytes32 internal constant PROXY_OWNER_ADDRESS = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
-/// @title AnchorStateRegistry
-/// @notice The AnchorStateRegistry is a contract that stores the latest "anchor" state for each available
-///         FaultDisputeGame type. The anchor state is the latest state that has been proposed on L1 and was not
-///         challenged within the challenge period. By using stored anchor states, new FaultDisputeGame instances can
-///         be initialized with a more recent starting state which reduces the amount of required offchain computation.
-contract AnchorStateRegistry is Initializable, IAnchorStateRegistry, ISemver {
-    /// @notice Describes an initial anchor state for a game type.
-    struct StartingAnchorRoot {
-        GameType gameType;
-        OutputRoot outputRoot;
-    }
-
-    /// @notice Semantic version.
-    /// @custom:semver 1.0.0
-    string public constant version = "1.0.0";
-
-    /// @notice DisputeGameFactory address.
-    IDisputeGameFactory internal immutable DISPUTE_GAME_FACTORY;
-
-    /// @inheritdoc IAnchorStateRegistry
-    mapping(GameType => OutputRoot) public anchors;
-
-    /// @param _disputeGameFactory DisputeGameFactory address.
-    constructor(IDisputeGameFactory _disputeGameFactory) {
-        DISPUTE_GAME_FACTORY = _disputeGameFactory;
-
-        // Initialize the implementation with an empty array of starting anchor roots.
-        initialize(new StartingAnchorRoot[](0));
-    }
-
-    /// @notice Initializes the contract.
-    /// @param _startingAnchorRoots An array of starting anchor roots.
-    function initialize(StartingAnchorRoot[] memory _startingAnchorRoots) public initializer {
-        for (uint256 i = 0; i < _startingAnchorRoots.length; i++) {
-            StartingAnchorRoot memory startingAnchorRoot = _startingAnchorRoots[i];
-            anchors[startingAnchorRoot.gameType] = startingAnchorRoot.outputRoot;
-        }
-    }
-
-    /// @inheritdoc IAnchorStateRegistry
-    function disputeGameFactory() external view returns (IDisputeGameFactory) {
-        return DISPUTE_GAME_FACTORY;
-    }
-
-    /// @inheritdoc IAnchorStateRegistry
-    function tryUpdateAnchorState() external {
-        // Grab the game and game data.
-        IFaultDisputeGame game = IFaultDisputeGame(msg.sender);
-        (GameType gameType, Claim rootClaim, bytes memory extraData) = game.gameData();
-
-        // Grab the verified address of the game based on the game data.
-        // slither-disable-next-line unused-return
-        (IDisputeGame factoryRegisteredGame,) =
-            DISPUTE_GAME_FACTORY.games({_gameType: gameType, _rootClaim: rootClaim, _extraData: extraData});
-
-        // Must be a valid game.
-        require(
-            address(factoryRegisteredGame) == address(game),
-            "AnchorStateRegistry: fault dispute game not registered with factory"
-        );
-
-        // No need to update anything if the anchor state is already newer.
-        if (game.l2BlockNumber() <= anchors[gameType].l2BlockNumber) {
-            return;
-        }
-
-        // Must be a game that resolved in favor of the state.
-        if (game.status() != GameStatus.DEFENDER_WINS) {
-            return;
-        }
-
-        // Actually update the anchor state.
-        anchors[gameType] = OutputRoot({l2BlockNumber: game.l2BlockNumber(), root: Hash.wrap(game.rootClaim().raw())});
+    /// @notice Returns the default values for the ResourceConfig. These are the recommended values
+    ///         for a production network.
+    function DEFAULT_RESOURCE_CONFIG() internal pure returns (ResourceMetering.ResourceConfig memory) {
+        ResourceMetering.ResourceConfig memory config = ResourceMetering.ResourceConfig({
+            maxResourceLimit: 20_000_000,
+            elasticityMultiplier: 10,
+            baseFeeMaxChangeDenominator: 8,
+            minimumBaseFee: 1 gwei,
+            systemTxMaxGas: 1_000_000,
+            maximumBaseFee: type(uint128).max
+        });
+        return config;
     }
 }
 
@@ -6414,986 +6694,866 @@ contract Safe is
     }
 }
 
-// src/dispute/FaultDisputeGame.sol
+// src/L1/SystemConfig.sol
 
-/// @title FaultDisputeGame
-/// @notice An implementation of the `IFaultDisputeGame` interface.
-contract FaultDisputeGame is IFaultDisputeGame, Clone, ISemver {
-    ////////////////////////////////////////////////////////////////
-    //                         State Vars                         //
-    ////////////////////////////////////////////////////////////////
+/// @title SystemConfig
+/// @notice The SystemConfig contract is used to manage configuration of an Optimism network.
+///         All configuration is stored on L1 and picked up by L2 as part of the derviation of
+///         the L2 chain.
+contract SystemConfig is OwnableUpgradeable, ISemver {
+    /// @notice Enum representing different types of updates.
+    /// @custom:value BATCHER              Represents an update to the batcher hash.
+    /// @custom:value GAS_CONFIG           Represents an update to txn fee config on L2.
+    /// @custom:value GAS_LIMIT            Represents an update to gas limit on L2.
+    /// @custom:value UNSAFE_BLOCK_SIGNER  Represents an update to the signer key for unsafe
+    ///                                    block distrubution.
+    enum UpdateType {
+        BATCHER,
+        GAS_CONFIG,
+        GAS_LIMIT,
+        UNSAFE_BLOCK_SIGNER
+    }
 
-    /// @notice The absolute prestate of the instruction trace. This is a constant that is defined
-    ///         by the program that is being used to execute the trace.
-    Claim internal immutable ABSOLUTE_PRESTATE;
+    /// @notice Struct representing the addresses of L1 system contracts. These should be the
+    ///         proxies and are network specific.
+    struct Addresses {
+        address l1CrossDomainMessenger;
+        address l1ERC721Bridge;
+        address l1StandardBridge;
+        address disputeGameFactory;
+        address optimismPortal;
+        address optimismMintableERC20Factory;
+    }
 
-    /// @notice The max depth of the game.
-    uint256 internal immutable MAX_GAME_DEPTH;
+    /// @notice Version identifier, used for upgrades.
+    uint256 public constant VERSION = 0;
 
-    /// @notice The max depth of the output bisection portion of the position tree. Immediately beneath
-    ///         this depth, execution trace bisection begins.
-    uint256 internal immutable SPLIT_DEPTH;
+    /// @notice Storage slot that the unsafe block signer is stored at.
+    ///         Storing it at this deterministic storage slot allows for decoupling the storage
+    ///         layout from the way that `solc` lays out storage. The `op-node` uses a storage
+    ///         proof to fetch this value.
+    /// @dev    NOTE: this value will be migrated to another storage slot in a future version.
+    ///         User input should not be placed in storage in this contract until this migration
+    ///         happens. It is unlikely that keccak second preimage resistance will be broken,
+    ///         but it is better to be safe than sorry.
+    bytes32 public constant UNSAFE_BLOCK_SIGNER_SLOT = keccak256("systemconfig.unsafeblocksigner");
 
-    /// @notice The maximum duration that may accumulate on a team's chess clock before they may no longer respond.
-    Duration internal immutable MAX_CLOCK_DURATION;
+    /// @notice Storage slot that the L1CrossDomainMessenger address is stored at.
+    bytes32 public constant L1_CROSS_DOMAIN_MESSENGER_SLOT =
+        bytes32(uint256(keccak256("systemconfig.l1crossdomainmessenger")) - 1);
 
-    /// @notice An onchain VM that performs single instruction steps on a fault proof program trace.
-    IBigStepper internal immutable VM;
+    /// @notice Storage slot that the L1ERC721Bridge address is stored at.
+    bytes32 public constant L1_ERC_721_BRIDGE_SLOT = bytes32(uint256(keccak256("systemconfig.l1erc721bridge")) - 1);
 
-    /// @notice The game type ID.
-    GameType internal immutable GAME_TYPE;
+    /// @notice Storage slot that the L1StandardBridge address is stored at.
+    bytes32 public constant L1_STANDARD_BRIDGE_SLOT = bytes32(uint256(keccak256("systemconfig.l1standardbridge")) - 1);
 
-    /// @notice WETH contract for holding ETH.
-    IDelayedWETH internal immutable WETH;
+    /// @notice Storage slot that the OptimismPortal address is stored at.
+    bytes32 public constant OPTIMISM_PORTAL_SLOT = bytes32(uint256(keccak256("systemconfig.optimismportal")) - 1);
 
-    /// @notice The anchor state registry.
-    IAnchorStateRegistry internal immutable ANCHOR_STATE_REGISTRY;
+    /// @notice Storage slot that the OptimismMintableERC20Factory address is stored at.
+    bytes32 public constant OPTIMISM_MINTABLE_ERC20_FACTORY_SLOT =
+        bytes32(uint256(keccak256("systemconfig.optimismmintableerc20factory")) - 1);
 
-    /// @notice The chain ID of the L2 network this contract argues about.
-    uint256 internal immutable L2_CHAIN_ID;
+    /// @notice Storage slot that the batch inbox address is stored at.
+    bytes32 public constant BATCH_INBOX_SLOT = bytes32(uint256(keccak256("systemconfig.batchinbox")) - 1);
 
-    /// @notice The duration of the clock extension. Will be doubled if the grandchild is the root claim of an execution
-    ///         trace bisection subgame.
-    Duration internal immutable CLOCK_EXTENSION;
+    /// @notice Storage slot for block at which the op-node can start searching for logs from.
+    bytes32 public constant START_BLOCK_SLOT = bytes32(uint256(keccak256("systemconfig.startBlock")) - 1);
 
-    /// @notice The global root claim's position is always at gindex 1.
-    Position internal constant ROOT_POSITION = Position.wrap(1);
+    /// @notice Storage slot for the DisputeGameFactory address.
+    bytes32 public constant DISPUTE_GAME_FACTORY_SLOT =
+        bytes32(uint256(keccak256("systemconfig.disputegamefactory")) - 1);
 
-    /// @notice The index of the block number in the RLP-encoded block header.
-    /// @dev Consensus encoding reference:
-    /// https://github.com/paradigmxyz/reth/blob/5f82993c23164ce8ccdc7bf3ae5085205383a5c8/crates/primitives/src/header.rs#L368
-    uint256 internal constant HEADER_BLOCK_NUMBER_INDEX = 8;
+    /// @notice The maximum gas limit that can be set for L2 blocks. This limit is used to enforce that the blocks
+    ///         on L2 are not too large to process and prove. Over time, this value can be increased as various
+    ///         optimizations and improvements are made to the system at large.
+    uint64 internal constant MAX_GAS_LIMIT = 200_000_000;
+
+    /// @notice Fixed L2 gas overhead. Used as part of the L2 fee calculation.
+    uint256 public overhead;
+
+    /// @notice Dynamic L2 gas overhead. Used as part of the L2 fee calculation.
+    uint256 public scalar;
+
+    /// @notice Identifier for the batcher.
+    ///         For version 1 of this configuration, this is represented as an address left-padded
+    ///         with zeros to 32 bytes.
+    bytes32 public batcherHash;
+
+    /// @notice L2 block gas limit.
+    uint64 public gasLimit;
+
+    /// @notice The configuration for the deposit fee market.
+    ///         Used by the OptimismPortal to meter the cost of buying L2 gas on L1.
+    ///         Set as internal with a getter so that the struct is returned instead of a tuple.
+    ResourceMetering.ResourceConfig internal _resourceConfig;
+
+    /// @notice Emitted when configuration is updated.
+    /// @param version    SystemConfig version.
+    /// @param updateType Type of update.
+    /// @param data       Encoded update data.
+    event ConfigUpdate(uint256 indexed version, UpdateType indexed updateType, bytes data);
 
     /// @notice Semantic version.
-    /// @custom:semver 1.2.0
-    string public constant version = "1.2.0";
+    /// @custom:semver 2.2.0
+    string public constant version = "2.2.0";
 
-    /// @notice The starting timestamp of the game
-    Timestamp public createdAt;
-
-    /// @notice The timestamp of the game's global resolution.
-    Timestamp public resolvedAt;
-
-    /// @inheritdoc IDisputeGame
-    GameStatus public status;
-
-    /// @notice Flag for the `initialize` function to prevent re-initialization.
-    bool internal initialized;
-
-    /// @notice Flag for whether or not the L2 block number claim has been invalidated via `challengeRootL2Block`.
-    bool public l2BlockNumberChallenged;
-
-    /// @notice The challenger of the L2 block number claim. Should always be `address(0)` if `l2BlockNumberChallenged`
-    ///         is `false`. Should be the address of the challenger if `l2BlockNumberChallenged` is `true`.
-    address public l2BlockNumberChallenger;
-
-    /// @notice An append-only array of all claims made during the dispute game.
-    ClaimData[] public claimData;
-
-    /// @notice Credited balances for winning participants.
-    mapping(address => uint256) public credit;
-
-    /// @notice A mapping to allow for constant-time lookups of existing claims.
-    mapping(Hash => bool) public claims;
-
-    /// @notice A mapping of subgames rooted at a claim index to other claim indices in the subgame.
-    mapping(uint256 => uint256[]) public subgames;
-
-    /// @notice A mapping of resolved subgames rooted at a claim index.
-    mapping(uint256 => bool) public resolvedSubgames;
-
-    /// @notice A mapping of claim indices to resolution checkpoints.
-    mapping(uint256 => ResolutionCheckpoint) public resolutionCheckpoints;
-
-    /// @notice The latest finalized output root, serving as the anchor for output bisection.
-    OutputRoot public startingOutputRoot;
-
-    /// @param _gameType The type ID of the game.
-    /// @param _absolutePrestate The absolute prestate of the instruction trace.
-    /// @param _maxGameDepth The maximum depth of bisection.
-    /// @param _splitDepth The final depth of the output bisection portion of the game.
-    /// @param _clockExtension The clock extension to perform when the remaining duration is less than the extension.
-    /// @param _maxClockDuration The maximum amount of time that may accumulate on a team's chess clock.
-    /// @param _vm An onchain VM that performs single instruction steps on an FPP trace.
-    /// @param _weth WETH contract for holding ETH.
-    /// @param _anchorStateRegistry The contract that stores the anchor state for each game type.
-    /// @param _l2ChainId Chain ID of the L2 network this contract argues about.
-    constructor(
-        GameType _gameType,
-        Claim _absolutePrestate,
-        uint256 _maxGameDepth,
-        uint256 _splitDepth,
-        Duration _clockExtension,
-        Duration _maxClockDuration,
-        IBigStepper _vm,
-        IDelayedWETH _weth,
-        IAnchorStateRegistry _anchorStateRegistry,
-        uint256 _l2ChainId
-    ) {
-        // The max game depth may not be greater than `LibPosition.MAX_POSITION_BITLEN - 1`.
-        if (_maxGameDepth > LibPosition.MAX_POSITION_BITLEN - 1) revert MaxDepthTooLarge();
-        // The split depth cannot be greater than or equal to the max game depth.
-        if (_splitDepth >= _maxGameDepth) revert InvalidSplitDepth();
-        // The clock extension may not be greater than the max clock duration.
-        if (_clockExtension.raw() > _maxClockDuration.raw()) revert InvalidClockExtension();
-
-        GAME_TYPE = _gameType;
-        ABSOLUTE_PRESTATE = _absolutePrestate;
-        MAX_GAME_DEPTH = _maxGameDepth;
-        SPLIT_DEPTH = _splitDepth;
-        CLOCK_EXTENSION = _clockExtension;
-        MAX_CLOCK_DURATION = _maxClockDuration;
-        VM = _vm;
-        WETH = _weth;
-        ANCHOR_STATE_REGISTRY = _anchorStateRegistry;
-        L2_CHAIN_ID = _l2ChainId;
+    /// @notice Constructs the SystemConfig contract. Cannot set
+    ///         the owner to `address(0)` due to the Ownable contract's
+    ///         implementation, so set it to `address(0xdEaD)`
+    /// @dev    START_BLOCK_SLOT is set to type(uint256).max here so that it will be a dead value
+    ///         in the singleton and is skipped by initialize when setting the start block.
+    constructor() {
+        Storage.setUint(START_BLOCK_SLOT, type(uint256).max);
+        initialize({
+            _owner: address(0xdEaD),
+            _overhead: 0,
+            _scalar: 0,
+            _batcherHash: bytes32(0),
+            _gasLimit: 1,
+            _unsafeBlockSigner: address(0),
+            _config: ResourceMetering.ResourceConfig({
+                maxResourceLimit: 1,
+                elasticityMultiplier: 1,
+                baseFeeMaxChangeDenominator: 2,
+                minimumBaseFee: 0,
+                systemTxMaxGas: 0,
+                maximumBaseFee: 0
+            }),
+            _batchInbox: address(0),
+            _addresses: SystemConfig.Addresses({
+                l1CrossDomainMessenger: address(0),
+                l1ERC721Bridge: address(0),
+                l1StandardBridge: address(0),
+                disputeGameFactory: address(0),
+                optimismPortal: address(0),
+                optimismMintableERC20Factory: address(0)
+            })
+        });
     }
 
-    /// @inheritdoc IInitializable
-    function initialize() public payable virtual {
-        // SAFETY: Any revert in this function will bubble up to the DisputeGameFactory and
-        // prevent the game from being created.
-        //
-        // Implicit assumptions:
-        // - The `gameStatus` state variable defaults to 0, which is `GameStatus.IN_PROGRESS`
-        // - The dispute game factory will enforce the required bond to initialize the game.
-        //
-        // Explicit checks:
-        // - The game must not have already been initialized.
-        // - An output root cannot be proposed at or before the starting block number.
+    /// @notice Initializer.
+    ///         The resource config must be set before the require check.
+    /// @param _owner             Initial owner of the contract.
+    /// @param _overhead          Initial overhead value.
+    /// @param _scalar            Initial scalar value.
+    /// @param _batcherHash       Initial batcher hash.
+    /// @param _gasLimit          Initial gas limit.
+    /// @param _unsafeBlockSigner Initial unsafe block signer address.
+    /// @param _config            Initial ResourceConfig.
+    /// @param _batchInbox        Batch inbox address. An identifier for the op-node to find
+    ///                           canonical data.
+    /// @param _addresses         Set of L1 contract addresses. These should be the proxies.
+    function initialize(
+        address _owner,
+        uint256 _overhead,
+        uint256 _scalar,
+        bytes32 _batcherHash,
+        uint64 _gasLimit,
+        address _unsafeBlockSigner,
+        ResourceMetering.ResourceConfig memory _config,
+        address _batchInbox,
+        SystemConfig.Addresses memory _addresses
+    ) public initializer {
+        __Ownable_init();
+        transferOwnership(_owner);
 
-        // INVARIANT: The game must not have already been initialized.
-        if (initialized) revert AlreadyInitialized();
+        // These are set in ascending order of their UpdateTypes.
+        _setBatcherHash(_batcherHash);
+        _setGasConfig({_overhead: _overhead, _scalar: _scalar});
+        _setGasLimit(_gasLimit);
 
-        // Grab the latest anchor root.
-        (Hash root, uint256 rootBlockNumber) = ANCHOR_STATE_REGISTRY.anchors(GAME_TYPE);
+        Storage.setAddress(UNSAFE_BLOCK_SIGNER_SLOT, _unsafeBlockSigner);
+        Storage.setAddress(BATCH_INBOX_SLOT, _batchInbox);
+        Storage.setAddress(L1_CROSS_DOMAIN_MESSENGER_SLOT, _addresses.l1CrossDomainMessenger);
+        Storage.setAddress(L1_ERC_721_BRIDGE_SLOT, _addresses.l1ERC721Bridge);
+        Storage.setAddress(L1_STANDARD_BRIDGE_SLOT, _addresses.l1StandardBridge);
+        Storage.setAddress(DISPUTE_GAME_FACTORY_SLOT, _addresses.disputeGameFactory);
+        Storage.setAddress(OPTIMISM_PORTAL_SLOT, _addresses.optimismPortal);
+        Storage.setAddress(OPTIMISM_MINTABLE_ERC20_FACTORY_SLOT, _addresses.optimismMintableERC20Factory);
 
-        // Should only happen if this is a new game type that hasn't been set up yet.
-        if (root.raw() == bytes32(0)) revert AnchorRootNotFound();
+        _setStartBlock();
 
-        // Set the starting output root.
-        startingOutputRoot = OutputRoot({l2BlockNumber: rootBlockNumber, root: root});
+        _setResourceConfig(_config);
+        require(_gasLimit >= minimumGasLimit(), "SystemConfig: gas limit too low");
+    }
 
-        // Revert if the calldata size is not the expected length.
-        //
-        // This is to prevent adding extra or omitting bytes from to `extraData` that result in a different game UUID
-        // in the factory, but are not used by the game, which would allow for multiple dispute games for the same
-        // output proposal to be created.
-        //
-        // Expected length: 0x7A
-        // - 0x04 selector
-        // - 0x14 creator address
-        // - 0x20 root claim
-        // - 0x20 l1 head
-        // - 0x20 extraData
-        // - 0x02 CWIA bytes
-        assembly {
-            if iszero(eq(calldatasize(), 0x7A)) {
-                // Store the selector for `BadExtraData()` & revert
-                mstore(0x00, 0x9824bdab)
-                revert(0x1C, 0x04)
-            }
+    /// @notice Returns the minimum L2 gas limit that can be safely set for the system to
+    ///         operate. The L2 gas limit must be larger than or equal to the amount of
+    ///         gas that is allocated for deposits per block plus the amount of gas that
+    ///         is allocated for the system transaction.
+    ///         This function is used to determine if changes to parameters are safe.
+    /// @return uint64 Minimum gas limit.
+    function minimumGasLimit() public view returns (uint64) {
+        return uint64(_resourceConfig.maxResourceLimit) + uint64(_resourceConfig.systemTxMaxGas);
+    }
+
+    /// @notice Returns the maximum L2 gas limit that can be safely set for the system to
+    ///         operate. This bound is used to prevent the gas limit from being set too high
+    ///         and causing the system to be unable to process and/or prove L2 blocks.
+    /// @return uint64 Maximum gas limit.
+    function maximumGasLimit() public pure returns (uint64) {
+        return MAX_GAS_LIMIT;
+    }
+
+    /// @notice High level getter for the unsafe block signer address.
+    ///         Unsafe blocks can be propagated across the p2p network if they are signed by the
+    ///         key corresponding to this address.
+    /// @return addr_ Address of the unsafe block signer.
+    function unsafeBlockSigner() public view returns (address addr_) {
+        addr_ = Storage.getAddress(UNSAFE_BLOCK_SIGNER_SLOT);
+    }
+
+    /// @notice Getter for the L1CrossDomainMessenger address.
+    function l1CrossDomainMessenger() external view returns (address addr_) {
+        addr_ = Storage.getAddress(L1_CROSS_DOMAIN_MESSENGER_SLOT);
+    }
+
+    /// @notice Getter for the L1ERC721Bridge address.
+    function l1ERC721Bridge() external view returns (address addr_) {
+        addr_ = Storage.getAddress(L1_ERC_721_BRIDGE_SLOT);
+    }
+
+    /// @notice Getter for the L1StandardBridge address.
+    function l1StandardBridge() external view returns (address addr_) {
+        addr_ = Storage.getAddress(L1_STANDARD_BRIDGE_SLOT);
+    }
+
+    /// @notice Getter for the DisputeGameFactory address.
+    function disputeGameFactory() external view returns (address addr_) {
+        addr_ = Storage.getAddress(DISPUTE_GAME_FACTORY_SLOT);
+    }
+
+    /// @notice Getter for the OptimismPortal address.
+    function optimismPortal() external view returns (address addr_) {
+        addr_ = Storage.getAddress(OPTIMISM_PORTAL_SLOT);
+    }
+
+    /// @notice Getter for the OptimismMintableERC20Factory address.
+    function optimismMintableERC20Factory() external view returns (address addr_) {
+        addr_ = Storage.getAddress(OPTIMISM_MINTABLE_ERC20_FACTORY_SLOT);
+    }
+
+    /// @notice Getter for the BatchInbox address.
+    function batchInbox() external view returns (address addr_) {
+        addr_ = Storage.getAddress(BATCH_INBOX_SLOT);
+    }
+
+    /// @notice Getter for the StartBlock number.
+    function startBlock() external view returns (uint256 startBlock_) {
+        startBlock_ = Storage.getUint(START_BLOCK_SLOT);
+    }
+
+    /// @notice Updates the unsafe block signer address. Can only be called by the owner.
+    /// @param _unsafeBlockSigner New unsafe block signer address.
+    function setUnsafeBlockSigner(address _unsafeBlockSigner) external onlyOwner {
+        _setUnsafeBlockSigner(_unsafeBlockSigner);
+    }
+
+    /// @notice Updates the unsafe block signer address.
+    /// @param _unsafeBlockSigner New unsafe block signer address.
+    function _setUnsafeBlockSigner(address _unsafeBlockSigner) internal {
+        Storage.setAddress(UNSAFE_BLOCK_SIGNER_SLOT, _unsafeBlockSigner);
+
+        bytes memory data = abi.encode(_unsafeBlockSigner);
+        emit ConfigUpdate(VERSION, UpdateType.UNSAFE_BLOCK_SIGNER, data);
+    }
+
+    /// @notice Updates the batcher hash. Can only be called by the owner.
+    /// @param _batcherHash New batcher hash.
+    function setBatcherHash(bytes32 _batcherHash) external onlyOwner {
+        _setBatcherHash(_batcherHash);
+    }
+
+    /// @notice Internal function for updating the batcher hash.
+    /// @param _batcherHash New batcher hash.
+    function _setBatcherHash(bytes32 _batcherHash) internal {
+        batcherHash = _batcherHash;
+
+        bytes memory data = abi.encode(_batcherHash);
+        emit ConfigUpdate(VERSION, UpdateType.BATCHER, data);
+    }
+
+    /// @notice Updates gas config. Can only be called by the owner.
+    /// @param _overhead New overhead value.
+    /// @param _scalar   New scalar value.
+    function setGasConfig(uint256 _overhead, uint256 _scalar) external onlyOwner {
+        _setGasConfig(_overhead, _scalar);
+    }
+
+    /// @notice Internal function for updating the gas config.
+    /// @param _overhead New overhead value.
+    /// @param _scalar   New scalar value.
+    function _setGasConfig(uint256 _overhead, uint256 _scalar) internal {
+        overhead = _overhead;
+        scalar = _scalar;
+
+        bytes memory data = abi.encode(_overhead, _scalar);
+        emit ConfigUpdate(VERSION, UpdateType.GAS_CONFIG, data);
+    }
+
+    /// @notice Updates the L2 gas limit. Can only be called by the owner.
+    /// @param _gasLimit New gas limit.
+    function setGasLimit(uint64 _gasLimit) external onlyOwner {
+        _setGasLimit(_gasLimit);
+    }
+
+    /// @notice Internal function for updating the L2 gas limit.
+    /// @param _gasLimit New gas limit.
+    function _setGasLimit(uint64 _gasLimit) internal {
+        require(_gasLimit >= minimumGasLimit(), "SystemConfig: gas limit too low");
+        require(_gasLimit <= maximumGasLimit(), "SystemConfig: gas limit too high");
+        gasLimit = _gasLimit;
+
+        bytes memory data = abi.encode(_gasLimit);
+        emit ConfigUpdate(VERSION, UpdateType.GAS_LIMIT, data);
+    }
+
+    /// @notice Sets the start block in a backwards compatible way. Proxies
+    ///         that were initialized before the startBlock existed in storage
+    ///         can have their start block set by a user provided override.
+    ///         A start block of 0 indicates that there is no override and the
+    ///         start block will be set by `block.number`.
+    /// @dev    This logic is used to patch legacy deployments with new storage values.
+    ///         Use the override if it is provided as a non zero value and the value
+    ///         has not already been set in storage. Use `block.number` if the value
+    ///         has already been set in storage
+    function _setStartBlock() internal {
+        if (Storage.getUint(START_BLOCK_SLOT) == 0) {
+            Storage.setUint(START_BLOCK_SLOT, block.number);
         }
+    }
 
-        // Do not allow the game to be initialized if the root claim corresponds to a block at or before the
-        // configured starting block number.
-        if (l2BlockNumber() <= rootBlockNumber) revert UnexpectedRootClaim(rootClaim());
+    /// @notice A getter for the resource config.
+    ///         Ensures that the struct is returned instead of a tuple.
+    /// @return ResourceConfig
+    function resourceConfig() external view returns (ResourceMetering.ResourceConfig memory) {
+        return _resourceConfig;
+    }
 
-        // Set the root claim
-        claimData.push(
-            ClaimData({
-                parentIndex: type(uint32).max,
-                counteredBy: address(0),
-                claimant: gameCreator(),
-                bond: uint128(msg.value),
-                claim: rootClaim(),
-                position: ROOT_POSITION,
-                clock: LibClock.wrap(Duration.wrap(0), Timestamp.wrap(uint64(block.timestamp)))
-            })
+    /// @notice An internal setter for the resource config.
+    ///         Ensures that the config is sane before storing it by checking for invariants.
+    ///         In the future, this method may emit an event that the `op-node` picks up
+    ///         for when the resource config is changed.
+    /// @param _config The new resource config.
+    function _setResourceConfig(ResourceMetering.ResourceConfig memory _config) internal {
+        // Min base fee must be less than or equal to max base fee.
+        require(
+            _config.minimumBaseFee <= _config.maximumBaseFee, "SystemConfig: min base fee must be less than max base"
+        );
+        // Base fee change denominator must be greater than 1.
+        require(_config.baseFeeMaxChangeDenominator > 1, "SystemConfig: denominator must be larger than 1");
+        // Max resource limit plus system tx gas must be less than or equal to the L2 gas limit.
+        // The gas limit must be increased before these values can be increased.
+        require(_config.maxResourceLimit + _config.systemTxMaxGas <= gasLimit, "SystemConfig: gas limit too low");
+        // Elasticity multiplier must be greater than 0.
+        require(_config.elasticityMultiplier > 0, "SystemConfig: elasticity multiplier cannot be 0");
+        // No precision loss when computing target resource limit.
+        require(
+            ((_config.maxResourceLimit / _config.elasticityMultiplier) * _config.elasticityMultiplier)
+                == _config.maxResourceLimit,
+            "SystemConfig: precision loss with target resource limit"
         );
 
-        // Set the game as initialized.
-        initialized = true;
-
-        // Deposit the bond.
-        WETH.deposit{value: msg.value}();
-
-        // Set the game's starting timestamp
-        createdAt = Timestamp.wrap(uint64(block.timestamp));
-    }
-
-    ////////////////////////////////////////////////////////////////
-    //                  `IFaultDisputeGame` impl                  //
-    ////////////////////////////////////////////////////////////////
-
-    /// @inheritdoc IFaultDisputeGame
-    function step(uint256 _claimIndex, bool _isAttack, bytes calldata _stateData, bytes calldata _proof)
-        public
-        virtual
-    {
-        // INVARIANT: Steps cannot be made unless the game is currently in progress.
-        if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
-
-        // Get the parent. If it does not exist, the call will revert with OOB.
-        ClaimData storage parent = claimData[_claimIndex];
-
-        // Pull the parent position out of storage.
-        Position parentPos = parent.position;
-        // Determine the position of the step.
-        Position stepPos = parentPos.move(_isAttack);
-
-        // INVARIANT: A step cannot be made unless the move position is 1 below the `MAX_GAME_DEPTH`
-        if (stepPos.depth() != MAX_GAME_DEPTH + 1) revert InvalidParent();
-
-        // Determine the expected pre & post states of the step.
-        Claim preStateClaim;
-        ClaimData storage postState;
-        if (_isAttack) {
-            // If the step position's index at depth is 0, the prestate is the absolute
-            // prestate.
-            // If the step is an attack at a trace index > 0, the prestate exists elsewhere in
-            // the game state.
-            // NOTE: We localize the `indexAtDepth` for the current execution trace subgame by finding
-            //       the remainder of the index at depth divided by 2 ** (MAX_GAME_DEPTH - SPLIT_DEPTH),
-            //       which is the number of leaves in each execution trace subgame. This is so that we can
-            //       determine whether or not the step position is represents the `ABSOLUTE_PRESTATE`.
-            preStateClaim = (stepPos.indexAtDepth() % (1 << (MAX_GAME_DEPTH - SPLIT_DEPTH))) == 0
-                ? ABSOLUTE_PRESTATE
-                : _findTraceAncestor(Position.wrap(parentPos.raw() - 1), parent.parentIndex, false).claim;
-            // For all attacks, the poststate is the parent claim.
-            postState = parent;
-        } else {
-            // If the step is a defense, the poststate exists elsewhere in the game state,
-            // and the parent claim is the expected pre-state.
-            preStateClaim = parent.claim;
-            postState = _findTraceAncestor(Position.wrap(parentPos.raw() + 1), parent.parentIndex, false);
-        }
-
-        // INVARIANT: The prestate is always invalid if the passed `_stateData` is not the
-        //            preimage of the prestate claim hash.
-        //            We ignore the highest order byte of the digest because it is used to
-        //            indicate the VM Status and is added after the digest is computed.
-        if (keccak256(_stateData) << 8 != preStateClaim.raw() << 8) revert InvalidPrestate();
-
-        // Compute the local preimage context for the step.
-        Hash uuid = _findLocalContext(_claimIndex);
-
-        // INVARIANT: If a step is an attack, the poststate is valid if the step produces
-        //            the same poststate hash as the parent claim's value.
-        //            If a step is a defense:
-        //              1. If the parent claim and the found post state agree with each other
-        //                 (depth diff % 2 == 0), the step is valid if it produces the same
-        //                 state hash as the post state's claim.
-        //              2. If the parent claim and the found post state disagree with each other
-        //                 (depth diff % 2 != 0), the parent cannot be countered unless the step
-        //                 produces the same state hash as `postState.claim`.
-        // SAFETY:    While the `attack` path does not need an extra check for the post
-        //            state's depth in relation to the parent, we don't need another
-        //            branch because (n - n) % 2 == 0.
-        bool validStep = VM.step(_stateData, _proof, uuid.raw()) == postState.claim.raw();
-        bool parentPostAgree = (parentPos.depth() - postState.position.depth()) % 2 == 0;
-        if (parentPostAgree == validStep) revert ValidStep();
-
-        // INVARIANT: A step cannot be made against a claim for a second time.
-        if (parent.counteredBy != address(0)) revert DuplicateStep();
-
-        // Set the parent claim as countered. We do not need to append a new claim to the game;
-        // instead, we can just set the existing parent as countered.
-        parent.counteredBy = msg.sender;
-    }
-
-    /// @notice Generic move function, used for both `attack` and `defend` moves.
-    /// @param _disputed The disputed `Claim`.
-    /// @param _challengeIndex The index of the claim being moved against.
-    /// @param _claim The claim at the next logical position in the game.
-    /// @param _isAttack Whether or not the move is an attack or defense.
-    function move(Claim _disputed, uint256 _challengeIndex, Claim _claim, bool _isAttack) public payable virtual {
-        // INVARIANT: Moves cannot be made unless the game is currently in progress.
-        if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
-
-        // Get the parent. If it does not exist, the call will revert with OOB.
-        ClaimData memory parent = claimData[_challengeIndex];
-
-        // INVARIANT: The claim at the _challengeIndex must be the disputed claim.
-        if (Claim.unwrap(parent.claim) != Claim.unwrap(_disputed)) revert InvalidDisputedClaimIndex();
-
-        // Compute the position that the claim commits to. Because the parent's position is already
-        // known, we can compute the next position by moving left or right depending on whether
-        // or not the move is an attack or defense.
-        Position parentPos = parent.position;
-        Position nextPosition = parentPos.move(_isAttack);
-        uint256 nextPositionDepth = nextPosition.depth();
-
-        // INVARIANT: A defense can never be made against the root claim of either the output root game or any
-        //            of the execution trace bisection subgames. This is because the root claim commits to the
-        //            entire state. Therefore, the only valid defense is to do nothing if it is agreed with.
-        if ((_challengeIndex == 0 || nextPositionDepth == SPLIT_DEPTH + 2) && !_isAttack) {
-            revert CannotDefendRootClaim();
-        }
-
-        // INVARIANT: No moves against the root claim can be made after it has been challenged with
-        //            `challengeRootL2Block`.`
-        if (l2BlockNumberChallenged && _challengeIndex == 0) revert L2BlockNumberChallenged();
-
-        // INVARIANT: A move can never surpass the `MAX_GAME_DEPTH`. The only option to counter a
-        //            claim at this depth is to perform a single instruction step on-chain via
-        //            the `step` function to prove that the state transition produces an unexpected
-        //            post-state.
-        if (nextPositionDepth > MAX_GAME_DEPTH) revert GameDepthExceeded();
-
-        // When the next position surpasses the split depth (i.e., it is the root claim of an execution
-        // trace bisection sub-game), we need to perform some extra verification steps.
-        if (nextPositionDepth == SPLIT_DEPTH + 1) {
-            _verifyExecBisectionRoot(_claim, _challengeIndex, parentPos, _isAttack);
-        }
-
-        // INVARIANT: The `msg.value` must exactly equal the required bond.
-        if (getRequiredBond(nextPosition) != msg.value) revert IncorrectBondAmount();
-
-        // Compute the duration of the next clock. This is done by adding the duration of the
-        // grandparent claim to the difference between the current block timestamp and the
-        // parent's clock timestamp.
-        Duration nextDuration = getChallengerDuration(_challengeIndex);
-
-        // INVARIANT: A move can never be made once its clock has exceeded `MAX_CLOCK_DURATION`
-        //            seconds of time.
-        if (nextDuration.raw() == MAX_CLOCK_DURATION.raw()) revert ClockTimeExceeded();
-
-        // If the remaining clock time has less than `CLOCK_EXTENSION` seconds remaining, grant the potential
-        // grandchild's clock `CLOCK_EXTENSION` seconds. This is to ensure that, even if a player has to inherit another
-        // team's clock to counter a freeloader claim, they will always have enough time to to respond. This extension
-        // is bounded by the depth of the tree. If the potential grandchild is an execution trace bisection root, the
-        // clock extension is doubled. This is to allow for extra time for the off-chain challenge agent to generate
-        // the initial instruction trace on the native FPVM.
-        if (nextDuration.raw() > MAX_CLOCK_DURATION.raw() - CLOCK_EXTENSION.raw()) {
-            // If the potential grandchild is an execution trace bisection root, double the clock extension.
-            uint64 extensionPeriod =
-                nextPositionDepth == SPLIT_DEPTH - 1 ? CLOCK_EXTENSION.raw() * 2 : CLOCK_EXTENSION.raw();
-            nextDuration = Duration.wrap(MAX_CLOCK_DURATION.raw() - extensionPeriod);
-        }
-
-        // Construct the next clock with the new duration and the current block timestamp.
-        Clock nextClock = LibClock.wrap(nextDuration, Timestamp.wrap(uint64(block.timestamp)));
-
-        // INVARIANT: There cannot be multiple identical claims with identical moves on the same challengeIndex. Multiple
-        //            claims at the same position may dispute the same challengeIndex. However, they must have different
-        //            values.
-        Hash claimHash = _claim.hashClaimPos(nextPosition, _challengeIndex);
-        if (claims[claimHash]) revert ClaimAlreadyExists();
-        claims[claimHash] = true;
-
-        // Create the new claim.
-        claimData.push(
-            ClaimData({
-                parentIndex: uint32(_challengeIndex),
-                // This is updated during subgame resolution
-                counteredBy: address(0),
-                claimant: msg.sender,
-                bond: uint128(msg.value),
-                claim: _claim,
-                position: nextPosition,
-                clock: nextClock
-            })
-        );
-
-        // Update the subgame rooted at the parent claim.
-        subgames[_challengeIndex].push(claimData.length - 1);
-
-        // Deposit the bond.
-        WETH.deposit{value: msg.value}();
-
-        // Emit the appropriate event for the attack or defense.
-        emit Move(_challengeIndex, _claim, msg.sender);
-    }
-
-    /// @inheritdoc IFaultDisputeGame
-    function attack(Claim _disputed, uint256 _parentIndex, Claim _claim) external payable {
-        move(_disputed, _parentIndex, _claim, true);
-    }
-
-    /// @inheritdoc IFaultDisputeGame
-    function defend(Claim _disputed, uint256 _parentIndex, Claim _claim) external payable {
-        move(_disputed, _parentIndex, _claim, false);
-    }
-
-    /// @inheritdoc IFaultDisputeGame
-    function addLocalData(uint256 _ident, uint256 _execLeafIdx, uint256 _partOffset) external {
-        // INVARIANT: Local data can only be added if the game is currently in progress.
-        if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
-
-        (Claim starting, Position startingPos, Claim disputed, Position disputedPos) =
-            _findStartingAndDisputedOutputs(_execLeafIdx);
-        Hash uuid = _computeLocalContext(starting, startingPos, disputed, disputedPos);
-
-        IPreimageOracle oracle = VM.oracle();
-        if (_ident == LocalPreimageKey.L1_HEAD_HASH) {
-            // Load the L1 head hash
-            oracle.loadLocalData(_ident, uuid.raw(), l1Head().raw(), 32, _partOffset);
-        } else if (_ident == LocalPreimageKey.STARTING_OUTPUT_ROOT) {
-            // Load the starting proposal's output root.
-            oracle.loadLocalData(_ident, uuid.raw(), starting.raw(), 32, _partOffset);
-        } else if (_ident == LocalPreimageKey.DISPUTED_OUTPUT_ROOT) {
-            // Load the disputed proposal's output root
-            oracle.loadLocalData(_ident, uuid.raw(), disputed.raw(), 32, _partOffset);
-        } else if (_ident == LocalPreimageKey.DISPUTED_L2_BLOCK_NUMBER) {
-            // Load the disputed proposal's L2 block number as a big-endian uint64 in the
-            // high order 8 bytes of the word.
-
-            // We add the index at depth + 1 to the starting block number to get the disputed L2
-            // block number.
-            uint256 l2Number = startingOutputRoot.l2BlockNumber + disputedPos.traceIndex(SPLIT_DEPTH) + 1;
-
-            oracle.loadLocalData(_ident, uuid.raw(), bytes32(l2Number << 0xC0), 8, _partOffset);
-        } else if (_ident == LocalPreimageKey.CHAIN_ID) {
-            // Load the chain ID as a big-endian uint64 in the high order 8 bytes of the word.
-            oracle.loadLocalData(_ident, uuid.raw(), bytes32(L2_CHAIN_ID << 0xC0), 8, _partOffset);
-        } else {
-            revert InvalidLocalIdent();
-        }
-    }
-
-    /// @inheritdoc IFaultDisputeGame
-    function getNumToResolve(uint256 _claimIndex) public view returns (uint256 numRemainingChildren_) {
-        ResolutionCheckpoint storage checkpoint = resolutionCheckpoints[_claimIndex];
-        uint256[] storage challengeIndices = subgames[_claimIndex];
-        uint256 challengeIndicesLen = challengeIndices.length;
-
-        numRemainingChildren_ = challengeIndicesLen - checkpoint.subgameIndex;
-    }
-
-    /// @inheritdoc IFaultDisputeGame
-    function l2BlockNumber() public pure returns (uint256 l2BlockNumber_) {
-        l2BlockNumber_ = _getArgUint256(0x54);
-    }
-
-    /// @inheritdoc IFaultDisputeGame
-    function startingBlockNumber() external view returns (uint256 startingBlockNumber_) {
-        startingBlockNumber_ = startingOutputRoot.l2BlockNumber;
-    }
-
-    /// @inheritdoc IFaultDisputeGame
-    function startingRootHash() external view returns (Hash startingRootHash_) {
-        startingRootHash_ = startingOutputRoot.root;
-    }
-
-    /// @notice Challenges the root L2 block number by providing the preimage of the output root and the L2 block header
-    ///         and showing that the committed L2 block number is incorrect relative to the claimed L2 block number.
-    /// @param _outputRootProof The output root proof.
-    /// @param _headerRLP The RLP-encoded L2 block header.
-    function challengeRootL2Block(Types.OutputRootProof calldata _outputRootProof, bytes calldata _headerRLP)
-        external
-    {
-        // INVARIANT: Moves cannot be made unless the game is currently in progress.
-        if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
-
-        // The root L2 block claim can only be challenged once.
-        if (l2BlockNumberChallenged) revert L2BlockNumberChallenged();
-
-        // Verify the output root preimage.
-        if (Hashing.hashOutputRootProof(_outputRootProof) != rootClaim().raw()) revert InvalidOutputRootProof();
-
-        // Verify the block hash preimage.
-        if (keccak256(_headerRLP) != _outputRootProof.latestBlockhash) revert InvalidHeaderRLP();
-
-        // Decode the header RLP to find the number of the block. In the consensus encoding, the timestamp
-        // is the 9th element in the list that represents the block header.
-        RLPReader.RLPItem[] memory headerContents = RLPReader.readList(RLPReader.toRLPItem(_headerRLP));
-        bytes memory rawBlockNumber = RLPReader.readBytes(headerContents[HEADER_BLOCK_NUMBER_INDEX]);
-
-        // Sanity check the block number string length.
-        if (rawBlockNumber.length > 32) revert InvalidHeaderRLP();
-
-        // Convert the raw, left-aligned block number to a uint256 by aligning it as a big-endian
-        // number in the low-order bytes of a 32-byte word.
-        //
-        // SAFETY: The length of `rawBlockNumber` is checked above to ensure it is at most 32 bytes.
-        uint256 blockNumber;
-        assembly {
-            blockNumber := shr(shl(0x03, sub(0x20, mload(rawBlockNumber))), mload(add(rawBlockNumber, 0x20)))
-        }
-
-        // Ensure the block number does not match the block number claimed in the dispute game.
-        if (blockNumber == l2BlockNumber()) revert BlockNumberMatches();
-
-        // Issue a special counter to the root claim. This counter will always win the root claim subgame, and receive
-        // the bond from the root claimant.
-        l2BlockNumberChallenger = msg.sender;
-        l2BlockNumberChallenged = true;
-    }
-
-    ////////////////////////////////////////////////////////////////
-    //                    `IDisputeGame` impl                     //
-    ////////////////////////////////////////////////////////////////
-
-    /// @inheritdoc IDisputeGame
-    function resolve() external returns (GameStatus status_) {
-        // INVARIANT: Resolution cannot occur unless the game is currently in progress.
-        if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
-
-        // INVARIANT: Resolution cannot occur unless the absolute root subgame has been resolved.
-        if (!resolvedSubgames[0]) revert OutOfOrderResolution();
-
-        // Update the global game status; The dispute has concluded.
-        status_ = claimData[0].counteredBy == address(0) ? GameStatus.DEFENDER_WINS : GameStatus.CHALLENGER_WINS;
-        resolvedAt = Timestamp.wrap(uint64(block.timestamp));
-
-        // Update the status and emit the resolved event, note that we're performing an assignment here.
-        emit Resolved(status = status_);
-
-        // Try to update the anchor state, this should not revert.
-        ANCHOR_STATE_REGISTRY.tryUpdateAnchorState();
-    }
-
-    /// @inheritdoc IFaultDisputeGame
-    function resolveClaim(uint256 _claimIndex, uint256 _numToResolve) external {
-        // INVARIANT: Resolution cannot occur unless the game is currently in progress.
-        if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
-
-        ClaimData storage subgameRootClaim = claimData[_claimIndex];
-        Duration challengeClockDuration = getChallengerDuration(_claimIndex);
-
-        // INVARIANT: Cannot resolve a subgame unless the clock of its would-be counter has expired
-        // INVARIANT: Assuming ordered subgame resolution, challengeClockDuration is always >= MAX_CLOCK_DURATION if all
-        // descendant subgames are resolved
-        if (challengeClockDuration.raw() < MAX_CLOCK_DURATION.raw()) revert ClockNotExpired();
-
-        // INVARIANT: Cannot resolve a subgame twice.
-        if (resolvedSubgames[_claimIndex]) revert ClaimAlreadyResolved();
-
-        uint256[] storage challengeIndices = subgames[_claimIndex];
-        uint256 challengeIndicesLen = challengeIndices.length;
-
-        // Uncontested claims are resolved implicitly unless they are the root claim. Pay out the bond to the claimant
-        // and return early.
-        if (challengeIndicesLen == 0 && _claimIndex != 0) {
-            // In the event that the parent claim is at the max depth, there will always be 0 subgames. If the
-            // `counteredBy` field is set and there are no subgames, this implies that the parent claim was successfully
-            // stepped against. In this case, we pay out the bond to the party that stepped against the parent claim.
-            // Otherwise, the parent claim is uncontested, and the bond is returned to the claimant.
-            address counteredBy = subgameRootClaim.counteredBy;
-            address recipient = counteredBy == address(0) ? subgameRootClaim.claimant : counteredBy;
-            _distributeBond(recipient, subgameRootClaim);
-            resolvedSubgames[_claimIndex] = true;
-            return;
-        }
-
-        // Fetch the resolution checkpoint from storage.
-        ResolutionCheckpoint memory checkpoint = resolutionCheckpoints[_claimIndex];
-
-        // If the checkpoint does not currently exist, initialize the current left most position as max u128.
-        if (!checkpoint.initialCheckpointComplete) {
-            checkpoint.leftmostPosition = Position.wrap(type(uint128).max);
-            checkpoint.initialCheckpointComplete = true;
-
-            // If `_numToResolve == 0`, assume that we can check all child subgames in this one callframe.
-            if (_numToResolve == 0) _numToResolve = challengeIndicesLen;
-        }
-
-        // Assume parent is honest until proven otherwise
-        uint256 lastToResolve = checkpoint.subgameIndex + _numToResolve;
-        uint256 finalCursor = lastToResolve > challengeIndicesLen ? challengeIndicesLen : lastToResolve;
-        for (uint256 i = checkpoint.subgameIndex; i < finalCursor; i++) {
-            uint256 challengeIndex = challengeIndices[i];
-
-            // INVARIANT: Cannot resolve a subgame containing an unresolved claim
-            if (!resolvedSubgames[challengeIndex]) revert OutOfOrderResolution();
-
-            ClaimData storage claim = claimData[challengeIndex];
-
-            // If the child subgame is uncountered and further left than the current left-most counter,
-            // update the parent subgame's `countered` address and the current `leftmostCounter`.
-            // The left-most correct counter is preferred in bond payouts in order to discourage attackers
-            // from countering invalid subgame roots via an invalid defense position. As such positions
-            // cannot be correctly countered.
-            // Note that correctly positioned defense, but invalid claimes can still be successfully countered.
-            if (claim.counteredBy == address(0) && checkpoint.leftmostPosition.raw() > claim.position.raw()) {
-                checkpoint.counteredBy = claim.claimant;
-                checkpoint.leftmostPosition = claim.position;
-            }
-        }
-
-        // Increase the checkpoint's cursor position by the number of children that were checked.
-        checkpoint.subgameIndex = uint32(finalCursor);
-
-        // Persist the checkpoint and allow for continuing in a separate transaction, if resolution is not already
-        // complete.
-        resolutionCheckpoints[_claimIndex] = checkpoint;
-
-        // If all children have been traversed in the above loop, the subgame may be resolved. Otherwise, persist the
-        // checkpoint and allow for continuation in a separate transaction.
-        if (checkpoint.subgameIndex == challengeIndicesLen) {
-            address countered = checkpoint.counteredBy;
-
-            // Mark the subgame as resolved.
-            resolvedSubgames[_claimIndex] = true;
-
-            // Distribute the bond to the appropriate party.
-            if (_claimIndex == 0 && l2BlockNumberChallenged) {
-                // Special case: If the root claim has been challenged with the `challengeRootL2Block` function,
-                // the bond is always paid out to the issuer of that challenge.
-                address challenger = l2BlockNumberChallenger;
-                _distributeBond(challenger, subgameRootClaim);
-                subgameRootClaim.counteredBy = challenger;
-            } else {
-                // If the parent was not successfully countered, pay out the parent's bond to the claimant.
-                // If the parent was successfully countered, pay out the parent's bond to the challenger.
-                _distributeBond(countered == address(0) ? subgameRootClaim.claimant : countered, subgameRootClaim);
-
-                // Once a subgame is resolved, we percolate the result up the DAG so subsequent calls to
-                // resolveClaim will not need to traverse this subgame.
-                subgameRootClaim.counteredBy = countered;
-            }
-        }
-    }
-
-    /// @inheritdoc IDisputeGame
-    function gameType() public view override returns (GameType gameType_) {
-        gameType_ = GAME_TYPE;
-    }
-
-    /// @inheritdoc IDisputeGame
-    function gameCreator() public pure returns (address creator_) {
-        creator_ = _getArgAddress(0x00);
-    }
-
-    /// @inheritdoc IDisputeGame
-    function rootClaim() public pure returns (Claim rootClaim_) {
-        rootClaim_ = Claim.wrap(_getArgBytes32(0x14));
-    }
-
-    /// @inheritdoc IDisputeGame
-    function l1Head() public pure returns (Hash l1Head_) {
-        l1Head_ = Hash.wrap(_getArgBytes32(0x34));
-    }
-
-    /// @inheritdoc IDisputeGame
-    function extraData() public pure returns (bytes memory extraData_) {
-        // The extra data starts at the second word within the cwia calldata and
-        // is 32 bytes long.
-        extraData_ = _getArgBytes(0x54, 0x20);
-    }
-
-    /// @inheritdoc IDisputeGame
-    function gameData() external view returns (GameType gameType_, Claim rootClaim_, bytes memory extraData_) {
-        gameType_ = gameType();
-        rootClaim_ = rootClaim();
-        extraData_ = extraData();
-    }
-
-    ////////////////////////////////////////////////////////////////
-    //                       MISC EXTERNAL                        //
-    ////////////////////////////////////////////////////////////////
-
-    /// @notice Returns the required bond for a given move kind.
-    /// @param _position The position of the bonded interaction.
-    /// @return requiredBond_ The required ETH bond for the given move, in wei.
-    function getRequiredBond(Position _position) public view returns (uint256 requiredBond_) {
-        uint256 depth = uint256(_position.depth());
-        if (depth > MAX_GAME_DEPTH) revert GameDepthExceeded();
-
-        // Values taken from Big Bonds v1.5 (TM) spec.
-        uint256 assumedBaseFee = 200 gwei;
-        uint256 baseGasCharged = 400_000;
-        uint256 highGasCharged = 300_000_000;
-
-        // Goal here is to compute the fixed multiplier that will be applied to the base gas
-        // charged to get the required gas amount for the given depth. We apply this multiplier
-        // some `n` times where `n` is the depth of the position. We are looking for some number
-        // that, when multiplied by itself `MAX_GAME_DEPTH` times and then multiplied by the base
-        // gas charged, will give us the maximum gas that we want to charge.
-        // We want to solve for (highGasCharged/baseGasCharged) ** (1/MAX_GAME_DEPTH).
-        // We know that a ** (b/c) is equal to e ** (ln(a) * (b/c)).
-        // We can compute e ** (ln(a) * (b/c)) quite easily with FixedPointMathLib.
-
-        // Set up a, b, and c.
-        uint256 a = highGasCharged / baseGasCharged;
-        uint256 b = FixedPointMathLib.WAD;
-        uint256 c = MAX_GAME_DEPTH * FixedPointMathLib.WAD;
-
-        // Compute ln(a).
-        // slither-disable-next-line divide-before-multiply
-        uint256 lnA = uint256(FixedPointMathLib.lnWad(int256(a * FixedPointMathLib.WAD)));
-
-        // Computes (b / c) with full precision using WAD = 1e18.
-        uint256 bOverC = FixedPointMathLib.divWad(b, c);
-
-        // Compute e ** (ln(a) * (b/c))
-        // sMulWad can be used here since WAD = 1e18 maintains the same precision.
-        uint256 numerator = FixedPointMathLib.mulWad(lnA, bOverC);
-        int256 base = FixedPointMathLib.expWad(int256(numerator));
-
-        // Compute the required gas amount.
-        int256 rawGas = FixedPointMathLib.powWad(base, int256(depth * FixedPointMathLib.WAD));
-        uint256 requiredGas = FixedPointMathLib.mulWad(baseGasCharged, uint256(rawGas));
-
-        // Compute the required bond.
-        requiredBond_ = assumedBaseFee * requiredGas;
-    }
-
-    /// @notice Claim the credit belonging to the recipient address.
-    /// @param _recipient The owner and recipient of the credit.
-    function claimCredit(address _recipient) external {
-        // Remove the credit from the recipient prior to performing the external call.
-        uint256 recipientCredit = credit[_recipient];
-        credit[_recipient] = 0;
-
-        // Revert if the recipient has no credit to claim.
-        if (recipientCredit == 0) revert NoCreditToClaim();
-
-        // Try to withdraw the WETH amount so it can be used here.
-        WETH.withdraw(_recipient, recipientCredit);
-
-        // Transfer the credit to the recipient.
-        (bool success,) = _recipient.call{value: recipientCredit}(hex"");
-        if (!success) revert BondTransferFailed();
-    }
-
-    /// @notice Returns the amount of time elapsed on the potential challenger to `_claimIndex`'s chess clock. Maxes
-    ///         out at `MAX_CLOCK_DURATION`.
-    /// @param _claimIndex The index of the subgame root claim.
-    /// @return duration_ The time elapsed on the potential challenger to `_claimIndex`'s chess clock.
-    function getChallengerDuration(uint256 _claimIndex) public view returns (Duration duration_) {
-        // INVARIANT: The game must be in progress to query the remaining time to respond to a given claim.
-        if (status != GameStatus.IN_PROGRESS) {
-            revert GameNotInProgress();
-        }
-
-        // Fetch the subgame root claim.
-        ClaimData storage subgameRootClaim = claimData[_claimIndex];
-
-        // Fetch the parent of the subgame root's clock, if it exists.
-        Clock parentClock;
-        if (subgameRootClaim.parentIndex != type(uint32).max) {
-            parentClock = claimData[subgameRootClaim.parentIndex].clock;
-        }
-
-        // Compute the duration elapsed of the potential challenger's clock.
-        uint64 challengeDuration =
-            uint64(parentClock.duration().raw() + (block.timestamp - subgameRootClaim.clock.timestamp().raw()));
-        duration_ = challengeDuration > MAX_CLOCK_DURATION.raw() ? MAX_CLOCK_DURATION : Duration.wrap(challengeDuration);
-    }
-
-    /// @notice Returns the length of the `claimData` array.
-    function claimDataLen() external view returns (uint256 len_) {
-        len_ = claimData.length;
-    }
-
-    ////////////////////////////////////////////////////////////////
-    //                     IMMUTABLE GETTERS                      //
-    ////////////////////////////////////////////////////////////////
-
-    /// @notice Returns the absolute prestate of the instruction trace.
-    function absolutePrestate() external view returns (Claim absolutePrestate_) {
-        absolutePrestate_ = ABSOLUTE_PRESTATE;
-    }
-
-    /// @notice Returns the max game depth.
-    function maxGameDepth() external view returns (uint256 maxGameDepth_) {
-        maxGameDepth_ = MAX_GAME_DEPTH;
-    }
-
-    /// @notice Returns the split depth.
-    function splitDepth() external view returns (uint256 splitDepth_) {
-        splitDepth_ = SPLIT_DEPTH;
-    }
-
-    /// @notice Returns the max clock duration.
-    function maxClockDuration() external view returns (Duration maxClockDuration_) {
-        maxClockDuration_ = MAX_CLOCK_DURATION;
-    }
-
-    /// @notice Returns the clock extension constant.
-    function clockExtension() external view returns (Duration clockExtension_) {
-        clockExtension_ = CLOCK_EXTENSION;
-    }
-
-    /// @notice Returns the address of the VM.
-    function vm() external view returns (IBigStepper vm_) {
-        vm_ = VM;
-    }
-
-    /// @notice Returns the WETH contract for holding ETH.
-    function weth() external view returns (IDelayedWETH weth_) {
-        weth_ = WETH;
-    }
-
-    /// @notice Returns the anchor state registry contract.
-    function anchorStateRegistry() external view returns (IAnchorStateRegistry registry_) {
-        registry_ = ANCHOR_STATE_REGISTRY;
-    }
-
-    /// @notice Returns the chain ID of the L2 network this contract argues about.
-    function l2ChainId() external view returns (uint256 l2ChainId_) {
-        l2ChainId_ = L2_CHAIN_ID;
-    }
-
-    ////////////////////////////////////////////////////////////////
-    //                          HELPERS                           //
-    ////////////////////////////////////////////////////////////////
-
-    /// @notice Pays out the bond of a claim to a given recipient.
-    /// @param _recipient The recipient of the bond.
-    /// @param _bonded The claim to pay out the bond of.
-    function _distributeBond(address _recipient, ClaimData storage _bonded) internal {
-        // Set all bits in the bond value to indicate that the bond has been paid out.
-        uint256 bond = _bonded.bond;
-
-        // Increase the recipient's credit.
-        credit[_recipient] += bond;
-
-        // Unlock the bond.
-        WETH.unlock(_recipient, bond);
-    }
-
-    /// @notice Verifies the integrity of an execution bisection subgame's root claim. Reverts if the claim
-    ///         is invalid.
-    /// @param _rootClaim The root claim of the execution bisection subgame.
-    function _verifyExecBisectionRoot(Claim _rootClaim, uint256 _parentIdx, Position _parentPos, bool _isAttack)
-        internal
-        view
-    {
-        // The root claim of an execution trace bisection sub-game must:
-        // 1. Signal that the VM panicked or resulted in an invalid transition if the disputed output root
-        //    was made by the opposing party.
-        // 2. Signal that the VM resulted in a valid transition if the disputed output root was made by the same party.
-
-        // If the move is a defense, the disputed output could have been made by either party. In this case, we
-        // need to search for the parent output to determine what the expected status byte should be.
-        Position disputedLeafPos = Position.wrap(_parentPos.raw() + 1);
-        ClaimData storage disputed = _findTraceAncestor({_pos: disputedLeafPos, _start: _parentIdx, _global: true});
-        uint8 vmStatus = uint8(_rootClaim.raw()[0]);
-
-        if (_isAttack || disputed.position.depth() % 2 == SPLIT_DEPTH % 2) {
-            // If the move is an attack, the parent output is always deemed to be disputed. In this case, we only need
-            // to check that the root claim signals that the VM panicked or resulted in an invalid transition.
-            // If the move is a defense, and the disputed output and creator of the execution trace subgame disagree,
-            // the root claim should also signal that the VM panicked or resulted in an invalid transition.
-            if (!(vmStatus == VMStatuses.INVALID.raw() || vmStatus == VMStatuses.PANIC.raw())) {
-                revert UnexpectedRootClaim(_rootClaim);
-            }
-        } else if (vmStatus != VMStatuses.VALID.raw()) {
-            // The disputed output and the creator of the execution trace subgame agree. The status byte should
-            // have signaled that the VM succeeded.
-            revert UnexpectedRootClaim(_rootClaim);
-        }
-    }
-
-    /// @notice Finds the trace ancestor of a given position within the DAG.
-    /// @param _pos The position to find the trace ancestor claim of.
-    /// @param _start The index to start searching from.
-    /// @param _global Whether or not to search the entire dag or just within an execution trace subgame. If set to
-    ///                `true`, and `_pos` is at or above the split depth, this function will revert.
-    /// @return ancestor_ The ancestor claim that commits to the same trace index as `_pos`.
-    function _findTraceAncestor(Position _pos, uint256 _start, bool _global)
-        internal
-        view
-        returns (ClaimData storage ancestor_)
-    {
-        // Grab the trace ancestor's expected position.
-        Position traceAncestorPos = _global ? _pos.traceAncestor() : _pos.traceAncestorBounded(SPLIT_DEPTH);
-
-        // Walk up the DAG to find a claim that commits to the same trace index as `_pos`. It is
-        // guaranteed that such a claim exists.
-        ancestor_ = claimData[_start];
-        while (ancestor_.position.raw() != traceAncestorPos.raw()) {
-            ancestor_ = claimData[ancestor_.parentIndex];
-        }
-    }
-
-    /// @notice Finds the starting and disputed output root for a given `ClaimData` within the DAG. This
-    ///         `ClaimData` must be below the `SPLIT_DEPTH`.
-    /// @param _start The index within `claimData` of the claim to start searching from.
-    /// @return startingClaim_ The starting output root claim.
-    /// @return startingPos_ The starting output root position.
-    /// @return disputedClaim_ The disputed output root claim.
-    /// @return disputedPos_ The disputed output root position.
-    function _findStartingAndDisputedOutputs(uint256 _start)
-        internal
-        view
-        returns (Claim startingClaim_, Position startingPos_, Claim disputedClaim_, Position disputedPos_)
-    {
-        // Fatch the starting claim.
-        uint256 claimIdx = _start;
-        ClaimData storage claim = claimData[claimIdx];
-
-        // If the starting claim's depth is less than or equal to the split depth, we revert as this is UB.
-        if (claim.position.depth() <= SPLIT_DEPTH) revert ClaimAboveSplit();
-
-        // We want to:
-        // 1. Find the first claim at the split depth.
-        // 2. Determine whether it was the starting or disputed output for the exec game.
-        // 3. Find the complimentary claim depending on the info from #2 (pre or post).
-
-        // Walk up the DAG until the ancestor's depth is equal to the split depth.
-        uint256 currentDepth;
-        ClaimData storage execRootClaim = claim;
-        while ((currentDepth = claim.position.depth()) > SPLIT_DEPTH) {
-            uint256 parentIndex = claim.parentIndex;
-
-            // If we're currently at the split depth + 1, we're at the root of the execution sub-game.
-            // We need to keep track of the root claim here to determine whether the execution sub-game was
-            // started with an attack or defense against the output leaf claim.
-            if (currentDepth == SPLIT_DEPTH + 1) execRootClaim = claim;
-
-            claim = claimData[parentIndex];
-            claimIdx = parentIndex;
-        }
-
-        // Determine whether the start of the execution sub-game was an attack or defense to the output root
-        // above. This is important because it determines which claim is the starting output root and which
-        // is the disputed output root.
-        (Position execRootPos, Position outputPos) = (execRootClaim.position, claim.position);
-        bool wasAttack = execRootPos.parent().raw() == outputPos.raw();
-
-        // Determine the starting and disputed output root indices.
-        // 1. If it was an attack, the disputed output root is `claim`, and the starting output root is
-        //    elsewhere in the DAG (it must commit to the block # index at depth of `outputPos - 1`).
-        // 2. If it was a defense, the starting output root is `claim`, and the disputed output root is
-        //    elsewhere in the DAG (it must commit to the block # index at depth of `outputPos + 1`).
-        if (wasAttack) {
-            // If this is an attack on the first output root (the block directly after the starting
-            // block number), the starting claim nor position exists in the tree. We leave these as
-            // 0, which can be easily identified due to 0 being an invalid Gindex.
-            if (outputPos.indexAtDepth() > 0) {
-                ClaimData storage starting = _findTraceAncestor(Position.wrap(outputPos.raw() - 1), claimIdx, true);
-                (startingClaim_, startingPos_) = (starting.claim, starting.position);
-            } else {
-                startingClaim_ = Claim.wrap(startingOutputRoot.root.raw());
-            }
-            (disputedClaim_, disputedPos_) = (claim.claim, claim.position);
-        } else {
-            ClaimData storage disputed = _findTraceAncestor(Position.wrap(outputPos.raw() + 1), claimIdx, true);
-            (startingClaim_, startingPos_) = (claim.claim, claim.position);
-            (disputedClaim_, disputedPos_) = (disputed.claim, disputed.position);
-        }
-    }
-
-    /// @notice Finds the local context hash for a given claim index that is present in an execution trace subgame.
-    /// @param _claimIndex The index of the claim to find the local context hash for.
-    /// @return uuid_ The local context hash.
-    function _findLocalContext(uint256 _claimIndex) internal view returns (Hash uuid_) {
-        (Claim starting, Position startingPos, Claim disputed, Position disputedPos) =
-            _findStartingAndDisputedOutputs(_claimIndex);
-        uuid_ = _computeLocalContext(starting, startingPos, disputed, disputedPos);
-    }
-
-    /// @notice Computes the local context hash for a set of starting/disputed claim values and positions.
-    /// @param _starting The starting claim.
-    /// @param _startingPos The starting claim's position.
-    /// @param _disputed The disputed claim.
-    /// @param _disputedPos The disputed claim's position.
-    /// @return uuid_ The local context hash.
-    function _computeLocalContext(Claim _starting, Position _startingPos, Claim _disputed, Position _disputedPos)
-        internal
-        pure
-        returns (Hash uuid_)
-    {
-        // A position of 0 indicates that the starting claim is the absolute prestate. In this special case,
-        // we do not include the starting claim within the local context hash.
-        uuid_ = _startingPos.raw() == 0
-            ? Hash.wrap(keccak256(abi.encode(_disputed, _disputedPos)))
-            : Hash.wrap(keccak256(abi.encode(_starting, _startingPos, _disputed, _disputedPos)));
+        _resourceConfig = _config;
     }
 }
 
-// src/vendor.sol
+// src/L1/OptimismPortal2.sol
+
+/// @custom:proxied
+/// @title OptimismPortal2
+/// @notice The OptimismPortal is a low-level contract responsible for passing messages between L1
+///         and L2. Messages sent directly to the OptimismPortal have no form of replayability.
+///         Users are encouraged to use the L1CrossDomainMessenger for a higher-level interface.
+contract OptimismPortal2 is Initializable_0, ResourceMetering, ISemver {
+    /// @notice Represents a proven withdrawal.
+    /// @custom:field disputeGameProxy The address of the dispute game proxy that the withdrawal was proven against.
+    /// @custom:field timestamp        Timestamp at whcih the withdrawal was proven.
+    struct ProvenWithdrawal {
+        IDisputeGame disputeGameProxy;
+        uint64 timestamp;
+    }
+
+    /// @notice The delay between when a withdrawal transaction is proven and when it may be finalized.
+    uint256 internal immutable PROOF_MATURITY_DELAY_SECONDS;
+
+    /// @notice The delay between when a dispute game is resolved and when a withdrawal proven against it may be
+    ///         finalized.
+    uint256 internal immutable DISPUTE_GAME_FINALITY_DELAY_SECONDS;
+
+    /// @notice Version of the deposit event.
+    uint256 internal constant DEPOSIT_VERSION = 0;
+
+    /// @notice The L2 gas limit set when eth is deposited using the receive() function.
+    uint64 internal constant RECEIVE_DEFAULT_GAS_LIMIT = 100_000;
+
+    /// @notice Address of the L2 account which initiated a withdrawal in this transaction.
+    ///         If the of this variable is the default L2 sender address, then we are NOT inside of
+    ///         a call to finalizeWithdrawalTransaction.
+    address public l2Sender;
+
+    /// @notice A list of withdrawal hashes which have been successfully finalized.
+    mapping(bytes32 => bool) public finalizedWithdrawals;
+
+    /// @custom:legacy
+    /// @custom:spacer provenWithdrawals
+    /// @notice Spacer taking up the legacy `provenWithdrawals` mapping slot.
+    bytes32 private spacer_52_0_32;
+
+    /// @custom:legacy
+    /// @custom:spacer paused
+    /// @notice Spacer for backwards compatibility.
+    bool private spacer_53_0_1;
+
+    /// @notice Contract of the Superchain Config.
+    SuperchainConfig public superchainConfig;
+
+    /// @custom:legacy
+    /// @custom:spacer l2Oracle
+    /// @notice Spacer taking up the legacy `l2Oracle` address slot.
+    address private spacer_54_0_20;
+
+    /// @notice Contract of the SystemConfig.
+    /// @custom:network-specific
+    SystemConfig public systemConfig;
+
+    /// @notice Address of the DisputeGameFactory.
+    /// @custom:network-specific
+    DisputeGameFactory public disputeGameFactory;
+
+    /// @notice A mapping of withdrawal hashes to proof submitters to `ProvenWithdrawal` data.
+    mapping(bytes32 => mapping(address => ProvenWithdrawal)) public provenWithdrawals;
+
+    /// @notice A mapping of dispute game addresses to whether or not they are blacklisted.
+    mapping(IDisputeGame => bool) public disputeGameBlacklist;
+
+    /// @notice The game type that the OptimismPortal consults for output proposals.
+    GameType public respectedGameType;
+
+    /// @notice The timestamp at which the respected game type was last updated.
+    uint64 public respectedGameTypeUpdatedAt;
+
+    /// @notice Mapping of withdrawal hashes to addresses that have submitted a proof for the withdrawal.
+    mapping(bytes32 => address[]) public proofSubmitters;
+
+    /// @custom:spacer _balance (custom gas token)
+    /// @notice Spacer for forwards compatibility.
+    bytes32 private spacer_61_0_32;
+
+    /// @notice Emitted when a transaction is deposited from L1 to L2.
+    ///         The parameters of this event are read by the rollup node and used to derive deposit
+    ///         transactions on L2.
+    /// @param from       Address that triggered the deposit transaction.
+    /// @param to         Address that the deposit transaction is directed to.
+    /// @param version    Version of this deposit transaction event.
+    /// @param opaqueData ABI encoded deposit data to be parsed off-chain.
+    event TransactionDeposited(address indexed from, address indexed to, uint256 indexed version, bytes opaqueData);
+
+    /// @notice Emitted when a withdrawal transaction is proven.
+    /// @param withdrawalHash Hash of the withdrawal transaction.
+    /// @param from           Address that triggered the withdrawal transaction.
+    /// @param to             Address that the withdrawal transaction is directed to.
+    event WithdrawalProven(bytes32 indexed withdrawalHash, address indexed from, address indexed to);
+
+    /// @notice Emitted when a withdrawal transaction is proven. Exists as a separate event to allow for backwards
+    ///         compatibility for tooling that observes the `WithdrawalProven` event.
+    /// @param withdrawalHash Hash of the withdrawal transaction.
+    /// @param proofSubmitter Address of the proof submitter.
+    event WithdrawalProvenExtension1(bytes32 indexed withdrawalHash, address indexed proofSubmitter);
+
+    /// @notice Emitted when a withdrawal transaction is finalized.
+    /// @param withdrawalHash Hash of the withdrawal transaction.
+    /// @param success        Whether the withdrawal transaction was successful.
+    event WithdrawalFinalized(bytes32 indexed withdrawalHash, bool success);
+
+    /// @notice Emitted when a dispute game is blacklisted by the Guardian.
+    /// @param disputeGame Address of the dispute game that was blacklisted.
+    event DisputeGameBlacklisted(IDisputeGame indexed disputeGame);
+
+    /// @notice Emitted when the Guardian changes the respected game type in the portal.
+    /// @param newGameType The new respected game type.
+    /// @param updatedAt   The timestamp at which the respected game type was updated.
+    event RespectedGameTypeSet(GameType indexed newGameType, Timestamp indexed updatedAt);
+
+    /// @notice Reverts when paused.
+    modifier whenNotPaused() {
+        if (paused()) revert CallPaused();
+        _;
+    }
+
+    /// @notice Semantic version.
+    /// @custom:semver 3.10.0
+    string public constant version = "3.10.0";
+
+    /// @notice Constructs the OptimismPortal contract.
+    constructor(uint256 _proofMaturityDelaySeconds, uint256 _disputeGameFinalityDelaySeconds) {
+        PROOF_MATURITY_DELAY_SECONDS = _proofMaturityDelaySeconds;
+        DISPUTE_GAME_FINALITY_DELAY_SECONDS = _disputeGameFinalityDelaySeconds;
+
+        initialize({
+            _disputeGameFactory: DisputeGameFactory(address(0)),
+            _systemConfig: SystemConfig(address(0)),
+            _superchainConfig: SuperchainConfig(address(0)),
+            _initialRespectedGameType: GameType.wrap(0)
+        });
+    }
+
+    /// @notice Initializer.
+    /// @param _disputeGameFactory Contract of the DisputeGameFactory.
+    /// @param _systemConfig Contract of the SystemConfig.
+    /// @param _superchainConfig Contract of the SuperchainConfig.
+    function initialize(
+        DisputeGameFactory _disputeGameFactory,
+        SystemConfig _systemConfig,
+        SuperchainConfig _superchainConfig,
+        GameType _initialRespectedGameType
+    ) public initializer {
+        disputeGameFactory = _disputeGameFactory;
+        systemConfig = _systemConfig;
+        superchainConfig = _superchainConfig;
+
+        // Set the `l2Sender` slot, only if it is currently empty. This signals the first initialization of the
+        // contract.
+        if (l2Sender == address(0)) {
+            l2Sender = Constants.DEFAULT_L2_SENDER;
+
+            // Set the `respectedGameTypeUpdatedAt` timestamp, to ignore all games of the respected type prior
+            // to this operation.
+            respectedGameTypeUpdatedAt = uint64(block.timestamp);
+
+            // Set the initial respected game type
+            respectedGameType = _initialRespectedGameType;
+        }
+
+        __ResourceMetering_init();
+    }
+
+    /// @notice Getter function for the address of the guardian.
+    ///         Public getter is legacy and will be removed in the future. Use `SuperchainConfig.guardian()` instead.
+    /// @return Address of the guardian.
+    /// @custom:legacy
+    function guardian() public view returns (address) {
+        return superchainConfig.guardian();
+    }
+
+    /// @notice Getter for the current paused status.
+    function paused() public view returns (bool) {
+        return superchainConfig.paused();
+    }
+
+    /// @notice Getter for the proof maturity delay.
+    function proofMaturityDelaySeconds() public view returns (uint256) {
+        return PROOF_MATURITY_DELAY_SECONDS;
+    }
+
+    /// @notice Getter for the dispute game finality delay.
+    function disputeGameFinalityDelaySeconds() public view returns (uint256) {
+        return DISPUTE_GAME_FINALITY_DELAY_SECONDS;
+    }
+
+    /// @notice Computes the minimum gas limit for a deposit.
+    ///         The minimum gas limit linearly increases based on the size of the calldata.
+    ///         This is to prevent users from creating L2 resource usage without paying for it.
+    ///         This function can be used when interacting with the portal to ensure forwards
+    ///         compatibility.
+    /// @param _byteCount Number of bytes in the calldata.
+    /// @return The minimum gas limit for a deposit.
+    function minimumGasLimit(uint64 _byteCount) public pure returns (uint64) {
+        return _byteCount * 16 + 21000;
+    }
+
+    /// @notice Accepts value so that users can send ETH directly to this contract and have the
+    ///         funds be deposited to their address on L2. This is intended as a convenience
+    ///         function for EOAs. Contracts should call the depositTransaction() function directly
+    ///         otherwise any deposited funds will be lost due to address aliasing.
+    receive() external payable {
+        depositTransaction(msg.sender, msg.value, RECEIVE_DEFAULT_GAS_LIMIT, false, bytes(""));
+    }
+
+    /// @notice Accepts ETH value without triggering a deposit to L2.
+    ///         This function mainly exists for the sake of the migration between the legacy
+    ///         Optimism system and Bedrock.
+    function donateETH() external payable {
+        // Intentionally empty.
+    }
+
+    /// @notice Getter for the resource config.
+    ///         Used internally by the ResourceMetering contract.
+    ///         The SystemConfig is the source of truth for the resource config.
+    /// @return ResourceMetering ResourceConfig
+    function _resourceConfig() internal view override returns (ResourceMetering.ResourceConfig memory) {
+        return systemConfig.resourceConfig();
+    }
+
+    /// @notice Proves a withdrawal transaction.
+    /// @param _tx               Withdrawal transaction to finalize.
+    /// @param _disputeGameIndex Index of the dispute game to prove the withdrawal against.
+    /// @param _outputRootProof  Inclusion proof of the L2ToL1MessagePasser contract's storage root.
+    /// @param _withdrawalProof  Inclusion proof of the withdrawal in L2ToL1MessagePasser contract.
+    function proveWithdrawalTransaction(
+        Types.WithdrawalTransaction memory _tx,
+        uint256 _disputeGameIndex,
+        Types.OutputRootProof calldata _outputRootProof,
+        bytes[] calldata _withdrawalProof
+    ) external whenNotPaused {
+        // Prevent users from creating a deposit transaction where this address is the message
+        // sender on L2. Because this is checked here, we do not need to check again in
+        // `finalizeWithdrawalTransaction`.
+        require(_tx.target != address(this), "OptimismPortal: you cannot send messages to the portal contract");
+
+        // Fetch the dispute game proxy from the `DisputeGameFactory` contract.
+        (GameType gameType,, IDisputeGame gameProxy) = disputeGameFactory.gameAtIndex(_disputeGameIndex);
+        Claim outputRoot = gameProxy.rootClaim();
+
+        // The game type of the dispute game must be the respected game type.
+        require(gameType.raw() == respectedGameType.raw(), "OptimismPortal: invalid game type");
+
+        // Verify that the output root can be generated with the elements in the proof.
+        require(
+            outputRoot.raw() == Hashing.hashOutputRootProof(_outputRootProof),
+            "OptimismPortal: invalid output root proof"
+        );
+
+        // Load the ProvenWithdrawal into memory, using the withdrawal hash as a unique identifier.
+        bytes32 withdrawalHash = Hashing.hashWithdrawal(_tx);
+
+        // We do not allow for proving withdrawals against dispute games that have resolved against the favor
+        // of the root claim.
+        require(
+            gameProxy.status() != GameStatus.CHALLENGER_WINS,
+            "OptimismPortal: cannot prove against invalid dispute games"
+        );
+
+        // Compute the storage slot of the withdrawal hash in the L2ToL1MessagePasser contract.
+        // Refer to the Solidity documentation for more information on how storage layouts are
+        // computed for mappings.
+        bytes32 storageKey = keccak256(
+            abi.encode(
+                withdrawalHash,
+                uint256(0) // The withdrawals mapping is at the first slot in the layout.
+            )
+        );
+
+        // Verify that the hash of this withdrawal was stored in the L2toL1MessagePasser contract
+        // on L2. If this is true, under the assumption that the SecureMerkleTrie does not have
+        // bugs, then we know that this withdrawal was actually triggered on L2 and can therefore
+        // be relayed on L1.
+        require(
+            SecureMerkleTrie.verifyInclusionProof({
+                _key: abi.encode(storageKey),
+                _value: hex"01",
+                _proof: _withdrawalProof,
+                _root: _outputRootProof.messagePasserStorageRoot
+            }),
+            "OptimismPortal: invalid withdrawal inclusion proof"
+        );
+
+        // Designate the withdrawalHash as proven by storing the `disputeGameProxy` & `timestamp` in the
+        // `provenWithdrawals` mapping. A `withdrawalHash` can only be proven once unless the dispute game it proved
+        // against resolves against the favor of the root claim.
+        provenWithdrawals[withdrawalHash][msg.sender] =
+            ProvenWithdrawal({disputeGameProxy: gameProxy, timestamp: uint64(block.timestamp)});
+
+        // Emit a `WithdrawalProven` event.
+        emit WithdrawalProven(withdrawalHash, _tx.sender, _tx.target);
+        // Emit a `WithdrawalProvenExtension1` event.
+        emit WithdrawalProvenExtension1(withdrawalHash, msg.sender);
+
+        // Add the proof submitter to the list of proof submitters for this withdrawal hash.
+        proofSubmitters[withdrawalHash].push(msg.sender);
+    }
+
+    /// @notice Finalizes a withdrawal transaction.
+    /// @param _tx Withdrawal transaction to finalize.
+    function finalizeWithdrawalTransaction(Types.WithdrawalTransaction memory _tx) external whenNotPaused {
+        finalizeWithdrawalTransactionExternalProof(_tx, msg.sender);
+    }
+
+    /// @notice Finalizes a withdrawal transaction, using an external proof submitter.
+    /// @param _tx Withdrawal transaction to finalize.
+    /// @param _proofSubmitter Address of the proof submitter.
+    function finalizeWithdrawalTransactionExternalProof(Types.WithdrawalTransaction memory _tx, address _proofSubmitter)
+        public
+        whenNotPaused
+    {
+        // Make sure that the l2Sender has not yet been set. The l2Sender is set to a value other
+        // than the default value when a withdrawal transaction is being finalized. This check is
+        // a defacto reentrancy guard.
+        require(
+            l2Sender == Constants.DEFAULT_L2_SENDER, "OptimismPortal: can only trigger one withdrawal per transaction"
+        );
+
+        // Compute the withdrawal hash.
+        bytes32 withdrawalHash = Hashing.hashWithdrawal(_tx);
+
+        // Check that the withdrawal can be finalized.
+        checkWithdrawal(withdrawalHash, _proofSubmitter);
+
+        // Mark the withdrawal as finalized so it can't be replayed.
+        finalizedWithdrawals[withdrawalHash] = true;
+
+        // Set the l2Sender so contracts know who triggered this withdrawal on L2.
+        l2Sender = _tx.sender;
+
+        // Trigger the call to the target contract. We use a custom low level method
+        // SafeCall.callWithMinGas to ensure two key properties
+        //   1. Target contracts cannot force this call to run out of gas by returning a very large
+        //      amount of data (and this is OK because we don't care about the returndata here).
+        //   2. The amount of gas provided to the execution context of the target is at least the
+        //      gas limit specified by the user. If there is not enough gas in the current context
+        //      to accomplish this, `callWithMinGas` will revert.
+        bool success = SafeCall.callWithMinGas(_tx.target, _tx.gasLimit, _tx.value, _tx.data);
+
+        // Reset the l2Sender back to the default value.
+        l2Sender = Constants.DEFAULT_L2_SENDER;
+
+        // All withdrawals are immediately finalized. Replayability can
+        // be achieved through contracts built on top of this contract
+        emit WithdrawalFinalized(withdrawalHash, success);
+
+        // Reverting here is useful for determining the exact gas cost to successfully execute the
+        // sub call to the target contract if the minimum gas limit specified by the user would not
+        // be sufficient to execute the sub call.
+        if (!success && tx.origin == Constants.ESTIMATION_ADDRESS) {
+            revert GasEstimation();
+        }
+    }
+
+    /// @notice Accepts deposits of ETH and data, and emits a TransactionDeposited event for use in
+    ///         deriving deposit transactions. Note that if a deposit is made by a contract, its
+    ///         address will be aliased when retrieved using `tx.origin` or `msg.sender`. Consider
+    ///         using the CrossDomainMessenger contracts for a simpler developer experience.
+    /// @param _to         Target address on L2.
+    /// @param _value      ETH value to send to the recipient.
+    /// @param _gasLimit   Amount of L2 gas to purchase by burning gas on L1.
+    /// @param _isCreation Whether or not the transaction is a contract creation.
+    /// @param _data       Data to trigger the recipient with.
+    function depositTransaction(address _to, uint256 _value, uint64 _gasLimit, bool _isCreation, bytes memory _data)
+        public
+        payable
+        metered(_gasLimit)
+    {
+        // Just to be safe, make sure that people specify address(0) as the target when doing
+        // contract creations.
+        if (_isCreation && _to != address(0)) revert BadTarget();
+
+        // Prevent depositing transactions that have too small of a gas limit. Users should pay
+        // more for more resource usage.
+        if (_gasLimit < minimumGasLimit(uint64(_data.length))) revert SmallGasLimit();
+
+        // Prevent the creation of deposit transactions that have too much calldata. This gives an
+        // upper limit on the size of unsafe blocks over the p2p network. 120kb is chosen to ensure
+        // that the transaction can fit into the p2p network policy of 128kb even though deposit
+        // transactions are not gossipped over the p2p network.
+        if (_data.length > 120_000) revert LargeCalldata();
+
+        // Transform the from-address to its alias if the caller is a contract.
+        address from = msg.sender;
+        if (msg.sender != tx.origin) {
+            from = AddressAliasHelper.applyL1ToL2Alias(msg.sender);
+        }
+
+        // Compute the opaque data that will be emitted as part of the TransactionDeposited event.
+        // We use opaque data so that we can update the TransactionDeposited event in the future
+        // without breaking the current interface.
+        bytes memory opaqueData = abi.encodePacked(msg.value, _value, _gasLimit, _isCreation, _data);
+
+        // Emit a TransactionDeposited event so that the rollup node can derive a deposit
+        // transaction for this deposit.
+        emit TransactionDeposited(from, _to, DEPOSIT_VERSION, opaqueData);
+    }
+
+    /// @notice Blacklists a dispute game. Should only be used in the event that a dispute game resolves incorrectly.
+    /// @param _disputeGame Dispute game to blacklist.
+    function blacklistDisputeGame(IDisputeGame _disputeGame) external {
+        if (msg.sender != guardian()) revert Unauthorized();
+        disputeGameBlacklist[_disputeGame] = true;
+        emit DisputeGameBlacklisted(_disputeGame);
+    }
+
+    /// @notice Sets the respected game type. Changing this value can alter the security properties of the system,
+    ///         depending on the new game's behavior.
+    /// @param _gameType The game type to consult for output proposals.
+    function setRespectedGameType(GameType _gameType) external {
+        if (msg.sender != guardian()) revert Unauthorized();
+        respectedGameType = _gameType;
+        respectedGameTypeUpdatedAt = uint64(block.timestamp);
+        emit RespectedGameTypeSet(_gameType, Timestamp.wrap(respectedGameTypeUpdatedAt));
+    }
+
+    /// @notice Checks if a withdrawal can be finalized. This function will revert if the withdrawal cannot be
+    ///         finalized, and otherwise has no side-effects.
+    /// @param _withdrawalHash Hash of the withdrawal to check.
+    /// @param _proofSubmitter The submitter of the proof for the withdrawal hash
+    function checkWithdrawal(bytes32 _withdrawalHash, address _proofSubmitter) public view {
+        ProvenWithdrawal memory provenWithdrawal = provenWithdrawals[_withdrawalHash][_proofSubmitter];
+        IDisputeGame disputeGameProxy = provenWithdrawal.disputeGameProxy;
+
+        // The dispute game must not be blacklisted.
+        require(!disputeGameBlacklist[disputeGameProxy], "OptimismPortal: dispute game has been blacklisted");
+
+        // A withdrawal can only be finalized if it has been proven. We know that a withdrawal has
+        // been proven at least once when its timestamp is non-zero. Unproven withdrawals will have
+        // a timestamp of zero.
+        require(
+            provenWithdrawal.timestamp != 0,
+            "OptimismPortal: withdrawal has not been proven by proof submitter address yet"
+        );
+
+        uint64 createdAt = disputeGameProxy.createdAt().raw();
+
+        // As a sanity check, we make sure that the proven withdrawal's timestamp is greater than
+        // starting timestamp inside the Dispute Game. Not strictly necessary but extra layer of
+        // safety against weird bugs in the proving step.
+        require(
+            provenWithdrawal.timestamp > createdAt,
+            "OptimismPortal: withdrawal timestamp less than dispute game creation timestamp"
+        );
+
+        // A proven withdrawal must wait at least `PROOF_MATURITY_DELAY_SECONDS` before finalizing.
+        require(
+            block.timestamp - provenWithdrawal.timestamp > PROOF_MATURITY_DELAY_SECONDS,
+            "OptimismPortal: proven withdrawal has not matured yet"
+        );
+
+        // A proven withdrawal must wait until the dispute game it was proven against has been
+        // resolved in favor of the root claim (the output proposal). This is to prevent users
+        // from finalizing withdrawals proven against non-finalized output roots.
+        require(
+            disputeGameProxy.status() == GameStatus.DEFENDER_WINS,
+            "OptimismPortal: output proposal has not been validated"
+        );
+
+        // The game type of the dispute game must be the respected game type. This was also checked in
+        // `proveWithdrawalTransaction`, but we check it again in case the respected game type has changed since
+        // the withdrawal was proven.
+        require(disputeGameProxy.gameType().raw() == respectedGameType.raw(), "OptimismPortal: invalid game type");
+
+        // The game must have been created after `respectedGameTypeUpdatedAt`. This is to prevent users from creating
+        // invalid disputes against a deployed game type while the off-chain challenge agents are not watching.
+        require(
+            createdAt >= respectedGameTypeUpdatedAt,
+            "OptimismPortal: dispute game created before respected game type was updated"
+        );
+
+        // Before a withdrawal can be finalized, the dispute game it was proven against must have been
+        // resolved for at least `DISPUTE_GAME_FINALITY_DELAY_SECONDS`. This is to allow for manual
+        // intervention in the event that a dispute game is resolved incorrectly.
+        require(
+            block.timestamp - disputeGameProxy.resolvedAt().raw() > DISPUTE_GAME_FINALITY_DELAY_SECONDS,
+            "OptimismPortal: output proposal in air-gap"
+        );
+
+        // Check that this withdrawal has not already been finalized, this is replay protection.
+        require(!finalizedWithdrawals[_withdrawalHash], "OptimismPortal: withdrawal has already been finalized");
+    }
+
+    /// @notice External getter for the number of proof submitters for a withdrawal hash.
+    /// @param _withdrawalHash Hash of the withdrawal.
+    /// @return The number of proof submitters for the withdrawal hash.
+    function numProofSubmitters(bytes32 _withdrawalHash) external view returns (uint256) {
+        return proofSubmitters[_withdrawalHash].length;
+    }
+}

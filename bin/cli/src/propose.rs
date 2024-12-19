@@ -21,13 +21,15 @@ use alloy::consensus::BlockHeader;
 use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::network::{BlockResponse, EthereumWallet};
-use alloy::primitives::{Address, Bytes};
+use alloy::primitives::Bytes;
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
 use anyhow::Context;
 use kailua_common::blobs::hash_to_fe;
-use kailua_contracts::KailuaTournament::KailuaTournamentInstance;
+use kailua_common::client::config_hash;
+use kailua_contracts::*;
+use kailua_host::fetch_rollup_config;
 use std::path::PathBuf;
 use std::process::exit;
 use std::str::FromStr;
@@ -47,10 +49,23 @@ pub struct ProposeArgs {
 
 pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()> {
     // initialize blockchain connections
-    let op_node_provider = OpNodeProvider(
-        ProviderBuilder::new().on_http(args.core.op_node_address.as_str().try_into()?),
-    );
-    let cl_node_provider = BlobProvider::new(args.core.l1_beacon_address.as_str()).await?;
+    let op_node_provider =
+        OpNodeProvider(ProviderBuilder::new().on_http(args.core.op_node_url.as_str().try_into()?));
+    let cl_node_provider = BlobProvider::new(args.core.beacon_rpc_url.as_str()).await?;
+    let eth_rpc_provider =
+        ProviderBuilder::new().on_http(args.core.eth_rpc_url.as_str().try_into()?);
+
+    info!("Fetching rollup configuration from rpc endpoints.");
+    // fetch rollup config
+    let config = fetch_rollup_config(&args.core.op_node_url, &args.core.op_geth_url, None)
+        .await
+        .context("fetch_rollup_config")?;
+    let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
+    info!("RollupConfigHash({})", hex::encode(rollup_config_hash));
+
+    // load system config
+    let system_config = SystemConfig::new(config.l1_system_config_address, &eth_rpc_provider);
+    let dgf_address = system_config.disputeGameFactory().stall().await.addr_;
 
     // initialize proposer wallet
     info!("Initializing proposer wallet.");
@@ -60,19 +75,12 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
     let proposer_provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .wallet(&proposer_wallet)
-        .on_http(args.core.l1_node_address.as_str().try_into()?);
+        .on_http(args.core.eth_rpc_url.as_str().try_into()?);
     info!("Proposer address: {proposer_address}");
 
     // Init registry and factory contracts
-    let anchor_state_registry = kailua_contracts::IAnchorStateRegistry::new(
-        Address::from_str(&args.core.registry_contract)?,
-        &proposer_provider,
-    );
-    info!("AnchorStateRegistry({:?})", anchor_state_registry.address());
-    let dispute_game_factory = kailua_contracts::IDisputeGameFactory::new(
-        anchor_state_registry.disputeGameFactory().stall().await._0,
-        &proposer_provider,
-    );
+    let dispute_game_factory =
+        kailua_contracts::IDisputeGameFactory::new(dgf_address, &proposer_provider);
     info!("DisputeGameFactory({:?})", dispute_game_factory.address());
     let game_count: u64 = dispute_game_factory
         .gameCount()
@@ -96,7 +104,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
     }
     // Initialize empty DB
     info!("Initializing..");
-    let mut kailua_db = KailuaDB::init(data_dir, &anchor_state_registry).await?;
+    let mut kailua_db = KailuaDB::init(data_dir, &dispute_game_factory).await?;
     info!("KailuaTreasury({:?})", kailua_db.treasury.address);
     // Run the proposer loop to sync and post
     info!(
@@ -109,7 +117,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         sleep(Duration::from_secs(1)).await;
         // fetch latest games
         kailua_db
-            .load_proposals(&anchor_state_registry, &op_node_provider, &cl_node_provider)
+            .load_proposals(&dispute_game_factory, &op_node_provider, &cl_node_provider)
             .await
             .context("load_proposals")?;
 
@@ -270,13 +278,12 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                 break Some(extra_data);
             }
             // fetch proposal from local data
-            let dupe_game_index: u64 =
-                KailuaTournamentInstance::new(dupe_game_address, &proposer_provider)
-                    .gameIndex()
-                    .stall()
-                    .await
-                    ._0
-                    .to();
+            let dupe_game_index: u64 = KailuaTournament::new(dupe_game_address, &proposer_provider)
+                .gameIndex()
+                .stall()
+                .await
+                ._0
+                .to();
             let Some(dupe_proposal) = kailua_db.get_local_proposal(&dupe_game_index) else {
                 // we need to fetch this proposal's data
                 break None;

@@ -69,7 +69,7 @@ contract KailuaGame is KailuaTournament {
         bytes32 _configHash,
         uint256 _proposalBlockCount,
         GameType _gameType,
-        IAnchorStateRegistry _anchorStateRegistry,
+        IDisputeGameFactory _disputeGameFactory,
         uint256 _genesisTimeStamp,
         uint256 _l2BlockTime,
         uint256 _proposalTimeGap,
@@ -82,7 +82,7 @@ contract KailuaGame is KailuaTournament {
             _configHash,
             _proposalBlockCount,
             _gameType,
-            _anchorStateRegistry
+            _disputeGameFactory
         )
     {
         MAX_CLOCK_DURATION = _maxClockDuration;
@@ -123,8 +123,7 @@ contract KailuaGame is KailuaTournament {
         uint256 duplicationCounter_ = duplicationCounter();
         if (duplicationCounter_ > 0) {
             bytes memory extra = abi.encodePacked(msg.data[0x58:0x68], uint64(duplicationCounter_ - 1));
-            (IDisputeGame previousDuplicate,) =
-                ANCHOR_STATE_REGISTRY.disputeGameFactory().games(GAME_TYPE, rootClaim(), extra);
+            (IDisputeGame previousDuplicate,) = DISPUTE_GAME_FACTORY.games(GAME_TYPE, rootClaim(), extra);
             if (address(previousDuplicate) == address(0x0)) {
                 revert InvalidDuplicationCounter();
             }
@@ -154,13 +153,13 @@ contract KailuaGame is KailuaTournament {
 
         // Allow only the treasury to create new games
         if (gameCreator() != address(KAILUA_TREASURY)) {
-            revert Unauthorized(gameCreator(), address(KAILUA_TREASURY));
+            revert Blacklisted(gameCreator(), address(KAILUA_TREASURY));
         }
 
         // Register this new game in the parent game's contract
         parentGame().appendChild();
 
-        // Do not permit proposals of l2 blocks inside the gap
+        // Do not permit proposals of l2 block is still inside the gap
         if (block.timestamp <= GENESIS_TIME_STAMP + thisL2BlockNumber * L2_BLOCK_TIME + PROPOSAL_TIME_GAP) {
             revert ClockTimeExceeded();
         }
@@ -205,19 +204,11 @@ contract KailuaGame is KailuaTournament {
 
         // Update the status and emit the resolved event, note that we're performing a storage update here.
         emit Resolved(status = status_ = GameStatus.DEFENDER_WINS);
-
-        // Try to update the anchor state, this should not revert.
-        ANCHOR_STATE_REGISTRY.tryUpdateAnchorState();
     }
 
     // ------------------------------
     // Immutable instance data
     // ------------------------------
-
-    /// @inheritdoc KailuaTournament
-    function l2BlockNumber() public pure override returns (uint256 l2BlockNumber_) {
-        l2BlockNumber_ = uint256(_getArgUint64(0x54));
-    }
 
     /// @notice The index of the parent game in the `DisputeGameFactory`.
     function parentGameIndex() public pure returns (uint64 parentGameIndex_) {
@@ -231,8 +222,7 @@ contract KailuaGame is KailuaTournament {
 
     /// @inheritdoc KailuaTournament
     function parentGame() public view override returns (KailuaTournament parentGame_) {
-        (GameType parentGameType,, IDisputeGame parentDisputeGame) =
-            ANCHOR_STATE_REGISTRY.disputeGameFactory().gameAtIndex(parentGameIndex());
+        (GameType parentGameType,, IDisputeGame parentDisputeGame) = DISPUTE_GAME_FACTORY.gameAtIndex(parentGameIndex());
 
         // Only allow fault claim games to be based off of other instances of the same game type
         if (parentGameType.raw() != GAME_TYPE.raw()) revert GameTypeMismatch(parentGameType, GAME_TYPE);

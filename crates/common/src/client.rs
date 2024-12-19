@@ -318,9 +318,11 @@ where
         let blob = *response[0];
         #[cfg(not(target_os = "zkvm"))]
         {
-            let settings = crate::kzg::kzg_settings();
             let blob = c_kzg::Blob::new(blob.0);
-            let commitment = c_kzg::KzgCommitment::blob_to_kzg_commitment(&blob, settings)?;
+            let commitment = c_kzg::KzgCommitment::blob_to_kzg_commitment(
+                &blob,
+                c_kzg::ethereum_kzg_settings(),
+            )?;
             let hash = alloy_eips::eip4844::kzg_to_versioned_hash(commitment.as_slice());
             assert_eq!(hash, expected_hash);
         }

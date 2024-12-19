@@ -4,7 +4,7 @@ set fallback := true
 default:
   @just --list
 
-build +ARGS="--release":
+build +ARGS="--release -F prove":
   cargo build {{ARGS}}
 
 clippy:
@@ -13,7 +13,7 @@ clippy:
 devnet-install:
   git clone --depth 1 --branch v1.9.1 --recursive https://github.com/ethereum-optimism/optimism.git
 
-devnet-build +ARGS="--release -F devnet": (build ARGS)
+devnet-build +ARGS="-F devnet -F prove": (build ARGS)
 
 devnet-up:
   make -C optimism devnet-up > devnet.log
@@ -24,63 +24,69 @@ devnet-down:
 devnet-clean: devnet-down
   make -C optimism devnet-clean
 
-devnet-upgrade target="release" verbosity="" l1_rpc="http://127.0.0.1:8545" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" registry="0xd801426328C609fCDe6E3B7a5623C27e8F607832" portal="0x6509f2a854BA7441039fCE3b959d5bAdd2fFCFCD" deployer="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba" owner="0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6" guardian="0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6":
-  ./target/{{target}}/kailua-cli deploy \
-      --registry-contract {{registry}} \
-      --portal-contract {{portal}} \
-      --l1-node-address {{l1_rpc}} \
-      --l2-node-address {{l2_rpc}} \
-      --op-node-address {{rollup_node_rpc}} \
-      --blocks-per-proposal 60 \
+devnet-config target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545":
+  ./target/{{target}}/kailua-cli config \
+      --eth-rpc-url {{l1_rpc}} \
+      --op-geth-url {{l2_rpc}} \
+      --op-node-url {{rollup_node_rpc}}
+
+devnet-upgrade target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" deployer="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba" owner="0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6" guardian="0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6":
+  RISC0_DEV_MODE=1 ./target/{{target}}/kailua-cli fast-track \
+      --eth-rpc-url {{l1_rpc}} \
+      --op-geth-url {{l2_rpc}} \
+      --op-node-url {{rollup_node_rpc}} \
+      --starting-block-number 0 \
+      --proposal-block-span 60 \
       --proposal-time-gap 30 \
-      --challenge-period 300 \
+      --challenge-timeout 300 \
+      --collateral-amount 1 \
       --deployer-key {{deployer}} \
       --owner-key {{owner}} \
       --guardian-key {{guardian}} \
+      --respect-kailua-proposals \
       {{verbosity}}
 
 devnet-reset: devnet-down devnet-clean devnet-up
 
-devnet-propose target="release" verbosity="" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" rollup_node_rpc="http://127.0.0.1:7545" data_dir=".localtestdata/propose" registry="0xd801426328C609fCDe6E3B7a5623C27e8F607832" deployer="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba":
+devnet-propose target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" data_dir=".localtestdata/propose" deployer="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba":
   ./target/{{target}}/kailua-cli propose \
-      --registry-contract {{registry}} \
-      --l1-node-address {{l1_rpc}} \
-      --l1-beacon-address {{l1_beacon_rpc}} \
-      --op-node-address {{rollup_node_rpc}} \
+      --eth-rpc-url {{l1_rpc}} \
+      --beacon-rpc-url {{l1_beacon_rpc}} \
+      --op-geth-url {{l2_rpc}} \
+      --op-node-url {{rollup_node_rpc}} \
       --data-dir {{data_dir}} \
       --proposer-key {{deployer}} \
       {{verbosity}}
 
-devnet-fault offset="1" parent="1" target="release" verbosity="" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" rollup_node_rpc="http://127.0.0.1:7545" registry="0xd801426328C609fCDe6E3B7a5623C27e8F607832" deployer="0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a":
+devnet-fault offset parent target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" deployer="0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a":
   ./target/{{target}}/kailua-cli test-fault \
-      --registry-contract {{registry}} \
-      --l1-node-address {{l1_rpc}} \
-      --l1-beacon-address {{l1_beacon_rpc}} \
-      --op-node-address {{rollup_node_rpc}} \
+      --eth-rpc-url {{l1_rpc}} \
+      --beacon-rpc-url {{l1_beacon_rpc}} \
+      --op-geth-url {{l2_rpc}} \
+      --op-node-url {{rollup_node_rpc}} \
       --proposer-key {{deployer}} \
       --fault-offset {{offset}} \
       --fault-parent {{parent}} \
       {{verbosity}}
 
-devnet-validate target="release" verbosity="" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" data_dir=".localtestdata/validate" registry="0xd801426328C609fCDe6E3B7a5623C27e8F607832" validator="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba":
+devnet-validate target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" data_dir=".localtestdata/validate" validator="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba":
   ./target/{{target}}/kailua-cli validate \
-      --registry-contract {{registry}} \
-      --l1-node-address {{l1_rpc}} \
-      --l1-beacon-address {{l1_beacon_rpc}} \
-      --l2-node-address {{l2_rpc}} \
-      --op-node-address {{rollup_node_rpc}} \
+      --eth-rpc-url {{l1_rpc}} \
+      --beacon-rpc-url {{l1_beacon_rpc}} \
+      --op-geth-url {{l2_rpc}} \
+      --op-node-url {{rollup_node_rpc}} \
       --kailua-host ./target/{{target}}/kailua-host \
       --validator-key {{validator}} \
       {{verbosity}}
 
-devnet-prove block_number block_count target="release" verbosity="" data=".localtestdata": (prove block_number block_count "http://localhost:8545" "http://localhost:5052" "http://localhost:9545" "http://localhost:7545" data target verbosity)
+devnet-prove block_number block_count target="debug" verbosity="" data=".localtestdata": (prove block_number block_count "http://localhost:8545" "http://localhost:5052" "http://localhost:9545" "http://localhost:7545" data target verbosity)
 
 bench l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data start range count target="release" verbosity="-v":
     ./target/{{target}}/kailua-cli benchmark \
-          --l1-node-address {{l1_rpc}} \
-          --l1-beacon-address {{l1_beacon_rpc}} \
-          --l2-node-address {{l2_rpc}} \
-          --op-node-address {{rollup_node_rpc}} \
+          --eth-rpc-url {{l1_rpc}} \
+          --beacon-rpc-url {{l1_beacon_rpc}} \
+          --op-geth-url {{l2_rpc}} \
+          --op-node-url {{rollup_node_rpc}} \
           --data-dir {{data}} \
           --bench-start {{start}} \
           --bench-range {{range}} \
