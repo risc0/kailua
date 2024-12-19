@@ -26,15 +26,14 @@ async fn main() -> anyhow::Result<()> {
     let data_dir = cli.data_dir().unwrap_or(tmp_dir.path().to_path_buf());
 
     match cli {
-        Cli::Deploy(deploy_args) => kailua_cli::deploy::deploy(deploy_args).await?,
-        Cli::Propose(propose_args) => kailua_cli::propose::propose(propose_args, data_dir).await?,
-        Cli::Validate(validate_args) => {
-            kailua_cli::validate::validate(validate_args, data_dir).await?
-        }
-        Cli::TestFault(_fault_args) =>
+        Cli::Config(args) => kailua_cli::config::config(args).await?,
+        Cli::FastTrack(args) => kailua_cli::fast_track::fast_track(args).await?,
+        Cli::Propose(args) => kailua_cli::propose::propose(args, data_dir).await?,
+        Cli::Validate(args) => kailua_cli::validate::validate(args, data_dir).await?,
+        Cli::TestFault(_args) =>
         {
             #[cfg(feature = "devnet")]
-            kailua_cli::fault::fault(_fault_args).await?
+            kailua_cli::fault::fault(_args).await?
         } // Cli::Benchmark(bench_args) => kailua_cli::bench::benchmark(bench_args).await?,
     }
     Ok(())

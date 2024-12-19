@@ -22,8 +22,9 @@ use std::path::PathBuf;
 
 // pub mod bench;
 pub mod channel;
+pub mod config;
 pub mod db;
-pub mod deploy;
+pub mod fast_track;
 pub mod fault;
 pub mod propose;
 pub mod providers;
@@ -45,7 +46,8 @@ pub const SET_BUILDER_ID: B256 =
 #[command(author, version, about, long_about = None)]
 #[allow(clippy::large_enum_variant)]
 pub enum Cli {
-    Deploy(deploy::DeployArgs),
+    Config(config::ConfigArgs),
+    FastTrack(fast_track::FastTrackArgs),
     Propose(propose::ProposeArgs),
     Validate(validate::ValidateArgs),
     TestFault(fault::FaultArgs),
@@ -57,19 +59,18 @@ pub struct CoreArgs {
     #[arg(long, short, help = "Verbosity level (0-4)", action = clap::ArgAction::Count)]
     pub v: u8,
 
-    /// Address of OP-NODE endpoint to use
+    /// Address of the OP-NODE endpoint to use
     #[clap(long, env)]
-    pub op_node_address: String,
-    /// Address of L1 JSON-RPC endpoint to use (eth namespace required)
+    pub op_node_url: String,
+    /// Address of the OP-GETH endpoint to use (eth and debug namespace required).
     #[clap(long, env)]
-    pub l1_node_address: String,
+    pub op_geth_url: String,
+    /// Address of the ethereum rpc endpoint to use (eth namespace required)
+    #[clap(long, env)]
+    pub eth_rpc_url: String,
     /// Address of the L1 Beacon API endpoint to use.
     #[clap(long, env)]
-    pub l1_beacon_address: String,
-
-    /// Address of the L1 `AnchorStateRegistry` contract
-    #[clap(long, env)]
-    pub registry_contract: String,
+    pub beacon_rpc_url: String,
 
     /// Directory to use for caching data
     #[clap(long, env)]
@@ -79,7 +80,8 @@ pub struct CoreArgs {
 impl Cli {
     pub fn verbosity(&self) -> u8 {
         match self {
-            Cli::Deploy(args) => args.v,
+            Cli::Config(args) => args.v,
+            Cli::FastTrack(args) => args.v,
             Cli::Propose(args) => args.core.v,
             Cli::Validate(args) => args.core.v,
             Cli::TestFault(args) => args.propose_args.core.v,
@@ -108,10 +110,9 @@ pub async fn exec_safe_txn<
     from: Address,
 ) -> anyhow::Result<()> {
     let req = txn.into_transaction_request();
-    let value = req.value().unwrap_or_default();
     safe.execTransaction(
         req.to().unwrap(),
-        value,
+        req.value().unwrap_or_default(),
         req.input().cloned().unwrap_or_default(),
         0,
         Uint::from(req.gas_limit().unwrap_or_default()),

@@ -1,0 +1,23 @@
+[book]
+authors = ["hashcashier"]
+language = "en"
+multilingual = false
+src = "src"
+title = "The Kailua Book"
+
+[preprocessor]
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
+
+[preprocessor.admonish]
+command = "mdbook-admonish"
+assets_version = "3.0.2" # do not edit: managed by `mdbook-admonish install`
+
+[output.html]
+default-theme = "ayu"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/risc0/kailua"
+edit-url-template = "https://github.com/risc0/kailua/edit/main/book/{path}"
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
+additional-css = ["./mdbook-admonish.css"]

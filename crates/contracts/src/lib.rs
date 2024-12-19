@@ -78,23 +78,21 @@ sol!(
 
 sol!(
     #[sol(rpc)]
-    IAnchorStateRegistry,
-    "foundry/out/FlatOPImportV1.4.0.sol/IAnchorStateRegistry.json"
-);
-
-sol!(
-    #[sol(rpc)]
     Safe,
     "foundry/out/FlatOPImportV1.4.0.sol/Safe.json"
 );
 
-sol! {
+sol!(
     #[sol(rpc)]
-    interface OptimismPortal {
-        function setRespectedGameType(uint32 _gameType) external;
-        function guardian() public view returns (address);
-    }
-}
+    OptimismPortal2,
+    "foundry/out/FlatOPImportV1.4.0.sol/OptimismPortal2.json"
+);
+
+sol!(
+    #[sol(rpc)]
+    SystemConfig,
+    "foundry/out/FlatOPImportV1.4.0.sol/SystemConfig.json"
+);
 
 sol! {
     #[sol(rpc)]

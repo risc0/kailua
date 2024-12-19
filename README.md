@@ -9,28 +9,27 @@ All proving costs are borne by the dishonest party in the protocol, whether that
 
 ## Development Status
 
-`kailua` as well as `kona` are still in active development and are NOT recommended for production usage.
+`Kailua` as well as `kona` are still in active development and are NOT recommended for production usage.
 
 ## Fraud/Validity Proofs
 
 Kailua enables rollup operators to add a new fault proof contract, compatible with Bedrock contracts `v1.4.0` and above, using the `DisputeGameFactory` rollup instance to their deployment that relies on RISC-Zero zkVM proofs to finalize/dismiss output proposals.
 
-`FaultProofGame` optimistically allows outputs to be accepted after a timeout if no fraud proof is published against it, or if the output is challenged, waits for a proof to be submitted to decide whether to dismiss or finalize the output.
+`KailuaGame` optimistically allows outputs to be accepted after a timeout if no fraud proof is published against it, or if the output is challenged, waits for a proof to be submitted to decide whether to dismiss the output.
 
 ## Prerequisites
 1. [rust](https://www.rust-lang.org/tools/install)
 2. [just](https://just.systems/man/en/)
 3. [docker](https://www.docker.com/)
 4. [solc](https://docs.soliditylang.org/en/latest/installing-solidity.html)
-5. [geth](https://geth.ethereum.org/docs/getting-started/installing-geth)
-6. [foundry](https://book.getfoundry.sh/getting-started/installation)
+5. [foundry](https://book.getfoundry.sh/getting-started/installation)
 
 ## Devnet Usage
 
 1. `just devnet-install`
-   * Fetches `v1.9.1` of the `optimism` monorepo
+   * Fetches `v1.9.1` of the `optimism` monorepo.
 2. `just devnet-build`
-   * Builds the local cargo and foundry projects
+   * Builds the local cargo and foundry projects.
 3. `just devnet-up`
    * Starts a local OP Stack devnet using docker.
    * Dumps the output into `devnetlog.txt` for inspection.
@@ -38,18 +37,19 @@ Kailua enables rollup operators to add a new fault proof contract, compatible wi
    * Upgrades the devnet to use the `KailuaGame` contract.
    * Assumes the default values of the local optimism devnet, but can take parameters.
 5. `just devnet-propose`
-   * Launches the kailua proposer.
-   * This constantly creates new `KailuaGame` instances to finalize the l2 on the l1.
+   * Launches the Kailua proposer.
+   * This runs the sequences, which periodically creates new `KailuaGame` instances.
 6. `just devnet-validate`
-   * Launches the kailua validator.
-   * This challenges `KailuaGame` instances that contain invalid proposals
+   * Launches the Kailua validator.
+   * This monitors `KailuaGame` instances for disputes and creates proofs to resolve them.
+   * Note: Use `RISC0_DEV_MODE=1` to use fake proofs.
 7. `just devnet-fault`
-   * Deploys a single `KailuaGame` instance with a faulty proposal.
+   * Deploys a single `KailuaGame` instance with a faulty sequencing proposal.
    * Tests the validator's fault proving functionality.
-   * Tests the proposer's canonical chain decision functionality.
+   * Tests the proposer's canonical chain tracking functionality.
 8. After you're done:
-   * `just devnet-down` to stop the running docker containers
-   * `just devnet-clean` to cleanup the docker volumes
+   * `just devnet-down` to stop the running docker containers.
+   * `just devnet-clean` to cleanup the docker volumes.
 
 ## Questions, Feedback, and Collaborations
 

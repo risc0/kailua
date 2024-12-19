@@ -34,7 +34,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     bytes32 internal immutable FPVM_IMAGE_ID;
 
     /// @notice The hash of the game configuration
-    bytes32 internal immutable GAME_CONFIG_HASH;
+    bytes32 internal immutable ROLLUP_CONFIG_HASH;
 
     /// @notice The number of blocks a claim must cover
     uint256 internal immutable PROPOSAL_BLOCK_COUNT;
@@ -45,8 +45,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     /// @notice The game type ID
     GameType internal immutable GAME_TYPE;
 
-    /// @notice The anchor state registry.
-    IAnchorStateRegistry internal immutable ANCHOR_STATE_REGISTRY;
+    /// @notice The dispute game factory
+    IDisputeGameFactory internal immutable DISPUTE_GAME_FACTORY;
 
     /// @notice Returns the address of the Kailua Treasury used by tournament instances
     function treasury() public view returns (IKailuaTreasury treasury_) {
@@ -65,7 +65,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
     /// @notice Returns the hash of the configuration of this game
     function configHash() public view returns (bytes32 configHash_) {
-        configHash_ = GAME_CONFIG_HASH;
+        configHash_ = ROLLUP_CONFIG_HASH;
     }
 
     /// @notice Returns the number of blocks that must be covered by this game
@@ -78,13 +78,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         proposalBlobs_ = PROPOSAL_BLOBS;
     }
 
-    /// @notice Returns the anchor state registry contract.
-    function anchorStateRegistry() public view returns (IAnchorStateRegistry registry_) {
-        registry_ = ANCHOR_STATE_REGISTRY;
-    }
-
     function disputeGameFactory() public view returns (IDisputeGameFactory factory_) {
-        factory_ = ANCHOR_STATE_REGISTRY.disputeGameFactory();
+        factory_ = DISPUTE_GAME_FACTORY;
     }
 
     constructor(
@@ -94,17 +89,17 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         bytes32 _configHash,
         uint256 _proposalBlockCount,
         GameType _gameType,
-        IAnchorStateRegistry _anchorStateRegistry
+        IDisputeGameFactory _disputeGameFactory
     ) {
         KAILUA_TREASURY = _kailuaTreasury;
         RISC_ZERO_VERIFIER = _verifierContract;
         FPVM_IMAGE_ID = _imageId;
-        GAME_CONFIG_HASH = _configHash;
+        ROLLUP_CONFIG_HASH = _configHash;
         PROPOSAL_BLOCK_COUNT = _proposalBlockCount;
         PROPOSAL_BLOBS = (_proposalBlockCount / (1 << KailuaLib.FIELD_ELEMENTS_PER_BLOB_PO2))
             + ((_proposalBlockCount % (1 << KailuaLib.FIELD_ELEMENTS_PER_BLOB_PO2)) == 0 ? 0 : 1);
         GAME_TYPE = _gameType;
-        ANCHOR_STATE_REGISTRY = _anchorStateRegistry;
+        DISPUTE_GAME_FACTORY = _disputeGameFactory;
     }
 
     /// @notice The blob hashes used to create the game
@@ -268,7 +263,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                     // The L2 claim block number.
                     claimBlockNumber,
                     // The configuration hash for this game
-                    GAME_CONFIG_HASH
+                    ROLLUP_CONFIG_HASH
                 )
             );
 
@@ -388,8 +383,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     }
 
     function isChildEliminated(KailuaTournament child) internal returns (bool) {
-        address proposer = KAILUA_TREASURY.proposerOf(address(child));
-        uint256 eliminationRound = KAILUA_TREASURY.eliminationRound(proposer);
+        address _proposer = KAILUA_TREASURY.proposerOf(address(child));
+        uint256 eliminationRound = KAILUA_TREASURY.eliminationRound(_proposer);
         if (eliminationRound == 0 || eliminationRound > child.gameIndex()) {
             // This proposer has not been eliminated as of their proposal at gameIndex
             return false;
@@ -454,7 +449,9 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     }
 
     /// @notice The l2BlockNumber of the claim's output root.
-    function l2BlockNumber() public pure virtual returns (uint256 l2BlockNumber_);
+    function l2BlockNumber() public pure returns (uint256 l2BlockNumber_) {
+        l2BlockNumber_ = uint256(_getArgUint64(0x54));
+    }
 
     /// @inheritdoc IDisputeGame
     function gameData() external view returns (GameType gameType_, Claim rootClaim_, bytes memory extraData_) {
