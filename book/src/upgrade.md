@@ -1,4 +1,4 @@
-# On-chain Migration
+# On-chain Contracts
 
 In order to utilize Kailua, you'll need to deploy the Kailua dispute contracts, and configure your rollup to use them.
 This process will require access to your rollup's 'Owner' and 'Guardian' wallets.
@@ -61,8 +61,9 @@ kailua-cli fast-track \
 \
       --respect-kailua-proposals
 ```
-All the parameters above are configurable as described below:
-
+```admonish tip
+All the parameters above can be provided as environment variables.
+```
 #### Endpoints
 The first three parameters to this command are the L1 and L2 RPC endpoints:
 * `eth-rpc-url`: The endpoint for the parent chain.
@@ -103,5 +104,5 @@ The final argument configures withdrawals in your rollup:
 * `respect-kailua-proposals`: (if present) will allow withdrawals using sequencing proposals finalized by Kailua.
 
 ```admonish done
-If you've successfully completed fast-track migration using the tool, you may now skip to the "Off-chain" page.
+If you've successfully completed fast-track migration using the tool, you may now skip to the [Off-chain page](./operate.md).
 ```

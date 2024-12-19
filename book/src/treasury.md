@@ -73,7 +73,7 @@ cast rpc --rpc-url [YOUR_OP_NODE_ADDRESS] \
 ```
 
 ```admonish tip
-You can filter through the returned response by piping it to `jq -r .outputRoot`
+You can quickly filter through the response for `outputRoot` by piping it to `jq -r .outputRoot`
 ```
 
 Once you have the `outputRoot` value you wish to start sequencing from, the next step is to call `create` on `DisputeGameFactory` using the `owner` wallet:
@@ -84,6 +84,11 @@ cast send [YOUR_DISPUTE_GAME_FACTORY] \
   [YOUR_OUTPUT_ROOT] \
   $(cast abi-encode --packed "f(uint64)" [YOUR_STARTING_L2_BLOCK_NUMBER])
 ```
+
+```admonish note
+The above cast abi-encode command requires the `--packed` argument.
+```
+
 
 To get the address of this new game instance, use the `games` function on the `DisputeGameFactory`:
 ```shell

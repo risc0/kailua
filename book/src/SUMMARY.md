@@ -13,10 +13,9 @@
   - [Dispute Resolution](./dispute.md)
   - [State Anchoring](./treasury.md)
   - [Sequencing Proposal](./game.md)
-- [Off-chain]()
-  - [Proposer]()
-  - [Validator]()
-    - [Proving]()
+- [Off-chain](./operate.md)
+  - [Proposer](./proposer.md)
+  - [Validator](./validator.md)
 
 # Specification
 - [Sequencing]()

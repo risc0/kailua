@@ -120,6 +120,11 @@ forge create KailuaGame --evm-version cancun --constructor-args \
   [YOUR_PROPOSAL_TIME_GAP] \
   [YOUR_MAX_CLOCK_DURATION]
 ```
+
+```admonish note
+The above forge command requires the `--evm-version cancun` argument.
+```
+
 Deploying the contract successfully should yield similar output to the following:
 ```
 Deployer: [YOUR_DEPLOYER_WALLET_ADDRESS]
