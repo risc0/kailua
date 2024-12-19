@@ -8,6 +8,7 @@
 
 # Migration Guide
 - [Setup](./setup.md)
+  - [Parameters](./parameters.md)
 - [On-chain](./upgrade.md)
   - [Proof Verification](./verifier.md)
   - [Dispute Resolution](./dispute.md)

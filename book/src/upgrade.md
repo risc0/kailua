@@ -64,6 +64,7 @@ kailua-cli fast-track \
 ```admonish tip
 All the parameters above can be provided as environment variables.
 ```
+
 #### Endpoints
 The first three parameters to this command are the L1 and L2 RPC endpoints:
 * `eth-rpc-url`: The endpoint for the parent chain.
