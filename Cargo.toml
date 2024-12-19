@@ -63,15 +63,15 @@ kailua-contracts = { path = "crates/contracts" }
 kailua-host = { path = "bin/host" }
 
 # Kona git = "https://github.com/ethereum-optimism/kona", rev = "2e943f4"
-kona-client = { git = "https://github.com/hashcashier/kona", branch = "main", default-features = false }
-kona-derive = { git = "https://github.com/hashcashier/kona", branch = "main", default-features = false, features = ["serde"] }
-kona-driver = { git = "https://github.com/hashcashier/kona", branch = "main" }
-kona-executor = { git = "https://github.com/hashcashier/kona", branch = "main" }
-kona-host = { git = "https://github.com/hashcashier/kona", branch = "main" }
-kona-mpt = { git = "https://github.com/hashcashier/kona", branch = "main", features = ["serde"] }
-kona-preimage = { git = "https://github.com/hashcashier/kona", branch = "main", features = ["rkyv"] }
-kona-proof = { git = "https://github.com/hashcashier/kona", branch = "main" }
-kona-std-fpvm = { git = "https://github.com/hashcashier/kona", branch = "main" }
+kona-client = { git = "https://github.com/hashcashier/kona", branch = "kailua", default-features = false }
+kona-derive = { git = "https://github.com/hashcashier/kona", branch = "kailua", default-features = false, features = ["serde"] }
+kona-driver = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
+kona-executor = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
+kona-host = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
+kona-mpt = { git = "https://github.com/hashcashier/kona", branch = "kailua", features = ["serde"] }
+kona-preimage = { git = "https://github.com/hashcashier/kona", branch = "kailua", features = ["rkyv"] }
+kona-proof = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
+kona-std-fpvm = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
 
 # RISC Zero zkVM
 bonsai-sdk = { version = "1.2.0", features = ["non_blocking"] }

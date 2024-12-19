@@ -12,9 +12,11 @@ This extra data consists of commitments to the intermediate sequencing states, w
 target only a sub-sequence of blocks comprising one transition between the intermediate states instead of the entire
 proposal.
 
-> While Kailua can be configured to operate using a single published commitment per proposal, this may make the proving
-> work required to resolve disputes impractical for chains with very low block times, or a significantly large number
-> of blocks per proposal in general.
+```admonish note
+While Kailua can be configured to operate using a single published commitment per proposal, this may make the proving
+work required to resolve disputes impractical for chains with very low block times, or a significantly large number
+of blocks per proposal in general.
+```
 
 <div style="text-align: center;">
 
@@ -41,9 +43,11 @@ While a standard proposal for sequencing 64-blocks would only comprise a single 
 configured to also require the commitment for every 8th block.
 In this configuration, any Kailua fault proof would only have to provably derive a sequence of at most 8 blocks. 
 
-> To save on DA costs, blobs or alternative DA layers can be used to publish intermediate commitments.
-> Moreover, as empty blocks are cheap to prove, an intermediate commitment can be defined to cover at most N empty and
-> at most M non-empty blocks, where N >> M.
+```admonish note
+To save on DA costs, blobs or alternative DA layers can be used to publish intermediate commitments.
+Moreover, as empty blocks are cheap to prove, an intermediate commitment can be defined to cover at most N empty and
+at most M non-empty blocks, where N >> M.
+```
 
 ## Disputes
 
@@ -53,8 +57,10 @@ correct sequencing state at their first point of divergence.
 The proof then eliminates one, or both, contradictory proposals, and neither proposals can be finalized until the proof
 is submitted.
 
-> While any new contradictory proposal has to be made within the timeout period of the prior proposal it contradicts, 
-> proofs are granted an unlimited amount of time for submission.
+```admonish note
+While any new contradictory proposal has to be made within the timeout period of the prior proposal it contradicts, 
+proofs are granted an unlimited amount of time for permissionless submission by anyone.
+```
 
 <div style="text-align: center;">
 

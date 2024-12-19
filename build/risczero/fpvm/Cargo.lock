@@ -1634,7 +1634,7 @@ dependencies = [
 [[package]]
 name = "kona-derive"
 version = "0.2.0"
-source = "git+https://github.com/hashcashier/kona?branch=main#9c01213a65729859c032b4999876c56a8c385dd1"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#d39b31468c889075ad53306aabf46c10da0bb9ea"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -1653,7 +1653,7 @@ dependencies = [
 [[package]]
 name = "kona-driver"
 version = "0.2.0"
-source = "git+https://github.com/hashcashier/kona?branch=main#9c01213a65729859c032b4999876c56a8c385dd1"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#d39b31468c889075ad53306aabf46c10da0bb9ea"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
@@ -1671,7 +1671,7 @@ dependencies = [
 [[package]]
 name = "kona-executor"
 version = "0.2.0"
-source = "git+https://github.com/hashcashier/kona?branch=main#9c01213a65729859c032b4999876c56a8c385dd1"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#d39b31468c889075ad53306aabf46c10da0bb9ea"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -1689,7 +1689,7 @@ dependencies = [
 [[package]]
 name = "kona-mpt"
 version = "0.1.1"
-source = "git+https://github.com/hashcashier/kona?branch=main#9c01213a65729859c032b4999876c56a8c385dd1"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#d39b31468c889075ad53306aabf46c10da0bb9ea"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -1701,7 +1701,7 @@ dependencies = [
 [[package]]
 name = "kona-preimage"
 version = "0.2.0"
-source = "git+https://github.com/hashcashier/kona?branch=main#9c01213a65729859c032b4999876c56a8c385dd1"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#d39b31468c889075ad53306aabf46c10da0bb9ea"
 dependencies = [
  "alloy-primitives",
  "async-trait",
@@ -1714,7 +1714,7 @@ dependencies = [
 [[package]]
 name = "kona-proof"
 version = "0.2.0"
-source = "git+https://github.com/hashcashier/kona?branch=main#9c01213a65729859c032b4999876c56a8c385dd1"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#d39b31468c889075ad53306aabf46c10da0bb9ea"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",

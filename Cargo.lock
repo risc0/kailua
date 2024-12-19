@@ -4682,7 +4682,7 @@ dependencies = [
 [[package]]
 name = "kona-client"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/kona?branch=main#9c01213a65729859c032b4999876c56a8c385dd1"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#d39b31468c889075ad53306aabf46c10da0bb9ea"
 dependencies = [
  "alloy-consensus 0.8.1",
  "alloy-eips 0.8.1",
@@ -4715,7 +4715,7 @@ dependencies = [
 [[package]]
 name = "kona-derive"
 version = "0.2.0"
-source = "git+https://github.com/hashcashier/kona?branch=main#9c01213a65729859c032b4999876c56a8c385dd1"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#d39b31468c889075ad53306aabf46c10da0bb9ea"
 dependencies = [
  "alloy-consensus 0.8.1",
  "alloy-eips 0.8.1",
@@ -4734,7 +4734,7 @@ dependencies = [
 [[package]]
 name = "kona-driver"
 version = "0.2.0"
-source = "git+https://github.com/hashcashier/kona?branch=main#9c01213a65729859c032b4999876c56a8c385dd1"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#d39b31468c889075ad53306aabf46c10da0bb9ea"
 dependencies = [
  "alloy-consensus 0.8.1",
  "alloy-primitives",
@@ -4752,7 +4752,7 @@ dependencies = [
 [[package]]
 name = "kona-executor"
 version = "0.2.0"
-source = "git+https://github.com/hashcashier/kona?branch=main#9c01213a65729859c032b4999876c56a8c385dd1"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#d39b31468c889075ad53306aabf46c10da0bb9ea"
 dependencies = [
  "alloy-consensus 0.8.1",
  "alloy-eips 0.8.1",
@@ -4770,7 +4770,7 @@ dependencies = [
 [[package]]
 name = "kona-host"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/kona?branch=main#9c01213a65729859c032b4999876c56a8c385dd1"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#d39b31468c889075ad53306aabf46c10da0bb9ea"
 dependencies = [
  "alloy-consensus 0.8.1",
  "alloy-eips 0.8.1",
@@ -4807,7 +4807,7 @@ dependencies = [
 [[package]]
 name = "kona-mpt"
 version = "0.1.1"
-source = "git+https://github.com/hashcashier/kona?branch=main#9c01213a65729859c032b4999876c56a8c385dd1"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#d39b31468c889075ad53306aabf46c10da0bb9ea"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -4819,7 +4819,7 @@ dependencies = [
 [[package]]
 name = "kona-preimage"
 version = "0.2.0"
-source = "git+https://github.com/hashcashier/kona?branch=main#9c01213a65729859c032b4999876c56a8c385dd1"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#d39b31468c889075ad53306aabf46c10da0bb9ea"
 dependencies = [
  "alloy-primitives",
  "async-channel",
@@ -4833,7 +4833,7 @@ dependencies = [
 [[package]]
 name = "kona-proof"
 version = "0.2.0"
-source = "git+https://github.com/hashcashier/kona?branch=main#9c01213a65729859c032b4999876c56a8c385dd1"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#d39b31468c889075ad53306aabf46c10da0bb9ea"
 dependencies = [
  "alloy-consensus 0.8.1",
  "alloy-eips 0.8.1",
@@ -4862,7 +4862,7 @@ dependencies = [
 [[package]]
 name = "kona-std-fpvm"
 version = "0.1.1"
-source = "git+https://github.com/hashcashier/kona?branch=main#9c01213a65729859c032b4999876c56a8c385dd1"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#d39b31468c889075ad53306aabf46c10da0bb9ea"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -4874,7 +4874,7 @@ dependencies = [
 [[package]]
 name = "kona-std-fpvm-proc"
 version = "0.1.1"
-source = "git+https://github.com/hashcashier/kona?branch=main#9c01213a65729859c032b4999876c56a8c385dd1"
+source = "git+https://github.com/hashcashier/kona?branch=kailua#d39b31468c889075ad53306aabf46c10da0bb9ea"
 dependencies = [
  "anyhow",
  "cfg-if",

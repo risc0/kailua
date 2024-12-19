@@ -8,18 +8,28 @@ section before proceeding.
 Before you can start migrating your rollup, you'll need to build and install Kailua's binaries by calling the following
 commands from the root project directory:
 
-```shell
-cargo install kailua-cli --path bin/cli
-```
-```shell
-cargo install kailua-host --path bin/host
-```
-
 ```admonish tip
 Do not run these commands in parallel.
 Each of these commands will take time to build the FPVM program in release mode.
 If you do, GitHub may throttle you, leading to a docker build error.
 ```
+
+### CLI Binary
+```shell
+cargo install kailua-cli --path bin/cli
+```
+
+### Prover Binary
+```admonish info
+At the cost of longer compilation time, you can embed the RISC Zero prover logic into `kailua-host` instead of having 
+it utilize your locally installed RISC Zero `r0vm`.
+To do this, add `-F prove` to the command below.
+```
+
+```shell
+cargo install kailua-host --path bin/host
+```
+
 
 ## Configuration
 

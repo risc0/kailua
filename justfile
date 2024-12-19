@@ -4,7 +4,7 @@ set fallback := true
 default:
   @just --list
 
-build +ARGS="--release":
+build +ARGS="--release -F prove":
   cargo build {{ARGS}}
 
 clippy:

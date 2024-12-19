@@ -4,8 +4,9 @@
 
 This document is a guide to the design, implementation, and usage of RISC Zero's Kailua.
 
-
-> Kailua is in active development and has not yet been reviewed for use in production.
+```admonish note
+Kailua is in active development and has not yet been reviewed for use in production.
+```
 
 ## Introduction
 
@@ -18,11 +19,13 @@ These benefits come at marginal added operational costs compared to full validit
 A delay attack happens when a dishonest party attempts to delay the withdrawal finality of correctly sequenced transactions.
 For optimistic rollups, the main attack vector is through triggering on-chain disputes using the fault proving mechanism.
 
-> Kailua's dispute resolution mechanism resolves disputes as fast as proofs can be generated.
-> Thanks to the RISC Zero zkVM's scale-out design, this means that the impact of delay attacks can be mitigated with
-> more proving power.
-> For example, the worst-case single-block dispute requires proving 100bn cycles in the zkVM, a workload that can be
-> computed by RISC Zero's Bonsai service in under an hour.
+```admonish check
+Kailua's dispute resolution mechanism resolves disputes as fast as proofs can be generated.
+Thanks to the RISC Zero zkVM's scale-out design, this means that the impact of delay attacks can be mitigated with
+more proving power.
+For example, the worst-case single-block dispute requires proving 100bn cycles in the zkVM, a workload that can be
+computed by RISC Zero's Bonsai service in under an hour.
+```
 
 ### Denial-of-Service
 
@@ -32,9 +35,11 @@ afford.
 This block congestion attack can effectively censor disputes on faulty sequencing from being made on-chain, threatening
 the safety of the rollup.
 
-> Kailua incorporates "Adaptive Dispute Cutoffs", which delays withdrawal finality to increase the opportunity to
-> dispute faulty sequencing based on the level of on-chain congestion. This guarantees that if faults cost more to
-> dispute than a predetermined amount, honest parties will be granted more time until gas costs return to normal.
+```admonish check
+Kailua incorporates "Adaptive Dispute Cutoffs", which delays withdrawal finality to increase the opportunity to
+dispute faulty sequencing based on the level of on-chain congestion. This guarantees that if faults cost more to
+dispute than a predetermined amount, honest parties will be granted more time until gas costs return to normal.
+```
 
 ### Sybil Identities
 
@@ -44,10 +49,12 @@ In fault proving schemes where a defender has to issue a timely response on-chai
 by the defender to continuously participate in all open disputes until they are resolved can be overwhelming, leading
 to some faults slipping through.
 
-> Sybil attacks against Kailua force attackers to prove each other's faults at no added cost to the honest defender.
-> The only requirement for safety in Kailua is for an honest party to submit a correct sequencing proposal.
-> The added requirement for liveness is for disputes to be resolved through proofs, which carry no time limit to
-> generate.
+```admonish check
+Sybil attacks against Kailua force attackers to prove each other's faults at no added cost to the honest defender.
+The only requirement for safety in Kailua is for an honest party to submit a correct sequencing proposal.
+The added requirement for liveness is for disputes to be resolved through proofs, which carry no time limit to
+generate.
+```
 
 ### Resource Exhaustion
 
@@ -57,5 +64,7 @@ These two requirements cause some other systems to be vulnerable to resource exh
 the collateral or the proving power required for an honest party to issue a timely response, even if it can afford the
 transaction fees.
 
-> Kailua operates under constant collateral requirements for honest parties, and places no restrictions on proving
-> times, enabling honest parties to successfully defend against attacks of any size at a pre-determined maximum cost.
+```admonish check
+Kailua operates under constant collateral requirements for honest parties, and places no restrictions on proving
+times, enabling honest parties to successfully defend against attacks of any size at a pre-determined maximum cost.
+```

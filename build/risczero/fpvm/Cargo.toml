@@ -12,7 +12,7 @@ rkyv = "0.8.9"
 
 kailua-common = { path = "../../../crates/common" }
 
-kona-proof = { git = "https://github.com/hashcashier/kona", branch = "main" }
+kona-proof = { git = "https://github.com/hashcashier/kona", branch = "kailua" }
 
 risc0-zkvm = { version = "1.2.0", features = ["std", "heap-embedded-alloc", "unstable"] }
 
