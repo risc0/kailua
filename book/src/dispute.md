@@ -8,7 +8,7 @@ Kailua's on-chain dispute mechanism is powered by its own custom contracts that 
 Each rollup has to deploy its own pair of dispute resolution contracts, and this section will guide you through that
 process.
 
-The commands below will be using Foundry's `forge` and `cast` utilities, which you should have installed as part oft the
+The commands below will be using Foundry's `forge` and `cast` utilities, which you should have installed as part of the
 foundry [prerequisite](quickstart.md#prerequisites).
 
 ```admonish note
@@ -123,13 +123,12 @@ forge create KailuaGame --evm-version cancun --constructor-args \
 Deploying the contract successfully should yield similar output to the following:
 ```
 Deployer: [YOUR_DEPLOYER_WALLET_ADDRESS]
-Deployed to: [YOUR_DEPLOYED_TREASURY_CONTRACT]
+Deployed to: [YOUR_DEPLOYED_GAME_CONTRACT]
 Transaction hash: [YOUR_DEPLOYMENT_TRANSACTION_HASH]
 ```
 Note down this contract's address, we'll use it later.
 There is no configuration needed for this contract.
 
 ```admonish success
-You have now deployed the two Kailua dispute resolution contracts that use your RiscZeroVerifierRouter contract to
-verify ZK fault proofs!
+You now have two Kailua dispute resolution contracts tailored to your rollup and ZK verifier!
 ```

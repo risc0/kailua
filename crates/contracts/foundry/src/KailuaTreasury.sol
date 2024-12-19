@@ -57,6 +57,11 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     /// @inheritdoc IInitializable
     function initialize() external payable override {
         super.initializeInternal();
+
+        OwnableUpgradeable factoryContract = OwnableUpgradeable(address(DISPUTE_GAME_FACTORY));
+        if (gameCreator() != factoryContract.owner()) {
+            revert BadAuth();
+        }
     }
 
     // ------------------------------
@@ -71,7 +76,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     }
 
     /// @inheritdoc IDisputeGame
-    function resolve() external returns (GameStatus status_) {
+    function resolve() external onlyFactoryOwner returns (GameStatus status_) {
         // INVARIANT: Resolution cannot occur unless the game is currently in progress.
         if (status != GameStatus.IN_PROGRESS) {
             revert GameNotInProgress();
@@ -89,12 +94,12 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     // ------------------------------
 
     /// @inheritdoc KailuaTournament
-    function verifyIntermediateOutput(
-        uint64,
-        bytes32,
-        bytes calldata,
-        bytes calldata
-    ) external pure override returns (bool success) {
+    function verifyIntermediateOutput(uint64, bytes32, bytes calldata, bytes calldata)
+        external
+        pure
+        override
+        returns (bool success)
+    {
         success = false;
     }
 
@@ -194,9 +199,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         }
         // Create proposal
         isProposing = true;
-        gameContract = KailuaTournament(
-            address(DISPUTE_GAME_FACTORY.create(GAME_TYPE, _rootClaim, _extraData))
-        );
+        gameContract = KailuaTournament(address(DISPUTE_GAME_FACTORY.create(GAME_TYPE, _rootClaim, _extraData)));
         isProposing = false;
         // Record proposer
         proposerOf[address(gameContract)] = msg.sender;

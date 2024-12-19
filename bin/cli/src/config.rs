@@ -46,6 +46,7 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
     let eth_rpc_provider = ProviderBuilder::new().on_http(args.eth_rpc_url.as_str().try_into()?);
     // load system config
     let system_config = SystemConfig::new(config.l1_system_config_address, &eth_rpc_provider);
+    let portal_address = system_config.optimismPortal().stall().await.addr_;
     let dgf_address = system_config.disputeGameFactory().stall().await.addr_;
 
     // report genesis time
@@ -62,6 +63,11 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
     println!(
         "DISPUTE_GAME_FACTORY: 0x{}",
         hex::encode_upper(dgf_address.as_slice())
+    );
+    // report portal address
+    println!(
+        "OPTIMISM_PORTAL: 0x{}",
+        hex::encode_upper(portal_address.as_slice())
     );
     // report game type
     println!("KAILUA_GAME_TYPE: {}", KAILUA_GAME_TYPE);

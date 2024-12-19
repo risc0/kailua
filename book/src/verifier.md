@@ -59,7 +59,7 @@ Do not use the fake proof verifier anywhere near production.
 ## Deployment
 
 This section will walk you through creating your own verifier deployment that supports individual and aggregated proofs.
-The commands below will be using Foundry's `forge` and `cast` utilities, which you should have installed as part oft the
+The commands below will be using Foundry's `forge` and `cast` utilities, which you should have installed as part of the
 foundry [prerequisite](quickstart.md#prerequisites).
 
 ```admonish note
@@ -221,7 +221,5 @@ cast send \
 ```
 
 ```admonish success
-You now have a RISC Zero verifier contract equipped with verifying stand-alone and aggregated proofs!
-Note down the address of your RISCZeroVerifierRouter contract.
-We will use this router as the verifier for the Kailua dispute resolution contracts we'll deploy later on!
+You now have a RISC Zero verifier contract for stand-alone and aggregated ZK (fault) proofs!
 ```

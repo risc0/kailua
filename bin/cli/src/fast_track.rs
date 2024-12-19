@@ -221,14 +221,13 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         "Creating new KailuaTreasury game instance from {} ({}).",
         args.starting_block_number, root_claim
     );
-    dispute_game_factory
-        .create(KAILUA_GAME_TYPE, root_claim, extra_data.clone())
-        .send()
-        .await
-        .context("create KailuaTreasury (send)")?
-        .get_receipt()
-        .await
-        .context("create KailuaTreasury (get_receipt)")?;
+    crate::exec_safe_txn(
+        dispute_game_factory.create(KAILUA_GAME_TYPE, root_claim, extra_data.clone()),
+        &factory_owner_safe,
+        owner_address,
+    )
+    .await
+    .context("create KailuaTreasury")?;
     let kailua_treasury_instance_address = dispute_game_factory
         .games(KAILUA_GAME_TYPE, root_claim, extra_data)
         .stall()
@@ -240,14 +239,13 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     let status = kailua_treasury_instance.status().stall().await._0;
     if status == 0 {
         info!("Resolving KailuaTreasury instance");
-        kailua_treasury_instance
-            .resolve()
-            .send()
-            .await
-            .context("KailuaTreasury::resolve (send)")?
-            .get_receipt()
-            .await
-            .context("KailuaTreasury::resolve (get_receipt)")?;
+        crate::exec_safe_txn(
+            kailua_treasury_instance.resolve(),
+            &factory_owner_safe,
+            owner_address,
+        )
+        .await
+        .context("resolve KailuaTreasury")?;
     } else {
         info!("Game instance is not ongoing ({status})");
     }

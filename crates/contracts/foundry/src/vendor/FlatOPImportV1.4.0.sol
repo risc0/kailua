@@ -6,7 +6,6 @@
 //import { Safe } from "../lib/safe-contracts/contracts/Safe.sol";
 //import { Clone } from "@solady/utils/Clone.sol";
 
-
 // The below code is copied as is from various files under https://github.com/ethereum-optimism/optimism/tree/op-contracts/v1.4.0/packages/contracts-bedrock
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
@@ -72,7 +71,7 @@ library Address {
     function sendValue(address payable recipient, uint256 amount) internal {
         require(address(this).balance >= amount, "Address: insufficient balance");
 
-        (bool success, ) = recipient.call{value: amount}("");
+        (bool success,) = recipient.call{value: amount}("");
         require(success, "Address: unable to send value, recipient may have reverted");
     }
 
@@ -104,11 +103,10 @@ library Address {
      *
      * _Available since v3.1._
      */
-    function functionCall(
-        address target,
-        bytes memory data,
-        string memory errorMessage
-    ) internal returns (bytes memory) {
+    function functionCall(address target, bytes memory data, string memory errorMessage)
+        internal
+        returns (bytes memory)
+    {
         return functionCallWithValue(target, data, 0, errorMessage);
     }
 
@@ -123,11 +121,7 @@ library Address {
      *
      * _Available since v3.1._
      */
-    function functionCallWithValue(
-        address target,
-        bytes memory data,
-        uint256 value
-    ) internal returns (bytes memory) {
+    function functionCallWithValue(address target, bytes memory data, uint256 value) internal returns (bytes memory) {
         return functionCallWithValue(target, data, value, "Address: low-level call with value failed");
     }
 
@@ -137,12 +131,10 @@ library Address {
      *
      * _Available since v3.1._
      */
-    function functionCallWithValue(
-        address target,
-        bytes memory data,
-        uint256 value,
-        string memory errorMessage
-    ) internal returns (bytes memory) {
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage)
+        internal
+        returns (bytes memory)
+    {
         require(address(this).balance >= value, "Address: insufficient balance for call");
         require(isContract(target), "Address: call to non-contract");
 
@@ -166,11 +158,11 @@ library Address {
      *
      * _Available since v3.3._
      */
-    function functionStaticCall(
-        address target,
-        bytes memory data,
-        string memory errorMessage
-    ) internal view returns (bytes memory) {
+    function functionStaticCall(address target, bytes memory data, string memory errorMessage)
+        internal
+        view
+        returns (bytes memory)
+    {
         require(isContract(target), "Address: static call to non-contract");
 
         (bool success, bytes memory returndata) = target.staticcall(data);
@@ -193,11 +185,10 @@ library Address {
      *
      * _Available since v3.4._
      */
-    function functionDelegateCall(
-        address target,
-        bytes memory data,
-        string memory errorMessage
-    ) internal returns (bytes memory) {
+    function functionDelegateCall(address target, bytes memory data, string memory errorMessage)
+        internal
+        returns (bytes memory)
+    {
         require(isContract(target), "Address: delegate call to non-contract");
 
         (bool success, bytes memory returndata) = target.delegatecall(data);
@@ -210,11 +201,11 @@ library Address {
      *
      * _Available since v4.3._
      */
-    function verifyCallResult(
-        bool success,
-        bytes memory returndata,
-        string memory errorMessage
-    ) internal pure returns (bytes memory) {
+    function verifyCallResult(bool success, bytes memory returndata, string memory errorMessage)
+        internal
+        pure
+        returns (bytes memory)
+    {
         if (success) {
             return returndata;
         } else {
@@ -245,6 +236,7 @@ library Math {
         Down, // Toward negative infinity
         Up, // Toward infinity
         Zero // Toward zero
+
     }
 
     /**
@@ -286,15 +278,11 @@ library Math {
      * @dev Original credit to Remco Bloemen under MIT license (https://xn--2-umb.com/21/muldiv)
      * with further edits by Uniswap Labs also under MIT license.
      */
-    function mulDiv(
-        uint256 x,
-        uint256 y,
-        uint256 denominator
-    ) internal pure returns (uint256 result) {
+    function mulDiv(uint256 x, uint256 y, uint256 denominator) internal pure returns (uint256 result) {
         unchecked {
-        // 512-bit multiply [prod1 prod0] = x * y. Compute the product mod 2^256 and mod 2^256 - 1, then use
-        // use the Chinese Remainder Theorem to reconstruct the 512 bit result. The result is stored in two 256
-        // variables such that product = prod1 * 2^256 + prod0.
+            // 512-bit multiply [prod1 prod0] = x * y. Compute the product mod 2^256 and mod 2^256 - 1, then use
+            // use the Chinese Remainder Theorem to reconstruct the 512 bit result. The result is stored in two 256
+            // variables such that product = prod1 * 2^256 + prod0.
             uint256 prod0; // Least significant 256 bits of the product
             uint256 prod1; // Most significant 256 bits of the product
             assembly {
@@ -303,55 +291,55 @@ library Math {
                 prod1 := sub(sub(mm, prod0), lt(mm, prod0))
             }
 
-        // Handle non-overflow cases, 256 by 256 division.
+            // Handle non-overflow cases, 256 by 256 division.
             if (prod1 == 0) {
                 return prod0 / denominator;
             }
 
-        // Make sure the result is less than 2^256. Also prevents denominator == 0.
+            // Make sure the result is less than 2^256. Also prevents denominator == 0.
             require(denominator > prod1);
 
-        ///////////////////////////////////////////////
-        // 512 by 256 division.
-        ///////////////////////////////////////////////
+            ///////////////////////////////////////////////
+            // 512 by 256 division.
+            ///////////////////////////////////////////////
 
-        // Make division exact by subtracting the remainder from [prod1 prod0].
+            // Make division exact by subtracting the remainder from [prod1 prod0].
             uint256 remainder;
             assembly {
-            // Compute remainder using mulmod.
+                // Compute remainder using mulmod.
                 remainder := mulmod(x, y, denominator)
 
-            // Subtract 256 bit number from 512 bit number.
+                // Subtract 256 bit number from 512 bit number.
                 prod1 := sub(prod1, gt(remainder, prod0))
                 prod0 := sub(prod0, remainder)
             }
 
-        // Factor powers of two out of denominator and compute largest power of two divisor of denominator. Always >= 1.
-        // See https://cs.stackexchange.com/q/138556/92363.
+            // Factor powers of two out of denominator and compute largest power of two divisor of denominator. Always >= 1.
+            // See https://cs.stackexchange.com/q/138556/92363.
 
-        // Does not overflow because the denominator cannot be zero at this stage in the function.
+            // Does not overflow because the denominator cannot be zero at this stage in the function.
             uint256 twos = denominator & (~denominator + 1);
             assembly {
-            // Divide denominator by twos.
+                // Divide denominator by twos.
                 denominator := div(denominator, twos)
 
-            // Divide [prod1 prod0] by twos.
+                // Divide [prod1 prod0] by twos.
                 prod0 := div(prod0, twos)
 
-            // Flip twos such that it is 2^256 / twos. If twos is zero, then it becomes one.
+                // Flip twos such that it is 2^256 / twos. If twos is zero, then it becomes one.
                 twos := add(div(sub(0, twos), twos), 1)
             }
 
-        // Shift in bits from prod1 into prod0.
+            // Shift in bits from prod1 into prod0.
             prod0 |= prod1 * twos;
 
-        // Invert denominator mod 2^256. Now that denominator is an odd number, it has an inverse modulo 2^256 such
-        // that denominator * inv = 1 mod 2^256. Compute the inverse by starting with a seed that is correct for
-        // four bits. That is, denominator * inv = 1 mod 2^4.
+            // Invert denominator mod 2^256. Now that denominator is an odd number, it has an inverse modulo 2^256 such
+            // that denominator * inv = 1 mod 2^256. Compute the inverse by starting with a seed that is correct for
+            // four bits. That is, denominator * inv = 1 mod 2^4.
             uint256 inverse = (3 * denominator) ^ 2;
 
-        // Use the Newton-Raphson iteration to improve the precision. Thanks to Hensel's lifting lemma, this also works
-        // in modular arithmetic, doubling the correct bits in each step.
+            // Use the Newton-Raphson iteration to improve the precision. Thanks to Hensel's lifting lemma, this also works
+            // in modular arithmetic, doubling the correct bits in each step.
             inverse *= 2 - denominator * inverse; // inverse mod 2^8
             inverse *= 2 - denominator * inverse; // inverse mod 2^16
             inverse *= 2 - denominator * inverse; // inverse mod 2^32
@@ -359,10 +347,10 @@ library Math {
             inverse *= 2 - denominator * inverse; // inverse mod 2^128
             inverse *= 2 - denominator * inverse; // inverse mod 2^256
 
-        // Because the division is now exact we can divide by multiplying with the modular inverse of denominator.
-        // This will give us the correct result modulo 2^256. Since the preconditions guarantee that the outcome is
-        // less than 2^256, this is the final result. We don't need to compute the high bits of the result and prod1
-        // is no longer required.
+            // Because the division is now exact we can divide by multiplying with the modular inverse of denominator.
+            // This will give us the correct result modulo 2^256. Since the preconditions guarantee that the outcome is
+            // less than 2^256, this is the final result. We don't need to compute the high bits of the result and prod1
+            // is no longer required.
             result = prod0 * inverse;
             return result;
         }
@@ -371,12 +359,7 @@ library Math {
     /**
      * @notice Calculates x * y / denominator with full precision, following the selected rounding direction.
      */
-    function mulDiv(
-        uint256 x,
-        uint256 y,
-        uint256 denominator,
-        Rounding rounding
-    ) internal pure returns (uint256) {
+    function mulDiv(uint256 x, uint256 y, uint256 denominator, Rounding rounding) internal pure returns (uint256) {
         uint256 result = mulDiv(x, y, denominator);
         if (rounding == Rounding.Up && mulmod(x, y, denominator) > 0) {
             result += 1;
@@ -496,7 +479,7 @@ library SignedMath {
      */
     function abs(int256 n) internal pure returns (uint256) {
         unchecked {
-        // must be unchecked in order to support `n = type(int256).min`
+            // must be unchecked in order to support `n = type(int256).min`
             return uint256(n >= 0 ? n : -n);
         }
     }
@@ -563,7 +546,7 @@ library AddressUpgradeable {
     function sendValue(address payable recipient, uint256 amount) internal {
         require(address(this).balance >= amount, "Address: insufficient balance");
 
-        (bool success, ) = recipient.call{value: amount}("");
+        (bool success,) = recipient.call{value: amount}("");
         require(success, "Address: unable to send value, recipient may have reverted");
     }
 
@@ -595,11 +578,10 @@ library AddressUpgradeable {
      *
      * _Available since v3.1._
      */
-    function functionCall(
-        address target,
-        bytes memory data,
-        string memory errorMessage
-    ) internal returns (bytes memory) {
+    function functionCall(address target, bytes memory data, string memory errorMessage)
+        internal
+        returns (bytes memory)
+    {
         return functionCallWithValue(target, data, 0, errorMessage);
     }
 
@@ -614,11 +596,7 @@ library AddressUpgradeable {
      *
      * _Available since v3.1._
      */
-    function functionCallWithValue(
-        address target,
-        bytes memory data,
-        uint256 value
-    ) internal returns (bytes memory) {
+    function functionCallWithValue(address target, bytes memory data, uint256 value) internal returns (bytes memory) {
         return functionCallWithValue(target, data, value, "Address: low-level call with value failed");
     }
 
@@ -628,12 +606,10 @@ library AddressUpgradeable {
      *
      * _Available since v3.1._
      */
-    function functionCallWithValue(
-        address target,
-        bytes memory data,
-        uint256 value,
-        string memory errorMessage
-    ) internal returns (bytes memory) {
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage)
+        internal
+        returns (bytes memory)
+    {
         require(address(this).balance >= value, "Address: insufficient balance for call");
         require(isContract(target), "Address: call to non-contract");
 
@@ -657,11 +633,11 @@ library AddressUpgradeable {
      *
      * _Available since v3.3._
      */
-    function functionStaticCall(
-        address target,
-        bytes memory data,
-        string memory errorMessage
-    ) internal view returns (bytes memory) {
+    function functionStaticCall(address target, bytes memory data, string memory errorMessage)
+        internal
+        view
+        returns (bytes memory)
+    {
         require(isContract(target), "Address: static call to non-contract");
 
         (bool success, bytes memory returndata) = target.staticcall(data);
@@ -674,11 +650,11 @@ library AddressUpgradeable {
      *
      * _Available since v4.3._
      */
-    function verifyCallResult(
-        bool success,
-        bytes memory returndata,
-        string memory errorMessage
-    ) internal pure returns (bytes memory) {
+    function verifyCallResult(bool success, bytes memory returndata, string memory errorMessage)
+        internal
+        pure
+        returns (bytes memory)
+    {
         if (success) {
             return returndata;
         } else {
@@ -749,19 +725,13 @@ abstract contract SecuredTokenTransfer {
         bytes memory data = abi.encodeWithSelector(0xa9059cbb, receiver, amount);
         // solhint-disable-next-line no-inline-assembly
         assembly {
-        // We write the return value to scratch space.
-        // See https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html#layout-in-memory
+            // We write the return value to scratch space.
+            // See https://docs.soliditylang.org/en/v0.7.6/internals/layout_in_memory.html#layout-in-memory
             let success := call(sub(gas(), 10000), token, 0, add(data, 0x20), mload(data), 0, 0x20)
             switch returndatasize()
-            case 0 {
-                transferred := success
-            }
-            case 0x20 {
-                transferred := iszero(or(iszero(success), iszero(mload(0))))
-            }
-            default {
-                transferred := 0
-            }
+            case 0 { transferred := success }
+            case 0x20 { transferred := iszero(or(iszero(success), iszero(mload(0)))) }
+            default { transferred := 0 }
         }
     }
 }
@@ -803,18 +773,22 @@ abstract contract SignatureDecoder {
      * @return r Output value r of the signature.
      * @return s Output value s of the signature.
      */
-    function signatureSplit(bytes memory signatures, uint256 pos) internal pure returns (uint8 v, bytes32 r, bytes32 s) {
+    function signatureSplit(bytes memory signatures, uint256 pos)
+        internal
+        pure
+        returns (uint8 v, bytes32 r, bytes32 s)
+    {
         // solhint-disable-next-line no-inline-assembly
         assembly {
             let signaturePos := mul(0x41, pos)
             r := mload(add(signatures, add(signaturePos, 0x20)))
             s := mload(add(signatures, add(signaturePos, 0x40)))
-        /**
-         * Here we are loading the last 32 bytes, including 31 bytes
-         * of 's'. There is no 'mload8' to do this.
-         * 'byte' is not working due to the Solidity parser, so lets
-         * use the second best option, 'and'
-         */
+            /**
+             * Here we are loading the last 32 bytes, including 31 bytes
+             * of 's'. There is no 'mload8' to do this.
+             * 'byte' is not working due to the Solidity parser, so lets
+             * use the second best option, 'and'
+             */
             v := and(mload(add(signatures, add(signaturePos, 0x41))), 0xff)
         }
     }
@@ -1006,11 +980,7 @@ abstract contract Clone {
     }
 
     /// @dev Reads an immutable arg with type bytes.
-    function _getArgBytes(uint256 argOffset, uint256 length)
-    internal
-    pure
-    returns (bytes memory arg)
-    {
+    function _getArgBytes(uint256 argOffset, uint256 length) internal pure returns (bytes memory arg) {
         uint256 offset = _getImmutableArgsOffset();
         /// @solidity memory-safe-assembly
         assembly {
@@ -1033,11 +1003,7 @@ abstract contract Clone {
     }
 
     /// @dev Reads a uint256 array stored in the immutable args.
-    function _getArgUint256Array(uint256 argOffset, uint256 length)
-    internal
-    pure
-    returns (uint256[] memory arg)
-    {
+    function _getArgUint256Array(uint256 argOffset, uint256 length) internal pure returns (uint256[] memory arg) {
         uint256 offset = _getImmutableArgsOffset();
         /// @solidity memory-safe-assembly
         assembly {
@@ -1049,11 +1015,7 @@ abstract contract Clone {
     }
 
     /// @dev Reads a bytes32 array stored in the immutable args.
-    function _getArgBytes32Array(uint256 argOffset, uint256 length)
-    internal
-    pure
-    returns (bytes32[] memory arg)
-    {
+    function _getArgBytes32Array(uint256 argOffset, uint256 length) internal pure returns (bytes32[] memory arg) {
         uint256 offset = _getImmutableArgsOffset();
         /// @solidity memory-safe-assembly
         assembly {
@@ -1427,62 +1389,62 @@ library LibClone {
     function clone(uint256 value, address implementation) internal returns (address instance) {
         /// @solidity memory-safe-assembly
         assembly {
-        /**
-         * --------------------------------------------------------------------------+
-         * CREATION (9 bytes)                                                        |
-         * --------------------------------------------------------------------------|
-         * Opcode     | Mnemonic          | Stack     | Memory                       |
-         * --------------------------------------------------------------------------|
-         * 60 runSize | PUSH1 runSize     | r         |                              |
-         * 3d         | RETURNDATASIZE    | 0 r       |                              |
-         * 81         | DUP2              | r 0 r     |                              |
-         * 60 offset  | PUSH1 offset      | o r 0 r   |                              |
-         * 3d         | RETURNDATASIZE    | 0 o r 0 r |                              |
-         * 39         | CODECOPY          | 0 r       | [0..runSize): runtime code   |
-         * f3         | RETURN            |           | [0..runSize): runtime code   |
-         * --------------------------------------------------------------------------|
-         * RUNTIME (44 bytes)                                                        |
-         * --------------------------------------------------------------------------|
-         * Opcode  | Mnemonic       | Stack                  | Memory                |
-         * --------------------------------------------------------------------------|
-         *                                                                           |
-         * ::: keep some values in stack ::::::::::::::::::::::::::::::::::::::::::: |
-         * 3d      | RETURNDATASIZE | 0                      |                       |
-         * 3d      | RETURNDATASIZE | 0 0                    |                       |
-         * 3d      | RETURNDATASIZE | 0 0 0                  |                       |
-         * 3d      | RETURNDATASIZE | 0 0 0 0                |                       |
-         *                                                                           |
-         * ::: copy calldata to memory ::::::::::::::::::::::::::::::::::::::::::::: |
-         * 36      | CALLDATASIZE   | cds 0 0 0 0            |                       |
-         * 3d      | RETURNDATASIZE | 0 cds 0 0 0 0          |                       |
-         * 3d      | RETURNDATASIZE | 0 0 cds 0 0 0 0        |                       |
-         * 37      | CALLDATACOPY   | 0 0 0 0                | [0..cds): calldata    |
-         *                                                                           |
-         * ::: delegate call to the implementation contract :::::::::::::::::::::::: |
-         * 36      | CALLDATASIZE   | cds 0 0 0 0            | [0..cds): calldata    |
-         * 3d      | RETURNDATASIZE | 0 cds 0 0 0 0          | [0..cds): calldata    |
-         * 73 addr | PUSH20 addr    | addr 0 cds 0 0 0 0     | [0..cds): calldata    |
-         * 5a      | GAS            | gas addr 0 cds 0 0 0 0 | [0..cds): calldata    |
-         * f4      | DELEGATECALL   | success 0 0            | [0..cds): calldata    |
-         *                                                                           |
-         * ::: copy return data to memory :::::::::::::::::::::::::::::::::::::::::: |
-         * 3d      | RETURNDATASIZE | rds success 0 0        | [0..cds): calldata    |
-         * 3d      | RETURNDATASIZE | rds rds success 0 0    | [0..cds): calldata    |
-         * 93      | SWAP4          | 0 rds success 0 rds    | [0..cds): calldata    |
-         * 80      | DUP1           | 0 0 rds success 0 rds  | [0..cds): calldata    |
-         * 3e      | RETURNDATACOPY | success 0 rds          | [0..rds): returndata  |
-         *                                                                           |
-         * 60 0x2a | PUSH1 0x2a     | 0x2a success 0 rds     | [0..rds): returndata  |
-         * 57      | JUMPI          | 0 rds                  | [0..rds): returndata  |
-         *                                                                           |
-         * ::: revert :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
-         * fd      | REVERT         |                        | [0..rds): returndata  |
-         *                                                                           |
-         * ::: return :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
-         * 5b      | JUMPDEST       | 0 rds                  | [0..rds): returndata  |
-         * f3      | RETURN         |                        | [0..rds): returndata  |
-         * --------------------------------------------------------------------------+
-         */
+            /**
+             * --------------------------------------------------------------------------+
+             * CREATION (9 bytes)                                                        |
+             * --------------------------------------------------------------------------|
+             * Opcode     | Mnemonic          | Stack     | Memory                       |
+             * --------------------------------------------------------------------------|
+             * 60 runSize | PUSH1 runSize     | r         |                              |
+             * 3d         | RETURNDATASIZE    | 0 r       |                              |
+             * 81         | DUP2              | r 0 r     |                              |
+             * 60 offset  | PUSH1 offset      | o r 0 r   |                              |
+             * 3d         | RETURNDATASIZE    | 0 o r 0 r |                              |
+             * 39         | CODECOPY          | 0 r       | [0..runSize): runtime code   |
+             * f3         | RETURN            |           | [0..runSize): runtime code   |
+             * --------------------------------------------------------------------------|
+             * RUNTIME (44 bytes)                                                        |
+             * --------------------------------------------------------------------------|
+             * Opcode  | Mnemonic       | Stack                  | Memory                |
+             * --------------------------------------------------------------------------|
+             *                                                                           |
+             * ::: keep some values in stack ::::::::::::::::::::::::::::::::::::::::::: |
+             * 3d      | RETURNDATASIZE | 0                      |                       |
+             * 3d      | RETURNDATASIZE | 0 0                    |                       |
+             * 3d      | RETURNDATASIZE | 0 0 0                  |                       |
+             * 3d      | RETURNDATASIZE | 0 0 0 0                |                       |
+             *                                                                           |
+             * ::: copy calldata to memory ::::::::::::::::::::::::::::::::::::::::::::: |
+             * 36      | CALLDATASIZE   | cds 0 0 0 0            |                       |
+             * 3d      | RETURNDATASIZE | 0 cds 0 0 0 0          |                       |
+             * 3d      | RETURNDATASIZE | 0 0 cds 0 0 0 0        |                       |
+             * 37      | CALLDATACOPY   | 0 0 0 0                | [0..cds): calldata    |
+             *                                                                           |
+             * ::: delegate call to the implementation contract :::::::::::::::::::::::: |
+             * 36      | CALLDATASIZE   | cds 0 0 0 0            | [0..cds): calldata    |
+             * 3d      | RETURNDATASIZE | 0 cds 0 0 0 0          | [0..cds): calldata    |
+             * 73 addr | PUSH20 addr    | addr 0 cds 0 0 0 0     | [0..cds): calldata    |
+             * 5a      | GAS            | gas addr 0 cds 0 0 0 0 | [0..cds): calldata    |
+             * f4      | DELEGATECALL   | success 0 0            | [0..cds): calldata    |
+             *                                                                           |
+             * ::: copy return data to memory :::::::::::::::::::::::::::::::::::::::::: |
+             * 3d      | RETURNDATASIZE | rds success 0 0        | [0..cds): calldata    |
+             * 3d      | RETURNDATASIZE | rds rds success 0 0    | [0..cds): calldata    |
+             * 93      | SWAP4          | 0 rds success 0 rds    | [0..cds): calldata    |
+             * 80      | DUP1           | 0 0 rds success 0 rds  | [0..cds): calldata    |
+             * 3e      | RETURNDATACOPY | success 0 rds          | [0..rds): returndata  |
+             *                                                                           |
+             * 60 0x2a | PUSH1 0x2a     | 0x2a success 0 rds     | [0..rds): returndata  |
+             * 57      | JUMPI          | 0 rds                  | [0..rds): returndata  |
+             *                                                                           |
+             * ::: revert :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
+             * fd      | REVERT         |                        | [0..rds): returndata  |
+             *                                                                           |
+             * ::: return :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
+             * 5b      | JUMPDEST       | 0 rds                  | [0..rds): returndata  |
+             * f3      | RETURN         |                        | [0..rds): returndata  |
+             * --------------------------------------------------------------------------+
+             */
             mstore(0x21, 0x5af43d3d93803e602a57fd5bf3)
             mstore(0x14, implementation)
             mstore(0x00, 0x602c3d8160093d39f33d3d3d3d363d3d37363d73)
@@ -1496,17 +1458,14 @@ library LibClone {
     }
 
     /// @dev Deploys a deterministic clone of `implementation` with `salt`.
-    function cloneDeterministic(address implementation, bytes32 salt)
-    internal
-    returns (address instance)
-    {
+    function cloneDeterministic(address implementation, bytes32 salt) internal returns (address instance) {
         instance = cloneDeterministic(0, implementation, salt);
     }
 
     /// @dev Deploys a deterministic clone of `implementation` with `salt`.
     function cloneDeterministic(uint256 value, address implementation, bytes32 salt)
-    internal
-    returns (address instance)
+        internal
+        returns (address instance)
     {
         /// @solidity memory-safe-assembly
         assembly {
@@ -1539,9 +1498,9 @@ library LibClone {
     /// with `salt` by `deployer`.
     /// Note: The returned result has dirty upper 96 bits. Please clean if used in assembly.
     function predictDeterministicAddress(address implementation, bytes32 salt, address deployer)
-    internal
-    pure
-    returns (address predicted)
+        internal
+        pure
+        returns (address predicted)
     {
         bytes32 hash = initCodeHash(implementation);
         predicted = predictDeterministicAddress(hash, salt, deployer);
@@ -1557,69 +1516,66 @@ library LibClone {
     }
 
     /// @dev Deploys a PUSH0 clone of `implementation`.
-    function clone_PUSH0(uint256 value, address implementation)
-    internal
-    returns (address instance)
-    {
+    function clone_PUSH0(uint256 value, address implementation) internal returns (address instance) {
         /// @solidity memory-safe-assembly
         assembly {
-        /**
-         * --------------------------------------------------------------------------+
-         * CREATION (9 bytes)                                                        |
-         * --------------------------------------------------------------------------|
-         * Opcode     | Mnemonic          | Stack     | Memory                       |
-         * --------------------------------------------------------------------------|
-         * 60 runSize | PUSH1 runSize     | r         |                              |
-         * 5f         | PUSH0             | 0 r       |                              |
-         * 81         | DUP2              | r 0 r     |                              |
-         * 60 offset  | PUSH1 offset      | o r 0 r   |                              |
-         * 5f         | PUSH0             | 0 o r 0 r |                              |
-         * 39         | CODECOPY          | 0 r       | [0..runSize): runtime code   |
-         * f3         | RETURN            |           | [0..runSize): runtime code   |
-         * --------------------------------------------------------------------------|
-         * RUNTIME (45 bytes)                                                        |
-         * --------------------------------------------------------------------------|
-         * Opcode  | Mnemonic       | Stack                  | Memory                |
-         * --------------------------------------------------------------------------|
-         *                                                                           |
-         * ::: keep some values in stack ::::::::::::::::::::::::::::::::::::::::::: |
-         * 5f      | PUSH0          | 0                      |                       |
-         * 5f      | PUSH0          | 0 0                    |                       |
-         *                                                                           |
-         * ::: copy calldata to memory ::::::::::::::::::::::::::::::::::::::::::::: |
-         * 36      | CALLDATASIZE   | cds 0 0                |                       |
-         * 5f      | PUSH0          | 0 cds 0 0              |                       |
-         * 5f      | PUSH0          | 0 0 cds 0 0            |                       |
-         * 37      | CALLDATACOPY   | 0 0                    | [0..cds): calldata    |
-         *                                                                           |
-         * ::: delegate call to the implementation contract :::::::::::::::::::::::: |
-         * 36      | CALLDATASIZE   | cds 0 0                | [0..cds): calldata    |
-         * 5f      | PUSH0          | 0 cds 0 0              | [0..cds): calldata    |
-         * 73 addr | PUSH20 addr    | addr 0 cds 0 0         | [0..cds): calldata    |
-         * 5a      | GAS            | gas addr 0 cds 0 0     | [0..cds): calldata    |
-         * f4      | DELEGATECALL   | success                | [0..cds): calldata    |
-         *                                                                           |
-         * ::: copy return data to memory :::::::::::::::::::::::::::::::::::::::::: |
-         * 3d      | RETURNDATASIZE | rds success            | [0..cds): calldata    |
-         * 5f      | PUSH0          | 0 rds success          | [0..cds): calldata    |
-         * 5f      | PUSH0          | 0 0 rds success        | [0..cds): calldata    |
-         * 3e      | RETURNDATACOPY | success                | [0..rds): returndata  |
-         *                                                                           |
-         * 60 0x29 | PUSH1 0x29     | 0x29 success           | [0..rds): returndata  |
-         * 57      | JUMPI          |                        | [0..rds): returndata  |
-         *                                                                           |
-         * ::: revert :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
-         * 3d      | RETURNDATASIZE | rds                    | [0..rds): returndata  |
-         * 5f      | PUSH0          | 0 rds                  | [0..rds): returndata  |
-         * fd      | REVERT         |                        | [0..rds): returndata  |
-         *                                                                           |
-         * ::: return :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
-         * 5b      | JUMPDEST       |                        | [0..rds): returndata  |
-         * 3d      | RETURNDATASIZE | rds                    | [0..rds): returndata  |
-         * 5f      | PUSH0          | 0 rds                  | [0..rds): returndata  |
-         * f3      | RETURN         |                        | [0..rds): returndata  |
-         * --------------------------------------------------------------------------+
-         */
+            /**
+             * --------------------------------------------------------------------------+
+             * CREATION (9 bytes)                                                        |
+             * --------------------------------------------------------------------------|
+             * Opcode     | Mnemonic          | Stack     | Memory                       |
+             * --------------------------------------------------------------------------|
+             * 60 runSize | PUSH1 runSize     | r         |                              |
+             * 5f         | PUSH0             | 0 r       |                              |
+             * 81         | DUP2              | r 0 r     |                              |
+             * 60 offset  | PUSH1 offset      | o r 0 r   |                              |
+             * 5f         | PUSH0             | 0 o r 0 r |                              |
+             * 39         | CODECOPY          | 0 r       | [0..runSize): runtime code   |
+             * f3         | RETURN            |           | [0..runSize): runtime code   |
+             * --------------------------------------------------------------------------|
+             * RUNTIME (45 bytes)                                                        |
+             * --------------------------------------------------------------------------|
+             * Opcode  | Mnemonic       | Stack                  | Memory                |
+             * --------------------------------------------------------------------------|
+             *                                                                           |
+             * ::: keep some values in stack ::::::::::::::::::::::::::::::::::::::::::: |
+             * 5f      | PUSH0          | 0                      |                       |
+             * 5f      | PUSH0          | 0 0                    |                       |
+             *                                                                           |
+             * ::: copy calldata to memory ::::::::::::::::::::::::::::::::::::::::::::: |
+             * 36      | CALLDATASIZE   | cds 0 0                |                       |
+             * 5f      | PUSH0          | 0 cds 0 0              |                       |
+             * 5f      | PUSH0          | 0 0 cds 0 0            |                       |
+             * 37      | CALLDATACOPY   | 0 0                    | [0..cds): calldata    |
+             *                                                                           |
+             * ::: delegate call to the implementation contract :::::::::::::::::::::::: |
+             * 36      | CALLDATASIZE   | cds 0 0                | [0..cds): calldata    |
+             * 5f      | PUSH0          | 0 cds 0 0              | [0..cds): calldata    |
+             * 73 addr | PUSH20 addr    | addr 0 cds 0 0         | [0..cds): calldata    |
+             * 5a      | GAS            | gas addr 0 cds 0 0     | [0..cds): calldata    |
+             * f4      | DELEGATECALL   | success                | [0..cds): calldata    |
+             *                                                                           |
+             * ::: copy return data to memory :::::::::::::::::::::::::::::::::::::::::: |
+             * 3d      | RETURNDATASIZE | rds success            | [0..cds): calldata    |
+             * 5f      | PUSH0          | 0 rds success          | [0..cds): calldata    |
+             * 5f      | PUSH0          | 0 0 rds success        | [0..cds): calldata    |
+             * 3e      | RETURNDATACOPY | success                | [0..rds): returndata  |
+             *                                                                           |
+             * 60 0x29 | PUSH1 0x29     | 0x29 success           | [0..rds): returndata  |
+             * 57      | JUMPI          |                        | [0..rds): returndata  |
+             *                                                                           |
+             * ::: revert :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
+             * 3d      | RETURNDATASIZE | rds                    | [0..rds): returndata  |
+             * 5f      | PUSH0          | 0 rds                  | [0..rds): returndata  |
+             * fd      | REVERT         |                        | [0..rds): returndata  |
+             *                                                                           |
+             * ::: return :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
+             * 5b      | JUMPDEST       |                        | [0..rds): returndata  |
+             * 3d      | RETURNDATASIZE | rds                    | [0..rds): returndata  |
+             * 5f      | PUSH0          | 0 rds                  | [0..rds): returndata  |
+             * f3      | RETURN         |                        | [0..rds): returndata  |
+             * --------------------------------------------------------------------------+
+             */
             mstore(0x24, 0x5af43d5f5f3e6029573d5ffd5b3d5ff3) // 16
             mstore(0x14, implementation) // 20
             mstore(0x00, 0x602d5f8160095f39f35f5f365f5f37365f73) // 9 + 9
@@ -1633,17 +1589,14 @@ library LibClone {
     }
 
     /// @dev Deploys a deterministic PUSH0 clone of `implementation` with `salt`.
-    function cloneDeterministic_PUSH0(address implementation, bytes32 salt)
-    internal
-    returns (address instance)
-    {
+    function cloneDeterministic_PUSH0(address implementation, bytes32 salt) internal returns (address instance) {
         instance = cloneDeterministic_PUSH0(0, implementation, salt);
     }
 
     /// @dev Deploys a deterministic PUSH0 clone of `implementation` with `salt`.
     function cloneDeterministic_PUSH0(uint256 value, address implementation, bytes32 salt)
-    internal
-    returns (address instance)
+        internal
+        returns (address instance)
     {
         /// @solidity memory-safe-assembly
         assembly {
@@ -1675,11 +1628,11 @@ library LibClone {
     /// @dev Returns the address of the deterministic PUSH0 clone of `implementation`,
     /// with `salt` by `deployer`.
     /// Note: The returned result has dirty upper 96 bits. Please clean if used in assembly.
-    function predictDeterministicAddress_PUSH0(
-        address implementation,
-        bytes32 salt,
-        address deployer
-    ) internal pure returns (address predicted) {
+    function predictDeterministicAddress_PUSH0(address implementation, bytes32 salt, address deployer)
+        internal
+        pure
+        returns (address predicted)
+    {
         bytes32 hash = initCodeHash_PUSH0(implementation);
         predicted = predictDeterministicAddress(hash, salt, deployer);
     }
@@ -1697,12 +1650,9 @@ library LibClone {
     }
 
     /// @dev Deploys a clone of `implementation` with immutable arguments encoded in `data`.
-    function clone(uint256 value, address implementation, bytes memory data)
-    internal
-    returns (address instance)
-    {
+    function clone(uint256 value, address implementation, bytes memory data) internal returns (address instance) {
         assembly {
-        // Compute the boundaries of the data and cache the memory slots around it.
+            // Compute the boundaries of the data and cache the memory slots around it.
             let mBefore3 := mload(sub(data, 0x60))
             let mBefore2 := mload(sub(data, 0x40))
             let mBefore1 := mload(sub(data, 0x20))
@@ -1710,103 +1660,98 @@ library LibClone {
             let dataEnd := add(add(data, 0x20), dataLength)
             let mAfter1 := mload(dataEnd)
 
-        // +2 bytes for telling how much data there is appended to the call.
+            // +2 bytes for telling how much data there is appended to the call.
             let extraLength := add(dataLength, 2)
-        // The `creationSize` is `extraLength + 108`
-        // The `runSize` is `creationSize - 10`.
+            // The `creationSize` is `extraLength + 108`
+            // The `runSize` is `creationSize - 10`.
 
-        /**
-         * ---------------------------------------------------------------------------------------------------+
-         * CREATION (10 bytes)                                                                                |
-         * ---------------------------------------------------------------------------------------------------|
-         * Opcode     | Mnemonic          | Stack     | Memory                                                |
-         * ---------------------------------------------------------------------------------------------------|
-         * 61 runSize | PUSH2 runSize     | r         |                                                       |
-         * 3d         | RETURNDATASIZE    | 0 r       |                                                       |
-         * 81         | DUP2              | r 0 r     |                                                       |
-         * 60 offset  | PUSH1 offset      | o r 0 r   |                                                       |
-         * 3d         | RETURNDATASIZE    | 0 o r 0 r |                                                       |
-         * 39         | CODECOPY          | 0 r       | [0..runSize): runtime code                            |
-         * f3         | RETURN            |           | [0..runSize): runtime code                            |
-         * ---------------------------------------------------------------------------------------------------|
-         * RUNTIME (98 bytes + extraLength)                                                                   |
-         * ---------------------------------------------------------------------------------------------------|
-         * Opcode   | Mnemonic       | Stack                    | Memory                                      |
-         * ---------------------------------------------------------------------------------------------------|
-         *                                                                                                    |
-         * ::: if no calldata, emit event & return w/o `DELEGATECALL` ::::::::::::::::::::::::::::::::::::::: |
-         * 36       | CALLDATASIZE   | cds                      |                                             |
-         * 60 0x2c  | PUSH1 0x2c     | 0x2c cds                 |                                             |
-         * 57       | JUMPI          |                          |                                             |
-         * 34       | CALLVALUE      | cv                       |                                             |
-         * 3d       | RETURNDATASIZE | 0 cv                     |                                             |
-         * 52       | MSTORE         |                          | [0..0x20): callvalue                        |
-         * 7f sig   | PUSH32 0x9e..  | sig                      | [0..0x20): callvalue                        |
-         * 59       | MSIZE          | 0x20 sig                 | [0..0x20): callvalue                        |
-         * 3d       | RETURNDATASIZE | 0 0x20 sig               | [0..0x20): callvalue                        |
-         * a1       | LOG1           |                          | [0..0x20): callvalue                        |
-         * 00       | STOP           |                          | [0..0x20): callvalue                        |
-         * 5b       | JUMPDEST       |                          |                                             |
-         *                                                                                                    |
-         * ::: copy calldata to memory :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
-         * 36       | CALLDATASIZE   | cds                      |                                             |
-         * 3d       | RETURNDATASIZE | 0 cds                    |                                             |
-         * 3d       | RETURNDATASIZE | 0 0 cds                  |                                             |
-         * 37       | CALLDATACOPY   |                          | [0..cds): calldata                          |
-         *                                                                                                    |
-         * ::: keep some values in stack :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
-         * 3d       | RETURNDATASIZE | 0                        | [0..cds): calldata                          |
-         * 3d       | RETURNDATASIZE | 0 0                      | [0..cds): calldata                          |
-         * 3d       | RETURNDATASIZE | 0 0 0                    | [0..cds): calldata                          |
-         * 3d       | RETURNDATASIZE | 0 0 0 0                  | [0..cds): calldata                          |
-         * 61 extra | PUSH2 extra    | e 0 0 0 0                | [0..cds): calldata                          |
-         *                                                                                                    |
-         * ::: copy extra data to memory :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
-         * 80       | DUP1           | e e 0 0 0 0              | [0..cds): calldata                          |
-         * 60 0x62  | PUSH1 0x62     | 0x62 e e 0 0 0 0         | [0..cds): calldata                          |
-         * 36       | CALLDATASIZE   | cds 0x62 e e 0 0 0 0     | [0..cds): calldata                          |
-         * 39       | CODECOPY       | e 0 0 0 0                | [0..cds): calldata, [cds..cds+e): extraData |
-         *                                                                                                    |
-         * ::: delegate call to the implementation contract ::::::::::::::::::::::::::::::::::::::::::::::::: |
-         * 36       | CALLDATASIZE   | cds e 0 0 0 0            | [0..cds): calldata, [cds..cds+e): extraData |
-         * 01       | ADD            | cds+e 0 0 0 0            | [0..cds): calldata, [cds..cds+e): extraData |
-         * 3d       | RETURNDATASIZE | 0 cds+e 0 0 0 0          | [0..cds): calldata, [cds..cds+e): extraData |
-         * 73 addr  | PUSH20 addr    | addr 0 cds+e 0 0 0 0     | [0..cds): calldata, [cds..cds+e): extraData |
-         * 5a       | GAS            | gas addr 0 cds+e 0 0 0 0 | [0..cds): calldata, [cds..cds+e): extraData |
-         * f4       | DELEGATECALL   | success 0 0              | [0..cds): calldata, [cds..cds+e): extraData |
-         *                                                                                                    |
-         * ::: copy return data to memory ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
-         * 3d       | RETURNDATASIZE | rds success 0 0          | [0..cds): calldata, [cds..cds+e): extraData |
-         * 3d       | RETURNDATASIZE | rds rds success 0 0      | [0..cds): calldata, [cds..cds+e): extraData |
-         * 93       | SWAP4          | 0 rds success 0 rds      | [0..cds): calldata, [cds..cds+e): extraData |
-         * 80       | DUP1           | 0 0 rds success 0 rds    | [0..cds): calldata, [cds..cds+e): extraData |
-         * 3e       | RETURNDATACOPY | success 0 rds            | [0..rds): returndata                        |
-         *                                                                                                    |
-         * 60 0x60  | PUSH1 0x60     | 0x60 success 0 rds       | [0..rds): returndata                        |
-         * 57       | JUMPI          | 0 rds                    | [0..rds): returndata                        |
-         *                                                                                                    |
-         * ::: revert ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
-         * fd       | REVERT         |                          | [0..rds): returndata                        |
-         *                                                                                                    |
-         * ::: return ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
-         * 5b       | JUMPDEST       | 0 rds                    | [0..rds): returndata                        |
-         * f3       | RETURN         |                          | [0..rds): returndata                        |
-         * ---------------------------------------------------------------------------------------------------+
-         */
+            /**
+             * ---------------------------------------------------------------------------------------------------+
+             * CREATION (10 bytes)                                                                                |
+             * ---------------------------------------------------------------------------------------------------|
+             * Opcode     | Mnemonic          | Stack     | Memory                                                |
+             * ---------------------------------------------------------------------------------------------------|
+             * 61 runSize | PUSH2 runSize     | r         |                                                       |
+             * 3d         | RETURNDATASIZE    | 0 r       |                                                       |
+             * 81         | DUP2              | r 0 r     |                                                       |
+             * 60 offset  | PUSH1 offset      | o r 0 r   |                                                       |
+             * 3d         | RETURNDATASIZE    | 0 o r 0 r |                                                       |
+             * 39         | CODECOPY          | 0 r       | [0..runSize): runtime code                            |
+             * f3         | RETURN            |           | [0..runSize): runtime code                            |
+             * ---------------------------------------------------------------------------------------------------|
+             * RUNTIME (98 bytes + extraLength)                                                                   |
+             * ---------------------------------------------------------------------------------------------------|
+             * Opcode   | Mnemonic       | Stack                    | Memory                                      |
+             * ---------------------------------------------------------------------------------------------------|
+             *                                                                                                    |
+             * ::: if no calldata, emit event & return w/o `DELEGATECALL` ::::::::::::::::::::::::::::::::::::::: |
+             * 36       | CALLDATASIZE   | cds                      |                                             |
+             * 60 0x2c  | PUSH1 0x2c     | 0x2c cds                 |                                             |
+             * 57       | JUMPI          |                          |                                             |
+             * 34       | CALLVALUE      | cv                       |                                             |
+             * 3d       | RETURNDATASIZE | 0 cv                     |                                             |
+             * 52       | MSTORE         |                          | [0..0x20): callvalue                        |
+             * 7f sig   | PUSH32 0x9e..  | sig                      | [0..0x20): callvalue                        |
+             * 59       | MSIZE          | 0x20 sig                 | [0..0x20): callvalue                        |
+             * 3d       | RETURNDATASIZE | 0 0x20 sig               | [0..0x20): callvalue                        |
+             * a1       | LOG1           |                          | [0..0x20): callvalue                        |
+             * 00       | STOP           |                          | [0..0x20): callvalue                        |
+             * 5b       | JUMPDEST       |                          |                                             |
+             *                                                                                                    |
+             * ::: copy calldata to memory :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
+             * 36       | CALLDATASIZE   | cds                      |                                             |
+             * 3d       | RETURNDATASIZE | 0 cds                    |                                             |
+             * 3d       | RETURNDATASIZE | 0 0 cds                  |                                             |
+             * 37       | CALLDATACOPY   |                          | [0..cds): calldata                          |
+             *                                                                                                    |
+             * ::: keep some values in stack :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
+             * 3d       | RETURNDATASIZE | 0                        | [0..cds): calldata                          |
+             * 3d       | RETURNDATASIZE | 0 0                      | [0..cds): calldata                          |
+             * 3d       | RETURNDATASIZE | 0 0 0                    | [0..cds): calldata                          |
+             * 3d       | RETURNDATASIZE | 0 0 0 0                  | [0..cds): calldata                          |
+             * 61 extra | PUSH2 extra    | e 0 0 0 0                | [0..cds): calldata                          |
+             *                                                                                                    |
+             * ::: copy extra data to memory :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
+             * 80       | DUP1           | e e 0 0 0 0              | [0..cds): calldata                          |
+             * 60 0x62  | PUSH1 0x62     | 0x62 e e 0 0 0 0         | [0..cds): calldata                          |
+             * 36       | CALLDATASIZE   | cds 0x62 e e 0 0 0 0     | [0..cds): calldata                          |
+             * 39       | CODECOPY       | e 0 0 0 0                | [0..cds): calldata, [cds..cds+e): extraData |
+             *                                                                                                    |
+             * ::: delegate call to the implementation contract ::::::::::::::::::::::::::::::::::::::::::::::::: |
+             * 36       | CALLDATASIZE   | cds e 0 0 0 0            | [0..cds): calldata, [cds..cds+e): extraData |
+             * 01       | ADD            | cds+e 0 0 0 0            | [0..cds): calldata, [cds..cds+e): extraData |
+             * 3d       | RETURNDATASIZE | 0 cds+e 0 0 0 0          | [0..cds): calldata, [cds..cds+e): extraData |
+             * 73 addr  | PUSH20 addr    | addr 0 cds+e 0 0 0 0     | [0..cds): calldata, [cds..cds+e): extraData |
+             * 5a       | GAS            | gas addr 0 cds+e 0 0 0 0 | [0..cds): calldata, [cds..cds+e): extraData |
+             * f4       | DELEGATECALL   | success 0 0              | [0..cds): calldata, [cds..cds+e): extraData |
+             *                                                                                                    |
+             * ::: copy return data to memory ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
+             * 3d       | RETURNDATASIZE | rds success 0 0          | [0..cds): calldata, [cds..cds+e): extraData |
+             * 3d       | RETURNDATASIZE | rds rds success 0 0      | [0..cds): calldata, [cds..cds+e): extraData |
+             * 93       | SWAP4          | 0 rds success 0 rds      | [0..cds): calldata, [cds..cds+e): extraData |
+             * 80       | DUP1           | 0 0 rds success 0 rds    | [0..cds): calldata, [cds..cds+e): extraData |
+             * 3e       | RETURNDATACOPY | success 0 rds            | [0..rds): returndata                        |
+             *                                                                                                    |
+             * 60 0x60  | PUSH1 0x60     | 0x60 success 0 rds       | [0..rds): returndata                        |
+             * 57       | JUMPI          | 0 rds                    | [0..rds): returndata                        |
+             *                                                                                                    |
+             * ::: revert ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
+             * fd       | REVERT         |                          | [0..rds): returndata                        |
+             *                                                                                                    |
+             * ::: return ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: |
+             * 5b       | JUMPDEST       | 0 rds                    | [0..rds): returndata                        |
+             * f3       | RETURN         |                          | [0..rds): returndata                        |
+             * ---------------------------------------------------------------------------------------------------+
+             */
             mstore(data, 0x5af43d3d93803e606057fd5bf3) // Write the bytecode before the data.
             mstore(sub(data, 0x0d), implementation) // Write the address of the implementation.
-        // Write the rest of the bytecode.
+            // Write the rest of the bytecode.
+            mstore(sub(data, 0x21), or(shl(0x48, extraLength), 0x593da1005b363d3d373d3d3d3d610000806062363936013d73))
+            // `keccak256("ReceiveETH(uint256)")`
+            mstore(sub(data, 0x3a), 0x9e4ac34f21c619cefc926c8bd93b54bf5a39c7ab2127a895af1cc0691d7e3dff)
             mstore(
-                sub(data, 0x21),
-                or(shl(0x48, extraLength), 0x593da1005b363d3d373d3d3d3d610000806062363936013d73)
-            )
-        // `keccak256("ReceiveETH(uint256)")`
-            mstore(
-                sub(data, 0x3a), 0x9e4ac34f21c619cefc926c8bd93b54bf5a39c7ab2127a895af1cc0691d7e3dff
-            )
-            mstore(
-            // Do a out-of-gas revert if `extraLength` is too big. 0xffff - 0x62 + 0x01 = 0xff9e.
-            // The actual EVM limit may be smaller and may change over time.
+                // Do a out-of-gas revert if `extraLength` is too big. 0xffff - 0x62 + 0x01 = 0xff9e.
+                // The actual EVM limit may be smaller and may change over time.
                 sub(data, add(0x59, lt(extraLength, 0xff9e))),
                 or(shl(0x78, add(extraLength, 0x62)), 0xfd6100003d81600a3d39f336602c57343d527f)
             )
@@ -1818,7 +1763,7 @@ library LibClone {
                 revert(0x1c, 0x04)
             }
 
-        // Restore the overwritten memory surrounding `data`.
+            // Restore the overwritten memory surrounding `data`.
             mstore(dataEnd, mAfter1)
             mstore(data, dataLength)
             mstore(sub(data, 0x20), mBefore1)
@@ -1830,22 +1775,20 @@ library LibClone {
     /// @dev Deploys a deterministic clone of `implementation`
     /// with immutable arguments encoded in `data` and `salt`.
     function cloneDeterministic(address implementation, bytes memory data, bytes32 salt)
-    internal
-    returns (address instance)
+        internal
+        returns (address instance)
     {
         instance = cloneDeterministic(0, implementation, data, salt);
     }
 
     /// @dev Deploys a deterministic clone of `implementation`
     /// with immutable arguments encoded in `data` and `salt`.
-    function cloneDeterministic(
-        uint256 value,
-        address implementation,
-        bytes memory data,
-        bytes32 salt
-    ) internal returns (address instance) {
+    function cloneDeterministic(uint256 value, address implementation, bytes memory data, bytes32 salt)
+        internal
+        returns (address instance)
+    {
         assembly {
-        // Compute the boundaries of the data and cache the memory slots around it.
+            // Compute the boundaries of the data and cache the memory slots around it.
             let mBefore3 := mload(sub(data, 0x60))
             let mBefore2 := mload(sub(data, 0x40))
             let mBefore1 := mload(sub(data, 0x20))
@@ -1853,23 +1796,18 @@ library LibClone {
             let dataEnd := add(add(data, 0x20), dataLength)
             let mAfter1 := mload(dataEnd)
 
-        // +2 bytes for telling how much data there is appended to the call.
+            // +2 bytes for telling how much data there is appended to the call.
             let extraLength := add(dataLength, 2)
 
             mstore(data, 0x5af43d3d93803e606057fd5bf3) // Write the bytecode before the data.
             mstore(sub(data, 0x0d), implementation) // Write the address of the implementation.
-        // Write the rest of the bytecode.
+            // Write the rest of the bytecode.
+            mstore(sub(data, 0x21), or(shl(0x48, extraLength), 0x593da1005b363d3d373d3d3d3d610000806062363936013d73))
+            // `keccak256("ReceiveETH(uint256)")`
+            mstore(sub(data, 0x3a), 0x9e4ac34f21c619cefc926c8bd93b54bf5a39c7ab2127a895af1cc0691d7e3dff)
             mstore(
-                sub(data, 0x21),
-                or(shl(0x48, extraLength), 0x593da1005b363d3d373d3d3d3d610000806062363936013d73)
-            )
-        // `keccak256("ReceiveETH(uint256)")`
-            mstore(
-                sub(data, 0x3a), 0x9e4ac34f21c619cefc926c8bd93b54bf5a39c7ab2127a895af1cc0691d7e3dff
-            )
-            mstore(
-            // Do a out-of-gas revert if `extraLength` is too big. 0xffff - 0x62 + 0x01 = 0xff9e.
-            // The actual EVM limit may be smaller and may change over time.
+                // Do a out-of-gas revert if `extraLength` is too big. 0xffff - 0x62 + 0x01 = 0xff9e.
+                // The actual EVM limit may be smaller and may change over time.
                 sub(data, add(0x59, lt(extraLength, 0xff9e))),
                 or(shl(0x78, add(extraLength, 0x62)), 0xfd6100003d81600a3d39f336602c57343d527f)
             )
@@ -1881,7 +1819,7 @@ library LibClone {
                 revert(0x1c, 0x04)
             }
 
-        // Restore the overwritten memory surrounding `data`.
+            // Restore the overwritten memory surrounding `data`.
             mstore(dataEnd, mAfter1)
             mstore(data, dataLength)
             mstore(sub(data, 0x20), mBefore1)
@@ -1893,13 +1831,9 @@ library LibClone {
     /// @dev Returns the initialization code hash of the clone of `implementation`
     /// using immutable arguments encoded in `data`.
     /// Used for mining vanity addresses with create2crunch.
-    function initCodeHash(address implementation, bytes memory data)
-    internal
-    pure
-    returns (bytes32 hash)
-    {
+    function initCodeHash(address implementation, bytes memory data) internal pure returns (bytes32 hash) {
         assembly {
-        // Compute the boundaries of the data and cache the memory slots around it.
+            // Compute the boundaries of the data and cache the memory slots around it.
             let mBefore3 := mload(sub(data, 0x60))
             let mBefore2 := mload(sub(data, 0x40))
             let mBefore1 := mload(sub(data, 0x20))
@@ -1907,33 +1841,25 @@ library LibClone {
             let dataEnd := add(add(data, 0x20), dataLength)
             let mAfter1 := mload(dataEnd)
 
-        // Do a out-of-gas revert if `dataLength` is too big. 0xffff - 0x02 - 0x62 = 0xff9b.
-        // The actual EVM limit may be smaller and may change over time.
+            // Do a out-of-gas revert if `dataLength` is too big. 0xffff - 0x02 - 0x62 = 0xff9b.
+            // The actual EVM limit may be smaller and may change over time.
             returndatacopy(returndatasize(), returndatasize(), gt(dataLength, 0xff9b))
 
-        // +2 bytes for telling how much data there is appended to the call.
+            // +2 bytes for telling how much data there is appended to the call.
             let extraLength := add(dataLength, 2)
 
             mstore(data, 0x5af43d3d93803e606057fd5bf3) // Write the bytecode before the data.
             mstore(sub(data, 0x0d), implementation) // Write the address of the implementation.
-        // Write the rest of the bytecode.
-            mstore(
-                sub(data, 0x21),
-                or(shl(0x48, extraLength), 0x593da1005b363d3d373d3d3d3d610000806062363936013d73)
-            )
-        // `keccak256("ReceiveETH(uint256)")`
-            mstore(
-                sub(data, 0x3a), 0x9e4ac34f21c619cefc926c8bd93b54bf5a39c7ab2127a895af1cc0691d7e3dff
-            )
-            mstore(
-                sub(data, 0x5a),
-                or(shl(0x78, add(extraLength, 0x62)), 0x6100003d81600a3d39f336602c57343d527f)
-            )
+            // Write the rest of the bytecode.
+            mstore(sub(data, 0x21), or(shl(0x48, extraLength), 0x593da1005b363d3d373d3d3d3d610000806062363936013d73))
+            // `keccak256("ReceiveETH(uint256)")`
+            mstore(sub(data, 0x3a), 0x9e4ac34f21c619cefc926c8bd93b54bf5a39c7ab2127a895af1cc0691d7e3dff)
+            mstore(sub(data, 0x5a), or(shl(0x78, add(extraLength, 0x62)), 0x6100003d81600a3d39f336602c57343d527f))
             mstore(dataEnd, shl(0xf0, extraLength))
 
             hash := keccak256(sub(data, 0x4c), add(extraLength, 0x6c))
 
-        // Restore the overwritten memory surrounding `data`.
+            // Restore the overwritten memory surrounding `data`.
             mstore(dataEnd, mAfter1)
             mstore(data, dataLength)
             mstore(sub(data, 0x20), mBefore1)
@@ -1945,12 +1871,11 @@ library LibClone {
     /// @dev Returns the address of the deterministic clone of
     /// `implementation` using immutable arguments encoded in `data`, with `salt`, by `deployer`.
     /// Note: The returned result has dirty upper 96 bits. Please clean if used in assembly.
-    function predictDeterministicAddress(
-        address implementation,
-        bytes memory data,
-        bytes32 salt,
-        address deployer
-    ) internal pure returns (address predicted) {
+    function predictDeterministicAddress(address implementation, bytes memory data, bytes32 salt, address deployer)
+        internal
+        pure
+        returns (address predicted)
+    {
         bytes32 hash = initCodeHash(implementation, data);
         predicted = predictDeterministicAddress(hash, salt, deployer);
     }
@@ -1968,73 +1893,70 @@ library LibClone {
     }
 
     /// @dev Deploys a minimal ERC1967 proxy with `implementation`.
-    function deployERC1967(uint256 value, address implementation)
-    internal
-    returns (address instance)
-    {
+    function deployERC1967(uint256 value, address implementation) internal returns (address instance) {
         /// @solidity memory-safe-assembly
         assembly {
-        /**
-         * ---------------------------------------------------------------------------------+
-         * CREATION (34 bytes)                                                              |
-         * ---------------------------------------------------------------------------------|
-         * Opcode     | Mnemonic       | Stack            | Memory                          |
-         * ---------------------------------------------------------------------------------|
-         * 60 runSize | PUSH1 runSize  | r                |                                 |
-         * 3d         | RETURNDATASIZE | 0 r              |                                 |
-         * 81         | DUP2           | r 0 r            |                                 |
-         * 60 offset  | PUSH1 offset   | o r 0 r          |                                 |
-         * 3d         | RETURNDATASIZE | 0 o r 0 r        |                                 |
-         * 39         | CODECOPY       | 0 r              | [0..runSize): runtime code      |
-         * 73 impl    | PUSH20 impl    | impl 0 r         | [0..runSize): runtime code      |
-         * 60 slotPos | PUSH1 slotPos  | slotPos impl 0 r | [0..runSize): runtime code      |
-         * 51         | MLOAD          | slot impl 0 r    | [0..runSize): runtime code      |
-         * 55         | SSTORE         | 0 r              | [0..runSize): runtime code      |
-         * f3         | RETURN         |                  | [0..runSize): runtime code      |
-         * ---------------------------------------------------------------------------------|
-         * RUNTIME (62 bytes)                                                               |
-         * ---------------------------------------------------------------------------------|
-         * Opcode     | Mnemonic       | Stack            | Memory                          |
-         * ---------------------------------------------------------------------------------|
-         *                                                                                  |
-         * ::: copy calldata to memory :::::::::::::::::::::::::::::::::::::::::::::::::::: |
-         * 36         | CALLDATASIZE   | cds              |                                 |
-         * 3d         | RETURNDATASIZE | 0 cds            |                                 |
-         * 3d         | RETURNDATASIZE | 0 0 cds          |                                 |
-         * 37         | CALLDATACOPY   |                  | [0..calldatasize): calldata     |
-         *                                                                                  |
-         * ::: delegatecall to implementation ::::::::::::::::::::::::::::::::::::::::::::: |
-         * 3d         | RETURNDATASIZE | 0                |                                 |
-         * 3d         | RETURNDATASIZE | 0 0              |                                 |
-         * 36         | CALLDATASIZE   | cds 0 0          | [0..calldatasize): calldata     |
-         * 3d         | RETURNDATASIZE | 0 cds 0 0        | [0..calldatasize): calldata     |
-         * 7f slot    | PUSH32 slot    | s 0 cds 0 0      | [0..calldatasize): calldata     |
-         * 54         | SLOAD          | i 0 cds 0 0      | [0..calldatasize): calldata     |
-         * 5a         | GAS            | g i 0 cds 0 0    | [0..calldatasize): calldata     |
-         * f4         | DELEGATECALL   | succ             | [0..calldatasize): calldata     |
-         *                                                                                  |
-         * ::: copy returndata to memory :::::::::::::::::::::::::::::::::::::::::::::::::: |
-         * 3d         | RETURNDATASIZE | rds succ         | [0..calldatasize): calldata     |
-         * 60 0x00    | PUSH1 0x00     | 0 rds succ       | [0..calldatasize): calldata     |
-         * 80         | DUP1           | 0 0 rds succ     | [0..calldatasize): calldata     |
-         * 3e         | RETURNDATACOPY | succ             | [0..returndatasize): returndata |
-         *                                                                                  |
-         * ::: branch on delegatecall status :::::::::::::::::::::::::::::::::::::::::::::: |
-         * 60 0x38    | PUSH1 0x38     | dest succ        | [0..returndatasize): returndata |
-         * 57         | JUMPI          |                  | [0..returndatasize): returndata |
-         *                                                                                  |
-         * ::: delegatecall failed, revert :::::::::::::::::::::::::::::::::::::::::::::::: |
-         * 3d         | RETURNDATASIZE | rds              | [0..returndatasize): returndata |
-         * 60 0x00    | PUSH1 0x00     | 0 rds            | [0..returndatasize): returndata |
-         * fd         | REVERT         |                  | [0..returndatasize): returndata |
-         *                                                                                  |
-         * ::: delegatecall succeeded, return ::::::::::::::::::::::::::::::::::::::::::::: |
-         * 5b         | JUMPDEST       |                  | [0..returndatasize): returndata |
-         * 3d         | RETURNDATASIZE | rds              | [0..returndatasize): returndata |
-         * 60 0x00    | PUSH1 0x00     | 0 rds            | [0..returndatasize): returndata |
-         * f3         | RETURN         |                  | [0..returndatasize): returndata |
-         * ---------------------------------------------------------------------------------+
-         */
+            /**
+             * ---------------------------------------------------------------------------------+
+             * CREATION (34 bytes)                                                              |
+             * ---------------------------------------------------------------------------------|
+             * Opcode     | Mnemonic       | Stack            | Memory                          |
+             * ---------------------------------------------------------------------------------|
+             * 60 runSize | PUSH1 runSize  | r                |                                 |
+             * 3d         | RETURNDATASIZE | 0 r              |                                 |
+             * 81         | DUP2           | r 0 r            |                                 |
+             * 60 offset  | PUSH1 offset   | o r 0 r          |                                 |
+             * 3d         | RETURNDATASIZE | 0 o r 0 r        |                                 |
+             * 39         | CODECOPY       | 0 r              | [0..runSize): runtime code      |
+             * 73 impl    | PUSH20 impl    | impl 0 r         | [0..runSize): runtime code      |
+             * 60 slotPos | PUSH1 slotPos  | slotPos impl 0 r | [0..runSize): runtime code      |
+             * 51         | MLOAD          | slot impl 0 r    | [0..runSize): runtime code      |
+             * 55         | SSTORE         | 0 r              | [0..runSize): runtime code      |
+             * f3         | RETURN         |                  | [0..runSize): runtime code      |
+             * ---------------------------------------------------------------------------------|
+             * RUNTIME (62 bytes)                                                               |
+             * ---------------------------------------------------------------------------------|
+             * Opcode     | Mnemonic       | Stack            | Memory                          |
+             * ---------------------------------------------------------------------------------|
+             *                                                                                  |
+             * ::: copy calldata to memory :::::::::::::::::::::::::::::::::::::::::::::::::::: |
+             * 36         | CALLDATASIZE   | cds              |                                 |
+             * 3d         | RETURNDATASIZE | 0 cds            |                                 |
+             * 3d         | RETURNDATASIZE | 0 0 cds          |                                 |
+             * 37         | CALLDATACOPY   |                  | [0..calldatasize): calldata     |
+             *                                                                                  |
+             * ::: delegatecall to implementation ::::::::::::::::::::::::::::::::::::::::::::: |
+             * 3d         | RETURNDATASIZE | 0                |                                 |
+             * 3d         | RETURNDATASIZE | 0 0              |                                 |
+             * 36         | CALLDATASIZE   | cds 0 0          | [0..calldatasize): calldata     |
+             * 3d         | RETURNDATASIZE | 0 cds 0 0        | [0..calldatasize): calldata     |
+             * 7f slot    | PUSH32 slot    | s 0 cds 0 0      | [0..calldatasize): calldata     |
+             * 54         | SLOAD          | i 0 cds 0 0      | [0..calldatasize): calldata     |
+             * 5a         | GAS            | g i 0 cds 0 0    | [0..calldatasize): calldata     |
+             * f4         | DELEGATECALL   | succ             | [0..calldatasize): calldata     |
+             *                                                                                  |
+             * ::: copy returndata to memory :::::::::::::::::::::::::::::::::::::::::::::::::: |
+             * 3d         | RETURNDATASIZE | rds succ         | [0..calldatasize): calldata     |
+             * 60 0x00    | PUSH1 0x00     | 0 rds succ       | [0..calldatasize): calldata     |
+             * 80         | DUP1           | 0 0 rds succ     | [0..calldatasize): calldata     |
+             * 3e         | RETURNDATACOPY | succ             | [0..returndatasize): returndata |
+             *                                                                                  |
+             * ::: branch on delegatecall status :::::::::::::::::::::::::::::::::::::::::::::: |
+             * 60 0x38    | PUSH1 0x38     | dest succ        | [0..returndatasize): returndata |
+             * 57         | JUMPI          |                  | [0..returndatasize): returndata |
+             *                                                                                  |
+             * ::: delegatecall failed, revert :::::::::::::::::::::::::::::::::::::::::::::::: |
+             * 3d         | RETURNDATASIZE | rds              | [0..returndatasize): returndata |
+             * 60 0x00    | PUSH1 0x00     | 0 rds            | [0..returndatasize): returndata |
+             * fd         | REVERT         |                  | [0..returndatasize): returndata |
+             *                                                                                  |
+             * ::: delegatecall succeeded, return ::::::::::::::::::::::::::::::::::::::::::::: |
+             * 5b         | JUMPDEST       |                  | [0..returndatasize): returndata |
+             * 3d         | RETURNDATASIZE | rds              | [0..returndatasize): returndata |
+             * 60 0x00    | PUSH1 0x00     | 0 rds            | [0..returndatasize): returndata |
+             * f3         | RETURN         |                  | [0..returndatasize): returndata |
+             * ---------------------------------------------------------------------------------+
+             */
             let m := mload(0x40) // Cache the free memory pointer.
             mstore(0x60, 0xcc3735a920a3ca505d382bbc545af43d6000803e6038573d6000fd5b3d6000f3)
             mstore(0x40, 0x5155f3363d3d373d3d363d7f360894a13ba1a3210667c828492db98dca3e2076)
@@ -2052,17 +1974,14 @@ library LibClone {
     }
 
     /// @dev Deploys a deterministic minimal ERC1967 proxy with `implementation` and `salt`.
-    function deployDeterministicERC1967(address implementation, bytes32 salt)
-    internal
-    returns (address instance)
-    {
+    function deployDeterministicERC1967(address implementation, bytes32 salt) internal returns (address instance) {
         instance = deployDeterministicERC1967(0, implementation, salt);
     }
 
     /// @dev Deploys a deterministic minimal ERC1967 proxy with `implementation` and `salt`.
     function deployDeterministicERC1967(uint256 value, address implementation, bytes32 salt)
-    internal
-    returns (address instance)
+        internal
+        returns (address instance)
     {
         /// @solidity memory-safe-assembly
         assembly {
@@ -2086,8 +2005,8 @@ library LibClone {
     /// Note: This method is intended for use in ERC4337 factories,
     /// which are expected to NOT revert if the proxy is already deployed.
     function createDeterministicERC1967(address implementation, bytes32 salt)
-    internal
-    returns (bool alreadyDeployed, address instance)
+        internal
+        returns (bool alreadyDeployed, address instance)
     {
         return createDeterministicERC1967(0, implementation, salt);
     }
@@ -2096,8 +2015,8 @@ library LibClone {
     /// Note: This method is intended for use in ERC4337 factories,
     /// which are expected to NOT revert if the proxy is already deployed.
     function createDeterministicERC1967(uint256 value, address implementation, bytes32 salt)
-    internal
-    returns (bool alreadyDeployed, address instance)
+        internal
+        returns (bool alreadyDeployed, address instance)
     {
         /// @solidity memory-safe-assembly
         assembly {
@@ -2107,7 +2026,7 @@ library LibClone {
             mstore(0x20, 0x6009)
             mstore(0x1e, implementation)
             mstore(0x0a, 0x603d3d8160223d3973)
-        // Compute and store the bytecode hash.
+            // Compute and store the bytecode hash.
             mstore(add(m, 0x35), keccak256(0x21, 0x5f))
             mstore(m, shl(88, address()))
             mstore8(m, 0xff) // Write the prefix.
@@ -2156,11 +2075,11 @@ library LibClone {
     /// @dev Returns the address of the deterministic clone of
     /// `implementation` using immutable arguments encoded in `data`, with `salt`, by `deployer`.
     /// Note: The returned result has dirty upper 96 bits. Please clean if used in assembly.
-    function predictDeterministicAddressERC1967(
-        address implementation,
-        bytes32 salt,
-        address deployer
-    ) internal pure returns (address predicted) {
+    function predictDeterministicAddressERC1967(address implementation, bytes32 salt, address deployer)
+        internal
+        pure
+        returns (address predicted)
+    {
         bytes32 hash = initCodeHashERC1967(implementation);
         predicted = predictDeterministicAddress(hash, salt, deployer);
     }
@@ -2173,13 +2092,13 @@ library LibClone {
     /// `hash`, is deployed with `salt`, by `deployer`.
     /// Note: The returned result has dirty upper 96 bits. Please clean if used in assembly.
     function predictDeterministicAddress(bytes32 hash, bytes32 salt, address deployer)
-    internal
-    pure
-    returns (address predicted)
+        internal
+        pure
+        returns (address predicted)
     {
         /// @solidity memory-safe-assembly
         assembly {
-        // Compute and store the bytecode hash.
+            // Compute and store the bytecode hash.
             mstore8(0x00, 0xff) // Write the prefix.
             mstore(0x35, hash)
             mstore(0x01, shl(96, deployer))
@@ -2193,7 +2112,7 @@ library LibClone {
     function checkStartsWith(bytes32 salt, address by) internal pure {
         /// @solidity memory-safe-assembly
         assembly {
-        // If the salt does not start with the zero address or `by`.
+            // If the salt does not start with the zero address or `by`.
             if iszero(or(iszero(shr(96, salt)), eq(shr(96, shl(96, by)), shr(96, salt)))) {
                 mstore(0x00, 0x0c4549ef) // `SaltDoesNotStartWith()`.
                 revert(0x1c, 0x04)
@@ -2236,36 +2155,36 @@ library FixedPointMathLib {
 
     function expWad(int256 x) internal pure returns (int256 r) {
         unchecked {
-        // When the result is < 0.5 we return zero. This happens when
-        // x <= floor(log(0.5e18) * 1e18) ~ -42e18
+            // When the result is < 0.5 we return zero. This happens when
+            // x <= floor(log(0.5e18) * 1e18) ~ -42e18
             if (x <= -42139678854452767551) return 0;
 
-        // When the result is > (2**255 - 1) / 1e18 we can not represent it as an
-        // int. This happens when x >= floor(log((2**255 - 1) / 1e18) * 1e18) ~ 135.
+            // When the result is > (2**255 - 1) / 1e18 we can not represent it as an
+            // int. This happens when x >= floor(log((2**255 - 1) / 1e18) * 1e18) ~ 135.
             if (x >= 135305999368893231589) revert("EXP_OVERFLOW");
 
-        // x is now in the range (-42, 136) * 1e18. Convert to (-42, 136) * 2**96
-        // for more intermediate precision and a binary basis. This base conversion
-        // is a multiplication by 1e18 / 2**96 = 5**18 / 2**78.
-            x = (x << 78) / 5**18;
+            // x is now in the range (-42, 136) * 1e18. Convert to (-42, 136) * 2**96
+            // for more intermediate precision and a binary basis. This base conversion
+            // is a multiplication by 1e18 / 2**96 = 5**18 / 2**78.
+            x = (x << 78) / 5 ** 18;
 
-        // Reduce range of x to (-½ ln 2, ½ ln 2) * 2**96 by factoring out powers
-        // of two such that exp(x) = exp(x') * 2**k, where k is an integer.
-        // Solving this gives k = round(x / log(2)) and x' = x - k * log(2).
-            int256 k = ((x << 96) / 54916777467707473351141471128 + 2**95) >> 96;
+            // Reduce range of x to (-½ ln 2, ½ ln 2) * 2**96 by factoring out powers
+            // of two such that exp(x) = exp(x') * 2**k, where k is an integer.
+            // Solving this gives k = round(x / log(2)) and x' = x - k * log(2).
+            int256 k = ((x << 96) / 54916777467707473351141471128 + 2 ** 95) >> 96;
             x = x - k * 54916777467707473351141471128;
 
-        // k is in the range [-61, 195].
+            // k is in the range [-61, 195].
 
-        // Evaluate using a (6, 7)-term rational approximation.
-        // p is made monic, we'll multiply by a scale factor later.
+            // Evaluate using a (6, 7)-term rational approximation.
+            // p is made monic, we'll multiply by a scale factor later.
             int256 y = x + 1346386616545796478920950773328;
             y = ((y * x) >> 96) + 57155421227552351082224309758442;
             int256 p = y + x - 94201549194550492254356042504812;
             p = ((p * y) >> 96) + 28719021644029726153956944680412240;
             p = p * x + (4385272521454847904659076985693276 << 96);
 
-        // We leave p in 2**192 basis so we don't need to scale it back up for the division.
+            // We leave p in 2**192 basis so we don't need to scale it back up for the division.
             int256 q = x - 2855989394907223263936484059900;
             q = ((q * x) >> 96) + 50020603652535783019961831881945;
             q = ((q * x) >> 96) - 533845033583426703283633433725380;
@@ -2274,20 +2193,20 @@ library FixedPointMathLib {
             q = ((q * x) >> 96) + 26449188498355588339934803723976023;
 
             assembly {
-            // Div in assembly because solidity adds a zero check despite the unchecked.
-            // The q polynomial won't have zeros in the domain as all its roots are complex.
-            // No scaling is necessary because p is already 2**96 too large.
+                // Div in assembly because solidity adds a zero check despite the unchecked.
+                // The q polynomial won't have zeros in the domain as all its roots are complex.
+                // No scaling is necessary because p is already 2**96 too large.
                 r := sdiv(p, q)
             }
 
-        // r should be in the range (0.09, 0.25) * 2**96.
+            // r should be in the range (0.09, 0.25) * 2**96.
 
-        // We now need to multiply r by:
-        // * the scale factor s = ~6.031367120.
-        // * the 2**k factor from the range reduction.
-        // * the 1e18 / 2**96 factor for base conversion.
-        // We do this all at once, with an intermediate result in 2**213
-        // basis, so the final right shift is always by a positive amount.
+            // We now need to multiply r by:
+            // * the scale factor s = ~6.031367120.
+            // * the 2**k factor from the range reduction.
+            // * the 1e18 / 2**96 factor for base conversion.
+            // We do this all at once, with an intermediate result in 2**213
+            // basis, so the final right shift is always by a positive amount.
             r = int256((uint256(r) * 3822833074963236453042738258902158003155416615667) >> uint256(195 - k));
         }
     }
@@ -2296,19 +2215,19 @@ library FixedPointMathLib {
         unchecked {
             require(x > 0, "UNDEFINED");
 
-        // We want to convert x from 10**18 fixed point to 2**96 fixed point.
-        // We do this by multiplying by 2**96 / 10**18. But since
-        // ln(x * C) = ln(x) + ln(C), we can simply do nothing here
-        // and add ln(2**96 / 10**18) at the end.
+            // We want to convert x from 10**18 fixed point to 2**96 fixed point.
+            // We do this by multiplying by 2**96 / 10**18. But since
+            // ln(x * C) = ln(x) + ln(C), we can simply do nothing here
+            // and add ln(2**96 / 10**18) at the end.
 
-        // Reduce range of x to (1, 2) * 2**96
-        // ln(2^k * x) = k * ln(2) + ln(x)
+            // Reduce range of x to (1, 2) * 2**96
+            // ln(2^k * x) = k * ln(2) + ln(x)
             int256 k = int256(log2(uint256(x))) - 96;
             x <<= uint256(159 - k);
             x = int256(uint256(x) >> 159);
 
-        // Evaluate using a (8, 8)-term rational approximation.
-        // p is made monic, we will multiply by a scale factor later.
+            // Evaluate using a (8, 8)-term rational approximation.
+            // p is made monic, we will multiply by a scale factor later.
             int256 p = x + 3273285459638523848632254066296;
             p = ((p * x) >> 96) + 24828157081833163892658089445524;
             p = ((p * x) >> 96) + 43456485725739037958740375743393;
@@ -2317,8 +2236,8 @@ library FixedPointMathLib {
             p = ((p * x) >> 96) - 14706773417378608786704636184526;
             p = p * x - (795164235651350426258249787498 << 96);
 
-        // We leave p in 2**192 basis so we don't need to scale it back up for the division.
-        // q is monic by convention.
+            // We leave p in 2**192 basis so we don't need to scale it back up for the division.
+            // q is monic by convention.
             int256 q = x + 5573035233440673466300451813936;
             q = ((q * x) >> 96) + 71694874799317883764090561454958;
             q = ((q * x) >> 96) + 283447036172924575727196451306956;
@@ -2327,27 +2246,27 @@ library FixedPointMathLib {
             q = ((q * x) >> 96) + 31853899698501571402653359427138;
             q = ((q * x) >> 96) + 909429971244387300277376558375;
             assembly {
-            // Div in assembly because solidity adds a zero check despite the unchecked.
-            // The q polynomial is known not to have zeros in the domain.
-            // No scaling required because p is already 2**96 too large.
+                // Div in assembly because solidity adds a zero check despite the unchecked.
+                // The q polynomial is known not to have zeros in the domain.
+                // No scaling required because p is already 2**96 too large.
                 r := sdiv(p, q)
             }
 
-        // r is in the range (0, 0.125) * 2**96
+            // r is in the range (0, 0.125) * 2**96
 
-        // Finalization, we need to:
-        // * multiply by the scale factor s = 5.549…
-        // * add ln(2**96 / 10**18)
-        // * add k * ln(2)
-        // * multiply by 10**18 / 2**96 = 5**18 >> 78
+            // Finalization, we need to:
+            // * multiply by the scale factor s = 5.549…
+            // * add ln(2**96 / 10**18)
+            // * add k * ln(2)
+            // * multiply by 10**18 / 2**96 = 5**18 >> 78
 
-        // mul s * 5e18 * 2**96, base is now 5**18 * 2**192
+            // mul s * 5e18 * 2**96, base is now 5**18 * 2**192
             r *= 1677202110996718588342820967067443963516166;
-        // add ln(2) * k * 5e18 * 2**192
+            // add ln(2) * k * 5e18 * 2**192
             r += 16597577552685614221487285958193947469193820559219878177908093499208371 * k;
-        // add ln(2**96 / 10**18) * 5e18 * 2**192
+            // add ln(2**96 / 10**18) * 5e18 * 2**192
             r += 600920179829731861736702779321621459595472258049074101567377883020018308;
-        // base conversion: mul 2**18 / 2**192
+            // base conversion: mul 2**18 / 2**192
             r >>= 174;
         }
     }
@@ -2356,127 +2275,103 @@ library FixedPointMathLib {
                     LOW LEVEL FIXED POINT OPERATIONS
     //////////////////////////////////////////////////////////////*/
 
-    function mulDivDown(
-        uint256 x,
-        uint256 y,
-        uint256 denominator
-    ) internal pure returns (uint256 z) {
+    function mulDivDown(uint256 x, uint256 y, uint256 denominator) internal pure returns (uint256 z) {
         assembly {
-        // Store x * y in z for now.
+            // Store x * y in z for now.
             z := mul(x, y)
 
-        // Equivalent to require(denominator != 0 && (x == 0 || (x * y) / x == y))
-            if iszero(and(iszero(iszero(denominator)), or(iszero(x), eq(div(z, x), y)))) {
-                revert(0, 0)
-            }
+            // Equivalent to require(denominator != 0 && (x == 0 || (x * y) / x == y))
+            if iszero(and(iszero(iszero(denominator)), or(iszero(x), eq(div(z, x), y)))) { revert(0, 0) }
 
-        // Divide z by the denominator.
+            // Divide z by the denominator.
             z := div(z, denominator)
         }
     }
 
-    function mulDivUp(
-        uint256 x,
-        uint256 y,
-        uint256 denominator
-    ) internal pure returns (uint256 z) {
+    function mulDivUp(uint256 x, uint256 y, uint256 denominator) internal pure returns (uint256 z) {
         assembly {
-        // Store x * y in z for now.
+            // Store x * y in z for now.
             z := mul(x, y)
 
-        // Equivalent to require(denominator != 0 && (x == 0 || (x * y) / x == y))
-            if iszero(and(iszero(iszero(denominator)), or(iszero(x), eq(div(z, x), y)))) {
-                revert(0, 0)
-            }
+            // Equivalent to require(denominator != 0 && (x == 0 || (x * y) / x == y))
+            if iszero(and(iszero(iszero(denominator)), or(iszero(x), eq(div(z, x), y)))) { revert(0, 0) }
 
-        // First, divide z - 1 by the denominator and add 1.
-        // We allow z - 1 to underflow if z is 0, because we multiply the
-        // end result by 0 if z is zero, ensuring we return 0 if z is zero.
+            // First, divide z - 1 by the denominator and add 1.
+            // We allow z - 1 to underflow if z is 0, because we multiply the
+            // end result by 0 if z is zero, ensuring we return 0 if z is zero.
             z := mul(iszero(iszero(z)), add(div(sub(z, 1), denominator), 1))
         }
     }
 
-    function rpow(
-        uint256 x,
-        uint256 n,
-        uint256 scalar
-    ) internal pure returns (uint256 z) {
+    function rpow(uint256 x, uint256 n, uint256 scalar) internal pure returns (uint256 z) {
         assembly {
             switch x
             case 0 {
                 switch n
                 case 0 {
-                // 0 ** 0 = 1
+                    // 0 ** 0 = 1
                     z := scalar
                 }
                 default {
-                // 0 ** n = 0
+                    // 0 ** n = 0
                     z := 0
                 }
             }
             default {
                 switch mod(n, 2)
                 case 0 {
-                // If n is even, store scalar in z for now.
+                    // If n is even, store scalar in z for now.
                     z := scalar
                 }
                 default {
-                // If n is odd, store x in z for now.
+                    // If n is odd, store x in z for now.
                     z := x
                 }
 
-            // Shifting right by 1 is like dividing by 2.
+                // Shifting right by 1 is like dividing by 2.
                 let half := shr(1, scalar)
 
                 for {
-                // Shift n right by 1 before looping to halve it.
+                    // Shift n right by 1 before looping to halve it.
                     n := shr(1, n)
                 } n {
-                // Shift n right by 1 each iteration to halve it.
+                    // Shift n right by 1 each iteration to halve it.
                     n := shr(1, n)
                 } {
-                // Revert immediately if x ** 2 would overflow.
-                // Equivalent to iszero(eq(div(xx, x), x)) here.
-                    if shr(128, x) {
-                        revert(0, 0)
-                    }
+                    // Revert immediately if x ** 2 would overflow.
+                    // Equivalent to iszero(eq(div(xx, x), x)) here.
+                    if shr(128, x) { revert(0, 0) }
 
-                // Store x squared.
+                    // Store x squared.
                     let xx := mul(x, x)
 
-                // Round to the nearest number.
+                    // Round to the nearest number.
                     let xxRound := add(xx, half)
 
-                // Revert if xx + half overflowed.
-                    if lt(xxRound, xx) {
-                        revert(0, 0)
-                    }
+                    // Revert if xx + half overflowed.
+                    if lt(xxRound, xx) { revert(0, 0) }
 
-                // Set x to scaled xxRound.
+                    // Set x to scaled xxRound.
                     x := div(xxRound, scalar)
 
-                // If n is even:
+                    // If n is even:
                     if mod(n, 2) {
-                    // Compute z * x.
+                        // Compute z * x.
                         let zx := mul(z, x)
 
-                    // If z * x overflowed:
+                        // If z * x overflowed:
                         if iszero(eq(div(zx, x), z)) {
-                        // Revert if x is non-zero.
-                            if iszero(iszero(x)) {
-                                revert(0, 0)
-                            }
+                            // Revert if x is non-zero.
+                            if iszero(iszero(x)) { revert(0, 0) }
                         }
 
-                    // Round to the nearest number.
+                        // Round to the nearest number.
                         let zxRound := add(zx, half)
 
-                    // Revert if zx + half overflowed.
-                        if lt(zxRound, zx) {
-                            revert(0, 0)
-                        }
+                        // Revert if zx + half overflowed.
+                        if lt(zxRound, zx) { revert(0, 0) }
 
-                    // Return properly scaled zxRound.
+                        // Return properly scaled zxRound.
                         z := div(zxRound, scalar)
                     }
                 }
@@ -2494,11 +2389,11 @@ library FixedPointMathLib {
 
             z := 181 // The "correct" value is 1, but this saves a multiplication later.
 
-        // This segment is to get a reasonable initial estimate for the Babylonian method. With a bad
-        // start, the correct # of bits increases ~linearly each iteration instead of ~quadratically.
+            // This segment is to get a reasonable initial estimate for the Babylonian method. With a bad
+            // start, the correct # of bits increases ~linearly each iteration instead of ~quadratically.
 
-        // We check y >= 2^(k + 8) but shift right by k bits
-        // each branch to ensure that if x >= 256, then y >= 256.
+            // We check y >= 2^(k + 8) but shift right by k bits
+            // each branch to ensure that if x >= 256, then y >= 256.
             if iszero(lt(y, 0x10000000000000000000000000000000000)) {
                 y := shr(128, y)
                 z := shl(64, z)
@@ -2516,25 +2411,25 @@ library FixedPointMathLib {
                 z := shl(8, z)
             }
 
-        // Goal was to get z*z*y within a small factor of x. More iterations could
-        // get y in a tighter range. Currently, we will have y in [256, 256*2^16).
-        // We ensured y >= 256 so that the relative difference between y and y+1 is small.
-        // That's not possible if x < 256 but we can just verify those cases exhaustively.
+            // Goal was to get z*z*y within a small factor of x. More iterations could
+            // get y in a tighter range. Currently, we will have y in [256, 256*2^16).
+            // We ensured y >= 256 so that the relative difference between y and y+1 is small.
+            // That's not possible if x < 256 but we can just verify those cases exhaustively.
 
-        // Now, z*z*y <= x < z*z*(y+1), and y <= 2^(16+8), and either y >= 256, or x < 256.
-        // Correctness can be checked exhaustively for x < 256, so we assume y >= 256.
-        // Then z*sqrt(y) is within sqrt(257)/sqrt(256) of sqrt(x), or about 20bps.
+            // Now, z*z*y <= x < z*z*(y+1), and y <= 2^(16+8), and either y >= 256, or x < 256.
+            // Correctness can be checked exhaustively for x < 256, so we assume y >= 256.
+            // Then z*sqrt(y) is within sqrt(257)/sqrt(256) of sqrt(x), or about 20bps.
 
-        // For s in the range [1/256, 256], the estimate f(s) = (181/1024) * (s+1) is in the range
-        // (1/2.84 * sqrt(s), 2.84 * sqrt(s)), with largest error when s = 1 and when s = 256 or 1/256.
+            // For s in the range [1/256, 256], the estimate f(s) = (181/1024) * (s+1) is in the range
+            // (1/2.84 * sqrt(s), 2.84 * sqrt(s)), with largest error when s = 1 and when s = 256 or 1/256.
 
-        // Since y is in [256, 256*2^16), let a = y/65536, so that a is in [1/256, 256). Then we can estimate
-        // sqrt(y) using sqrt(65536) * 181/1024 * (a + 1) = 181/4 * (y + 65536)/65536 = 181 * (y + 65536)/2^18.
+            // Since y is in [256, 256*2^16), let a = y/65536, so that a is in [1/256, 256). Then we can estimate
+            // sqrt(y) using sqrt(65536) * 181/1024 * (a + 1) = 181/4 * (y + 65536)/65536 = 181 * (y + 65536)/2^18.
 
-        // There is no overflow risk here since y < 2^136 after the first branch above.
+            // There is no overflow risk here since y < 2^136 after the first branch above.
             z := shr(18, mul(z, add(y, 65536))) // A mul() is saved from starting z at 181.
 
-        // Given the worst case multiplicative error of 2.84 above, 7 iterations should be enough.
+            // Given the worst case multiplicative error of 2.84 above, 7 iterations should be enough.
             z := shr(1, add(z, div(x, z)))
             z := shr(1, add(z, div(x, z)))
             z := shr(1, add(z, div(x, z)))
@@ -2543,11 +2438,11 @@ library FixedPointMathLib {
             z := shr(1, add(z, div(x, z)))
             z := shr(1, add(z, div(x, z)))
 
-        // If x+1 is a perfect square, the Babylonian method cycles between
-        // floor(sqrt(x)) and ceil(sqrt(x)). This statement ensures we return floor.
-        // See: https://en.wikipedia.org/wiki/Integer_square_root#Using_only_integer_division
-        // Since the ceil is rare, we save gas on the assignment and repeat division in the rare case.
-        // If you don't care whether the floor or ceil square root is returned, you can remove this statement.
+            // If x+1 is a perfect square, the Babylonian method cycles between
+            // floor(sqrt(x)) and ceil(sqrt(x)). This statement ensures we return floor.
+            // See: https://en.wikipedia.org/wiki/Integer_square_root#Using_only_integer_division
+            // Since the ceil is rare, we save gas on the assignment and repeat division in the rare case.
+            // If you don't care whether the floor or ceil square root is returned, you can remove this statement.
             z := sub(z, lt(div(x, z), z))
         }
     }
@@ -2580,14 +2475,14 @@ interface IInitializable {
 
 // src/dispute/lib/LibPosition.sol
 
-    using LibPosition for Position global;
+using LibPosition for Position global;
 
 /// @notice A `Position` represents a position of a claim within the game tree.
 /// @dev This is represented as a "generalized index" where the high-order bit
 /// is the level in the tree and the remaining bits is a unique bit pattern, allowing
 /// a unique identifier for each node in the tree. Mathematically, it is calculated
 /// as 2^{depth} + indexAtDepth.
-    type Position is uint128;
+type Position is uint128;
 
 /// @title LibPosition
 /// @notice This library contains helper functions for working with the `Position` type.
@@ -2602,7 +2497,7 @@ library LibPosition {
     /// @return position_ The computed generalized index.
     function wrap(uint8 _depth, uint128 _indexAtDepth) internal pure returns (Position position_) {
         assembly {
-        // gindex = 2^{_depth} + _indexAtDepth
+            // gindex = 2^{_depth} + _indexAtDepth
             position_ := add(shl(_depth, 1), _indexAtDepth)
         }
     }
@@ -2617,7 +2512,7 @@ library LibPosition {
             depth_ := or(depth_, shl(6, lt(0xffffffffffffffff, shr(depth_, _position))))
             depth_ := or(depth_, shl(5, lt(0xffffffff, shr(depth_, _position))))
 
-        // For the remaining 32 bits, use a De Bruijn lookup.
+            // For the remaining 32 bits, use a De Bruijn lookup.
             _position := shr(depth_, _position)
             _position := or(_position, shr(1, _position))
             _position := or(_position, shr(2, _position))
@@ -2626,13 +2521,13 @@ library LibPosition {
             _position := or(_position, shr(16, _position))
 
             depth_ :=
-            or(
-                depth_,
-                byte(
-                    shr(251, mul(_position, shl(224, 0x07c4acdd))),
-                    0x0009010a0d15021d0b0e10121619031e080c141c0f111807131b17061a05041f
+                or(
+                    depth_,
+                    byte(
+                        shr(251, mul(_position, shl(224, 0x07c4acdd))),
+                        0x0009010a0d15021d0b0e10121619031e080c141c0f111807131b17061a05041f
+                    )
                 )
-            )
         }
     }
 
@@ -2721,7 +2616,7 @@ library LibPosition {
         // shifted right by the index of the lowest unset bit.
         assembly {
             let a := shr(msb, _position)
-        // Bound the ancestor to the minimum gindex, 1.
+            // Bound the ancestor to the minimum gindex, 1.
             ancestor_ := or(a, iszero(a))
         }
     }
@@ -2732,18 +2627,15 @@ library LibPosition {
     /// @param _upperBoundExclusive The exclusive upper depth bound, used to inform where to stop in order
     ///                             to not escape a sub-tree.
     /// @return ancestor_ The highest ancestor of `position` that commits to the same trace index.
-    function traceAncestorBounded(
-        Position _position,
-        uint256 _upperBoundExclusive
-    )
-    internal
-    pure
-    returns (Position ancestor_)
+    function traceAncestorBounded(Position _position, uint256 _upperBoundExclusive)
+        internal
+        pure
+        returns (Position ancestor_)
     {
         // This function only works for positions that are below the upper bound.
         if (_position.depth() <= _upperBoundExclusive) {
             assembly {
-            // Revert with `ClaimAboveSplit()`
+                // Revert with `ClaimAboveSplit()`
                 mstore(0x00, 0xb34b5c22)
                 revert(0x1C, 0x04)
             }
@@ -2790,7 +2682,7 @@ library Burn {
     /// @notice Burns a given amount of ETH.
     /// @param _amount Amount of ETH to burn.
     function eth(uint256 _amount) internal {
-        new Burner{ value: _amount }();
+        new Burner{value: _amount}();
     }
 
     /// @notice Burns a given amount of gas.
@@ -2839,30 +2731,30 @@ library Bytes {
         assembly {
             switch iszero(_length)
             case 0 {
-            // Get a location of some free memory and store it in tempBytes as
-            // Solidity does for memory variables.
+                // Get a location of some free memory and store it in tempBytes as
+                // Solidity does for memory variables.
                 tempBytes := mload(0x40)
 
-            // The first word of the slice result is potentially a partial
-            // word read from the original array. To read it, we calculate
-            // the length of that partial word and start copying that many
-            // bytes into the array. The first word we copy will start with
-            // data we don't care about, but the last `lengthmod` bytes will
-            // land at the beginning of the contents of the new array. When
-            // we're done copying, we overwrite the full first word with
-            // the actual length of the slice.
+                // The first word of the slice result is potentially a partial
+                // word read from the original array. To read it, we calculate
+                // the length of that partial word and start copying that many
+                // bytes into the array. The first word we copy will start with
+                // data we don't care about, but the last `lengthmod` bytes will
+                // land at the beginning of the contents of the new array. When
+                // we're done copying, we overwrite the full first word with
+                // the actual length of the slice.
                 let lengthmod := and(_length, 31)
 
-            // The multiplication in the next line is necessary
-            // because when slicing multiples of 32 bytes (lengthmod == 0)
-            // the following copy loop was copying the origin's length
-            // and then ending prematurely not copying everything it should.
+                // The multiplication in the next line is necessary
+                // because when slicing multiples of 32 bytes (lengthmod == 0)
+                // the following copy loop was copying the origin's length
+                // and then ending prematurely not copying everything it should.
                 let mc := add(add(tempBytes, lengthmod), mul(0x20, iszero(lengthmod)))
                 let end := add(mc, _length)
 
                 for {
-                // The multiplication in the next line has the same exact purpose
-                // as the one above.
+                    // The multiplication in the next line has the same exact purpose
+                    // as the one above.
                     let cc := add(add(add(_bytes, lengthmod), mul(0x20, iszero(lengthmod))), _start)
                 } lt(mc, end) {
                     mc := add(mc, 0x20)
@@ -2871,16 +2763,16 @@ library Bytes {
 
                 mstore(tempBytes, _length)
 
-            //update free-memory pointer
-            //allocating the array padded to 32 bytes like the compiler does now
+                //update free-memory pointer
+                //allocating the array padded to 32 bytes like the compiler does now
                 mstore(0x40, and(add(mc, 31), not(31)))
             }
             //if we want a zero-length slice let's just return a zero-length array
             default {
                 tempBytes := mload(0x40)
 
-            //zero out the 32 bytes slice we are about to return
-            //we need to do it because Solidity does not garbage collect
+                //zero out the 32 bytes slice we are about to return
+                //we need to do it because Solidity does not garbage collect
                 mstore(tempBytes, 0)
 
                 mstore(0x40, add(tempBytes, 0x20))
@@ -2909,40 +2801,40 @@ library Bytes {
     function toNibbles(bytes memory _bytes) internal pure returns (bytes memory) {
         bytes memory _nibbles;
         assembly {
-        // Grab a free memory offset for the new array
+            // Grab a free memory offset for the new array
             _nibbles := mload(0x40)
 
-        // Load the length of the passed bytes array from memory
+            // Load the length of the passed bytes array from memory
             let bytesLength := mload(_bytes)
 
-        // Calculate the length of the new nibble array
-        // This is the length of the input array times 2
+            // Calculate the length of the new nibble array
+            // This is the length of the input array times 2
             let nibblesLength := shl(0x01, bytesLength)
 
-        // Update the free memory pointer to allocate memory for the new array.
-        // To do this, we add the length of the new array + 32 bytes for the array length
-        // rounded up to the nearest 32 byte boundary to the current free memory pointer.
+            // Update the free memory pointer to allocate memory for the new array.
+            // To do this, we add the length of the new array + 32 bytes for the array length
+            // rounded up to the nearest 32 byte boundary to the current free memory pointer.
             mstore(0x40, add(_nibbles, and(not(0x1F), add(nibblesLength, 0x3F))))
 
-        // Store the length of the new array in memory
+            // Store the length of the new array in memory
             mstore(_nibbles, nibblesLength)
 
-        // Store the memory offset of the _bytes array's contents on the stack
+            // Store the memory offset of the _bytes array's contents on the stack
             let bytesStart := add(_bytes, 0x20)
 
-        // Store the memory offset of the nibbles array's contents on the stack
+            // Store the memory offset of the nibbles array's contents on the stack
             let nibblesStart := add(_nibbles, 0x20)
 
-        // Loop through each byte in the input array
+            // Loop through each byte in the input array
             for { let i := 0x00 } lt(i, bytesLength) { i := add(i, 0x01) } {
-            // Get the starting offset of the next 2 bytes in the nibbles array
+                // Get the starting offset of the next 2 bytes in the nibbles array
                 let offset := add(nibblesStart, shl(0x01, i))
-            // Load the byte at the current index within the `_bytes` array
+                // Load the byte at the current index within the `_bytes` array
                 let b := byte(0x00, mload(add(bytesStart, i)))
 
-            // Pull out the first nibble and store it in the new array
+                // Pull out the first nibble and store it in the new array
                 mstore8(offset, shr(0x04, b))
-            // Pull out the second nibble and store it in the new array
+                // Pull out the second nibble and store it in the new array
                 mstore8(add(offset, 0x01), and(b, 0x0F))
             }
         }
@@ -2961,24 +2853,24 @@ library Bytes {
 // src/libraries/PortalErrors.sol
 
 /// @notice Error for when a deposit or withdrawal is to a bad target.
-    error BadTarget();
+error BadTarget();
 /// @notice Error for when a deposit has too much calldata.
-    error LargeCalldata();
+error LargeCalldata();
 /// @notice Error for when a deposit has too small of a gas limit.
-    error SmallGasLimit();
+error SmallGasLimit();
 /// @notice Error for when a withdrawal transfer fails.
-    error TransferFailed();
+error TransferFailed();
 /// @notice Error for when a method is called that only works when using a custom gas token.
-    error OnlyCustomGasToken();
+error OnlyCustomGasToken();
 /// @notice Error for when a method cannot be called with non zero CALLVALUE.
-    error NoValue();
+error NoValue();
 /// @notice Error for an unauthorized CALLER.
-    error Unauthorized();
+error Unauthorized();
 /// @notice Error for when a method cannot be called when paused. This could be renamed
 ///         to `Paused` in the future, but it collides with the `Paused` event.
-    error CallPaused();
+error CallPaused();
 /// @notice Error for special gas estimation.
-    error GasEstimation();
+error GasEstimation();
 
 // src/libraries/SafeCall.sol
 
@@ -2994,15 +2886,15 @@ library SafeCall {
         bool _success;
         assembly {
             _success :=
-            call(
-                _gas, // gas
-                _target, // recipient
-                _value, // ether value
-                0, // inloc
-                0, // inlen
-                0, // outloc
-                0 // outlen
-            )
+                call(
+                    _gas, // gas
+                    _target, // recipient
+                    _value, // ether value
+                    0, // inloc
+                    0, // inlen
+                    0, // outloc
+                    0 // outlen
+                )
         }
         return _success;
     }
@@ -3016,15 +2908,15 @@ library SafeCall {
         bool _success;
         assembly {
             _success :=
-            call(
-                _gas, // gas
-                _target, // recipient
-                _value, // ether value
-                add(_calldata, 32), // inloc
-                mload(_calldata), // inlen
-                0, // outloc
-                0 // outlen
-            )
+                call(
+                    _gas, // gas
+                    _target, // recipient
+                    _value, // ether value
+                    add(_calldata, 32), // inloc
+                    mload(_calldata), // inlen
+                    0, // outloc
+                    0 // outlen
+                )
         }
         return _success;
     }
@@ -3055,7 +2947,7 @@ library SafeCall {
     function hasMinGas(uint256 _minGas, uint256 _reservedGas) internal view returns (bool) {
         bool _hasMinGas;
         assembly {
-        // Equation: gas × 63 ≥ minGas × 64 + 63(40_000 + reservedGas)
+            // Equation: gas × 63 ≥ minGas × 64 + 63(40_000 + reservedGas)
             _hasMinGas := iszero(lt(mul(gas(), 63), add(mul(_minGas, 64), mul(add(40000, _reservedGas), 63))))
         }
         return _hasMinGas;
@@ -3068,55 +2960,50 @@ library SafeCall {
     /// @param _minGas   The minimum amount of gas that may be passed to the call
     /// @param _value    Amount of value to pass to the call
     /// @param _calldata Calldata to pass to the call
-    function callWithMinGas(
-        address _target,
-        uint256 _minGas,
-        uint256 _value,
-        bytes memory _calldata
-    )
-    internal
-    returns (bool)
+    function callWithMinGas(address _target, uint256 _minGas, uint256 _value, bytes memory _calldata)
+        internal
+        returns (bool)
     {
         bool _success;
         bool _hasMinGas = hasMinGas(_minGas, 0);
         assembly {
-        // Assertion: gasleft() >= (_minGas * 64) / 63 + 40_000
+            // Assertion: gasleft() >= (_minGas * 64) / 63 + 40_000
             if iszero(_hasMinGas) {
-            // Store the "Error(string)" selector in scratch space.
+                // Store the "Error(string)" selector in scratch space.
                 mstore(0, 0x08c379a0)
-            // Store the pointer to the string length in scratch space.
+                // Store the pointer to the string length in scratch space.
                 mstore(32, 32)
-            // Store the string.
-            //
-            // SAFETY:
-            // - We pad the beginning of the string with two zero bytes as well as the
-            // length (24) to ensure that we override the free memory pointer at offset
-            // 0x40. This is necessary because the free memory pointer is likely to
-            // be greater than 1 byte when this function is called, but it is incredibly
-            // unlikely that it will be greater than 3 bytes. As for the data within
-            // 0x60, it is ensured that it is 0 due to 0x60 being the zero offset.
-            // - It's fine to clobber the free memory pointer, we're reverting.
+                // Store the string.
+                //
+                // SAFETY:
+                // - We pad the beginning of the string with two zero bytes as well as the
+                // length (24) to ensure that we override the free memory pointer at offset
+                // 0x40. This is necessary because the free memory pointer is likely to
+                // be greater than 1 byte when this function is called, but it is incredibly
+                // unlikely that it will be greater than 3 bytes. As for the data within
+                // 0x60, it is ensured that it is 0 due to 0x60 being the zero offset.
+                // - It's fine to clobber the free memory pointer, we're reverting.
                 mstore(88, 0x0000185361666543616c6c3a204e6f7420656e6f75676820676173)
 
-            // Revert with 'Error("SafeCall: Not enough gas")'
+                // Revert with 'Error("SafeCall: Not enough gas")'
                 revert(28, 100)
             }
 
-        // The call will be supplied at least ((_minGas * 64) / 63) gas due to the
-        // above assertion. This ensures that, in all circumstances (except for when the
-        // `_minGas` does not account for the `memory_expansion_cost` and `code_execution_cost`
-        // factors of the dynamic cost of the `CALL` opcode), the call will receive at least
-        // the minimum amount of gas specified.
+            // The call will be supplied at least ((_minGas * 64) / 63) gas due to the
+            // above assertion. This ensures that, in all circumstances (except for when the
+            // `_minGas` does not account for the `memory_expansion_cost` and `code_execution_cost`
+            // factors of the dynamic cost of the `CALL` opcode), the call will receive at least
+            // the minimum amount of gas specified.
             _success :=
-            call(
-                gas(), // gas
-                _target, // recipient
-                _value, // ether value
-                add(_calldata, 32), // inloc
-                mload(_calldata), // inlen
-                0x00, // outloc
-                0x00 // outlen
-            )
+                call(
+                    gas(), // gas
+                    _target, // recipient
+                    _value, // ether value
+                    add(_calldata, 32), // inloc
+                    mload(_calldata), // inlen
+                    0x00, // outloc
+                    0x00 // outlen
+                )
         }
         return _success;
     }
@@ -3283,22 +3170,22 @@ library Types {
 // src/libraries/rlp/RLPErrors.sol
 
 /// @notice The length of an RLP item must be greater than zero to be decodable
-    error EmptyItem();
+error EmptyItem();
 
 /// @notice The decoded item type for list is not a list item
-    error UnexpectedString();
+error UnexpectedString();
 
 /// @notice The RLP item has an invalid data remainder
-    error InvalidDataRemainder();
+error InvalidDataRemainder();
 
 /// @notice Decoded item type for bytes is not a string item
-    error UnexpectedList();
+error UnexpectedList();
 
 /// @notice The length of the content must be greater than the RLP item length
-    error ContentLengthMismatch();
+error ContentLengthMismatch();
 
 /// @notice Invalid RLP header for RLP item
-    error InvalidHeader();
+error InvalidHeader();
 
 // src/libraries/rlp/RLPWriter.sol
 
@@ -3808,13 +3695,10 @@ abstract contract Executor {
      * @param operation Operation type.
      * @return success boolean flag indicating if the call succeeded.
      */
-    function execute(
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation,
-        uint256 txGas
-    ) internal returns (bool success) {
+    function execute(address to, uint256 value, bytes memory data, Enum.Operation operation, uint256 txGas)
+        internal
+        returns (bool success)
+    {
         if (operation == Enum.Operation.DelegateCall) {
             // solhint-disable-next-line no-inline-assembly
             assembly {
@@ -3839,7 +3723,8 @@ abstract contract FallbackManager is SelfAuthorized {
     event ChangedFallbackHandler(address indexed handler);
 
     // keccak256("fallback_manager.handler.address")
-    bytes32 internal constant FALLBACK_HANDLER_STORAGE_SLOT = 0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5;
+    bytes32 internal constant FALLBACK_HANDLER_STORAGE_SLOT =
+        0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5;
 
     /**
      *  @notice Internal function to set the fallback handler.
@@ -3891,19 +3776,15 @@ abstract contract FallbackManager is SelfAuthorized {
         // solhint-disable-next-line no-inline-assembly
         assembly {
             let handler := sload(slot)
-            if iszero(handler) {
-                return(0, 0)
-            }
+            if iszero(handler) { return(0, 0) }
             calldatacopy(0, 0, calldatasize())
-        // The msg.sender address is shifted to the left by 12 bytes to remove the padding
-        // Then the address without padding is stored right after the calldata
+            // The msg.sender address is shifted to the left by 12 bytes to remove the padding
+            // Then the address without padding is stored right after the calldata
             mstore(calldatasize(), shl(96, caller()))
-        // Add 20 bytes for the address appended add the end
+            // Add 20 bytes for the address appended add the end
             let success := call(gas(), handler, 0, 0, add(calldatasize(), 20), 0, 0)
             returndatacopy(0, 0, returndatasize())
-            if iszero(success) {
-                revert(0, returndatasize())
-            }
+            if iszero(success) { revert(0, returndatasize()) }
             return(0, returndatasize())
         }
     }
@@ -3947,7 +3828,10 @@ abstract contract OwnerManager is SelfAuthorized {
         for (uint256 i = 0; i < _owners.length; i++) {
             // Owner address cannot be null.
             address owner = _owners[i];
-            require(owner != address(0) && owner != SENTINEL_OWNERS && owner != address(this) && currentOwner != owner, "GS203");
+            require(
+                owner != address(0) && owner != SENTINEL_OWNERS && owner != address(this) && currentOwner != owner,
+                "GS203"
+            );
             // No duplicate owners allowed.
             require(owners[owner] == address(0), "GS204");
             owners[currentOwner] = owner;
@@ -4071,14 +3955,14 @@ abstract contract OwnerManager is SelfAuthorized {
 
 // src/dispute/lib/LibUDT.sol
 
-    using LibClaim for Claim global;
-    using LibHash for Hash global;
-    using LibDuration for Duration global;
-    using LibClock for Clock global;
-    using LibGameId for GameId global;
-    using LibTimestamp for Timestamp global;
-    using LibVMStatus for VMStatus global;
-    using LibGameType for GameType global;
+using LibClaim for Claim global;
+using LibHash for Hash global;
+using LibDuration for Duration global;
+using LibClock for Clock global;
+using LibGameId for GameId global;
+using LibTimestamp for Timestamp global;
+using LibVMStatus for VMStatus global;
+using LibGameType for GameType global;
 
 /// @notice A `Clock` represents a packed `Duration` and `Timestamp`
 /// @dev The packed layout of this type is as follows:
@@ -4088,7 +3972,7 @@ abstract contract OwnerManager is SelfAuthorized {
 /// │ [0, 64)    │ Duration       │
 /// │ [64, 128)  │ Timestamp      │
 /// └────────────┴────────────────┘
-    type Clock is uint128;
+type Clock is uint128;
 
 /// @title LibClock
 /// @notice This library contains helper functions for working with the `Clock` type.
@@ -4143,7 +4027,7 @@ library LibClock {
 /// │ [32, 96)  │ Timestamp │
 /// │ [96, 256) │ Address   │
 /// └───────────┴───────────┘
-    type GameId is bytes32;
+type GameId is bytes32;
 
 /// @title LibGameId
 /// @notice Utility functions for packing and unpacking GameIds.
@@ -4153,14 +4037,10 @@ library LibGameId {
     /// @param _timestamp The timestamp of the game's creation.
     /// @param _gameProxy The game proxy address.
     /// @return gameId_ The packed GameId.
-    function pack(
-        GameType _gameType,
-        Timestamp _timestamp,
-        address _gameProxy
-    )
-    internal
-    pure
-    returns (GameId gameId_)
+    function pack(GameType _gameType, Timestamp _timestamp, address _gameProxy)
+        internal
+        pure
+        returns (GameId gameId_)
     {
         assembly {
             gameId_ := or(or(shl(224, _gameType), shl(160, _timestamp)), _gameProxy)
@@ -4173,9 +4053,9 @@ library LibGameId {
     /// @return timestamp_ The timestamp of the game's creation.
     /// @return gameProxy_ The game proxy address.
     function unpack(GameId _gameId)
-    internal
-    pure
-    returns (GameType gameType_, Timestamp timestamp_, address gameProxy_)
+        internal
+        pure
+        returns (GameType gameType_, Timestamp timestamp_, address gameProxy_)
     {
         assembly {
             gameType_ := shr(224, _gameId)
@@ -4186,7 +4066,7 @@ library LibGameId {
 }
 
 /// @notice A claim represents an MPT root representing the state of the fault proof program.
-    type Claim is bytes32;
+type Claim is bytes32;
 
 /// @title LibClaim
 /// @notice This library contains helper functions for working with the `Claim` type.
@@ -4205,14 +4085,10 @@ library LibClaim {
     /// @param _position The position of `claim`.
     /// @param _challengeIndex The index of the claim being moved against.
     /// @return claimHash_ A hash of abi.encodePacked(claim, position|challengeIndex);
-    function hashClaimPos(
-        Claim _claim,
-        Position _position,
-        uint256 _challengeIndex
-    )
-    internal
-    pure
-    returns (Hash claimHash_)
+    function hashClaimPos(Claim _claim, Position _position, uint256 _challengeIndex)
+        internal
+        pure
+        returns (Hash claimHash_)
     {
         assembly {
             mstore(0x00, _claim)
@@ -4224,7 +4100,7 @@ library LibClaim {
 
 /// @notice A dedicated duration type.
 /// @dev Unit: seconds
-    type Duration is uint64;
+type Duration is uint64;
 
 /// @title LibDuration
 /// @notice This library contains helper functions for working with the `Duration` type.
@@ -4240,7 +4116,7 @@ library LibDuration {
 }
 
 /// @notice A custom type for a generic hash.
-    type Hash is bytes32;
+type Hash is bytes32;
 
 /// @title LibHash
 /// @notice This library contains helper functions for working with the `Hash` type.
@@ -4256,7 +4132,7 @@ library LibHash {
 }
 
 /// @notice A dedicated timestamp type.
-    type Timestamp is uint64;
+type Timestamp is uint64;
 
 /// @title LibTimestamp
 /// @notice This library contains helper functions for working with the `Timestamp` type.
@@ -4272,7 +4148,7 @@ library LibTimestamp {
 }
 
 /// @notice A `VMStatus` represents the status of a VM execution.
-    type VMStatus is uint8;
+type VMStatus is uint8;
 
 /// @title LibVMStatus
 /// @notice This library contains helper functions for working with the `VMStatus` type.
@@ -4288,7 +4164,7 @@ library LibVMStatus {
 }
 
 /// @notice A `GameType` represents the type of game being played.
-    type GameType is uint32;
+type GameType is uint32;
 
 /// @title LibGameType
 /// @notice This library contains helper functions for working with the `GameType` type.
@@ -4345,7 +4221,7 @@ library RLPReader {
             ptr := add(_in, 32)
         }
 
-        out_ = RLPItem({ length: _in.length, ptr: ptr });
+        out_ = RLPItem({length: _in.length, ptr: ptr});
     }
 
     /// @notice Reads an RLP list value into a list of RLP items.
@@ -4368,7 +4244,7 @@ library RLPReader {
         uint256 offset = listOffset;
         while (offset < _in.length) {
             (uint256 itemOffset, uint256 itemLength,) = _decodeLength(
-                RLPItem({ length: _in.length - offset, ptr: MemoryPointer.wrap(MemoryPointer.unwrap(_in.ptr) + offset) })
+                RLPItem({length: _in.length - offset, ptr: MemoryPointer.wrap(MemoryPointer.unwrap(_in.ptr) + offset)})
             );
 
             // We don't need to check itemCount < out.length explicitly because Solidity already
@@ -4428,9 +4304,9 @@ library RLPReader {
     /// @return length_ Length of the encoded data.
     /// @return type_ RLP item type (LIST_ITEM or DATA_ITEM).
     function _decodeLength(RLPItem memory _in)
-    private
-    pure
-    returns (uint256 offset_, uint256 length_, RLPItemType type_)
+        private
+        pure
+        returns (uint256 offset_, uint256 length_, RLPItemType type_)
     {
         // Short-circuit if there's nothing to decode, note that we perform this check when
         // the user creates an RLP item via toRLPItem, but it's always possible for them to bypass
@@ -4536,7 +4412,7 @@ library RLPReader {
         assembly {
             let dest := add(out_, 32)
             let i := 0
-            for { } lt(i, _length) { i := add(i, 32) } { mstore(add(dest, i), mload(add(src, i))) }
+            for {} lt(i, _length) { i := add(i, 32) } { mstore(add(dest, i), mload(add(src, i))) }
 
             if gt(i, _length) { mstore(add(dest, _length), 0) }
         }
@@ -4558,11 +4434,10 @@ library RLPReader {
  * This contract is only required for intermediate, library-like contracts.
  */
 abstract contract ContextUpgradeable is Initializable_1 {
-    function __Context_init() internal onlyInitializing {
-    }
+    function __Context_init() internal onlyInitializing {}
 
-    function __Context_init_unchained() internal onlyInitializing {
-    }
+    function __Context_init_unchained() internal onlyInitializing {}
+
     function _msgSender() internal view virtual returns (address) {
         return msg.sender;
     }
@@ -4587,140 +4462,140 @@ abstract contract ContextUpgradeable is Initializable_1 {
 
 /// @notice Thrown when a dispute game is attempted to be created with an unsupported game type.
 /// @param gameType The unsupported game type.
-    error NoImplementation(GameType gameType);
+error NoImplementation(GameType gameType);
 
 /// @notice Thrown when a dispute game that already exists is attempted to be created.
 /// @param uuid The UUID of the dispute game that already exists.
-    error GameAlreadyExists(Hash uuid);
+error GameAlreadyExists(Hash uuid);
 
 /// @notice Thrown when the root claim has an unexpected VM status.
 ///         Some games can only start with a root-claim with a specific status.
 /// @param rootClaim is the claim that was unexpected.
-    error UnexpectedRootClaim(Claim rootClaim);
+error UnexpectedRootClaim(Claim rootClaim);
 
 ////////////////////////////////////////////////////////////////
 //                 `FaultDisputeGame` Errors                  //
 ////////////////////////////////////////////////////////////////
 
 /// @notice Thrown when a dispute game has already been initialized.
-    error AlreadyInitialized();
+error AlreadyInitialized();
 
 /// @notice Thrown when a supplied bond is not equal to the required bond amount to cover the cost of the interaction.
-    error IncorrectBondAmount();
+error IncorrectBondAmount();
 
 /// @notice Thrown when a credit claim is attempted for a value of 0.
-    error NoCreditToClaim();
+error NoCreditToClaim();
 
 /// @notice Thrown when the transfer of credit to a recipient account reverts.
-    error BondTransferFailed();
+error BondTransferFailed();
 
 /// @notice Thrown when the `extraData` passed to the CWIA proxy is of improper length, or contains invalid information.
-    error BadExtraData();
+error BadExtraData();
 
 /// @notice Thrown when a defense against the root claim is attempted.
-    error CannotDefendRootClaim();
+error CannotDefendRootClaim();
 
 /// @notice Thrown when a claim is attempting to be made that already exists.
-    error ClaimAlreadyExists();
+error ClaimAlreadyExists();
 
 /// @notice Thrown when a disputed claim does not match its index in the game.
-    error InvalidDisputedClaimIndex();
+error InvalidDisputedClaimIndex();
 
 /// @notice Thrown when an action that requires the game to be `IN_PROGRESS` is invoked when
 ///         the game is not in progress.
-    error GameNotInProgress();
+error GameNotInProgress();
 
 /// @notice Thrown when a move is attempted to be made after the clock has timed out.
-    error ClockTimeExceeded();
+error ClockTimeExceeded();
 
 /// @notice Thrown when the game is attempted to be resolved too early.
-    error ClockNotExpired();
+error ClockNotExpired();
 
 /// @notice Thrown when a move is attempted to be made at or greater than the max depth of the game.
-    error GameDepthExceeded();
+error GameDepthExceeded();
 
 /// @notice Thrown when a step is attempted above the maximum game depth.
-    error InvalidParent();
+error InvalidParent();
 
 /// @notice Thrown when an invalid prestate is supplied to `step`.
-    error InvalidPrestate();
+error InvalidPrestate();
 
 /// @notice Thrown when a step is made that computes the expected post state correctly.
-    error ValidStep();
+error ValidStep();
 
 /// @notice Thrown when a game is attempted to be initialized with an L1 head that does
 ///         not contain the disputed output root.
-    error L1HeadTooOld();
+error L1HeadTooOld();
 
 /// @notice Thrown when an invalid local identifier is passed to the `addLocalData` function.
-    error InvalidLocalIdent();
+error InvalidLocalIdent();
 
 /// @notice Thrown when resolving claims out of order.
-    error OutOfOrderResolution();
+error OutOfOrderResolution();
 
 /// @notice Thrown when resolving a claim that has already been resolved.
-    error ClaimAlreadyResolved();
+error ClaimAlreadyResolved();
 
 /// @notice Thrown when a parent output root is attempted to be found on a claim that is in
 ///         the output root portion of the tree.
-    error ClaimAboveSplit();
+error ClaimAboveSplit();
 
 /// @notice Thrown on deployment if the split depth is greater than or equal to the max
 ///         depth of the game.
-    error InvalidSplitDepth();
+error InvalidSplitDepth();
 
 /// @notice Thrown on deployment if the max clock duration is less than or equal to the clock extension.
-    error InvalidClockExtension();
+error InvalidClockExtension();
 
 /// @notice Thrown on deployment if the max depth is greater than `LibPosition.`
-    error MaxDepthTooLarge();
+error MaxDepthTooLarge();
 
 /// @notice Thrown when trying to step against a claim for a second time, after it has already been countered with
 ///         an instruction step.
-    error DuplicateStep();
+error DuplicateStep();
 
 /// @notice Thrown when an anchor root is not found for a given game type.
-    error AnchorRootNotFound();
+error AnchorRootNotFound();
 
 /// @notice Thrown when an output root proof is invalid.
-    error InvalidOutputRootProof();
+error InvalidOutputRootProof();
 
 /// @notice Thrown when header RLP is invalid with respect to the block hash in an output root proof.
-    error InvalidHeaderRLP();
+error InvalidHeaderRLP();
 
 /// @notice Thrown when there is a match between the block number in the output root proof and the block number
 ///         claimed in the dispute game.
-    error BlockNumberMatches();
+error BlockNumberMatches();
 
 /// @notice Thrown when the L2 block number claim has already been challenged.
-    error L2BlockNumberChallenged();
+error L2BlockNumberChallenged();
 
 ////////////////////////////////////////////////////////////////
 //              `PermissionedDisputeGame` Errors              //
 ////////////////////////////////////////////////////////////////
 
 /// @notice Thrown when an unauthorized address attempts to interact with the game.
-    error BadAuth();
+error BadAuth();
 
 // src/dispute/lib/Types.sol
 
 /// @notice The current status of the dispute game.
-    enum GameStatus {
-        // The game is currently in progress, and has not been resolved.
-        IN_PROGRESS,
-        // The game has concluded, and the `rootClaim` was challenged successfully.
-        CHALLENGER_WINS,
-        // The game has concluded, and the `rootClaim` could not be contested.
-        DEFENDER_WINS
-    }
+enum GameStatus {
+    // The game is currently in progress, and has not been resolved.
+    IN_PROGRESS,
+    // The game has concluded, and the `rootClaim` was challenged successfully.
+    CHALLENGER_WINS,
+    // The game has concluded, and the `rootClaim` could not be contested.
+    DEFENDER_WINS
+}
 
 /// @notice Represents an L2 output root and the L2 block number at which it was generated.
 /// @custom:field root The output root.
 /// @custom:field l2BlockNumber The L2 block number at which the output root was generated.
-    struct OutputRoot {
-        Hash root;
-        uint256 l2BlockNumber;
-    }
+struct OutputRoot {
+    Hash root;
+    uint256 l2BlockNumber;
+}
 
 /// @title GameTypes
 /// @notice A library that defines the IDs of games that can be played.
@@ -4913,9 +4788,8 @@ interface Guard is IERC165 {
 
 abstract contract BaseGuard is Guard {
     function supportsInterface(bytes4 interfaceId) external view virtual override returns (bool) {
-        return
-            interfaceId == type(Guard).interfaceId || // 0xe6d7a83a
-            interfaceId == type(IERC165).interfaceId; // 0x01ffc9a7
+        return interfaceId == type(Guard).interfaceId // 0xe6d7a83a
+            || interfaceId == type(IERC165).interfaceId; // 0x01ffc9a7
     }
 }
 
@@ -4971,9 +4845,9 @@ abstract contract GuardManager is SelfAuthorized {
 /**
  * @title Module Manager - A contract managing Safe modules
  * @notice Modules are extensions with unlimited access to a Safe that can be added to a Safe by its owners.
-           ⚠️ WARNING: Modules are a security risk since they can execute arbitrary transactions,
-           so only trusted and audited modules should be added to a Safe. A malicious module can
-           completely takeover a Safe.
+ *            ⚠️ WARNING: Modules are a security risk since they can execute arbitrary transactions,
+ *            so only trusted and audited modules should be added to a Safe. A malicious module can
+ *            completely takeover a Safe.
  * @author Stefan George - @Georgi87
  * @author Richard Meissner - @rmeissner
  */
@@ -5042,12 +4916,11 @@ abstract contract ModuleManager is SelfAuthorized, Executor {
      * @param operation Operation type of module transaction.
      * @return success Boolean flag indicating if the call succeeded.
      */
-    function execTransactionFromModule(
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation
-    ) public virtual returns (bool success) {
+    function execTransactionFromModule(address to, uint256 value, bytes memory data, Enum.Operation operation)
+        public
+        virtual
+        returns (bool success)
+    {
         // Only whitelisted modules are allowed.
         require(msg.sender != SENTINEL_MODULES && modules[msg.sender] != address(0), "GS104");
         // Execute transaction without further confirmations.
@@ -5065,25 +4938,23 @@ abstract contract ModuleManager is SelfAuthorized, Executor {
      * @return success Boolean flag indicating if the call succeeded.
      * @return returnData Data returned by the call.
      */
-    function execTransactionFromModuleReturnData(
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation
-    ) public returns (bool success, bytes memory returnData) {
+    function execTransactionFromModuleReturnData(address to, uint256 value, bytes memory data, Enum.Operation operation)
+        public
+        returns (bool success, bytes memory returnData)
+    {
         success = execTransactionFromModule(to, value, data, operation);
         // solhint-disable-next-line no-inline-assembly
         assembly {
-        // Load free memory location
+            // Load free memory location
             let ptr := mload(0x40)
-        // We allocate memory for the return data by setting the free memory location to
-        // current free memory location + data size + 32 bytes for data size value
+            // We allocate memory for the return data by setting the free memory location to
+            // current free memory location + data size + 32 bytes for data size value
             mstore(0x40, add(ptr, add(returndatasize(), 0x20)))
-        // Store the size
+            // Store the size
             mstore(ptr, returndatasize())
-        // Store the data
+            // Store the data
             returndatacopy(add(ptr, 0x20), 0, returndatasize())
-        // Point the return data to the correct memory location
+            // Point the return data to the correct memory location
             returnData := ptr
         }
     }
@@ -5105,7 +4976,11 @@ abstract contract ModuleManager is SelfAuthorized, Executor {
      * @return array Array of modules.
      * @return next Start of the next page.
      */
-    function getModulesPaginated(address start, uint256 pageSize) external view returns (address[] memory array, address next) {
+    function getModulesPaginated(address start, uint256 pageSize)
+        external
+        view
+        returns (address[] memory array, address next)
+    {
         require(start == SENTINEL_MODULES || isModuleEnabled(start), "GS105");
         require(pageSize > 0, "GS106");
         // Init array with max page size
@@ -5121,13 +4996,13 @@ abstract contract ModuleManager is SelfAuthorized, Executor {
         }
 
         /**
-          Because of the argument validation, we can assume that the loop will always iterate over the valid module list values
-          and the `next` variable will either be an enabled module or a sentinel address (signalling the end).
-
-          If we haven't reached the end inside the loop, we need to set the next pointer to the last element of the modules array
-          because the `next` variable (which is a module by itself) acting as a pointer to the start of the next page is neither
-          included to the current page, nor will it be included in the next one if you pass it as a start.
-        */
+         * Because of the argument validation, we can assume that the loop will always iterate over the valid module list values
+         *       and the `next` variable will either be an enabled module or a sentinel address (signalling the end).
+         *
+         *       If we haven't reached the end inside the loop, we need to set the next pointer to the last element of the modules array
+         *       because the `next` variable (which is a module by itself) acting as a pointer to the start of the next page is neither
+         *       included to the current page, nor will it be included in the next one if you pass it as a start.
+         */
         if (next != SENTINEL_MODULES) {
             next = array[moduleCount - 1];
         }
@@ -5194,11 +5069,7 @@ library Encoding {
         uint256 _value,
         uint256 _gasLimit,
         bytes memory _data
-    )
-    internal
-    pure
-    returns (bytes memory)
-    {
+    ) internal pure returns (bytes memory) {
         (, uint16 version) = decodeVersionedNonce(_nonce);
         if (version == 0) {
             return encodeCrossDomainMessageV0(_target, _sender, _data, _nonce);
@@ -5215,15 +5086,10 @@ library Encoding {
     /// @param _data   Data to send with the message.
     /// @param _nonce  Message nonce.
     /// @return Encoded cross domain message.
-    function encodeCrossDomainMessageV0(
-        address _target,
-        address _sender,
-        bytes memory _data,
-        uint256 _nonce
-    )
-    internal
-    pure
-    returns (bytes memory)
+    function encodeCrossDomainMessageV0(address _target, address _sender, bytes memory _data, uint256 _nonce)
+        internal
+        pure
+        returns (bytes memory)
     {
         return abi.encodeWithSignature("relayMessage(address,address,bytes,uint256)", _target, _sender, _data, _nonce);
     }
@@ -5243,11 +5109,7 @@ library Encoding {
         uint256 _value,
         uint256 _gasLimit,
         bytes memory _data
-    )
-    internal
-    pure
-    returns (bytes memory)
-    {
+    ) internal pure returns (bytes memory) {
         return abi.encodeWithSignature(
             "relayMessage(uint256,address,address,uint256,uint256,bytes)",
             _nonce,
@@ -5305,11 +5167,7 @@ library Encoding {
         uint256 blobBaseFee,
         bytes32 hash,
         bytes32 batcherHash
-    )
-    internal
-    pure
-    returns (bytes memory)
-    {
+    ) internal pure returns (bytes memory) {
         bytes4 functionSignature = bytes4(keccak256("setL1BlockValuesEcotone()"));
         return abi.encodePacked(
             functionSignature,
@@ -5347,11 +5205,7 @@ library Encoding {
         bytes32 _hash,
         bytes32 _batcherHash,
         uint256[] memory _dependencySet
-    )
-    internal
-    pure
-    returns (bytes memory)
-    {
+    ) internal pure returns (bytes memory) {
         require(_dependencySet.length <= type(uint8).max, "Encoding: dependency set length is too large");
         // Check that the batcher hash is just the address with 0 padding to the left for version 0.
         require(uint160(uint256(_batcherHash)) == uint256(_batcherHash), "Encoding: invalid batcher hash");
@@ -5415,11 +5269,7 @@ library Hashing {
         uint256 _value,
         uint256 _gasLimit,
         bytes memory _data
-    )
-    internal
-    pure
-    returns (bytes32)
-    {
+    ) internal pure returns (bytes32) {
         (, uint16 version) = Encoding.decodeVersionedNonce(_nonce);
         if (version == 0) {
             return hashCrossDomainMessageV0(_target, _sender, _data, _nonce);
@@ -5436,15 +5286,10 @@ library Hashing {
     /// @param _data   Data to send with the message.
     /// @param _nonce  Message nonce.
     /// @return Hashed cross domain message.
-    function hashCrossDomainMessageV0(
-        address _target,
-        address _sender,
-        bytes memory _data,
-        uint256 _nonce
-    )
-    internal
-    pure
-    returns (bytes32)
+    function hashCrossDomainMessageV0(address _target, address _sender, bytes memory _data, uint256 _nonce)
+        internal
+        pure
+        returns (bytes32)
     {
         return keccak256(Encoding.encodeCrossDomainMessageV0(_target, _sender, _data, _nonce));
     }
@@ -5464,11 +5309,7 @@ library Hashing {
         uint256 _value,
         uint256 _gasLimit,
         bytes memory _data
-    )
-    internal
-    pure
-    returns (bytes32)
-    {
+    ) internal pure returns (bytes32) {
         return keccak256(Encoding.encodeCrossDomainMessageV1(_nonce, _sender, _target, _value, _gasLimit, _data));
     }
 
@@ -5540,15 +5381,10 @@ library MerkleTrie {
     /// @param _root  Known root of the Merkle trie. Used to verify that the included proof is
     ///               correctly constructed.
     /// @return valid_ Whether or not the proof is valid.
-    function verifyInclusionProof(
-        bytes memory _key,
-        bytes memory _value,
-        bytes[] memory _proof,
-        bytes32 _root
-    )
-    internal
-    pure
-    returns (bool valid_)
+    function verifyInclusionProof(bytes memory _key, bytes memory _value, bytes[] memory _proof, bytes32 _root)
+        internal
+        pure
+        returns (bool valid_)
     {
         valid_ = Bytes.equal(_value, get(_key, _proof, _root));
     }
@@ -5676,7 +5512,7 @@ library MerkleTrie {
         uint256 length = _proof.length;
         proof_ = new TrieNode[](length);
         for (uint256 i = 0; i < length;) {
-            proof_[i] = TrieNode({ encoded: _proof[i], decoded: RLPReader.readList(_proof[i]) });
+            proof_[i] = TrieNode({encoded: _proof[i], decoded: RLPReader.readList(_proof[i])});
             unchecked {
                 ++i;
             }
@@ -5749,7 +5585,7 @@ contract SuperchainConfig is Initializable_0, ISemver {
 
     /// @notice Constructs the SuperchainConfig contract.
     constructor() {
-        initialize({ _guardian: address(0), _paused: false });
+        initialize({_guardian: address(0), _paused: false});
     }
 
     /// @notice Initializer.
@@ -5882,15 +5718,10 @@ library SecureMerkleTrie {
     /// @param _root  Known root of the Merkle trie. Used to verify that the included proof is
     ///               correctly constructed.
     /// @return valid_ Whether or not the proof is valid.
-    function verifyInclusionProof(
-        bytes memory _key,
-        bytes memory _value,
-        bytes[] memory _proof,
-        bytes32 _root
-    )
-    internal
-    pure
-    returns (bool valid_)
+    function verifyInclusionProof(bytes memory _key, bytes memory _value, bytes[] memory _proof, bytes32 _root)
+        internal
+        pure
+        returns (bool valid_)
     {
         bytes memory key = _getSecureKey(_key);
         valid_ = MerkleTrie.verifyInclusionProof(key, _value, _proof, _root);
@@ -5957,14 +5788,10 @@ interface IDisputeGameFactory {
     /// @return proxy_ The clone of the `DisputeGame` created with the given parameters.
     ///         Returns `address(0)` if nonexistent.
     /// @return timestamp_ The timestamp of the creation of the dispute game.
-    function games(
-        GameType _gameType,
-        Claim _rootClaim,
-        bytes calldata _extraData
-    )
-    external
-    view
-    returns (IDisputeGame proxy_, Timestamp timestamp_);
+    function games(GameType _gameType, Claim _rootClaim, bytes calldata _extraData)
+        external
+        view
+        returns (IDisputeGame proxy_, Timestamp timestamp_);
 
     /// @notice `gameAtIndex` returns the dispute game contract address and its creation timestamp
     ///          at the given index. Each created dispute game increments the underlying index.
@@ -5974,9 +5801,9 @@ interface IDisputeGameFactory {
     /// @return proxy_ The clone of the `DisputeGame` created with the given parameters.
     ///         Returns `address(0)` if nonexistent.
     function gameAtIndex(uint256 _index)
-    external
-    view
-    returns (GameType gameType_, Timestamp timestamp_, IDisputeGame proxy_);
+        external
+        view
+        returns (GameType gameType_, Timestamp timestamp_, IDisputeGame proxy_);
 
     /// @notice `gameImpls` is a mapping that maps `GameType`s to their respective
     ///         `IDisputeGame` implementations.
@@ -5995,14 +5822,10 @@ interface IDisputeGameFactory {
     /// @param _rootClaim The root claim of the DisputeGame.
     /// @param _extraData Any extra data that should be provided to the created dispute game.
     /// @return proxy_ The address of the created DisputeGame proxy.
-    function create(
-        GameType _gameType,
-        Claim _rootClaim,
-        bytes calldata _extraData
-    )
-    external
-    payable
-    returns (IDisputeGame proxy_);
+    function create(GameType _gameType, Claim _rootClaim, bytes calldata _extraData)
+        external
+        payable
+        returns (IDisputeGame proxy_);
 
     /// @notice Sets the implementation contract for a specific `GameType`.
     /// @dev May only be called by the `owner`.
@@ -6023,28 +5846,20 @@ interface IDisputeGameFactory {
     /// @param _rootClaim The root claim of the DisputeGame.
     /// @param _extraData Any extra data that should be provided to the created dispute game.
     /// @return uuid_ The unique identifier for the given dispute game parameters.
-    function getGameUUID(
-        GameType _gameType,
-        Claim _rootClaim,
-        bytes memory _extraData
-    )
-    external
-    pure
-    returns (Hash uuid_);
+    function getGameUUID(GameType _gameType, Claim _rootClaim, bytes memory _extraData)
+        external
+        pure
+        returns (Hash uuid_);
 
     /// @notice Finds the `_n` most recent `GameId`'s of type `_gameType` starting at `_start`. If there are less than
     ///         `_n` games of type `_gameType` starting at `_start`, then the returned array will be shorter than `_n`.
     /// @param _gameType The type of game to find.
     /// @param _start The index to start the reverse search from.
     /// @param _n The number of games to find.
-    function findLatestGames(
-        GameType _gameType,
-        uint256 _start,
-        uint256 _n
-    )
-    external
-    view
-    returns (GameSearchResult[] memory games_);
+    function findLatestGames(GameType _gameType, uint256 _start, uint256 _n)
+        external
+        view
+        returns (GameSearchResult[] memory games_);
 }
 
 // src/L1/ResourceMetering.sol
@@ -6150,10 +5965,10 @@ abstract contract ResourceMetering is Initializable_0 {
                 // between min and max.
                 newBaseFee = Arithmetic.clamp({
                     _value: Arithmetic.cdexp({
-                    _coefficient: newBaseFee,
-                    _denominator: int256(uint256(config.baseFeeMaxChangeDenominator)),
-                    _exponent: int256(blockDiff - 1)
-                }),
+                        _coefficient: newBaseFee,
+                        _denominator: int256(uint256(config.baseFeeMaxChangeDenominator)),
+                        _exponent: int256(blockDiff - 1)
+                    }),
                     _min: int256(uint256(config.minimumBaseFee)),
                     _max: int256(uint256(config.maximumBaseFee))
                 });
@@ -6200,7 +6015,7 @@ abstract contract ResourceMetering is Initializable_0 {
     ///         child contract.
     function __ResourceMetering_init() internal onlyInitializing {
         if (params.prevBlockNum == 0) {
-            params = ResourceParams({ prevBaseFee: 1 gwei, prevBoughtGas: 0, prevBlockNum: uint64(block.number) });
+            params = ResourceParams({prevBaseFee: 1 gwei, prevBoughtGas: 0, prevBlockNum: uint64(block.number)});
         }
     }
 }
@@ -6228,7 +6043,7 @@ library Constants {
     /// @notice The storage slot that holds the address of a proxy implementation.
     /// @dev `bytes32(uint256(keccak256('eip1967.proxy.implementation')) - 1)`
     bytes32 internal constant PROXY_IMPLEMENTATION_ADDRESS =
-    0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+        0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
     /// @notice The storage slot that holds the address of the owner.
     /// @dev `bytes32(uint256(keccak256('eip1967.proxy.admin')) - 1)`
@@ -6296,14 +6111,10 @@ contract DisputeGameFactory is OwnableUpgradeable, IDisputeGameFactory, ISemver 
     }
 
     /// @inheritdoc IDisputeGameFactory
-    function games(
-        GameType _gameType,
-        Claim _rootClaim,
-        bytes calldata _extraData
-    )
-    external
-    view
-    returns (IDisputeGame proxy_, Timestamp timestamp_)
+    function games(GameType _gameType, Claim _rootClaim, bytes calldata _extraData)
+        external
+        view
+        returns (IDisputeGame proxy_, Timestamp timestamp_)
     {
         Hash uuid = getGameUUID(_gameType, _rootClaim, _extraData);
         (, Timestamp timestamp, address proxy) = _disputeGames[uuid].unpack();
@@ -6312,23 +6123,19 @@ contract DisputeGameFactory is OwnableUpgradeable, IDisputeGameFactory, ISemver 
 
     /// @inheritdoc IDisputeGameFactory
     function gameAtIndex(uint256 _index)
-    external
-    view
-    returns (GameType gameType_, Timestamp timestamp_, IDisputeGame proxy_)
+        external
+        view
+        returns (GameType gameType_, Timestamp timestamp_, IDisputeGame proxy_)
     {
         (GameType gameType, Timestamp timestamp, address proxy) = _disputeGameList[_index].unpack();
         (gameType_, timestamp_, proxy_) = (gameType, timestamp, IDisputeGame(proxy));
     }
 
     /// @inheritdoc IDisputeGameFactory
-    function create(
-        GameType _gameType,
-        Claim _rootClaim,
-        bytes calldata _extraData
-    )
-    external
-    payable
-    returns (IDisputeGame proxy_)
+    function create(GameType _gameType, Claim _rootClaim, bytes calldata _extraData)
+        external
+        payable
+        returns (IDisputeGame proxy_)
     {
         // Grab the implementation contract for the given `GameType`.
         IDisputeGame impl = gameImpls[_gameType];
@@ -6354,7 +6161,7 @@ contract DisputeGameFactory is OwnableUpgradeable, IDisputeGameFactory, ISemver 
         // │ [84, 84 + n) │ Extra data (opaque)                │
         // └──────────────┴────────────────────────────────────┘
         proxy_ = IDisputeGame(address(impl).clone(abi.encodePacked(msg.sender, _rootClaim, parentHash, _extraData)));
-        proxy_.initialize{ value: msg.value }();
+        proxy_.initialize{value: msg.value}();
 
         // Compute the unique identifier for the dispute game.
         Hash uuid = getGameUUID(_gameType, _rootClaim, _extraData);
@@ -6372,27 +6179,19 @@ contract DisputeGameFactory is OwnableUpgradeable, IDisputeGameFactory, ISemver 
     }
 
     /// @inheritdoc IDisputeGameFactory
-    function getGameUUID(
-        GameType _gameType,
-        Claim _rootClaim,
-        bytes calldata _extraData
-    )
-    public
-    pure
-    returns (Hash uuid_)
+    function getGameUUID(GameType _gameType, Claim _rootClaim, bytes calldata _extraData)
+        public
+        pure
+        returns (Hash uuid_)
     {
         uuid_ = Hash.wrap(keccak256(abi.encode(_gameType, _rootClaim, _extraData)));
     }
 
     /// @inheritdoc IDisputeGameFactory
-    function findLatestGames(
-        GameType _gameType,
-        uint256 _start,
-        uint256 _n
-    )
-    external
-    view
-    returns (GameSearchResult[] memory games_)
+    function findLatestGames(GameType _gameType, uint256 _start, uint256 _n)
+        external
+        view
+        returns (GameSearchResult[] memory games_)
     {
         // If the `_start` index is greater than or equal to the game array length or `_n == 0`, return an empty array.
         if (_start >= _disputeGameList.length || _n == 0) return games_;
@@ -6468,16 +6267,16 @@ contract DisputeGameFactory is OwnableUpgradeable, IDisputeGameFactory, ISemver 
  * @author Richard Meissner - @rmeissner
  */
 contract Safe is
-Singleton,
-NativeCurrencyPaymentFallback,
-ModuleManager,
-OwnerManager,
-SignatureDecoder,
-SecuredTokenTransfer,
-ISignatureValidatorConstants,
-FallbackManager,
-StorageAccessible,
-GuardManager
+    Singleton,
+    NativeCurrencyPaymentFallback,
+    ModuleManager,
+    OwnerManager,
+    SignatureDecoder,
+    SecuredTokenTransfer,
+    ISignatureValidatorConstants,
+    FallbackManager,
+    StorageAccessible,
+    GuardManager
 {
     using SafeMath for uint256;
 
@@ -6486,14 +6285,17 @@ GuardManager
     // keccak256(
     //     "EIP712Domain(uint256 chainId,address verifyingContract)"
     // );
-    bytes32 private constant DOMAIN_SEPARATOR_TYPEHASH = 0x47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218;
+    bytes32 private constant DOMAIN_SEPARATOR_TYPEHASH =
+        0x47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218;
 
     // keccak256(
     //     "SafeTx(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 baseGas,uint256 gasPrice,address gasToken,address refundReceiver,uint256 nonce)"
     // );
     bytes32 private constant SAFE_TX_TYPEHASH = 0xbb8310d486368db6bd6f849402fdd73ad53d316b5a4b2644ad6efe0f941286d8;
 
-    event SafeSetup(address indexed initiator, address[] owners, uint256 threshold, address initializer, address fallbackHandler);
+    event SafeSetup(
+        address indexed initiator, address[] owners, uint256 threshold, address initializer, address fallbackHandler
+    );
     event ApproveHash(bytes32 indexed approvedHash, address indexed owner);
     event SignMsg(bytes32 indexed msgHash);
     event ExecutionFailure(bytes32 indexed txHash, uint256 payment);
@@ -6553,7 +6355,8 @@ GuardManager
         emit SafeSetup(msg.sender, _owners, _threshold, to, fallbackHandler);
     }
 
-    /** @notice Executes a `operation` {0: Call, 1: DelegateCall}} transaction to `to` with `value` (Native Currency)
+    /**
+     * @notice Executes a `operation` {0: Call, 1: DelegateCall}} transaction to `to` with `value` (Native Currency)
      *          and pays `gasPrice` * `gasLimit` in `gasToken` token to `refundReceiver`.
      * @dev The fees are always transferred, even if the user transaction fails.
      *      This method doesn't perform any sanity check of the transaction, such as:
@@ -6589,7 +6392,7 @@ GuardManager
         // Use scope here to limit variable lifetime and prevent `stack too deep` errors
         {
             bytes memory txHashData = encodeTransactionData(
-            // Transaction info
+                // Transaction info
                 to,
                 value,
                 data,
@@ -6612,7 +6415,7 @@ GuardManager
         {
             if (guard != address(0)) {
                 Guard(guard).checkTransaction(
-                // Transaction info
+                    // Transaction info
                     to,
                     value,
                     data,
@@ -6708,7 +6511,10 @@ GuardManager
      *                   Can be packed ECDSA signature ({bytes32 r}{bytes32 s}{uint8 v}), contract signature (EIP-1271) or approved hash.
      * @param requiredSignatures Amount of required valid signatures.
      */
-    function checkNSignatures(bytes32 dataHash, bytes memory data, bytes memory signatures, uint256 requiredSignatures) public view {
+    function checkNSignatures(bytes32 dataHash, bytes memory data, bytes memory signatures, uint256 requiredSignatures)
+        public
+        view
+    {
         // Check that the provided signature data is not too short
         require(signatures.length >= requiredSignatures.mul(65), "GS020");
         // There cannot be an owner with address 0.
@@ -6746,10 +6552,13 @@ GuardManager
                 bytes memory contractSignature;
                 // solhint-disable-next-line no-inline-assembly
                 assembly {
-                // The signature data for contract signatures is appended to the concatenated signatures and the offset is stored in s
+                    // The signature data for contract signatures is appended to the concatenated signatures and the offset is stored in s
                     contractSignature := add(add(signatures, s), 0x20)
                 }
-                require(ISignatureValidator(currentOwner).isValidSignature(data, contractSignature) == EIP1271_MAGIC_VALUE, "GS024");
+                require(
+                    ISignatureValidator(currentOwner).isValidSignature(data, contractSignature) == EIP1271_MAGIC_VALUE,
+                    "GS024"
+                );
             } else if (v == 1) {
                 // If v is 1 then it is an approved hash
                 // When handling approved hashes the address of the approver is encoded into r
@@ -6759,13 +6568,17 @@ GuardManager
             } else if (v > 30) {
                 // If v > 30 then default va (27,28) has been adjusted for eth_sign flow
                 // To support eth_sign and similar we adjust v and hash the messageHash with the Ethereum message prefix before applying ecrecover
-                currentOwner = ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", dataHash)), v - 4, r, s);
+                currentOwner =
+                    ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", dataHash)), v - 4, r, s);
             } else {
                 // Default is the ecrecover flow with the provided data hash
                 // Use ecrecover with the messageHash for EOA signatures
                 currentOwner = ecrecover(dataHash, v, r, s);
             }
-            require(currentOwner > lastOwner && owners[currentOwner] != address(0) && currentOwner != SENTINEL_OWNERS, "GS026");
+            require(
+                currentOwner > lastOwner && owners[currentOwner] != address(0) && currentOwner != SENTINEL_OWNERS,
+                "GS026"
+            );
             lastOwner = currentOwner;
         }
     }
@@ -6873,7 +6686,11 @@ GuardManager
         address refundReceiver,
         uint256 _nonce
     ) public view returns (bytes32) {
-        return keccak256(encodeTransactionData(to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver, _nonce));
+        return keccak256(
+            encodeTransactionData(
+                to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver, _nonce
+            )
+        );
     }
 }
 
@@ -6923,7 +6740,7 @@ contract SystemConfig is OwnableUpgradeable, ISemver {
 
     /// @notice Storage slot that the L1CrossDomainMessenger address is stored at.
     bytes32 public constant L1_CROSS_DOMAIN_MESSENGER_SLOT =
-    bytes32(uint256(keccak256("systemconfig.l1crossdomainmessenger")) - 1);
+        bytes32(uint256(keccak256("systemconfig.l1crossdomainmessenger")) - 1);
 
     /// @notice Storage slot that the L1ERC721Bridge address is stored at.
     bytes32 public constant L1_ERC_721_BRIDGE_SLOT = bytes32(uint256(keccak256("systemconfig.l1erc721bridge")) - 1);
@@ -6936,7 +6753,7 @@ contract SystemConfig is OwnableUpgradeable, ISemver {
 
     /// @notice Storage slot that the OptimismMintableERC20Factory address is stored at.
     bytes32 public constant OPTIMISM_MINTABLE_ERC20_FACTORY_SLOT =
-    bytes32(uint256(keccak256("systemconfig.optimismmintableerc20factory")) - 1);
+        bytes32(uint256(keccak256("systemconfig.optimismmintableerc20factory")) - 1);
 
     /// @notice Storage slot that the batch inbox address is stored at.
     bytes32 public constant BATCH_INBOX_SLOT = bytes32(uint256(keccak256("systemconfig.batchinbox")) - 1);
@@ -6946,7 +6763,7 @@ contract SystemConfig is OwnableUpgradeable, ISemver {
 
     /// @notice Storage slot for the DisputeGameFactory address.
     bytes32 public constant DISPUTE_GAME_FACTORY_SLOT =
-    bytes32(uint256(keccak256("systemconfig.disputegamefactory")) - 1);
+        bytes32(uint256(keccak256("systemconfig.disputegamefactory")) - 1);
 
     /// @notice The maximum gas limit that can be set for L2 blocks. This limit is used to enforce that the blocks
     ///         on L2 are not too large to process and prove. Over time, this value can be increased as various
@@ -6997,22 +6814,22 @@ contract SystemConfig is OwnableUpgradeable, ISemver {
             _gasLimit: 1,
             _unsafeBlockSigner: address(0),
             _config: ResourceMetering.ResourceConfig({
-            maxResourceLimit: 1,
-            elasticityMultiplier: 1,
-            baseFeeMaxChangeDenominator: 2,
-            minimumBaseFee: 0,
-            systemTxMaxGas: 0,
-            maximumBaseFee: 0
-        }),
+                maxResourceLimit: 1,
+                elasticityMultiplier: 1,
+                baseFeeMaxChangeDenominator: 2,
+                minimumBaseFee: 0,
+                systemTxMaxGas: 0,
+                maximumBaseFee: 0
+            }),
             _batchInbox: address(0),
             _addresses: SystemConfig.Addresses({
-            l1CrossDomainMessenger: address(0),
-            l1ERC721Bridge: address(0),
-            l1StandardBridge: address(0),
-            disputeGameFactory: address(0),
-            optimismPortal: address(0),
-            optimismMintableERC20Factory: address(0)
-        })
+                l1CrossDomainMessenger: address(0),
+                l1ERC721Bridge: address(0),
+                l1StandardBridge: address(0),
+                disputeGameFactory: address(0),
+                optimismPortal: address(0),
+                optimismMintableERC20Factory: address(0)
+            })
         });
     }
 
@@ -7038,16 +6855,13 @@ contract SystemConfig is OwnableUpgradeable, ISemver {
         ResourceMetering.ResourceConfig memory _config,
         address _batchInbox,
         SystemConfig.Addresses memory _addresses
-    )
-    public
-    initializer
-    {
+    ) public initializer {
         __Ownable_init();
         transferOwnership(_owner);
 
         // These are set in ascending order of their UpdateTypes.
         _setBatcherHash(_batcherHash);
-        _setGasConfig({ _overhead: _overhead, _scalar: _scalar });
+        _setGasConfig({_overhead: _overhead, _scalar: _scalar});
         _setGasLimit(_gasLimit);
 
         Storage.setAddress(UNSAFE_BLOCK_SIGNER_SLOT, _unsafeBlockSigner);
@@ -7238,7 +7052,7 @@ contract SystemConfig is OwnableUpgradeable, ISemver {
         // No precision loss when computing target resource limit.
         require(
             ((_config.maxResourceLimit / _config.elasticityMultiplier) * _config.elasticityMultiplier)
-            == _config.maxResourceLimit,
+                == _config.maxResourceLimit,
             "SystemConfig: precision loss with target resource limit"
         );
 
@@ -7395,10 +7209,7 @@ contract OptimismPortal2 is Initializable_0, ResourceMetering, ISemver {
         SystemConfig _systemConfig,
         SuperchainConfig _superchainConfig,
         GameType _initialRespectedGameType
-    )
-    public
-    initializer
-    {
+    ) public initializer {
         disputeGameFactory = _disputeGameFactory;
         systemConfig = _systemConfig;
         superchainConfig = _superchainConfig;
@@ -7486,10 +7297,7 @@ contract OptimismPortal2 is Initializable_0, ResourceMetering, ISemver {
         uint256 _disputeGameIndex,
         Types.OutputRootProof calldata _outputRootProof,
         bytes[] calldata _withdrawalProof
-    )
-    external
-    whenNotPaused
-    {
+    ) external whenNotPaused {
         // Prevent users from creating a deposit transaction where this address is the message
         // sender on L2. Because this is checked here, we do not need to check again in
         // `finalizeWithdrawalTransaction`.
@@ -7546,7 +7354,7 @@ contract OptimismPortal2 is Initializable_0, ResourceMetering, ISemver {
         // `provenWithdrawals` mapping. A `withdrawalHash` can only be proven once unless the dispute game it proved
         // against resolves against the favor of the root claim.
         provenWithdrawals[withdrawalHash][msg.sender] =
-                        ProvenWithdrawal({ disputeGameProxy: gameProxy, timestamp: uint64(block.timestamp) });
+            ProvenWithdrawal({disputeGameProxy: gameProxy, timestamp: uint64(block.timestamp)});
 
         // Emit a `WithdrawalProven` event.
         emit WithdrawalProven(withdrawalHash, _tx.sender, _tx.target);
@@ -7566,12 +7374,9 @@ contract OptimismPortal2 is Initializable_0, ResourceMetering, ISemver {
     /// @notice Finalizes a withdrawal transaction, using an external proof submitter.
     /// @param _tx Withdrawal transaction to finalize.
     /// @param _proofSubmitter Address of the proof submitter.
-    function finalizeWithdrawalTransactionExternalProof(
-        Types.WithdrawalTransaction memory _tx,
-        address _proofSubmitter
-    )
-    public
-    whenNotPaused
+    function finalizeWithdrawalTransactionExternalProof(Types.WithdrawalTransaction memory _tx, address _proofSubmitter)
+        public
+        whenNotPaused
     {
         // Make sure that the l2Sender has not yet been set. The l2Sender is set to a value other
         // than the default value when a withdrawal transaction is being finalized. This check is
@@ -7625,16 +7430,10 @@ contract OptimismPortal2 is Initializable_0, ResourceMetering, ISemver {
     /// @param _gasLimit   Amount of L2 gas to purchase by burning gas on L1.
     /// @param _isCreation Whether or not the transaction is a contract creation.
     /// @param _data       Data to trigger the recipient with.
-    function depositTransaction(
-        address _to,
-        uint256 _value,
-        uint64 _gasLimit,
-        bool _isCreation,
-        bytes memory _data
-    )
-    public
-    payable
-    metered(_gasLimit)
+    function depositTransaction(address _to, uint256 _value, uint64 _gasLimit, bool _isCreation, bytes memory _data)
+        public
+        payable
+        metered(_gasLimit)
     {
         // Just to be safe, make sure that people specify address(0) as the target when doing
         // contract creations.

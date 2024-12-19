@@ -3,6 +3,16 @@
 In order to utilize Kailua, you'll need to deploy the Kailua dispute contracts, and configure your rollup to use them.
 This process will require access to your rollup's 'Owner' and 'Guardian' wallets.
 
+## Overview
+
+The steps required to upgrade your on-chain rollup contracts to support Kailua are as follows:
+1. (Optional) Deploy a RISC Zero Verifier contract set.
+   * This can be skipped by using a pre-existing verifier contract.
+2. Deploy a `KailuaTreasury` and a `KailuaGame` contract with your configuration.
+3. Initialize the `KailuaTreasury` contract to mark the start of sequencing under Kailua.
+4. Update the rollup's `DisputeGameFactory` contract to use `KailuaGame` for sequencing proposals.
+   * (Optional) Enable withdrawals using finalized Kailua proposals.
+
 ```admonish tip
 The Kailua CLI has a `fast-track` command for automating the L1 transactions required to migrate to Kailua.
 If the command does not yet support your configuration, you'll need to follow the manual steps in the next sub-sections.
