@@ -10,13 +10,11 @@ bincode.workspace = true
 bytemuck.workspace = true
 c-kzg.workspace = true
 clap.workspace = true
-pot.workspace = true
 rkyv.workspace = true
 serde.workspace = true
 sha2.workspace = true
 tracing.workspace = true
 tokio.workspace = true
-url.workspace = true
 
 alloy = { workspace = true, features = ["full", "kzg"] }
 alloy-primitives = { workspace = true, features = ["map-hashbrown"] }
