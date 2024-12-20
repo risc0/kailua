@@ -83,9 +83,8 @@ cast send \
 ```admonish tip
 If your rollup `owner` account is controlled by a `Safe` contract, or some other multi-sig contract, you can use
 `cast calldata` to get the necessary input that your wallet contract should forward.
-* You can use the [safe-cli](https://github.com/safe-global/safe-cli) to issue the necessary `send-custom` commands.
-  * `docker run -it safeglobal/safe-cli safe-cli <safe> <rpc>`
-* You can use the [safe](https://app.safe.global/home) web app to create the necessary transactions.
+* You can use the [safe cli](https://github.com/safe-global/safe-cli) to issue the necessary `send-custom` commands.
+* You can use the [safe gui](https://app.safe.global/home) web app to create the necessary transactions.
 ```
 
 ## KailuaGame
