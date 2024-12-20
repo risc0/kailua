@@ -33,7 +33,8 @@ to ensure the liveness of your chain.
 ```admonish example
 Consider Optimism Mainnnet as an example, which has a block time of 2 seconds.
 To keep its current average sequencing frequency of ~55 minutes, it only needs to publish ~1650 commitments per proposal.
-To maximize its usage of this single blob, OP Mainnet can relax its proposal rate to once per 2 hours and 15 minutes.
+To maximize the utilization of the extra blob published when proposing, OP Mainnet can relax its proposal rate to once
+per 2 hours and 15 minutes.
 ```
 
 ## Proposal Time Gap
@@ -44,11 +45,13 @@ proposals from being made eagerly before the parent chain data supporting that s
 This mechanism comes in the form of a forced delay between the timestamp of the L2 block being proposed, and the current
 timestamp on the parent chain (ethereum).
 
-At the time of writing, Ethereum finalized a block in [approximately 15 minutes](https://ethereum.org/en/roadmap/single-slot-finality/#:~:text=It%20takes%20about%2015%20minutes%20for%20an%20Ethereum%20block%20to%20finalize).
-Consequently, we recommend you set this parameter to `15 × 60 = 900` seconds.
+At the time of writing, Ethereum finalizes each block in [approximately 15 minutes](https://ethereum.org/en/roadmap/single-slot-finality/#:~:text=It%20takes%20about%2015%20minutes%20for%20an%20Ethereum%20block%20to%20finalize).
+Consequently, we recommend you set this parameter to `15 × 60 = 900` seconds to match.
 
+```admonish note
 While the Kailua proposer agent won't publish a sequencing proposal until it is considered safe, the Kailua contracts
 allow you to enforce this requirement so that even an eager (potentially dishonest) proposer cannot have a head start!
+```
 
 ## Collateral Amount
 
@@ -68,18 +71,15 @@ days if it is undisputed.
 This means, at an average hourly rate of proposing, the proposer has `84 * 0.08 = 6.72` ETH (\~$3700 USD) on average 
 locked up as collateral in the best case where no disputes take place.
 
-Using Kailua 0.08 ETH would be sufficient as the total collateral locked up by the proposer, even under the same finality
+Using Kailua, 0.08 ETH would be sufficient as the total collateral locked up by the proposer, even under the same finality
 delay.
-This would cover the worst-case proving cost in case of dispute, and leave a $200 tip as well.
+This would cover the worst-case proving cost in case of dispute, and, discounting transaction costs, leave a $200 tip.
 ```
 
 ## Challenge Timeout
 
-```admonish note
-Kailua does not yet implement adaptive dispute periods.
-```
-
-For simplicity and ease of mind, you can keep your current sequencing proposal dispute period.
+The current implementation of Kailua does not yet have adaptive dispute periods based on congestion.
+Consequently, you should keep your existing challenge timeout period.
 
 ## Verifier Contract
 RISC Zero maintains a set of pre-deployed verifier contracts for its ZK proving system.
@@ -88,6 +88,7 @@ mechanism that anyone who can produce a proof-of-exploit can trigger to halt the
 
 ```admonish note
 You must ensure that the chosen verifier contract supports your RISC Zero zkVM version.
+Once a new zkVM version is released, there can be a delay in adding it to the router.
 ```
 
 You have the choice of either using the already deployed verifier for your parent chain, or deploying and maintaining

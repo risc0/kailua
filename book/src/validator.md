@@ -5,7 +5,7 @@ proof to settle the dispute between them.
 
 ```admonish note
 The Kailua validator agent requires access to an archive `op-geth` rollup node to retrieve data during proof generation.
-Node software other than `geth` is not as reliable.
+Node software other than `op-geth` is not as reliable for the necessary `debug` namespace rpc calls.
 ```
 
 ## Usage

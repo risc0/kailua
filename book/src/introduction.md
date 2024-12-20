@@ -32,19 +32,19 @@ computed by RISC Zero's Bonsai service in under an hour.
 Assuming an honest majority operates the parent chain of the rollup, on-chain denial-of-service attacks can still
 happen if a wealthy party raises the on-chain gas costs beyond what honest participants in the fault proof protocol can
 afford.
-This block congestion attack can effectively censor disputes on faulty sequencing from being made on-chain, threatening
-the safety of the rollup.
+This block congestion attack can effectively censor disputes against faulty sequencing proposals from being made
+on-chain, threatening the safety of the rollup.
 
 ```admonish check
-Kailua incorporates "Adaptive Dispute Cutoffs", which delays withdrawal finality to increase the opportunity to
-dispute faulty sequencing based on the level of on-chain congestion. This guarantees that if faults cost more to
-dispute than a predetermined amount, honest parties will be granted more time until gas costs return to normal.
+Kailua's design incorporates "Adaptive Dispute Cutoffs", which delays withdrawal finality to increase the dispute 
+opportunity based on the level of on-chain congestion. This guarantees that if faults cost more to dispute than a
+predetermined amount, honest parties will be granted more time until gas costs subside.
 ```
 
 ### Sybil Identities
 
-Whale attackers can overwhelm honest parties in a dispute resolution mechanism by using multiple identities to flood the
-system with disputes.
+**Whale** attackers can overwhelm honest parties in a dispute resolution mechanism by using multiple identities to flood
+the system with disputes.
 In fault proving schemes where a defender has to issue a timely response on-chain to every dispute, the costs borne
 by the defender to continuously participate in all open disputes until they are resolved can be overwhelming, leading
 to some faults slipping through.
@@ -58,8 +58,8 @@ generate.
 
 ### Resource Exhaustion
 
-In addition to transaction fee expenditure, some protocols additionally require collateral to be staked for every move
-made in the system, while others require proofs to be generated in a timely manner.
+Some fault proof protocols require additional collateral to be staked for every move made in the system, while others
+require proofs to be generated in a timely manner.
 These two requirements cause some other systems to be vulnerable to resource exhaustion, where the resource can be
 the collateral or the proving power required for an honest party to issue a timely response, even if it can afford the
 transaction fees.

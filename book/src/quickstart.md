@@ -1,10 +1,10 @@
 # Quickstart
 
-Kailua enables rollup operators to add a new fault proof system to their rollup using the `DisputeGameFactory`.
-Kailua's contracts rely on RISC-Zero zkVM proofs to finalize/dismiss output proposals, and are compatible with Optimism's Bedrock contracts `v1.4.0` and above.
+Kailua enables rollup operators to add a new fault proof system to their rollup via the Optimism `DisputeGameFactory`
+contract.
+Kailua's contracts rely on RISC-Zero zkVM proofs to finalize/dismiss output proposals, and are compatible with
+Optimism's Bedrock contracts `v1.4.0` and above.
 
-The `KailuaTournament` contract optimistically allows outputs to be accepted after a timeout if no fraud proof is published against it,
-or if the output is challenged, waits for a proof to be submitted to decide whether to dismiss the output.
 
 ## Prerequisites
 1. [rust](https://www.rust-lang.org/tools/install)

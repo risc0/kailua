@@ -18,6 +18,10 @@ The Kailua CLI has a `fast-track` command for automating the L1 transactions req
 If the command does not yet support your configuration, you'll need to follow the manual steps in the next sub-sections.
 ```
 
+```admonish hint
+You might find it useful to rehearse migration using a local devnet first.
+```
+
 ## Fast-track Migration
 
 ```admonish info

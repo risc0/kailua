@@ -9,9 +9,9 @@ Before you can start migrating your rollup, you'll need to build and install Kai
 commands from the root project directory:
 
 ```admonish tip
-Do not run these commands in parallel.
-Each of these commands will take time to build the FPVM program in release mode.
-If you do, GitHub may throttle you, leading to a docker build error.
+Do not run these `install` commands in parallel.
+Each binary installation will take time to reproducibly build the FPVM program in release mode.
+If you install them in parallel, GitHub may throttle you, leading to a docker build error.
 ```
 
 ### CLI Binary
@@ -33,8 +33,8 @@ cargo install kailua-host --path bin/host
 
 ## Configuration
 
-Once your installation is successful, you should be able to run the following command to fetch the configuration
-parameters of your rollup instance:
+Once your installation is successful, you should be able to run the following command to fetch the Kailua configuration
+parameters for your rollup instance:
 
 ```shell
 kailua-cli config --op-node-url [YOUR_OP_NODE_URL] --op-geth-url [YOUR_OP_GETH_URL] --eth-rpc-url [YOUR_ETH_RPC_URL]
@@ -56,6 +56,11 @@ OPTIMISM_PORTAL: 0x16FC5058F25648194471939DF75CF27A2FDC48BC
 KAILUA_GAME_TYPE: 1337
 ```
 
+```admonish warning
+Make sure that your `FPVM_IMAGE_ID` matches the value above.
+This value determines the exact program used to prove faults.
+```
+
 ```admonish note
 If your `RISC_ZERO_VERIFIER` value is blank, this means that your rollup might be deployed on a base layer that does
 not have a deployed RISC Zero zkVM verifier contract.
@@ -64,9 +69,4 @@ Always revise the RISC Zero [documentation](https://dev.risczero.com/api/blockch
 to double-check verifier availability.
 ```
 
-```admonish warning
-Make sure that your `FPVM_IMAGE_ID` matches the value above.
-This value determines the exact program used to prove faults.
-```
-
-Once you have these values you'll need to save them for later use during contract deployment.
+Once you have these values you'll need to save them for later use during migration.
