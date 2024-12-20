@@ -21,11 +21,12 @@ kailua                      // Root project directory
 
 ## CLI
 
-The CLI for Kailua is designed to support four main commands:
-* `Upgrade`: Upgrades an existing rollup deployment to utilize Kailua for fault proving.
-* `Propose`: Monitor a rollup for sequencing state and publish proposals on-chain (akin to op-proposer).
-* `Validate`: Monitor a rollup for disputes and publish the necessary FPVM proofs for resolution.
-* `Fault`: Submit garbage proposals to test fault proving.
+The CLI for Kailua is designed to support five main commands:
+* `config`: Outputs configuration information required for migration.
+* `fast-track`: Automatically upgrades an existing rollup deployment to utilize Kailua for fault proving.
+* `propose`: Monitor a rollup for sequencing state and publish proposals on-chain (akin to op-proposer).
+* `validate`: Monitor a rollup for disputes and publish the necessary FPVM proofs for resolution.
+* `fault`: Submit garbage proposals to test fault proving.
 
 ## Contracts
 

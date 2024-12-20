@@ -3,6 +3,11 @@
 The Kailua validator watches your rollup for sequencing proposals that contradict each other and generates a ZK fault
 proof to settle the dispute between them.
 
+```admonish note
+The Kailua validator agent requires access to an archive `op-geth` rollup node to retrieve data during proof generation.
+Node software other than `geth` is not as reliable.
+```
+
 ## Usage
 
 Starting the Kailua validator is straightforward:

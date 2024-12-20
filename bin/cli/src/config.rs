@@ -49,32 +49,26 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
     let portal_address = system_config.optimismPortal().stall().await.addr_;
     let dgf_address = system_config.disputeGameFactory().stall().await.addr_;
 
-    // report genesis time
-    println!("GENESIS_TIMESTAMP: {}", config.genesis.l2_time);
-    // report inter-block time
-    println!("BLOCK_TIME: {}", config.block_time);
-    // report rollup config hash
-    let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
-    println!(
-        "ROLLUP_CONFIG_HASH: 0x{}",
-        hex::encode_upper(rollup_config_hash)
-    );
-    // report factory address
-    println!(
-        "DISPUTE_GAME_FACTORY: 0x{}",
-        hex::encode_upper(dgf_address.as_slice())
-    );
-    // report portal address
-    println!(
-        "OPTIMISM_PORTAL: 0x{}",
-        hex::encode_upper(portal_address.as_slice())
-    );
-    // report game type
-    println!("KAILUA_GAME_TYPE: {}", KAILUA_GAME_TYPE);
+    // report risc0 version
+    println!("RISC0_VERSION: {}", risc0_zkvm::get_version()?);
     // report fpvm image id
     println!(
         "FPVM_IMAGE_ID: 0x{}",
         hex::encode_upper(Digest::new(KAILUA_FPVM_ID).as_bytes())
+    );
+    // Report expected Groth16 verifier parameters
+    println!(
+        "CONTROL_ROOT: 0x{}",
+        hex::encode_upper(CONTROL_ROOT.as_slice()),
+    );
+    println!(
+        "CONTROL_ID: 0x{}",
+        hex::encode_upper(BN254_CONTROL_ID.as_slice()),
+    );
+    // Report expected Boundless verifier parameters
+    println!(
+        "SET_BUILDER_ID: 0x{}",
+        hex::encode_upper(SET_BUILDER_ID.as_slice())
     );
     // report verifier address
     let verifier_address = match config.l1_chain_id {
@@ -106,20 +100,29 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
             .map(|a| hex::encode_upper(a.as_slice()))
             .unwrap_or_default()
     );
-    // Report expected Boundless verifier parameters
+
+    // report genesis time
+    println!("GENESIS_TIMESTAMP: {}", config.genesis.l2_time);
+    // report inter-block time
+    println!("BLOCK_TIME: {}", config.block_time);
+    // report rollup config hash
+    let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
     println!(
-        "SET_BUILDER_ID: 0x{}",
-        hex::encode_upper(SET_BUILDER_ID.as_slice())
+        "ROLLUP_CONFIG_HASH: 0x{}",
+        hex::encode_upper(rollup_config_hash)
     );
-    // Report expected Groth16 verifier parameters
+    // report factory address
     println!(
-        "CONTROL_ROOT: 0x{}",
-        hex::encode_upper(CONTROL_ROOT.as_slice()),
+        "DISPUTE_GAME_FACTORY: 0x{}",
+        hex::encode_upper(dgf_address.as_slice())
     );
+    // report portal address
     println!(
-        "CONTROL_ID: 0x{}",
-        hex::encode_upper(BN254_CONTROL_ID.as_slice()),
+        "OPTIMISM_PORTAL: 0x{}",
+        hex::encode_upper(portal_address.as_slice())
     );
+    // report game type
+    println!("KAILUA_GAME_TYPE: {}", KAILUA_GAME_TYPE);
 
     Ok(())
 }

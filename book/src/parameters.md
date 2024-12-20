@@ -86,6 +86,10 @@ RISC Zero maintains a set of pre-deployed verifier contracts for its ZK proving 
 These contracts are regularly upgraded to support new releases of the prover, and also have a permissionless fail-safe
 mechanism that anyone who can produce a proof-of-exploit can trigger to halt the verifier.
 
+```admonish note
+You must ensure that the chosen verifier contract supports your RISC Zero zkVM version.
+```
+
 You have the choice of either using the already deployed verifier for your parent chain, or deploying and maintaining
 your own verifier contracts, as described in the later sections.
 
