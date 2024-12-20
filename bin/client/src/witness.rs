@@ -44,7 +44,7 @@ impl<T: BlobProvider + Send> BlobProvider for BlobWitnessProvider<T> {
     ) -> Result<Vec<Box<Blob>>, Self::Error> {
         let blobs = self.provider.get_blobs(block_ref, blob_hashes).await?;
         for blob in &blobs {
-            let c_kzg_blob = c_kzg::Blob::from_bytes(blob.as_slice()).unwrap();
+            let c_kzg_blob = c_kzg::Blob::new(***blob);
             let settings = alloy::consensus::EnvKzgSettings::default();
             let commitment =
                 c_kzg::KzgCommitment::blob_to_kzg_commitment(&c_kzg_blob, settings.get())
