@@ -1,0 +1,452 @@
+<!DOCTYPE HTML>
+<html lang="en" class="ayu sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Proof Verification - The Kailua Book</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="./mdbook-admonish.css">
+
+
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "ayu" : "ayu";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('ayu')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">The Kailua Book</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/risc0/kailua" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/risc0/kailua/edit/main/book/src/verifier.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="on-chain-proof-verification"><a class="header" href="#on-chain-proof-verification">On-chain Proof Verification</a></h1>
+<div id="admonition-note" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-title">
+<div class="admonition-title">
+<div id="admonition-note-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-note"></a>
+</div>
+<div>
+<p>If you've successfully performed fast-track migration, you do not need to follow the steps on this page.</p>
+</div>
+</div>
+<p>The cryptographic fault proofs generated by Kailua require the existence of a RISC Zero verifier contract on the parent
+chain (ethereum).</p>
+<div id="admonition-tip" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-title">
+<div class="admonition-title">
+<div id="admonition-tip-title">
+<p>Tip</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-tip"></a>
+</div>
+<div>
+<p>Use the Kailua CLI <code>config</code> command to retrieve the address of the officially deployed RISC Zero verifier for your
+parent chain.
+If one is available, you can use that address as your verifier and skip the steps in this section.</p>
+</div>
+</div>
+<p>This section explains how to deploy a verifier suited to your needs, but you'll need to maintain it in case
+of adopting any updates to Kailua that change the RISC Zero zkVM version used for proving.</p>
+<h2 id="verifier-contracts"><a class="header" href="#verifier-contracts">Verifier Contracts</a></h2>
+<p>This section describes the contracts that make up the on-chain proof verification pipeline.</p>
+<h3 id="verifier-router"><a class="header" href="#verifier-router">Verifier Router</a></h3>
+<p>The <a href="https://dev.risczero.com/api/blockchain-integration/contracts/verifier#verifier-router">RISCZeroVerifierRouter contract</a>
+routes proofs from different sources to their correct verifier.
+This allows your application (and Kailua) to leverage proofs generated using different zkVM versions, or aggregated through
+the <a href="https://docs.beboundless.xyz/">Boundless proving network</a>, while delegating the complexity of managing the
+verifier version to the router contract.</p>
+<p>Depending on your needs, you may need to deploy and manage your own verifier instead of relying on the pre-deployed
+router managed by RISC Zero.</p>
+<div id="admonition-warning" class="admonition admonish-warning" role="note" aria-labelledby="admonition-warning-title">
+<div class="admonition-title">
+<div id="admonition-warning-title">
+<p>Warning</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-warning"></a>
+</div>
+<div>
+<p>The verifier deployment made by Kailua does not yet utilize the <a href="https://github.com/risc0/risc0-ethereum/blob/release-1.2/contracts/src/RiscZeroVerifierEmergencyStop.sol">Emergency stop</a>
+contract in the pre-deployed RISC Zero verifier, which allows anyone to permissionlessy disable a verification backend
+in the router by proving a false statement.</p>
+</div>
+</div>
+<h3 id="groth16-verifier"><a class="header" href="#groth16-verifier">Groth16 Verifier</a></h3>
+<p>The <a href="https://github.com/risc0/risc0-ethereum/blob/release-1.2/contracts/src/groth16/RiscZeroGroth16Verifier.sol">RISCZeroGroth16Verifier</a>
+only accepts valid Groth16 proofs generated using its hardcoded RISC Zero zkVM version determined by the control root
+and id constructor parameters.
+This verifier is intended to be deployed and then added as a possible backend to a router instead of being used directly on its own.
+However, it is possible to call and use this verifier directly if the prover and verifier versions align.</p>
+<h3 id="set-verifier-boundless-network"><a class="header" href="#set-verifier-boundless-network">Set Verifier (Boundless Network)</a></h3>
+<p>The <a href="https://github.com/risc0/risc0-ethereum/blob/release-1.2/contracts/src/RiscZeroSetVerifier.sol">RISCZeroSetVerifier</a>
+accepts aggregated proofs, which are generated through recursively verifying other proofs inside an aggregator program.
+This verifier only verifies "inclusion proofs", and delegates the verification of the cryptographic proof of correct
+aggregation to another verifier (such as the router or the Groth16 verifier directly).
+This means it must be paired with another verifier contract.</p>
+<h3 id="fake-proof-verifier-insecure"><a class="header" href="#fake-proof-verifier-insecure">Fake Proof Verifier (INSECURE)</a></h3>
+<p>This verifier accepts fake proofs generated while running the RISC Zero zkVM in "dev mode".
+It is only useful for testing out the zkVM in a development environment without being delayed by proving time.</p>
+<div id="admonition-danger" class="admonition admonish-danger" role="note" aria-labelledby="admonition-danger-title">
+<div class="admonition-title">
+<div id="admonition-danger-title">
+<p>Danger</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-danger"></a>
+</div>
+<div>
+<p>Do not use the fake proof verifier anywhere near production.</p>
+</div>
+</div>
+<h2 id="deployment"><a class="header" href="#deployment">Deployment</a></h2>
+<p>This section will walk you through creating your own verifier deployment that supports individual and aggregated proofs.
+The commands below will be using Foundry's <code>forge</code> and <code>cast</code> utilities, which you should have installed as part of the
+foundry <a href="quickstart.html#prerequisites">prerequisite</a>.</p>
+<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
+<div class="admonition-title">
+<div id="admonition-note-1-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-note-1"></a>
+</div>
+<div>
+<p>The below foundry commands expect both a parameter that determines the wallet to use and the rpc endpoint of the parent
+chain.
+You will have to add these two parameters manually to every command below.
+For more information, refer to <code>forge create --help</code>, <code>cast call --help</code>, and <code>cast send --help</code></p>
+</div>
+</div>
+<p>First, change your working directory to <code>crates/contracts/foundry</code> for <code>forge</code> to work:</p>
+<pre><code class="language-shell">cd crates/contracts/foundry
+</code></pre>
+<h3 id="router"><a class="header" href="#router">Router</a></h3>
+<pre><code class="language-solidity">constructor(address admin) Ownable(admin)
+</code></pre>
+<p>The <code>RISCZeroVerifierRouter</code> constructor requires a single <code>admin</code> address, which is an account authorised to modify
+the router in one of two ways after it is deployed:</p>
+<ol>
+<li>Add a new verification backend through <code>addVerifier</code>:</li>
+<li>Permanently disable a verification backend through <code>removeVerifier</code>:</li>
+</ol>
+<p>To deploy a new router, invoke the following command</p>
+<pre><code class="language-shell">forge create RiscZeroVerifierRouter --constructor-args [ADMIN_ADDRESS]
+</code></pre>
+<p>On success, you should see output similar to the following:</p>
+<pre><code>Deployer: [YOUR_DEPLOYER_WALLET_ADDRESS]
+Deployed to: [YOUR_DEPLOYED_ROUTER_CONTRACT]
+Transaction hash: [YOUR_DEPLOYMENT_TRANSACTION_HASH]
+</code></pre>
+<div id="admonition-success" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-title">
+<div class="admonition-title">
+<div id="admonition-success-title">
+<p>Success</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-success"></a>
+</div>
+<div>
+<p>Make sure to note down the <code>YOUR_DEPLOYED_ROUTER_CONTRACT</code> address.
+We will use this in the following commands when adding proving backends.
+The router cannot verify any proofs on its own.</p>
+</div>
+</div>
+<h3 id="aggregate-verifier"><a class="header" href="#aggregate-verifier">Aggregate Verifier</a></h3>
+<pre><code class="language-solidity">constructor(IRiscZeroVerifier verifier, bytes32 imageId, string memory _imageUrl)
+</code></pre>
+<p>The aggregate verifier requires two main parameters to construct it, an address for a verifier to use to validate proofs of
+aggregation, and an image id defining the program to use for aggregating proofs.
+The third parameter specifies where the aggregation program is hosted, and can be left blank.</p>
+<p>We will reuse the router contract we just deployed as the verifier, and the <code>SET_BUILDER_ID</code> value we got from running
+<code>kailua-cli config</code>.</p>
+<p>To deploy a new aggregate verifier</p>
+<pre><code class="language-shell">forge create RiscZeroSetVerifier --constructor-args \
+  [YOUR_DEPLOYED_ROUTER_CONTRACT] \
+  [SET_BUILDER_ID] \
+  ""
+</code></pre>
+<p>On success, you should see output similar to the following:</p>
+<pre><code>Deployer: [YOUR_DEPLOYER_WALLET_ADDRESS]
+Deployed to: [YOUR_DEPLOYED_AGGREGATE_VERIFIER_CONTRACT]
+Transaction hash: [YOUR_DEPLOYMENT_TRANSACTION_HASH]
+</code></pre>
+<p>The next step is to now add this aggregate verifier contract as a backend for our router to use to verify any aggregated
+proofs it receives.
+For this, we will first to need to query the aggregate verifier for its "selector" using foundry's <code>cast</code> utility:</p>
+<pre><code class="language-shell">cast call \
+  [YOUR_DEPLOYED_AGGREGATE_VERIFIER_CONTRACT] \
+  "SELECTOR() returns (bytes4)"
+</code></pre>
+<p>This should return a short string similar to the following:</p>
+<pre><code>0x9cc26c32
+</code></pre>
+<p>We can now use this selector to add the aggregate verifier to the router using the <code>admin</code> wallet you specified while
+deploying the router:</p>
+<pre><code class="language-shell">cast send \
+  [YOUR_DEPLOYED_ROUTER_CONTRACT] \
+  "addVerifier(bytes4 selector, address verifier)" \
+  [YOUR_AGGREGATE_VERIFIER_SELECTOR] \
+  [YOUR_DEPLOYED_AGGREGATE_VERIFIER_CONTRACT]
+</code></pre>
+<p>The output from successfully issuing this transaction should resemble the following:</p>
+<pre><code>blockHash               0x9cb7f77cab555ff8907a62d19165795e7dbd51d558ee29a7383ced32daea18ab
+blockNumber             821
+contractAddress         
+cumulativeGasUsed       414546
+effectiveGasPrice       1000000007
+from                    0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc
+gasUsed                 46831
+logs                    []
+logsBloom               0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+root                    
+status                  1 (success)
+transactionHash         0x1446eeeb02008e6ef37dc60556f6a45848f106e175d0ea597fc41370918022c9
+transactionIndex        1
+type                    2
+blobGasPrice            
+blobGasUsed             
+authorizationList       
+to                      0x0116686E2291dbd5e317F47faDBFb43B599786Ef
+</code></pre>
+<p>Make sure that the status field in your output indicates success!</p>
+<div id="admonition-success-1" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-1-title">
+<div class="admonition-title">
+<div id="admonition-success-1-title">
+<p>Success</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-success-1"></a>
+</div>
+<div>
+<p>You've now connected your verifier router to the aggregate verifier.
+However, this pair still cannot verify any proofs on its own!
+Next, we will install a cryptographic verifier for this task.</p>
+</div>
+</div>
+<h3 id="groth16-verifier-1"><a class="header" href="#groth16-verifier-1">Groth16 Verifier</a></h3>
+<p>The Groth16 verifier validates stand-alone cryptographic proofs generated using the RISC Zero zkVM and compressed using
+the RISC Zero STARK-to-SNARK wrapper.</p>
+<p>This verifier can be deployed as follows using the control root and id from the <code>kailua-cli config</code> command output:</p>
+<pre><code class="language-shell">forge create RiscZeroGroth16Verifier --constructor-args \ 
+  [YOUR_CONTROL_ROOT] \
+  [YOUR_CONTROL_ID]
+</code></pre>
+<p>The output should again give you the relevant addresses:</p>
+<pre><code>Deployer: [YOUR_DEPLOYER_WALLET_ADDRESS]
+Deployed to: [YOUR_DEPLOYED_GROTH16_VERIFIER_CONTRACT]
+Transaction hash: [YOUR_DEPLOYMENT_TRANSACTION_HASH]
+</code></pre>
+<p>We again need to query this verifier's selector:</p>
+<pre><code class="language-shell">cast call [YOUR_DEPLOYED_GROTH16_VERIFIER_CONTRACT] \
+  "SELECTOR() returns (bytes4)"
+</code></pre>
+<p>Yielding another 4-byte selector:</p>
+<pre><code>0xc101b42b
+</code></pre>
+<p>And finally we need to add this verifier to our router:</p>
+<pre><code class="language-shell">cast send \
+  [YOUR_DEPLOYED_ROUTER_CONTRACT] \
+  "addVerifier(bytes4 selector, address verifier)" \
+  [YOUR_GROTH16_SELECTOR] \
+  [YOUR_DEPLOYED_GROTH16_VERIFIER_CONTRACT]
+</code></pre>
+<div id="admonition-success-2" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-2-title">
+<div class="admonition-title">
+<div id="admonition-success-2-title">
+<p>Success</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-success-2"></a>
+</div>
+<div>
+<p>You now have a RISC Zero verifier contract for stand-alone and aggregated ZK (fault) proofs!</p>
+</div>
+</div>
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="upgrade.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="dispute.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="upgrade.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="dispute.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="mermaid.min.js"></script>
+        <script src="mermaid-init.js"></script>
+
+
+    </div>
+    </body>
+</html>
