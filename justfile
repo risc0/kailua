@@ -18,6 +18,9 @@ devnet-build +ARGS="-F devnet -F prove": (build ARGS)
 devnet-up:
   make -C optimism devnet-up > devnet.log
 
+altda-devnet-up:
+  DEVNET_ALTDA=true GENERIC_ALTDA=true make -C optimism devnet-up > devnet.log
+
 devnet-down:
   make -C optimism devnet-down
 
@@ -79,7 +82,7 @@ devnet-validate target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l1_be
       --validator-key {{validator}} \
       {{verbosity}}
 
-devnet-prove block_number block_count target="debug" verbosity="" data=".localtestdata": (prove block_number block_count "http://localhost:8545" "http://localhost:5052" "http://localhost:9545" "http://localhost:7545" data target verbosity)
+devnet-prove block_number block_count target="debug" verbosity="" data=".localtestdata": devnet-build (prove block_number block_count "http://localhost:8545" "http://localhost:5052" "http://localhost:9545" "http://localhost:7545" "http://localhost:3100" data target verbosity)
 
 bench l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data start range count target="release" verbosity="-v":
     ./target/{{target}}/kailua-cli benchmark \
@@ -94,13 +97,14 @@ bench l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data start range count target=
           {{verbosity}}
 
 # Run the client program natively with the host program attached.
-prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data target="release" verbosity="":
+prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc eigenda_proxy_rpc data target="release" verbosity="":
   #!/usr/bin/env bash
 
   L1_NODE_ADDRESS="{{l1_rpc}}"
   L1_BEACON_ADDRESS="{{l1_beacon_rpc}}"
   L2_NODE_ADDRESS="{{l2_rpc}}"
   OP_NODE_ADDRESS="{{rollup_node_rpc}}"
+  EIGENDA_PROXY_ADDRESS="{{eigenda_proxy_rpc}}"
 
   L2_BLOCK_NUMBER={{block_number}}
   CLAIMED_L2_BLOCK_NUMBER=$((L2_BLOCK_NUMBER + {{block_count}} - 1))
@@ -134,6 +138,7 @@ prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data 
     --l1-beacon-address $L1_BEACON_ADDRESS \
     --l2-node-address $L2_NODE_ADDRESS \
     --op-node-address $OP_NODE_ADDRESS \
+    --eigenda-proxy-address $EIGENDA_PROXY_ADDRESS \
     --data-dir {{data}} \
     --native \
     {{verbosity}}

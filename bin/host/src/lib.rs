@@ -18,15 +18,17 @@ use alloy::primitives::{keccak256, B256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy_chains::NamedChain;
 use alloy_eips::eip4844::IndexedBlobHash;
+use anyhow::anyhow;
 use anyhow::bail;
 use boundless_market::storage::StorageProviderConfig;
 use clap::Parser;
+use hokulea_host::eigenda_blobs::OnlineEigenDABlobProvider;
+use hokulea_host::eigenda_fetcher::FetcherWithEigenDASupport;
+use hokulea_host::start_native_preimage_server;
 use kailua_client::{parse_b256, BoundlessArgs};
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
-use kona_host::fetcher::Fetcher;
 use kona_host::kv::SharedKeyValueStore;
-use kona_host::start_native_preimage_server;
 use kona_preimage::{BidirectionalChannel, HintWriter, OracleReader, PreimageKey, PreimageKeyType};
 use op_alloy_genesis::RollupConfig;
 use op_alloy_protocol::BlockInfo;
@@ -76,6 +78,17 @@ pub struct KailuaHostCli {
     /// Storage provider to use for elf and input
     #[clap(flatten)]
     pub boundless_storage_config: Option<StorageProviderConfig>,
+
+    #[clap(flatten)]
+    pub eigenda_args: EigenDAArgs,
+}
+
+#[derive(Parser, Debug, Clone)]
+pub struct EigenDAArgs {
+    /// URL of the Ethereum RPC endpoint.
+    #[clap(long, env)]
+    #[arg(required = false)]
+    pub eigenda_proxy_address: Option<String>,
 }
 
 /// Starts the [PreimageServer] and the client program in separate threads. The client program is
@@ -97,13 +110,24 @@ pub async fn start_server_and_native_client(
     let kv_store = args.kona.construct_kv_store();
     let fetcher = if !args.kona.is_offline() {
         let (l1_provider, blob_provider, l2_provider) = args.kona.create_providers().await?;
-        Some(Arc::new(RwLock::new(Fetcher::new(
-            kv_store.clone(),
-            l1_provider,
-            blob_provider,
-            l2_provider,
-            args.kona.agreed_l2_head_hash,
-        ))))
+        let eigenda_blob_provider = OnlineEigenDABlobProvider::new_http(
+            args.eigenda_args
+                .eigenda_proxy_address
+                .expect("missing eigenda_proxy_address")
+                .clone(),
+        )
+        .await
+        .map_err(|e| anyhow!("Failed to load eigenda blob provider configuration: {e}"))?;
+        Some(Arc::new(RwLock::new(
+            FetcherWithEigenDASupport::new_from_parts(
+                kv_store.clone(),
+                l1_provider,
+                blob_provider,
+                eigenda_blob_provider,
+                l2_provider,
+                args.kona.agreed_l2_head_hash,
+            ),
+        )))
     } else {
         None
     };

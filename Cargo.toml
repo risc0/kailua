@@ -63,15 +63,20 @@ kailua-contracts = { path = "crates/contracts" }
 kailua-host = { path = "bin/host" }
 
 # Kona
-kona-client = { git = "https://github.com/ethereum-optimism/kona", rev = "7a40d87", default-features = false }
-kona-derive = { git = "https://github.com/ethereum-optimism/kona", rev = "7a40d87", default-features = false, features = ["serde"] }
-kona-driver = { git = "https://github.com/ethereum-optimism/kona", rev = "7a40d87" }
-kona-executor = { git = "https://github.com/ethereum-optimism/kona", rev = "7a40d87" }
-kona-host = { git = "https://github.com/ethereum-optimism/kona", rev = "7a40d87" }
-kona-mpt = { git = "https://github.com/ethereum-optimism/kona", rev = "7a40d87", features = ["serde"] }
-kona-preimage = { git = "https://github.com/ethereum-optimism/kona", rev = "7a40d87", features = ["rkyv"] }
-kona-proof = { git = "https://github.com/ethereum-optimism/kona", rev = "7a40d87" }
-kona-std-fpvm = { git = "https://github.com/ethereum-optimism/kona", rev = "7a40d87" }
+kona-client = { git = "https://github.com/anton-rs/kona", rev = "7a40d87", default-features = false }
+kona-derive = { git = "https://github.com/anton-rs/kona", rev = "7a40d87", default-features = false }
+kona-driver = { git = "https://github.com/anton-rs/kona", rev = "7a40d87", default-features = false }
+kona-executor = { git = "https://github.com/anton-rs/kona", rev = "7a40d87", default-features = false }
+kona-host = { git = "https://github.com/anton-rs/kona", rev = "7a40d87", default-features = false }
+kona-mpt = { git = "https://github.com/anton-rs/kona", rev = "7a40d87", default-features = false }
+kona-preimage = { git = "https://github.com/anton-rs/kona", rev = "7a40d87", default-features = false }
+kona-proof = { git = "https://github.com/anton-rs/kona", rev = "7a40d87", default-features = false }
+kona-std-fpvm = { git = "https://github.com/anton-rs/kona", rev = "7a40d87", default-features = false }
+
+# Hokulea
+hokulea-eigenda = { git = "https://github.com/Layr-Labs/hokulea", branch = "kailua-compatible", default-features = false }
+hokulea-proof = { git = "https://github.com/Layr-Labs/hokulea", branch = "kailua-compatible", default-features = false }
+hokulea-host = { git = "https://github.com/Layr-Labs/hokulea", branch = "kailua-compatible", default-features = false }
 
 # RISC Zero zkVM
 bonsai-sdk = { version = "1.2.0", features = ["non_blocking"] }

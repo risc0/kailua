@@ -1,0 +1,6 @@
+{
+    "rust-analyzer.linkedProjects": [
+        "./Cargo.toml",
+        "./build/risczero/fpvm/Cargo.toml"
+    ]
+}
