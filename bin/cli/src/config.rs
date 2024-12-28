@@ -90,7 +90,7 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
         11155420 => Some(address!("B369b4dd27FBfb59921d3A4a3D23AC2fc32FB908")),
         // linea
         59144 => Some(address!("0b144e07a0826182b6b59788c34b32bfa86fb711")),
-        // ploygon
+        // polygon
         1101 => Some(address!("0b144e07a0826182b6b59788c34b32bfa86fb711")),
         _ => None,
     };
