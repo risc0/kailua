@@ -11,3 +11,4 @@ methods = ["fpvm"]
 
 [features]
 debug-guest-build = []
+eigenda = []

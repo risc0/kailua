@@ -51,6 +51,20 @@ Kailua enables rollup operators to add a new fault proof contract, compatible wi
     * `just devnet-down` to stop the running docker containers.
     * `just devnet-clean` to cleanup the docker volumes.
 
+## AltDA
+
+### EigenDA
+
+The EigenDA integration uses the [hokulea](https://github.com/Layr-Labs/hokulea) library to allow the kona derivation pipeline to understand eigenDA blobs. All of this extra code is feature guarded in Kailua behind the `eigenda` feature flag.
+
+To run against a devnet using eigenDA for altDA, use the following commands:
+```bash
+just eigenda-devnet-build # builds with the -F eigenda feature flag
+just eigenda-devnet-up # starts the optimism devnet with altda enabled
+# At this point, must wait for a few minutes for the devnet to finalize block 1 so that we can prove it:
+RISC0_DEV_MODE=true just eigenda-devnet-prove 1 1
+```
+
 ## Questions, Feedback, and Collaborations
 
 We'd love to hear from you on [Discord][discord] or [Twitter][twitter].

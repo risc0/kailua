@@ -18,8 +18,6 @@ use alloy_consensus::Header;
 use alloy_eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy_primitives::{Address, Sealed, B256};
 use anyhow::{bail, Context};
-use hokulea_proof::eigenda_provider::OracleEigenDAProvider;
-use hokulea_proof::pipeline::OraclePipeline;
 use kona_derive::traits::BlobProvider;
 use kona_driver::Driver;
 use kona_executor::TrieDBProvider;
@@ -34,6 +32,11 @@ use op_alloy_genesis::RollupConfig;
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use std::fmt::Debug;
 use std::sync::Arc;
+
+#[cfg(feature = "eigenda")]
+use hokulea_proof::{eigenda_provider::OracleEigenDAProvider, pipeline::OraclePipeline};
+#[cfg(not(feature = "eigenda"))]
+use kona_proof::l1::OraclePipeline;
 
 pub fn run_client<
     O: CommsClient + FlushableCache + Send + Sync + Debug,
@@ -68,6 +71,7 @@ where
 
         let mut l1_provider = OracleL1ChainProvider::new(boot.clone(), oracle.clone());
         let mut l2_provider = OracleL2ChainProvider::new(boot.clone(), oracle.clone());
+        #[cfg(feature = "eigenda")]
         let eigenda_blob_provider = OracleEigenDAProvider::new(oracle.clone());
 
         // If the claimed L2 block number is less than the safe head of the L2 chain, the claim is
@@ -91,6 +95,7 @@ where
         let cursor =
             new_pipeline_cursor(&boot, safe_head, &mut l1_provider, &mut l2_provider).await?;
         let cfg = Arc::new(boot.rollup_config.clone());
+        #[cfg(feature = "eigenda")]
         let pipeline = OraclePipeline::new(
             cfg.clone(),
             cursor.clone(),
@@ -99,6 +104,15 @@ where
             l1_provider.clone(),
             l2_provider.clone(),
             eigenda_blob_provider,
+        );
+        #[cfg(not(feature = "eigenda"))]
+        let pipeline = OraclePipeline::new(
+            cfg.clone(),
+            cursor.clone(),
+            oracle.clone(),
+            beacon,
+            l1_provider.clone(),
+            l2_provider.clone(),
         );
         let executor = KonaExecutor::new(&cfg, l2_provider.clone(), l2_provider, None, None);
         let mut driver = Driver::new(cursor, executor, pipeline);

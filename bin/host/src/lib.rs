@@ -18,13 +18,9 @@ use alloy::primitives::{keccak256, B256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy_chains::NamedChain;
 use alloy_eips::eip4844::IndexedBlobHash;
-use anyhow::anyhow;
 use anyhow::bail;
 use boundless_market::storage::StorageProviderConfig;
 use clap::Parser;
-use hokulea_host::eigenda_blobs::OnlineEigenDABlobProvider;
-use hokulea_host::eigenda_fetcher::FetcherWithEigenDASupport;
-use hokulea_host::start_native_preimage_server;
 use kailua_client::{parse_b256, BoundlessArgs};
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
@@ -47,6 +43,18 @@ use zeth_core::stateless::data::StatelessClientData;
 use zeth_core_optimism::OpRethCoreDriver;
 use zeth_preflight::client::PreflightClient;
 use zeth_preflight_optimism::OpRethPreflightClient;
+
+#[cfg(feature = "eigenda")]
+use {
+    anyhow::anyhow,
+    hokulea_host::{
+        eigenda_blobs::OnlineEigenDABlobProvider, eigenda_fetcher::FetcherWithEigenDASupport,
+        start_native_preimage_server,
+    },
+};
+
+#[cfg(not(feature = "eigenda"))]
+use kona_host::{fetcher::Fetcher, start_native_preimage_server};
 
 /// The host binary CLI application arguments.
 #[derive(Parser, Clone, Debug)]
@@ -108,6 +116,8 @@ pub async fn start_server_and_native_client(
     let hint_chan = BidirectionalChannel::new()?;
     let preimage_chan = BidirectionalChannel::new()?;
     let kv_store = args.kona.construct_kv_store();
+
+    #[cfg(feature = "eigenda")]
     let fetcher = if !args.kona.is_offline() {
         let (l1_provider, blob_provider, l2_provider) = args.kona.create_providers().await?;
         let eigenda_blob_provider = OnlineEigenDABlobProvider::new_http(
@@ -128,6 +138,20 @@ pub async fn start_server_and_native_client(
                 args.kona.agreed_l2_head_hash,
             ),
         )))
+    } else {
+        None
+    };
+
+    #[cfg(not(feature = "eigenda"))]
+    let fetcher = if !args.kona.is_offline() {
+        let (l1_provider, blob_provider, l2_provider) = args.kona.create_providers().await?;
+        Some(Arc::new(RwLock::new(Fetcher::new(
+            kv_store.clone(),
+            l1_provider,
+            blob_provider,
+            l2_provider,
+            args.kona.agreed_l2_head_hash,
+        ))))
     } else {
         None
     };

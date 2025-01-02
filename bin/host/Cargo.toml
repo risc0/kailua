@@ -36,7 +36,7 @@ kona-host.workspace = true
 kona-preimage.workspace = true
 
 # Hokulea
-hokulea-host.workspace = true
+hokulea-host = { workspace = true, optional = true }
 
 # zkVM
 bonsai-sdk.workspace = true
@@ -52,4 +52,7 @@ zeth-preflight-optimism.workspace = true
 [features]
 prove = [
     "risc0-zkvm/prove"
+]
+eigenda = [
+    "hokulea-host"
 ]

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::vec;
+
 fn main() {
     // Build a reproducible ELF file using docker under the release profile
     #[cfg(not(any(feature = "debug-guest-build", debug_assertions)))]
@@ -29,7 +31,20 @@ fn main() {
 
     // Build ELFs natively under debug
     #[cfg(any(feature = "debug-guest-build", debug_assertions))]
-    let build_opts = Default::default();
+    let features = if cfg!(feature = "eigenda") {
+        vec!["eigenda".to_string()]
+    } else {
+        vec![]
+    };
+    let build_opts = {
+        std::collections::HashMap::from([(
+            "kailua-fpvm",
+            risc0_build::GuestOptions {
+                features,
+                ..Default::default()
+            },
+        )])
+    };
 
     risc0_build::embed_methods_with_options(build_opts);
     println!("cargo:rerun-if-changed=src");

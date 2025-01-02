@@ -2,5 +2,10 @@
     "rust-analyzer.linkedProjects": [
         "./Cargo.toml",
         "./build/risczero/fpvm/Cargo.toml"
+    ],
+    "rust-analyzer.cargo.features": [
+        "eigenda",
+        "prove",
+        "devnet"
     ]
 }

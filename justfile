@@ -18,8 +18,15 @@ devnet-build +ARGS="-F devnet -F prove": (build ARGS)
 devnet-up:
   make -C optimism devnet-up > devnet.log
 
-altda-devnet-up:
+[group('eigenda')]
+eigenda-devnet-build +ARGS="-F devnet -F prove -F eigenda": (build ARGS)
+
+[group('eigenda')]
+eigenda-devnet-up:
   DEVNET_ALTDA=true GENERIC_ALTDA=true make -C optimism devnet-up > devnet.log
+
+[group('eigenda')]
+eigenda-devnet-prove block_number block_count target="debug" verbosity="" data=".localtestdata": eigenda-devnet-build (prove block_number block_count "http://localhost:8545" "http://localhost:5052" "http://localhost:9545" "http://localhost:7545" "http://localhost:3100" data target verbosity)
 
 devnet-down:
   make -C optimism devnet-down

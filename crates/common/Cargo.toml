@@ -31,10 +31,13 @@ kona-mpt.workspace = true
 kona-preimage = { workspace = true, features = ["serde", "rkyv"] }
 kona-proof.workspace = true
 
-hokulea-proof.workspace = true
+hokulea-proof = { workspace = true, optional = true }
 
 risc0-zkvm.workspace = true
 risc0-zkvm-platform.workspace = true
 
 serde.workspace = true
 tracing.workspace = true
+
+[features]
+eigenda = ["hokulea-proof"]
