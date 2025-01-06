@@ -14,7 +14,7 @@
 
 use crate::blobs::BlobWitnessData;
 use crate::oracle::OracleWitnessData;
-use alloy_primitives::B256;
+use alloy_primitives::{Address, B256};
 use serde::{Deserialize, Serialize};
 
 #[derive(
@@ -23,6 +23,8 @@ use serde::{Deserialize, Serialize};
 pub struct Witness {
     pub oracle_witness: OracleWitnessData,
     pub blobs_witness: BlobWitnessData,
+    #[rkyv(with = AddressDef)]
+    pub payout_recipient_address: Address,
     #[rkyv(with = B256Def)]
     pub precondition_validation_data_hash: B256,
 }
@@ -35,5 +37,17 @@ pub struct B256Def(pub [u8; 32]);
 impl From<B256Def> for B256 {
     fn from(value: B256Def) -> Self {
         B256::new(value.0)
+    }
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(remote = Address)]
+#[rkyv(archived = ArchivedAddress)]
+#[rkyv(derive(Hash, Eq, PartialEq))]
+pub struct AddressDef(pub [u8; 20]);
+
+impl From<AddressDef> for Address {
+    fn from(value: AddressDef) -> Self {
+        Address::new(value.0)
     }
 }

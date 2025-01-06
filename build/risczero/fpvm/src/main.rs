@@ -14,21 +14,23 @@
 
 use alloy_primitives::B256;
 use kailua_common::blobs::PreloadedBlobProvider;
+use kailua_common::client::log;
 use kailua_common::journal::ProofJournal;
 use kailua_common::oracle::PreloadedOracle;
 use kailua_common::witness::{ArchivedWitness, Witness};
 use kona_proof::BootInfo;
 use risc0_zkvm::guest::env;
-use std::sync::Arc;
 use rkyv::rancor::Error;
-use kailua_common::client::log;
+use std::sync::Arc;
 
 fn main() {
     let witness_data = env::read_frame();
     log("ACCESS");
-    let witness_access = rkyv::access::<ArchivedWitness, Error>(&witness_data).expect("Failed to access witness data");
+    let witness_access = rkyv::access::<ArchivedWitness, Error>(&witness_data)
+        .expect("Failed to access witness data");
     log("DESERIALIZE");
-    let witness = rkyv::deserialize::<Witness, Error>(witness_access).expect("Failed to deserialize witness");
+    let witness =
+        rkyv::deserialize::<Witness, Error>(witness_access).expect("Failed to deserialize witness");
     log("RUN");
     // let witness: Witness = pot::from_slice(&witness_data).expect("Failed to parse framed witness");
     let oracle = Arc::new(PreloadedOracle::from(witness.oracle_witness));
@@ -55,5 +57,12 @@ fn main() {
         assert_eq!(boot.claimed_l2_output_root, B256::ZERO);
     }
     // Write the proof journal
-    env::commit_slice(&ProofJournal::new(precondition_hash, boot.as_ref()).encode_packed());
+    env::commit_slice(
+        &ProofJournal::new(
+            witness.payout_recipient_address,
+            precondition_hash,
+            boot.as_ref(),
+        )
+        .encode_packed(),
+    );
 }

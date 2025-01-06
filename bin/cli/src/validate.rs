@@ -22,13 +22,13 @@ use alloy::eips::eip4844::IndexedBlobHash;
 use alloy::eips::BlockNumberOrTag;
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::network::EthereumWallet;
-use alloy::primitives::{Bytes, FixedBytes, U256};
+use alloy::primitives::{Address, Bytes, FixedBytes, U256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy::signers::local::LocalSigner;
 use anyhow::{anyhow, bail, Context};
 use boundless_market::storage::StorageProviderConfig;
 use kailua_client::proof::{fpvm_proof_file_name, Proof};
-use kailua_client::BoundlessArgs;
+use kailua_client::{parse_address, BoundlessArgs};
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::client::config_hash;
@@ -61,6 +61,8 @@ pub struct ValidateArgs {
     /// Secret key of L1 wallet to use for challenging and proving outputs
     #[clap(long, env)]
     pub validator_key: String,
+    #[clap(long, value_parser = parse_address, env)]
+    pub payout_recipient_address: Option<Address>,
 
     #[clap(flatten)]
     pub boundless_args: Option<BoundlessArgs>,
@@ -602,6 +604,7 @@ pub async fn handle_proposals(
 
             match proposal_parent_contract
                 .prove(
+                    proof_journal.payout_recipient,
                     [u_index, v_index, challenge_position],
                     encoded_seal.clone(),
                     proof_journal.agreed_l2_output_root,
@@ -778,6 +781,13 @@ pub async fn handle_proofs(
         .await?
         .l2_chain_id
         .to_string();
+    // Set payout recipient
+    let payout_recipient = args.payout_recipient_address.unwrap_or_else(|| {
+        LocalSigner::from_str(&args.validator_key)
+            .unwrap()
+            .address()
+    });
+    info!("Proof payout recipient: {payout_recipient}");
     // Run proof generator loop
     loop {
         // Dequeue messages
@@ -810,6 +820,7 @@ pub async fn handle_proofs(
             claimed_l2_block_number,
             agreed_l2_output_root,
         );
+        let payout_recipient = payout_recipient.to_string();
         let l1_head = l1_head.to_string();
         let agreed_l2_head_hash = agreed_l2_head_hash.to_string();
         let agreed_l2_output_root = agreed_l2_output_root.to_string();
@@ -821,6 +832,8 @@ pub async fn handle_proofs(
         ]
         .concat();
         let mut proving_args = vec![
+            String::from("--payout-recipient-address"), // wallet address for payouts
+            payout_recipient,
             String::from("--l1-head"), // l1 head from on-chain proposal
             l1_head,
             String::from("--agreed-l2-head-hash"), // l2 starting block hash from on-chain proposal

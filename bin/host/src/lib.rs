@@ -18,10 +18,11 @@ use alloy::primitives::{keccak256, B256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy_chains::NamedChain;
 use alloy_eips::eip4844::IndexedBlobHash;
+use alloy_primitives::Address;
 use anyhow::bail;
 use boundless_market::storage::StorageProviderConfig;
 use clap::Parser;
-use kailua_client::{parse_b256, BoundlessArgs};
+use kailua_client::{parse_address, parse_b256, BoundlessArgs};
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
 use kona_host::fetcher::Fetcher;
@@ -58,6 +59,8 @@ pub struct KailuaHostCli {
     /// Whether to skip running the zeth preflight engine
     #[clap(long, default_value_t = false, env)]
     pub skip_zeth_preflight: bool,
+    #[clap(long, value_parser = parse_address, env)]
+    pub payout_recipient_address: Option<Address>,
 
     #[clap(long, default_value_t = 1, env)]
     /// Number of blocks to build in a single proof
@@ -122,6 +125,7 @@ pub async fn start_server_and_native_client(
         args.boundless_storage_config,
         OracleReader::new(preimage_chan.client),
         HintWriter::new(hint_chan.client),
+        args.payout_recipient_address.unwrap_or_default(),
         precondition_validation_data_hash,
     ));
 

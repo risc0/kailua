@@ -150,6 +150,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
     /// @notice Proves the outcome of a tournament match
     function prove(
+        address payoutRecipient,
         uint64[3] calldata uvo,
         bytes calldata encodedSeal,
         bytes32 acceptedOutput,
@@ -258,6 +259,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             uint64 claimBlockNumber = uint64(l2BlockNumber() + uvo[2] + 1);
             bytes32 journalDigest = sha256(
                 abi.encodePacked(
+                    // The address of the recipient of the payout for this proof
+                    payoutRecipient,
                     // The parent proposal's claim hash
                     preconditionHash,
                     // The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
@@ -295,7 +298,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         emit Proven(uvo[0], uvo[1], proofStatus[uvo[0]][uvo[1]]);
 
         // Set the game's prover address
-        prover[uvo[0]][uvo[1]] = msg.sender;
+        prover[uvo[0]][uvo[1]] = payoutRecipient;
 
         // Set the game's proving timestamp
         provenAt[uvo[0]][uvo[1]] = Timestamp.wrap(uint64(block.timestamp));

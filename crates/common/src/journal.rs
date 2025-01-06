@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy_primitives::B256;
+use alloy_primitives::{Address, B256};
 use anyhow::Context;
 use kona_proof::BootInfo;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub struct ProofJournal {
+    /// The recipient address for the payout
+    pub payout_recipient: Address,
     /// The last finalized L2 output
     pub precondition_output: B256,
     /// The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
@@ -34,8 +36,9 @@ pub struct ProofJournal {
 }
 
 impl ProofJournal {
-    pub fn new(precondition_output: B256, boot_info: &BootInfo) -> Self {
+    pub fn new(payout_recipient: Address, precondition_output: B256, boot_info: &BootInfo) -> Self {
         Self {
+            payout_recipient,
             precondition_output,
             l1_head: boot_info.l1_head,
             agreed_l2_output_root: boot_info.agreed_l2_output_root,
@@ -49,6 +52,7 @@ impl ProofJournal {
 impl ProofJournal {
     pub fn encode_packed(&self) -> Vec<u8> {
         [
+            self.payout_recipient.as_slice(),
             self.precondition_output.as_slice(),
             self.l1_head.as_slice(),
             self.agreed_l2_output_root.as_slice(),
@@ -61,20 +65,21 @@ impl ProofJournal {
 
     pub fn decode_packed(encoded: &[u8]) -> Result<Self, anyhow::Error> {
         Ok(ProofJournal {
-            precondition_output: encoded[..32].try_into().context("precondition_output")?,
-            l1_head: encoded[32..64].try_into().context("l1_head")?,
-            agreed_l2_output_root: encoded[64..96]
+            payout_recipient: encoded[..20].try_into().context("payout_recipient")?,
+            precondition_output: encoded[20..52].try_into().context("precondition_output")?,
+            l1_head: encoded[52..84].try_into().context("l1_head")?,
+            agreed_l2_output_root: encoded[84..116]
                 .try_into()
                 .context("agreed_l2_output_root")?,
-            claimed_l2_output_root: encoded[96..128]
+            claimed_l2_output_root: encoded[116..148]
                 .try_into()
                 .context("claimed_l2_output_root")?,
             claimed_l2_block_number: u64::from_be_bytes(
-                encoded[128..136]
+                encoded[148..156]
                     .try_into()
                     .context("claimed_l2_block_number")?,
             ),
-            config_hash: encoded[136..168].try_into().context("config_hash")?,
+            config_hash: encoded[156..188].try_into().context("config_hash")?,
         })
     }
 }

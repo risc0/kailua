@@ -22,12 +22,14 @@ async fn main() -> anyhow::Result<()> {
     kona_host::init_tracing_subscriber(args.kailua_verbosity)?;
     let precondition_validation_data_hash =
         args.precondition_validation_data_hash.unwrap_or_default();
+    let payout_recipient_address = args.payout_recipient_address.unwrap_or_default();
 
     kailua_client::run_client(
         args.boundless_args,
         args.boundless_storage_config,
         ORACLE_READER,
         HINT_WRITER,
+        payout_recipient_address,
         precondition_validation_data_hash,
     )
     .await

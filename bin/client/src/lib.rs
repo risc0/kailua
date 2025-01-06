@@ -60,6 +60,9 @@ pub struct KailuaClientCli {
     #[arg(long, action = clap::ArgAction::Count, env)]
     pub kailua_verbosity: u8,
 
+    #[clap(long, value_parser = parse_address, env)]
+    pub payout_recipient_address: Option<Address>,
+
     #[clap(long, value_parser = parse_b256, env)]
     pub precondition_validation_data_hash: Option<B256>,
 
@@ -187,11 +190,16 @@ pub fn parse_b256(s: &str) -> Result<B256, String> {
     B256::from_str(s).map_err(|_| format!("Invalid B256 value: {}", s))
 }
 
+pub fn parse_address(s: &str) -> Result<Address, String> {
+    Address::from_str(s).map_err(|_| format!("Invalid Address value: {}", s))
+}
+
 pub async fn run_client<P, H>(
     boundless_args: Option<BoundlessArgs>,
     boundless_storage_config: Option<StorageProviderConfig>,
     oracle_client: P,
     hint_client: H,
+    payout_recipient: Address,
     precondition_validation_data_hash: B256,
 ) -> anyhow::Result<()>
 where
@@ -203,6 +211,7 @@ where
     let (journal, witness) = run_native_client(
         oracle_client.clone(),
         hint_client.clone(),
+        payout_recipient,
         precondition_validation_data_hash,
     )
     .await
@@ -245,6 +254,7 @@ where
 pub async fn run_native_client<P, H>(
     oracle_client: P,
     hint_client: H,
+    payout_recipient: Address,
     precondition_validation_data_hash: B256,
 ) -> anyhow::Result<(ProofJournal, Witness)>
 where
@@ -285,9 +295,10 @@ where
     let witness = Witness {
         oracle_witness: core::mem::take(oracle_witness.lock().unwrap().deref_mut()),
         blobs_witness: core::mem::take(blobs_witness.lock().unwrap().deref_mut()),
+        payout_recipient_address: payout_recipient,
         precondition_validation_data_hash,
     };
-    let journal_output = ProofJournal::new(precondition_hash, boot.as_ref());
+    let journal_output = ProofJournal::new(payout_recipient, precondition_hash, boot.as_ref());
     Ok((journal_output, witness))
 }
 
