@@ -22,6 +22,8 @@ use serde::{Deserialize, Serialize};
 use std::iter::repeat;
 use tracing::{error, info, warn};
 
+pub const ELIMINATIONS_LIMIT: u64 = 128;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Proposal {
     // pointers
@@ -344,14 +346,39 @@ impl Proposal {
         &self,
         provider: P,
     ) -> anyhow::Result<N::ReceiptResponse> {
-        self.tournament_contract_instance(provider)
+        let contract_instance = self.tournament_contract_instance(&provider);
+        let parent_tournament: Address = contract_instance.parentGame().stall().await.parentGame_;
+        let parent_tournament_instance = KailuaTournament::new(parent_tournament, &provider);
+
+        loop {
+            let survivor = parent_tournament_instance
+                .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
+                .call()
+                .await?
+                .survivor;
+            if !survivor.is_zero() {
+                break;
+            }
+
+            info!("Eliminating {ELIMINATIONS_LIMIT} opponents before resolution.");
+            parent_tournament_instance
+                .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
+                .send()
+                .await
+                .context("KailuaTournament::pruneChildren (send)")?
+                .get_receipt()
+                .await
+                .context("KailuaTournament::pruneChildren (get_receipt)")?;
+        }
+
+        contract_instance
             .resolve()
             .send()
             .await
-            .context("KailuaTreasury::resolve (send)")?
+            .context("KailuaTournament::resolve (send)")?
             .get_receipt()
             .await
-            .context("KailuaTreasury::resolve (get_receipt)")
+            .context("KailuaTournament::resolve (get_receipt)")
     }
 
     pub fn has_parent(&self) -> bool {
