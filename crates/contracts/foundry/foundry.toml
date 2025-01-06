@@ -5,8 +5,6 @@ libs = ["lib"]
 optimizer = true
 optimizer_runs = 10_000_000
 ffi = true
-
-[profile.default.compiler]
 evm_version = "cancun"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

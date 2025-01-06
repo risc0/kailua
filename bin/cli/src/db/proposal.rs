@@ -197,8 +197,9 @@ impl Proposal {
             .await
             .parentGame_;
         let parent_tournament_instance = KailuaTournament::new(parent_tournament, &provider);
+        let children = parent_tournament_instance.childCount().call().await?.count_;
         let survivor = parent_tournament_instance
-            .pruneChildren()
+            .pruneChildren(children)
             .call()
             .await?
             .survivor;

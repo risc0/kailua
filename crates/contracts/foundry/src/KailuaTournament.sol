@@ -135,6 +135,12 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     /// @notice The proposals extending this proposal
     KailuaTournament[] public children;
 
+    /// @notice The last surviving contender
+    uint64 public contenderIndex;
+
+    /// @notice The next unprocessed opponent
+    uint64 public opponentIndex;
+
     function verifyIntermediateOutput(
         uint64 outputNumber,
         bytes32 outputHash,
@@ -295,6 +301,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         provenAt[uvo[0]][uvo[1]] = Timestamp.wrap(uint64(block.timestamp));
     }
 
+    /// @notice Returns the number of children
+    function childCount() external view returns (uint256 count_) {
+        count_ = children.length;
+    }
+
     /// @notice Registers a new proposal that extends this one
     function appendChild() external {
         // INVARIANT: The calling contract is a newly deployed contract by the dispute game factory
@@ -313,8 +324,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     }
 
     /// @notice Eliminates children until at least one remains
-    // todo: this needs to be refactored into a tape-style function that can be resumed in case gas is high
-    function pruneChildren() external returns (KailuaTournament survivor) {
+    function pruneChildren(uint256 eliminationLimit) external returns (KailuaTournament survivor) {
         // INVARIANT: Only finalized proposals may host tournaments
         if (status != GameStatus.DEFENDER_WINS) {
             revert GameNotResolved();
@@ -325,36 +335,47 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             revert NotProposed();
         }
 
-        // Select the first possible survivor
-        uint256 u;
-        for (u = 0; u < children.length; u++) {
-            if (!isChildEliminated(children[u])) {
-                break;
+        // Resume from last surviving contender
+        uint64 u = contenderIndex;
+        if (u == 0) {
+            // Select the first possible contender
+            for (; u < children.length && eliminationLimit > 0; (u++, eliminationLimit--)) {
+                if (!isChildEliminated(children[u])) {
+                    break;
+                }
             }
         }
-        // Eliminate other opponents
-        uint256 v;
-        for (v = u + 1; v < children.length; v++) {
-            KailuaTournament contender = children[u];
+
+        // Resume from last unprocessed opponent
+        uint64 v = opponentIndex;
+        if (v == 0) {
+            // Select first possible opponent
+            v = u + 1;
+        }
+
+        // Match contenders and opponents
+        KailuaTournament contender = children[u];
+        for (; v < children.length && eliminationLimit > 0; (v++, eliminationLimit--)) {
             KailuaTournament opponent = children[v];
-            // If the opponent is eliminated or has the same identity, skip
+            // If the opponent proposer is eliminated or has the same identity, skip
             if (canIgnoreOpponent(contender, opponent)) {
                 continue;
             }
-            // If the survivor hasn't been challenged for as long as the timeout, declare them winner
+            // If the contender hasn't been challenged for as long as the timeout, declare them winner
             if (contender.getChallengerDuration(opponent.createdAt().raw()).raw() == 0) {
+                // Note: This implies eliminationLimit > 0
                 break;
             }
-            // If the opponent proposal is a twin, skip it
+            // If the opponent proposal is an identical twin, skip it
             if (contender.rootClaim().raw() == opponent.rootClaim().raw()) {
-                uint256 common;
+                uint64 common;
                 for (common = 0; common < PROPOSAL_BLOBS; common++) {
                     if (contender.proposalBlobHashes(common).raw() != opponent.proposalBlobHashes(common).raw()) {
                         break;
                     }
                 }
                 if (common == PROPOSAL_BLOBS) {
-                    // The opponent is an unjustified duplicate. Ignore it.
+                    // The opponent is an unjustified duplicate proposal. Ignore it.
                     continue;
                 }
             }
@@ -365,21 +386,28 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             // Otherwise decide winner
             if (proven == ProofStatus.U_LOSE_V_WIN) {
                 // u was shown as faulty (beat by v)
-                // eliminate the player
+                // eliminate the contender
                 KAILUA_TREASURY.eliminate(address(contender), prover[u][v]);
-                // proceed with opponent as new player
+                // proceed with opponent as new contender
                 u = v;
+                contender = opponent;
             } else {
-                // assume u survives
-                // todo jump over u if both players lose?
+                // assume u survives (todo eliminate u on lose-lose)
                 // eliminate the opponent
                 KAILUA_TREASURY.eliminate(address(opponent), prover[u][v]);
-                // proceed with the same player
+                // proceed with the same contender
             }
         }
-        // todo: Handle stragglers?
-        // Return the sole survivor
-        survivor = children[u];
+
+        // INVARIANT: v > u && contender == children[u]
+        // Record incremental progress
+        contenderIndex = u;
+        opponentIndex = v;
+
+        // Return the sole survivor if no more matches can be played
+        if (v == children.length || eliminationLimit > 0) {
+            survivor = contender;
+        }
     }
 
     function isChildEliminated(KailuaTournament child) internal returns (bool) {
