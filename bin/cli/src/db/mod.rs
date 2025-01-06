@@ -328,7 +328,7 @@ impl KailuaDB {
                 !self
                     .get_local_proposal(&contender)
                     .unwrap()
-                    .wins_against(proposal)
+                    .wins_against(proposal, self.config.timeout)
             })
             .unwrap_or(true)
         {

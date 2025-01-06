@@ -400,17 +400,22 @@ impl Proposal {
         None
     }
 
-    pub fn wins_against(&self, proposal: &Proposal) -> bool {
-        // todo: If the survivor hasn't been challenged for as long as the timeout, declare them winner
-        match self.divergence_point(proposal) {
+    /// Returns true iff self (as contender) wins against opponent
+    pub fn wins_against(&self, opponent: &Proposal, timeout: u64) -> bool {
+        // If the survivor hasn't been challenged for as long as the timeout, declare them winner
+        if opponent.created_at - self.created_at >= timeout {
+            return true;
+        }
+        // Check provable outcome
+        match self.divergence_point(opponent) {
             // u wins if v is a duplicate
             None => true,
             // u wins if v is wrong (even if u is wrong)
             Some(point) => {
                 if point < self.io_field_elements.len() {
-                    !proposal.correct_io[point].unwrap()
+                    !opponent.correct_io[point].unwrap()
                 } else {
-                    !proposal.correct_claim.unwrap()
+                    !opponent.correct_claim.unwrap()
                 }
             }
         }
