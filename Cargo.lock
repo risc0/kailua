@@ -4680,7 +4680,7 @@ dependencies = [
 [[package]]
 name = "kona-client"
 version = "0.1.0"
-source = "git+https://github.com/anton-rs/kona?rev=7a40d87#7a40d87b616556f76fc49f1651e035b975a2ed1a"
+source = "git+https://github.com/op-rs/kona?rev=3a28646efc344b3f68a05accb79da3f2aa4feb9f#3a28646efc344b3f68a05accb79da3f2aa4feb9f"
 dependencies = [
  "alloy-consensus 0.8.1",
  "alloy-eips 0.8.1",
@@ -4713,7 +4713,7 @@ dependencies = [
 [[package]]
 name = "kona-derive"
 version = "0.2.0"
-source = "git+https://github.com/anton-rs/kona?rev=7a40d87#7a40d87b616556f76fc49f1651e035b975a2ed1a"
+source = "git+https://github.com/op-rs/kona?rev=3a28646efc344b3f68a05accb79da3f2aa4feb9f#3a28646efc344b3f68a05accb79da3f2aa4feb9f"
 dependencies = [
  "alloy-consensus 0.8.1",
  "alloy-eips 0.8.1",
@@ -4732,7 +4732,7 @@ dependencies = [
 [[package]]
 name = "kona-driver"
 version = "0.2.0"
-source = "git+https://github.com/anton-rs/kona?rev=7a40d87#7a40d87b616556f76fc49f1651e035b975a2ed1a"
+source = "git+https://github.com/op-rs/kona?rev=3a28646efc344b3f68a05accb79da3f2aa4feb9f#3a28646efc344b3f68a05accb79da3f2aa4feb9f"
 dependencies = [
  "alloy-consensus 0.8.1",
  "alloy-primitives",
@@ -4750,7 +4750,7 @@ dependencies = [
 [[package]]
 name = "kona-executor"
 version = "0.2.0"
-source = "git+https://github.com/anton-rs/kona?rev=7a40d87#7a40d87b616556f76fc49f1651e035b975a2ed1a"
+source = "git+https://github.com/op-rs/kona?rev=3a28646efc344b3f68a05accb79da3f2aa4feb9f#3a28646efc344b3f68a05accb79da3f2aa4feb9f"
 dependencies = [
  "alloy-consensus 0.8.1",
  "alloy-eips 0.8.1",
@@ -4768,7 +4768,7 @@ dependencies = [
 [[package]]
 name = "kona-host"
 version = "0.1.0"
-source = "git+https://github.com/anton-rs/kona?rev=7a40d87#7a40d87b616556f76fc49f1651e035b975a2ed1a"
+source = "git+https://github.com/op-rs/kona?rev=3a28646efc344b3f68a05accb79da3f2aa4feb9f#3a28646efc344b3f68a05accb79da3f2aa4feb9f"
 dependencies = [
  "alloy-consensus 0.8.1",
  "alloy-eips 0.8.1",
@@ -4805,7 +4805,7 @@ dependencies = [
 [[package]]
 name = "kona-mpt"
 version = "0.1.1"
-source = "git+https://github.com/anton-rs/kona?rev=7a40d87#7a40d87b616556f76fc49f1651e035b975a2ed1a"
+source = "git+https://github.com/op-rs/kona?rev=3a28646efc344b3f68a05accb79da3f2aa4feb9f#3a28646efc344b3f68a05accb79da3f2aa4feb9f"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -4817,7 +4817,7 @@ dependencies = [
 [[package]]
 name = "kona-preimage"
 version = "0.2.0"
-source = "git+https://github.com/anton-rs/kona?rev=7a40d87#7a40d87b616556f76fc49f1651e035b975a2ed1a"
+source = "git+https://github.com/op-rs/kona?rev=3a28646efc344b3f68a05accb79da3f2aa4feb9f#3a28646efc344b3f68a05accb79da3f2aa4feb9f"
 dependencies = [
  "alloy-primitives",
  "async-channel",
@@ -4831,7 +4831,7 @@ dependencies = [
 [[package]]
 name = "kona-proof"
 version = "0.2.0"
-source = "git+https://github.com/anton-rs/kona?rev=7a40d87#7a40d87b616556f76fc49f1651e035b975a2ed1a"
+source = "git+https://github.com/op-rs/kona?rev=3a28646efc344b3f68a05accb79da3f2aa4feb9f#3a28646efc344b3f68a05accb79da3f2aa4feb9f"
 dependencies = [
  "alloy-consensus 0.8.1",
  "alloy-eips 0.8.1",
@@ -4860,7 +4860,7 @@ dependencies = [
 [[package]]
 name = "kona-std-fpvm"
 version = "0.1.1"
-source = "git+https://github.com/anton-rs/kona?rev=7a40d87#7a40d87b616556f76fc49f1651e035b975a2ed1a"
+source = "git+https://github.com/op-rs/kona?rev=3a28646efc344b3f68a05accb79da3f2aa4feb9f#3a28646efc344b3f68a05accb79da3f2aa4feb9f"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -4872,7 +4872,7 @@ dependencies = [
 [[package]]
 name = "kona-std-fpvm-proc"
 version = "0.1.1"
-source = "git+https://github.com/anton-rs/kona?rev=7a40d87#7a40d87b616556f76fc49f1651e035b975a2ed1a"
+source = "git+https://github.com/op-rs/kona?rev=3a28646efc344b3f68a05accb79da3f2aa4feb9f#3a28646efc344b3f68a05accb79da3f2aa4feb9f"
 dependencies = [
  "anyhow",
  "cfg-if",

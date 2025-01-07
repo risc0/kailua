@@ -12,7 +12,7 @@ rkyv = "0.8.9"
 
 kailua-common = { path = "../../../crates/common" }
 
-kona-proof = { git = "https://github.com/anton-rs/kona", rev = "7a40d87" }
+kona-proof = { git = "https://github.com/op-rs/kona", rev = "3a28646efc344b3f68a05accb79da3f2aa4feb9f" }
 
 risc0-zkvm = { version = "1.2.0", features = ["std", "heap-embedded-alloc", "unstable"] }
 
