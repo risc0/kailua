@@ -9,7 +9,9 @@ All proving costs are borne by the dishonest party in the protocol, whether that
 
 ## Development Status
 
-`Kailua` as well as `kona` are still in active development and are NOT recommended for production usage.
+> [!CAUTION]
+> 
+> `Kailua` as well as `kona` are still in active development and are NOT recommended for production usage.
 
 ## Fraud/Validity Proofs
 
