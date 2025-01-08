@@ -44,16 +44,20 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.5.4"
 
 # Alloy
-alloy = { version = "0.8.1", default-features = false, features = ["json"] }
+alloy = { version = "0.9.2", default-features = false, features = ["json"] }
 alloy-chains = "0.1.46"
-alloy-consensus = { version = "0.8.1", default-features = false }
-alloy-eips = { version = "0.8.1", default-features = false, features = ["kzg"] }
+alloy-consensus = { version = "0.9.2", default-features = false }
+alloy-eips = { version = "0.9.2", default-features = false, features = ["kzg"] }
+alloy-rlp = "0.3.9"
 alloy-primitives = { version = "0.8", default-features = false }
-alloy-rpc-types-beacon = "0.8.1"
-op-alloy-genesis = { version = "0.8.4", default-features = false }
-op-alloy-consensus = { version = "0.8.4", default-features = false }
-op-alloy-protocol = { version = "0.8.4", default-features = false }
-op-alloy-registry = { version = "0.8.4", default-features = false }
+alloy-rpc-types-beacon = "0.9.2"
+
+# OP Alloy
+op-alloy-genesis = { version = "0.9.1", default-features = false }
+op-alloy-consensus = { version = "0.9.1", default-features = false }
+op-alloy-protocol = { version = "0.9.1", default-features = false }
+op-alloy-registry = { version = "0.9.1", default-features = false }
+op-alloy-rpc-types-engine = { version = "0.9.1", default-features = false }
 
 # Kailua
 kailua-build = { path = "build/risczero" }
@@ -99,3 +103,14 @@ lto = true
 crypto-bigint = { git = "https://github.com/risc0/RustCrypto-crypto-bigint", tag = "v0.5.5-risczero.0" }
 k256 = { git = "https://github.com/risc0/RustCrypto-elliptic-curves", tag = "k256/v0.13.3-risczero.0" }
 sha2 = { git = "https://github.com/risc0/RustCrypto-hashes", tag = "sha2-v0.10.8-risczero.0" }
+
+[patch.'https://github.com/op-rs/kona']
+kona-client = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/multiblock" }
+kona-derive = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/multiblock" }
+kona-driver = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/multiblock" }
+kona-executor = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/multiblock" }
+kona-host = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/multiblock" }
+kona-mpt = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/multiblock" }
+kona-preimage = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/multiblock" }
+kona-proof = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/multiblock" }
+kona-std-fpvm = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/multiblock" }

@@ -32,7 +32,6 @@ fn main() {
     let witness =
         rkyv::deserialize::<Witness, Error>(witness_access).expect("Failed to deserialize witness");
     log("RUN");
-    // let witness: Witness = pot::from_slice(&witness_data).expect("Failed to parse framed witness");
     let oracle = Arc::new(PreloadedOracle::from(witness.oracle_witness));
     let boot = Arc::new(kona_proof::block_on(async {
         BootInfo::load(oracle.as_ref())
