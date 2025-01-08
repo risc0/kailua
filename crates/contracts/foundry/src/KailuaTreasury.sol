@@ -33,7 +33,8 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         IRiscZeroVerifier _verifierContract,
         bytes32 _imageId,
         bytes32 _configHash,
-        uint256 _proposalBlockCount,
+        uint256 _proposalOutputCount,
+        uint256 _outputBlockSpan,
         GameType _gameType,
         IDisputeGameFactory _disputeGameFactory
     )
@@ -42,7 +43,8 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
             _verifierContract,
             _imageId,
             _configHash,
-            _proposalBlockCount,
+            _proposalOutputCount,
+            _outputBlockSpan,
             _gameType,
             _disputeGameFactory
         )

@@ -67,7 +67,8 @@ contract KailuaGame is KailuaTournament {
         IRiscZeroVerifier _verifierContract,
         bytes32 _imageId,
         bytes32 _configHash,
-        uint256 _proposalBlockCount,
+        uint256 _proposalOutputCount,
+        uint256 _outputBlockSpan,
         GameType _gameType,
         IDisputeGameFactory _disputeGameFactory,
         uint256 _genesisTimeStamp,
@@ -80,7 +81,8 @@ contract KailuaGame is KailuaTournament {
             _verifierContract,
             _imageId,
             _configHash,
-            _proposalBlockCount,
+            _proposalOutputCount,
+            _outputBlockSpan,
             _gameType,
             _disputeGameFactory
         )
@@ -138,7 +140,7 @@ contract KailuaGame is KailuaTournament {
         }
 
         // Do not initialize a game that does not cover the required number of l2 blocks
-        if (thisL2BlockNumber - prevL2BlockNumber != PROPOSAL_BLOCK_COUNT) {
+        if (thisL2BlockNumber - prevL2BlockNumber != PROPOSAL_OUTPUT_COUNT * OUTPUT_BLOCK_SPAN) {
             revert BlockCountExceeded(thisL2BlockNumber, prevL2BlockNumber);
         }
 
@@ -159,7 +161,7 @@ contract KailuaGame is KailuaTournament {
         // Register this new game in the parent game's contract
         parentGame().appendChild();
 
-        // Do not permit proposals of l2 block is still inside the gap
+        // Do not permit proposals if l2 block is still inside the gap
         if (block.timestamp <= GENESIS_TIME_STAMP + thisL2BlockNumber * L2_BLOCK_TIME + PROPOSAL_TIME_GAP) {
             revert ClockTimeExceeded();
         }
@@ -196,7 +198,7 @@ contract KailuaGame is KailuaTournament {
 
         // INVARIANT: Can only resolve the last remaining child
         if (parentGame_.pruneChildren(parentGame_.childCount()) != this) {
-            revert ProvenFaulty();
+            revert NotProven();
         }
 
         // Mark resolution timestamp

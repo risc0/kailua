@@ -36,8 +36,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     /// @notice The hash of the game configuration
     bytes32 internal immutable ROLLUP_CONFIG_HASH;
 
-    /// @notice The number of blocks a claim must cover
-    uint256 internal immutable PROPOSAL_BLOCK_COUNT;
+    /// @notice The number of outputs a proposal must publish
+    uint256 internal immutable PROPOSAL_OUTPUT_COUNT;
+
+    /// @notice The number of blocks each output must cover
+    uint256 internal immutable OUTPUT_BLOCK_SPAN;
 
     /// @notice The number of blobs a claim must provide
     uint256 internal immutable PROPOSAL_BLOBS;
@@ -68,9 +71,14 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         configHash_ = ROLLUP_CONFIG_HASH;
     }
 
-    /// @notice Returns the number of blocks that must be covered by this game
-    function proposalBlockCount() public view returns (uint256 proposalBlockCount_) {
-        proposalBlockCount_ = PROPOSAL_BLOCK_COUNT;
+    /// @notice Returns the number of outputs that were published with this game
+    function proposalOutputCount() public view returns (uint256 proposalOutputCount_) {
+        proposalOutputCount_ = PROPOSAL_OUTPUT_COUNT;
+    }
+
+    /// @notice Returns the number of blocks covered by each output in this game
+    function outputBlockSpan() public view returns (uint256 outputBlockSpan_) {
+        outputBlockSpan_ = OUTPUT_BLOCK_SPAN;
     }
 
     /// @notice Returns the number of blobs containing intermediate blob data
@@ -87,7 +95,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         IRiscZeroVerifier _verifierContract,
         bytes32 _imageId,
         bytes32 _configHash,
-        uint256 _proposalBlockCount,
+        uint256 _proposalOutputCount,
+        uint256 _outputBlockSpan,
         GameType _gameType,
         IDisputeGameFactory _disputeGameFactory
     ) {
@@ -95,9 +104,10 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         RISC_ZERO_VERIFIER = _verifierContract;
         FPVM_IMAGE_ID = _imageId;
         ROLLUP_CONFIG_HASH = _configHash;
-        PROPOSAL_BLOCK_COUNT = _proposalBlockCount;
-        PROPOSAL_BLOBS = (_proposalBlockCount / (1 << KailuaLib.FIELD_ELEMENTS_PER_BLOB_PO2))
-            + ((_proposalBlockCount % (1 << KailuaLib.FIELD_ELEMENTS_PER_BLOB_PO2)) == 0 ? 0 : 1);
+        PROPOSAL_OUTPUT_COUNT = _proposalOutputCount;
+        OUTPUT_BLOCK_SPAN = _outputBlockSpan;
+        PROPOSAL_BLOBS = (_proposalOutputCount / (1 << KailuaLib.FIELD_ELEMENTS_PER_BLOB_PO2))
+            + ((_proposalOutputCount % (1 << KailuaLib.FIELD_ELEMENTS_PER_BLOB_PO2)) == 0 ? 0 : 1);
         GAME_TYPE = _gameType;
         DISPUTE_GAME_FACTORY = _disputeGameFactory;
     }
@@ -183,7 +193,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         if (uvo[2] > 0) {
             // Find the divergent blob index
             uint256 divergentBlobIndex = KailuaLib.blobIndex(uvo[2]);
-            if (uvo[2] == PROPOSAL_BLOCK_COUNT - 1) {
+            if (uvo[2] == PROPOSAL_OUTPUT_COUNT - 1) {
                 // If the only difference is the root claim, require all blobs to be equal.
                 divergentBlobIndex = PROPOSAL_BLOBS;
             }
@@ -196,7 +206,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                 }
             }
             // Update required precondition hash from proof if not at a boundary
-            if (KailuaLib.blobPosition(uvo[2]) != 0 && uvo[2] < PROPOSAL_BLOCK_COUNT - 1) {
+            if (KailuaLib.blobPosition(uvo[2]) != 0 && uvo[2] < PROPOSAL_OUTPUT_COUNT - 1) {
                 preconditionHash = sha256(
                     abi.encodePacked(
                         childContracts[0].proposalBlobHashes(divergentBlobIndex).raw(),
@@ -228,7 +238,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         }
 
         // Validate the claimed output roots.
-        if (uvo[2] == PROPOSAL_BLOCK_COUNT - 1) {
+        if (uvo[2] == PROPOSAL_OUTPUT_COUNT - 1) {
             require(proposedOutput[0] == childContracts[0].rootClaim().raw());
             require(proposedOutput[1] == childContracts[1].rootClaim().raw());
         } else {
@@ -256,7 +266,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
         {
             // Construct the expected journal
-            uint64 claimBlockNumber = uint64(l2BlockNumber() + uvo[2] + 1);
+            uint64 claimBlockNumber = uint64(l2BlockNumber() + (uvo[2] + 1) * PROPOSAL_OUTPUT_COUNT);
             bytes32 journalDigest = sha256(
                 abi.encodePacked(
                     // The address of the recipient of the payout for this proof
