@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::channel::DuplexChannel;
+use crate::db::config::Config;
 use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
 use crate::providers::beacon::BlobProvider;
@@ -235,6 +236,7 @@ pub async fn handle_proposals(
             if proof_status == 0 {
                 request_proof(
                     &mut channel,
+                    &kailua_db.config,
                     &contender,
                     &proposal,
                     &eth_rpc_provider,
@@ -275,8 +277,10 @@ pub async fn handle_proposals(
                 .child_index(proposal.index)
                 .expect("Could not look up contender's index in parent tournament");
 
-            let challenge_position =
-                proof_journal.claimed_l2_block_number - proposal_parent.output_block_number - 1;
+            let challenge_position = (proof_journal.claimed_l2_block_number
+                - proposal_parent.output_block_number)
+                / kailua_db.config.output_block_span
+                - 1;
 
             let expected_image_id = proposal_parent_contract.imageId().stall().await.imageId_.0;
 
@@ -591,8 +595,8 @@ pub async fn handle_proposals(
                 info!("Proof L1 head confirmed.");
             }
 
-            let expected_block_number =
-                proposal_parent.output_block_number + challenge_position + 1;
+            let expected_block_number = proposal_parent.output_block_number
+                + (challenge_position + 1) * kailua_db.config.output_block_span;
             if expected_block_number != proof_journal.claimed_l2_block_number {
                 warn!(
                     "Claimed l2 block number mismatch. Found {}, expected {expected_block_number}.",
@@ -647,6 +651,7 @@ pub async fn handle_proposals(
 
 async fn request_proof(
     channel: &mut DuplexChannel<Message>,
+    config: &Config,
     contender: &Proposal,
     proposal: &Proposal,
     l1_node_provider: &ReqwestProvider,
@@ -659,9 +664,9 @@ async fn request_proof(
 
     // Read additional data for Kona invocation
     info!("Requesting proof for proposal {}.", proposal.index);
-    let agreed_l2_head_number =
-        proposal.output_block_number - proposal.io_field_elements.len() as u64 - 1
-            + challenge_point; // the challenge point is zero indexed, so it cancels out
+    let agreed_l2_head_number = proposal.output_block_number
+        - config.output_block_span * (proposal.io_field_elements.len() as u64 + 1)
+        + config.output_block_span * challenge_point; // the challenge point is zero indexed, so it cancels out
     debug!("l2_head_number {:?}", &agreed_l2_head_number);
     let agreed_l2_head_hash = l2_node_provider
         .get_block_by_number(
@@ -678,7 +683,7 @@ async fn request_proof(
         .output_at_block(agreed_l2_head_number)
         .await
         .context("output_at_block")?;
-    let claimed_l2_block_number = agreed_l2_head_number + 1;
+    let claimed_l2_block_number = agreed_l2_head_number + config.output_block_span;
     let claimed_l2_output_root = op_node_provider
         .output_at_block(claimed_l2_block_number)
         .await

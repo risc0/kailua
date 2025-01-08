@@ -4501,6 +4501,7 @@ error ClaimAlreadyExists();
 /// @notice Thrown when a disputed claim does not match its index in the game.
 error InvalidDisputedClaimIndex();
 
+// 0x67fe1950
 /// @notice Thrown when an action that requires the game to be `IN_PROGRESS` is invoked when
 ///         the game is not in progress.
 error GameNotInProgress();

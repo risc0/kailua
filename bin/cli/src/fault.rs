@@ -93,12 +93,19 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let kailua_treasury_instance = KailuaTreasury::new(kailua_treasury_address, &tester_provider);
 
     // load constants
-    let proposal_block_count: u64 = kailua_game_implementation
-        .proposalBlockCount()
+    let proposal_output_count: u64 = kailua_game_implementation
+        .proposalOutputCount()
         .stall()
         .await
-        .proposalBlockCount_
+        .proposalOutputCount_
         .to();
+    let output_block_span: u64 = kailua_game_implementation
+        .outputBlockSpan()
+        .stall()
+        .await
+        .outputBlockSpan_
+        .to();
+    let proposal_block_count = proposal_output_count * output_block_span;
 
     // get proposal parent
     let games_count = dispute_game_factory.gameCount().stall().await.gameCount_;
@@ -115,7 +122,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .l2BlockNumber_
         .to();
     // Prepare faulty proposal
-    let faulty_block_number = parent_block_number + args.fault_offset;
+    let faulty_block_number = parent_block_number + args.fault_offset * output_block_span;
     let faulty_root_claim = B256::from(games_count.to_be_bytes());
     // Prepare remainder of proposal
     let proposed_block_number = parent_block_number + proposal_block_count;
@@ -129,12 +136,13 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
 
     // Prepare intermediate outputs
     let mut io_field_elements = vec![];
-    let first_io_number = parent_block_number + 1;
-    for i in first_io_number..proposed_block_number {
-        let output = if i == faulty_block_number {
+    for i in 1..proposal_output_count {
+        let io_block_number = parent_block_number + i * output_block_span;
+
+        let output = if io_block_number == faulty_block_number {
             faulty_root_claim
         } else {
-            op_node_provider.output_at_block(i).await?
+            op_node_provider.output_at_block(io_block_number).await?
         };
         io_field_elements.push(hash_to_fe(output));
     }

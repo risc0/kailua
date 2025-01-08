@@ -27,6 +27,7 @@ enum ProofStatus {
     U_WIN_V_LOSE
 }
 
+// 0xd36871fd
 /// @notice Thrown when a blacklisted address attempts to interact with the game.
 error Blacklisted(address source, address expected);
 
@@ -62,7 +63,7 @@ error UnchallengedGame();
 /// @notice Thrown when a proving fault for an unchallenged output
 error UnchallengedOutput();
 
-// 0xf1082a93
+// 0x5e22e582
 /// @notice Thrown when resolving a faulty proposal
 error ProvenFaulty();
 
@@ -86,7 +87,7 @@ error BlockCountExceeded(uint256 l2BlockNumber, uint256 rootBlockNumber);
 /// @notice Thrown when an incorrect blob hash is provided
 error BlobHashMismatch(bytes32 found, bytes32 expected);
 
-// 0x6dafbcfa
+// 0x1434391f
 /// @notice Thrown when a blob hash is missing
 error BlobHashMissing(uint256 index, uint256 count);
 

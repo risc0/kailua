@@ -26,7 +26,8 @@ pub struct Config {
     pub verifier: Address,
     pub image_id: B256,
     pub cfg_hash: B256,
-    pub proposal_block_count: u64,
+    pub proposal_output_count: u64,
+    pub output_block_span: u64,
     pub proposal_blobs: u64,
     pub game_type: u8,
     pub factory: Address,
@@ -57,11 +58,17 @@ impl Config {
             .stall()
             .await
             .configHash_;
-        let proposal_block_count = kailua_game_implementation
-            .proposalBlockCount()
+        let proposal_output_count = kailua_game_implementation
+            .proposalOutputCount()
             .stall()
             .await
-            .proposalBlockCount_
+            .proposalOutputCount_
+            .to();
+        let output_block_span = kailua_game_implementation
+            .outputBlockSpan()
+            .stall()
+            .await
+            .outputBlockSpan_
             .to();
         let proposal_blobs = kailua_game_implementation
             .proposalBlobs()
@@ -108,7 +115,8 @@ impl Config {
             verifier,
             image_id,
             cfg_hash,
-            proposal_block_count,
+            proposal_output_count,
+            output_block_span,
             proposal_blobs,
             game_type,
             factory,
@@ -125,5 +133,9 @@ impl Config {
 
     pub fn min_proposal_time(&self, proposal_block_number: u64) -> u64 {
         self.genesis_time + proposal_block_number * self.block_time + self.proposal_gap + 1
+    }
+
+    pub fn blocks_per_proposal(&self) -> u64 {
+        self.proposal_output_count * self.output_block_span
     }
 }

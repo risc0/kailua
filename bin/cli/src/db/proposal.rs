@@ -144,7 +144,7 @@ impl Proposal {
                 .await
                 .context("get_blob")?;
             // save data
-            let io_remaining = config.proposal_block_count - (io_field_elements.len() as u64) - 1;
+            let io_remaining = config.proposal_output_count - (io_field_elements.len() as u64) - 1;
             let io_in_blob = io_remaining.min(FIELD_ELEMENTS_PER_BLOB);
             io_field_elements.extend(intermediate_outputs(&blob_data, io_in_blob as usize)?);
             io_blobs.push((blob_kzg_hash, blob_data));
@@ -173,7 +173,7 @@ impl Proposal {
             survivor: None,
             contender: None,
             correct_io: repeat(None)
-                .take((config.proposal_block_count - 1) as usize)
+                .take((config.proposal_output_count - 1) as usize)
                 .collect(),
             correct_claim: None,
             correct_parent: None,
@@ -299,9 +299,13 @@ impl Proposal {
         if self.has_parent() {
             let starting_block_number = self
                 .output_block_number
-                .saturating_sub(config.proposal_block_count);
+                .saturating_sub(config.blocks_per_proposal());
+            debug_assert_eq!(
+                self.io_field_elements.len() as u64,
+                config.proposal_output_count - 1
+            );
             for (i, output_hash) in self.io_field_elements.iter().enumerate() {
-                let io_number = starting_block_number + (i as u64) + 1;
+                let io_number = starting_block_number + (i as u64 + 1) * config.output_block_span;
                 if let Ok(local_output) = op_node_provider.output_at_block(io_number).await {
                     self.correct_io[i] = Some(&hash_to_fe(local_output) == output_hash);
                 } else {

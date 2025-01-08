@@ -48,9 +48,12 @@ pub struct FastTrackArgs {
     /// The l2 block number to start sequencing since
     #[clap(long, env)]
     pub starting_block_number: u64,
-    /// The number of blocks that a proposal must cover
+    /// The number of outputs that a proposal must publish
     #[clap(long, env)]
-    pub proposal_block_span: u64,
+    pub proposal_output_count: u64,
+    /// The number of blocks each output must cover
+    #[clap(long, env)]
+    pub output_block_span: u64,
     /// The time gap before a proposal can be made
     #[clap(long, env)]
     pub proposal_time_gap: u64,
@@ -151,7 +154,8 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         verifier_contract_address,
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
         rollup_config_hash.into(),
-        Uint::from(args.proposal_block_span),
+        Uint::from(args.proposal_output_count),
+        Uint::from(args.output_block_span),
         KAILUA_GAME_TYPE,
         dgf_address,
     )
@@ -258,7 +262,8 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         verifier_contract_address,
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
         rollup_config_hash.into(),
-        Uint::from(args.proposal_block_span),
+        Uint::from(args.proposal_output_count),
+        Uint::from(args.output_block_span),
         KAILUA_GAME_TYPE,
         dgf_address,
         U256::from(config.genesis.l2_time),

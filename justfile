@@ -36,7 +36,8 @@ devnet-upgrade target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l2_rpc
       --op-geth-url {{l2_rpc}} \
       --op-node-url {{rollup_node_rpc}} \
       --starting-block-number 0 \
-      --proposal-block-span 60 \
+      --proposal-output-count 20 \
+      --output-block-span 3 \
       --proposal-time-gap 30 \
       --challenge-timeout 300 \
       --collateral-amount 1 \
