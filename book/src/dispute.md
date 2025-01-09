@@ -29,7 +29,8 @@ constructor(
   IRiscZeroVerifier _verifierContract,
   bytes32 _imageId,
   bytes32 _configHash,
-  uint256 _proposalBlockCount,
+  uint256 _proposalOutputCount,
+  uint256 _outputBlockSpan,
   GameType _gameType,
   IDisputeGameFactory _disputeGameFactory
 )
@@ -37,6 +38,12 @@ constructor(
 
 This contract stores the collateral bonds required for sequencers to publish their proposal, and also stores the first
 sequencing proposal for Kailua as a fault dispute game in your rollup.
+
+```admonish note
+Each published proposal on the L1 will cover `proposalOutputCount × outputBlockSpan` L2 blocks, and require
+publication of `proposalOutputCount` 32-byte commitments on the DA layer.
+```
+
 
 ### Deployment
 
@@ -46,7 +53,8 @@ forge create KailuaTreasury --constructor-args \
   [YOUR_RISC_ZERO_VERIFIER] \
   [YOUR_FPVM_IMAGE_ID] \
   [YOUR_ROLLUP_CONFIG_HASH] \
-  [YOUR_PROPOSAL_BLOCK_COUNT] \
+  [YOUR_PROPOSAL_OUTPUT_COUNT] \
+  [YOUR_OUTPUT_BLOCK_SPAN] \
   [YOUR_KAILUA_GAME_TYPE] \
   [YOUR_DISPUTE_GAME_FACTORY]
 ```
@@ -94,7 +102,8 @@ constructor(
   IRiscZeroVerifier _verifierContract,
   bytes32 _imageId,
   bytes32 _configHash,
-  uint256 _proposalBlockCount,
+  uint256 _proposalOutputCount,
+  uint256 _outputBlockSpan,
   GameType _gameType,
   IDisputeGameFactory _disputeGameFactory,
   uint256 _genesisTimeStamp,
@@ -114,7 +123,8 @@ forge create KailuaGame --evm-version cancun --constructor-args \
   [YOUR_RISC_ZERO_VERIFIER] \
   [YOUR_FPVM_IMAGE_ID] \
   [YOUR_ROLLUP_CONFIG_HASH] \
-  [YOUR_PROPOSAL_BLOCK_COUNT] \
+  [YOUR_PROPOSAL_OUTPUT_COUNT] \
+  [YOUR_OUTPUT_BLOCK_SPAN] \
   [YOUR_KAILUA_GAME_TYPE] \
   [YOUR_DISPUTE_GAME_FACTORY] \
   [YOUR_GENESIS_TIMESTAMP] \

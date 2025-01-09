@@ -13,15 +13,11 @@ using this finalized state.
 You can postpone enabling withdrawals using Kailua at any later point in time after successful migration.
 ```
 
-## Proposal Block Span
+## Proposal Output Count / Output Block Span
 Each sequencing proposal in Kailua must cover a fixed number of L2 blocks, which will determine how much data must be
 published per proposal.
-Consequently, this parameter will determine your proposer's DA costs for using Kailua.
-
-```admonish note
-The current implementation does not yet support mutli-block fault proofs, which means that proposals will have to
-publish a commitment per covered L2 block in the proposal.
-```
+Consequently, configuring how many output commitments are published per proposal and how many L2 blocks are covered per
+commitment will determine your proposer's DA costs for using Kailua and your validator's proving costs during dispute.
 
 These commitments are published as Blobs, which means you should optimize your block span `S` to be `S = B * 4096 + 1`,
 where `B` is the number of blobs required for a single proposal transaction (Ethereum currently limits a single block to

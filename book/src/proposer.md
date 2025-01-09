@@ -20,6 +20,7 @@ kailua-cli propose \
 ```admonish tip
 All the parameters above can be provided as environment variables.
 ```
+
 ### Endpoints
 The first four arguments specify the endpoints that the proposer should use for sequencing:
 * `eth-rpc-url`: The parent chain (ethereum) endpoint for reading/publishing proposals.
