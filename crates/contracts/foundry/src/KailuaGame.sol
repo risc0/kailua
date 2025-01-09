@@ -115,7 +115,7 @@ contract KailuaGame is KailuaTournament {
         // - 0x18 extraData:                    0x58 0x70
         //      + 0x08 l2BlockNumber            0x58 0x60
         //      + 0x08 parentGameIndex          0x60 0x68
-        //      + 0x08 duplicationCounter)      0x68 0x70
+        //      + 0x08 duplicationCounter       0x68 0x70
         // - 0x02 CWIA bytes                    0x70 0x72
         if (msg.data.length != 0x72) {
             revert BadExtraData();
@@ -191,8 +191,15 @@ contract KailuaGame is KailuaTournament {
             revert OutOfOrderResolution();
         }
 
-        // INVARIANT: Cannot resolve unless the clock has expired
-        if (getChallengerDuration(block.timestamp).raw() > 0) {
+        // INVARIANT: Cannot resolve unless proven valid or the clock has expired
+        if (parentGame_.provenAt(0, 0).raw() > 0) {
+            if (
+                rootClaim().raw() != parentGame_.validChildRootClaim()
+                    || blobsHash() == parentGame_.validChildBlobsHash()
+            ) {
+                revert ProvenFaulty();
+            }
+        } else if (getChallengerDuration(block.timestamp).raw() > 0) {
             revert ClockNotExpired();
         }
 

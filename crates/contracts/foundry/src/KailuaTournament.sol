@@ -127,7 +127,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     }
 
     // ------------------------------
-    // Fault proving
+    // Tournament
     // ------------------------------
 
     /// @notice The game's index in the factory
@@ -151,6 +151,291 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     /// @notice The next unprocessed opponent
     uint64 public opponentIndex;
 
+    /// @notice The next output accepted through a validity proof
+    bytes32 public validChildRootClaim;
+
+    /// @notice The next blobs hash accepted through a validity proof
+    bytes32 public validChildBlobsHash;
+
+    /// @notice Returns the number of children
+    function childCount() external view returns (uint256 count_) {
+        count_ = children.length;
+    }
+
+    /// @notice Registers a new proposal that extends this one
+    function appendChild() external {
+        // INVARIANT: The calling contract is a newly deployed contract by the dispute game factory
+        if (!KAILUA_TREASURY.isProposing()) {
+            revert UnknownGame();
+        }
+
+        // INVARIANT: The calling KailuaGame contract is not referring to itself as a parent
+        if (msg.sender == address(this)) {
+            revert InvalidParent();
+        }
+
+        // Append new child to children list
+        children.push(KailuaTournament(msg.sender));
+    }
+
+    /// @notice Eliminates children until at least one remains
+    function pruneChildren(uint256 eliminationLimit) external returns (KailuaTournament survivor) {
+        // INVARIANT: Only finalized proposals may host tournaments
+        if (status != GameStatus.DEFENDER_WINS) {
+            revert GameNotResolved();
+        }
+
+        // INVARIANT: No tournament to play without at least one child
+        if (children.length == 0) {
+            revert NotProposed();
+        }
+
+        // Discover survivor using available proofs
+        if (provenAt[0][0].raw() > 0) {
+            survivor = pruneWithValidityProof(eliminationLimit);
+        } else {
+            survivor = pruneWithFaultProofs(eliminationLimit);
+        }
+    }
+
+    /// @notice Eliminates children until at least one remains if a validity proof is available
+    function pruneWithValidityProof(uint256 eliminationLimit) internal returns (KailuaTournament survivor) {
+        // Resume from last surviving contender
+        uint64 u = contenderIndex;
+        for (; u < children.length && eliminationLimit > 0; (u++, eliminationLimit--)) {
+            KailuaTournament child = children[u];
+            if (!isChildEliminated(child)) {
+                // Find the first viable proven child
+                if (child.blobsHash() == validChildBlobsHash && child.rootClaim().raw() == validChildRootClaim) {
+                    break;
+                }
+                // Eliminate faulty proposal
+                KAILUA_TREASURY.eliminate(address(child), prover[0][0]);
+            }
+        }
+
+        // Resume from last unprocessed opponent
+        uint64 v = opponentIndex;
+        if (v <= u) {
+            // Select first possible opponent
+            v = u + 1;
+        }
+
+        // Eliminate faulty opponents
+        KailuaTournament contender = children[u];
+        for (; v < children.length && eliminationLimit > 0; (v++, eliminationLimit--)) {
+            KailuaTournament opponent = children[v];
+            // If the opponent proposer is eliminated or has the same identity, skip
+            if (canIgnoreOpponent(contender, opponent)) {
+                continue;
+            }
+            // If the contender hasn't been challenged for as long as the timeout, declare them winner
+            if (contender.getChallengerDuration(opponent.createdAt().raw()).raw() == 0) {
+                // Note: This implies eliminationLimit > 0
+                break;
+            }
+            // If the opponent proposal is an identical twin, skip it
+            if (opponent.rootClaim().raw() == validChildRootClaim) {
+                if (opponent.blobsHash() == validChildBlobsHash) {
+                    // The opponent is an unjustified duplicate proposal. Ignore it.
+                    continue;
+                }
+            }
+            // eliminate the opponent
+            if (provenAt[0][0].raw() < provenAt[u][v].raw()) {
+                KAILUA_TREASURY.eliminate(address(opponent), prover[0][0]);
+            } else {
+                KAILUA_TREASURY.eliminate(address(opponent), prover[u][v]);
+            }
+        }
+
+        // INVARIANT: v > u && contender == children[u]
+        // Record incremental progress
+        contenderIndex = u;
+        opponentIndex = v;
+
+        // Return the sole survivor if no more matches can be played
+        if (v == children.length || eliminationLimit > 0) {
+            survivor = contender;
+        }
+    }
+
+    /// @notice Eliminates children until at least one remains if all required fault proofs are available
+    function pruneWithFaultProofs(uint256 eliminationLimit) internal returns (KailuaTournament survivor) {
+        // Resume from last surviving contender
+        uint64 u = contenderIndex;
+        if (u == 0) {
+            // Select the first possible contender
+            for (; u < children.length && eliminationLimit > 0; (u++, eliminationLimit--)) {
+                if (!isChildEliminated(children[u])) {
+                    break;
+                }
+            }
+        }
+
+        // Resume from last unprocessed opponent
+        uint64 v = opponentIndex;
+        if (v == 0) {
+            // Select first possible opponent
+            v = u + 1;
+        }
+
+        // Match contenders and opponents
+        KailuaTournament contender = children[u];
+        for (; v < children.length && eliminationLimit > 0; (v++, eliminationLimit--)) {
+            KailuaTournament opponent = children[v];
+            // If the opponent proposer is eliminated or has the same identity, skip
+            if (canIgnoreOpponent(contender, opponent)) {
+                continue;
+            }
+            // If the contender hasn't been challenged for as long as the timeout, declare them winner
+            if (contender.getChallengerDuration(opponent.createdAt().raw()).raw() == 0) {
+                // Note: This implies eliminationLimit > 0
+                break;
+            }
+            // If the opponent proposal is an identical twin, skip it
+            if (contender.rootClaim().raw() == opponent.rootClaim().raw()) {
+                if (contender.blobsHash() == opponent.blobsHash()) {
+                    // The opponent is an unjustified duplicate proposal. Ignore it.
+                    continue;
+                }
+            }
+            // Check if the result of playing this match is available
+            ProofStatus proven = proofStatus[u][v];
+            // We must wait for more proofs if the result is unavailable
+            if (proven == ProofStatus.NONE) {
+                revert NotProven();
+            }
+            // Otherwise decide winner
+            if (proven == ProofStatus.U_LOSE_V_WIN) {
+                // u was shown as faulty (beat by v)
+                // eliminate the contender
+                KAILUA_TREASURY.eliminate(address(contender), prover[u][v]);
+                // proceed with opponent as new contender
+                u = v;
+                contender = opponent;
+            } else {
+                // assume u survives (todo eliminate u on lose-lose)
+                // eliminate the opponent
+                KAILUA_TREASURY.eliminate(address(opponent), prover[u][v]);
+                // proceed with the same contender
+            }
+        }
+
+        // INVARIANT: v > u && contender == children[u]
+        // Record incremental progress
+        contenderIndex = u;
+        opponentIndex = v;
+
+        // Return the sole survivor if no more matches can be played
+        if (v == children.length || eliminationLimit > 0) {
+            survivor = contender;
+        }
+    }
+
+    /// @notice Returns true iff the child proposal was eliminated
+    function isChildEliminated(KailuaTournament child) internal returns (bool) {
+        address _proposer = KAILUA_TREASURY.proposerOf(address(child));
+        uint256 eliminationRound = KAILUA_TREASURY.eliminationRound(_proposer);
+        if (eliminationRound == 0 || eliminationRound > child.gameIndex()) {
+            // This proposer has not been eliminated as of their proposal at gameIndex
+            return false;
+        }
+        return true;
+    }
+
+    /// @notice Returns true if the opposing proposal can be ignored by the contender
+    function canIgnoreOpponent(KailuaTournament contender, KailuaTournament opponent) internal returns (bool) {
+        address opponentProposer = KAILUA_TREASURY.proposerOf(address(opponent));
+        uint256 eliminationRound = KAILUA_TREASURY.eliminationRound(opponentProposer);
+        if (eliminationRound == 0 || eliminationRound > opponent.gameIndex()) {
+            address contenderProposer = KAILUA_TREASURY.proposerOf(address(contender));
+            // The opponent is fighting itself
+            return contenderProposer == opponentProposer;
+        }
+        // The opponent had been eliminated prior to their proposal
+        return true;
+    }
+
+    /// @notice Returns the amount of time left for challenges as of the input timestamp.
+    function getChallengerDuration(uint256 asOfTimestamp) public view virtual returns (Duration duration_);
+
+    /// @notice Returns the parent game contract.
+    function parentGame() public view virtual returns (KailuaTournament parentGame_);
+
+    /// @notice Returns the proposer address
+    function proposer() public returns (address proposer_) {
+        proposer_ = KAILUA_TREASURY.proposerOf(address(this));
+    }
+
+    // ------------------------------
+    // Validity proving
+    // ------------------------------
+
+    /// @notice Returns the hash of all blob hashes associated with this proposal
+    function blobsHash() public view returns (bytes32 blobsHash_) {
+        blobsHash_ = sha256(abi.encodePacked(proposalBlobHashes));
+    }
+
+    /// @notice Proves that a proposal is valid
+    function proveValidity(address payoutRecipient, uint64 childIndex, bytes calldata encodedSeal) external {
+        KailuaTournament childContract = children[childIndex];
+        // INVARIANT: Can only proof unresolved proposals
+        if (childContract.status() != GameStatus.IN_PROGRESS) {
+            revert GameNotInProgress();
+        }
+
+        // INVARIANT: Proofs can only be submitted once
+        if (provenAt[0][0].raw() != 0) {
+            revert AlreadyProven();
+        }
+
+        // Store validity proof data (deleted on revert)
+        validChildRootClaim = childContract.rootClaim().raw();
+        validChildBlobsHash = childContract.blobsHash();
+
+        // Calculate the expected precondition hash
+        bytes32 preconditionHash =
+            sha256(abi.encodePacked(PROPOSAL_OUTPUT_COUNT - 1, OUTPUT_BLOCK_SPAN, validChildBlobsHash));
+
+        // Calculate the expected block number
+        uint64 claimBlockNumber = uint64(l2BlockNumber() + PROPOSAL_OUTPUT_COUNT * OUTPUT_BLOCK_SPAN);
+
+        // Construct the expected journal
+        bytes32 journalDigest = sha256(
+            abi.encodePacked(
+                // The address of the recipient of the payout for this proof
+                payoutRecipient,
+                // The blob equivalence precondition hash
+                preconditionHash,
+                // The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
+                childContract.l1Head().raw(),
+                // The accepted output
+                rootClaim().raw(),
+                // The proposed output
+                validChildRootClaim,
+                // The claim block number
+                claimBlockNumber,
+                // The rollup configuration hash
+                ROLLUP_CONFIG_HASH
+            )
+        );
+
+        // Revert on proof verification failure
+        RISC_ZERO_VERIFIER.verify(encodedSeal, FPVM_IMAGE_ID, journalDigest);
+
+        // Set the game's prover address
+        prover[0][0] = payoutRecipient;
+
+        // Set the proving timestamp
+        provenAt[0][0] = Timestamp.wrap(uint64(block.timestamp));
+    }
+
+    // ------------------------------
+    // Fault proving
+    // ------------------------------
+
+    /// @notice Verifies that an intermediate output was part of the proposal
     function verifyIntermediateOutput(
         uint64 outputNumber,
         bytes32 outputHash,
@@ -158,8 +443,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         bytes calldata kzgProof
     ) external virtual returns (bool success);
 
-    /// @notice Proves the outcome of a tournament match
-    function prove(
+    /// @notice Proves which parties are faulty in a tournament match
+    function proveFault(
         address payoutRecipient,
         uint64[3] calldata uvo,
         bytes calldata encodedSeal,
@@ -219,7 +504,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         // Validate the common output root.
         if (uvo[2] == 0) {
             // The safe output is the parent game's output when proving the first output
-            require(acceptedOutput == rootClaim().raw());
+            require(acceptedOutput == rootClaim().raw(), "bad acceptedOutput");
         } else {
             // Prove common output publication
             require(
@@ -239,8 +524,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
         // Validate the claimed output roots.
         if (uvo[2] == PROPOSAL_OUTPUT_COUNT - 1) {
-            require(proposedOutput[0] == childContracts[0].rootClaim().raw());
-            require(proposedOutput[1] == childContracts[1].rootClaim().raw());
+            require(proposedOutput[0] == childContracts[0].rootClaim().raw(), "bad proposedOutput[0]");
+            require(proposedOutput[1] == childContracts[1].rootClaim().raw(), "bad proposedOutput[1]");
         } else {
             // Prove divergent output publication
             require(
@@ -271,7 +556,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                 abi.encodePacked(
                     // The address of the recipient of the payout for this proof
                     payoutRecipient,
-                    // The parent proposal's claim hash
+                    // The blob equivalence precondition hash
                     preconditionHash,
                     // The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
                     childContracts[1].l1Head().raw(),
@@ -281,7 +566,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                     computedOutput,
                     // The L2 claim block number.
                     claimBlockNumber,
-                    // The configuration hash for this game
+                    // The rollup configuration hash
                     ROLLUP_CONFIG_HASH
                 )
             );
@@ -312,148 +597,6 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
         // Set the game's proving timestamp
         provenAt[uvo[0]][uvo[1]] = Timestamp.wrap(uint64(block.timestamp));
-    }
-
-    /// @notice Returns the number of children
-    function childCount() external view returns (uint256 count_) {
-        count_ = children.length;
-    }
-
-    /// @notice Registers a new proposal that extends this one
-    function appendChild() external {
-        // INVARIANT: The calling contract is a newly deployed contract by the dispute game factory
-        if (!KAILUA_TREASURY.isProposing()) {
-            revert UnknownGame();
-        }
-
-        // INVARIANT: The calling KailuaGame contract is not referring to itself as a parent
-        if (msg.sender == address(this)) {
-            revert InvalidParent();
-        }
-
-        // Append new child to children list
-        children.push(KailuaTournament(msg.sender));
-        // todo: automatically request fault proof from boundless to resolve dispute
-    }
-
-    /// @notice Eliminates children until at least one remains
-    function pruneChildren(uint256 eliminationLimit) external returns (KailuaTournament survivor) {
-        // INVARIANT: Only finalized proposals may host tournaments
-        if (status != GameStatus.DEFENDER_WINS) {
-            revert GameNotResolved();
-        }
-
-        // INVARIANT: No tournament to play without at least one child
-        if (children.length == 0) {
-            revert NotProposed();
-        }
-
-        // Resume from last surviving contender
-        uint64 u = contenderIndex;
-        if (u == 0) {
-            // Select the first possible contender
-            for (; u < children.length && eliminationLimit > 0; (u++, eliminationLimit--)) {
-                if (!isChildEliminated(children[u])) {
-                    break;
-                }
-            }
-        }
-
-        // Resume from last unprocessed opponent
-        uint64 v = opponentIndex;
-        if (v == 0) {
-            // Select first possible opponent
-            v = u + 1;
-        }
-
-        // Match contenders and opponents
-        KailuaTournament contender = children[u];
-        for (; v < children.length && eliminationLimit > 0; (v++, eliminationLimit--)) {
-            KailuaTournament opponent = children[v];
-            // If the opponent proposer is eliminated or has the same identity, skip
-            if (canIgnoreOpponent(contender, opponent)) {
-                continue;
-            }
-            // If the contender hasn't been challenged for as long as the timeout, declare them winner
-            if (contender.getChallengerDuration(opponent.createdAt().raw()).raw() == 0) {
-                // Note: This implies eliminationLimit > 0
-                break;
-            }
-            // If the opponent proposal is an identical twin, skip it
-            if (contender.rootClaim().raw() == opponent.rootClaim().raw()) {
-                uint64 common;
-                for (common = 0; common < PROPOSAL_BLOBS; common++) {
-                    if (contender.proposalBlobHashes(common).raw() != opponent.proposalBlobHashes(common).raw()) {
-                        break;
-                    }
-                }
-                if (common == PROPOSAL_BLOBS) {
-                    // The opponent is an unjustified duplicate proposal. Ignore it.
-                    continue;
-                }
-            }
-            // Check if the result of playing this match is available
-            ProofStatus proven = proofStatus[u][v];
-            // We must wait for more proofs if the result is unavailable
-            require(proven != ProofStatus.NONE);
-            // Otherwise decide winner
-            if (proven == ProofStatus.U_LOSE_V_WIN) {
-                // u was shown as faulty (beat by v)
-                // eliminate the contender
-                KAILUA_TREASURY.eliminate(address(contender), prover[u][v]);
-                // proceed with opponent as new contender
-                u = v;
-                contender = opponent;
-            } else {
-                // assume u survives (todo eliminate u on lose-lose)
-                // eliminate the opponent
-                KAILUA_TREASURY.eliminate(address(opponent), prover[u][v]);
-                // proceed with the same contender
-            }
-        }
-
-        // INVARIANT: v > u && contender == children[u]
-        // Record incremental progress
-        contenderIndex = u;
-        opponentIndex = v;
-
-        // Return the sole survivor if no more matches can be played
-        if (v == children.length || eliminationLimit > 0) {
-            survivor = contender;
-        }
-    }
-
-    function isChildEliminated(KailuaTournament child) internal returns (bool) {
-        address _proposer = KAILUA_TREASURY.proposerOf(address(child));
-        uint256 eliminationRound = KAILUA_TREASURY.eliminationRound(_proposer);
-        if (eliminationRound == 0 || eliminationRound > child.gameIndex()) {
-            // This proposer has not been eliminated as of their proposal at gameIndex
-            return false;
-        }
-        return true;
-    }
-
-    function canIgnoreOpponent(KailuaTournament contender, KailuaTournament opponent) internal returns (bool) {
-        address opponentProposer = KAILUA_TREASURY.proposerOf(address(opponent));
-        uint256 eliminationRound = KAILUA_TREASURY.eliminationRound(opponentProposer);
-        if (eliminationRound == 0 || eliminationRound > opponent.gameIndex()) {
-            address contenderProposer = KAILUA_TREASURY.proposerOf(address(contender));
-            // The opponent is fighting itself
-            return contenderProposer == opponentProposer;
-        }
-        // The opponent had been eliminated prior to their proposal
-        return true;
-    }
-
-    /// @notice Returns the amount of time left for challenges as of the input timestamp.
-    function getChallengerDuration(uint256 asOfTimestamp) public view virtual returns (Duration duration_);
-
-    /// @notice Returns the parent game contract.
-    function parentGame() public view virtual returns (KailuaTournament parentGame_);
-
-    /// @notice Returns the proposer address
-    function proposer() public returns (address proposer_) {
-        proposer_ = KAILUA_TREASURY.proposerOf(address(this));
     }
 
     // ------------------------------
