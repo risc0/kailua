@@ -385,14 +385,14 @@ pub async fn handle_proposals(
             }
 
             let contender_output = contender.output_at(challenge_position);
-            if contender_output != hash_to_fe(proof_journal.claimed_l2_output_root) {
+            if hash_to_fe(contender_output) != hash_to_fe(proof_journal.claimed_l2_output_root) {
                 warn!(
                     "Contender output fe {contender_output} doesn't match proof fe {}",
                     hash_to_fe(proof_journal.claimed_l2_output_root)
                 );
             }
             let proposal_output = proposal.output_at(challenge_position);
-            if proposal_output != hash_to_fe(proof_journal.claimed_l2_output_root) {
+            if hash_to_fe(proposal_output) != hash_to_fe(proof_journal.claimed_l2_output_root) {
                 warn!(
                     "Proposal output fe {proposal_output} doesn't match proof fe {}",
                     hash_to_fe(proof_journal.claimed_l2_output_root)
