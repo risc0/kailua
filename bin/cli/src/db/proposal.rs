@@ -13,12 +13,13 @@ use alloy::providers::Provider;
 use alloy::transports::Transport;
 use alloy_rpc_types_beacon::sidecar::BlobData;
 use anyhow::{bail, Context};
-use kailua_common::blobs::{hash_to_fe, intermediate_outputs};
+use kailua_common::blobs::{hash_to_fe, intermediate_outputs, trail_data};
 use kailua_contracts::{
     KailuaGame::KailuaGameInstance, KailuaTournament::KailuaTournamentInstance,
     KailuaTreasury::KailuaTreasuryInstance, *,
 };
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::iter::repeat;
 use tracing::{error, info, warn};
 
@@ -35,6 +36,7 @@ pub struct Proposal {
     pub created_at: u64,
     pub io_blobs: Vec<(B256, BlobData)>,
     pub io_field_elements: Vec<B256>,
+    pub trail_field_elements: Vec<B256>,
     pub output_root: B256,
     pub output_block_number: u64,
     pub l1_head: B256,
@@ -44,6 +46,7 @@ pub struct Proposal {
     pub contender: Option<u64>,
     // correctness
     pub correct_io: Vec<Option<bool>>,
+    pub correct_trail: Vec<Option<bool>>,
     pub correct_claim: Option<bool>,
     pub correct_parent: Option<bool>,
     // resolution
@@ -104,6 +107,7 @@ impl Proposal {
             created_at,
             io_blobs: vec![],
             io_field_elements: vec![],
+            trail_field_elements: vec![],
             output_root,
             output_block_number,
             l1_head,
@@ -111,6 +115,7 @@ impl Proposal {
             survivor: None,
             contender: None,
             correct_io: vec![],
+            correct_trail: vec![],
             correct_claim: Some(true),
             correct_parent: Some(true),
             canonical: None,
@@ -133,6 +138,7 @@ impl Proposal {
         // fetch blob data
         let mut io_blobs = Vec::new();
         let mut io_field_elements = Vec::new();
+        let mut trail_field_elements = Vec::new();
         for _ in 0..config.proposal_blobs {
             let blob_kzg_hash = game_instance
                 .proposalBlobHashes(U256::from(io_blobs.len()))
@@ -145,8 +151,9 @@ impl Proposal {
                 .context("get_blob")?;
             // save data
             let io_remaining = config.proposal_output_count - (io_field_elements.len() as u64) - 1;
-            let io_in_blob = io_remaining.min(FIELD_ELEMENTS_PER_BLOB);
-            io_field_elements.extend(intermediate_outputs(&blob_data, io_in_blob as usize)?);
+            let io_in_blob = io_remaining.min(FIELD_ELEMENTS_PER_BLOB) as usize;
+            io_field_elements.extend(intermediate_outputs(&blob_data, io_in_blob)?);
+            trail_field_elements.extend(trail_data(&blob_data, io_in_blob)?);
             io_blobs.push((blob_kzg_hash, blob_data));
         }
         // claim data
@@ -158,6 +165,7 @@ impl Proposal {
             .l2BlockNumber_
             .to();
         let l1_head = game_instance.l1Head().stall().await.l1Head_.0.into();
+        let trail_len = trail_field_elements.len();
         Ok(Self {
             contract: *game_instance.address(),
             index,
@@ -166,6 +174,7 @@ impl Proposal {
             created_at,
             io_blobs,
             io_field_elements,
+            trail_field_elements,
             output_root,
             output_block_number,
             l1_head,
@@ -175,6 +184,7 @@ impl Proposal {
             correct_io: repeat(None)
                 .take((config.proposal_output_count - 1) as usize)
                 .collect(),
+            correct_trail: repeat(None).take(trail_len).collect(),
             correct_claim: None,
             correct_parent: None,
             canonical: None,
@@ -304,6 +314,7 @@ impl Proposal {
                 self.io_field_elements.len() as u64,
                 config.proposal_output_count - 1
             );
+            // output commitments
             for (i, output_hash) in self.io_field_elements.iter().enumerate() {
                 let io_number = starting_block_number + (i as u64 + 1) * config.output_block_span;
                 if let Ok(local_output) = op_node_provider.output_at_block(io_number).await {
@@ -311,6 +322,10 @@ impl Proposal {
                 } else {
                     error!("Could not get output hash {io_number} from op node");
                 }
+            }
+            // trail data
+            for (i, output_hash) in self.trail_field_elements.iter().enumerate() {
+                self.correct_trail[i] = Some(output_hash.is_zero());
             }
         }
         // Return correctness
@@ -328,10 +343,14 @@ impl Proposal {
         if self.correct_io.iter().flatten().any(|c| !c) {
             return Some(false);
         }
+        if self.correct_trail.iter().flatten().any(|c| !c) {
+            return Some(false);
+        }
         // Unknown case
         if self.correct_parent.is_none()
             || self.correct_claim.is_none()
             || self.correct_io.iter().any(|c| c.is_none())
+            || self.correct_trail.iter().any(|c| c.is_none())
         {
             return None;
         }
@@ -400,6 +419,12 @@ impl Proposal {
         if self.output_root != proposal.output_root {
             return Some(self.io_field_elements.len());
         }
+        // Check divergence in trail
+        for i in 0..self.trail_field_elements.len() {
+            if self.trail_field_elements[i] != proposal.trail_field_elements[i] {
+                return Some(self.io_field_elements.len() + i + 1);
+            }
+        }
         // Report equivalence
         None
     }
@@ -415,13 +440,13 @@ impl Proposal {
             // u wins if v is a duplicate
             None => true,
             // u wins if v is wrong (even if u is wrong)
-            Some(point) => {
-                if point < self.io_field_elements.len() {
-                    !opponent.correct_io[point].unwrap()
-                } else {
-                    !opponent.correct_claim.unwrap()
+            Some(point) => match point.cmp(&self.io_field_elements.len()) {
+                Ordering::Less => !opponent.correct_io[point].unwrap(),
+                Ordering::Equal => !opponent.correct_claim.unwrap(),
+                Ordering::Greater => {
+                    !opponent.correct_trail[point - self.io_field_elements.len() - 1].unwrap()
                 }
-            }
+            },
         }
     }
 
@@ -443,11 +468,10 @@ impl Proposal {
     }
 
     pub fn has_precondition_for(&self, position: u64) -> bool {
-        if position == self.io_field_elements.len() as u64 {
-            false
-        } else {
-            // technically this can be > 1 instead
+        if position <= self.io_field_elements.len() as u64 {
             (position % FIELD_ELEMENTS_PER_BLOB) > 0
+        } else {
+            true
         }
     }
 
@@ -468,10 +492,20 @@ impl Proposal {
     }
 
     pub fn output_at(&self, position: u64) -> B256 {
-        self.io_field_elements
-            .get(position as usize)
-            .copied()
-            .unwrap_or(self.output_root)
+        let io_count = self.io_field_elements.len() as u64;
+        match position.cmp(&io_count) {
+            Ordering::Less => self
+                .io_field_elements
+                .get(position as usize)
+                .copied()
+                .unwrap(),
+            Ordering::Equal => self.output_root,
+            Ordering::Greater => self
+                .trail_field_elements
+                .get((position - io_count - 1) as usize)
+                .copied()
+                .unwrap(),
+        }
     }
 
     pub fn create_sidecar(io_field_elements: &[B256]) -> anyhow::Result<BlobTransactionSidecar> {

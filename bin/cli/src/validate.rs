@@ -19,11 +19,11 @@ use crate::db::KailuaDB;
 use crate::providers::beacon::BlobProvider;
 use crate::providers::optimism::OpNodeProvider;
 use crate::{stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
-use alloy::eips::eip4844::IndexedBlobHash;
+use alloy::eips::eip4844::{IndexedBlobHash, FIELD_ELEMENTS_PER_BLOB};
 use alloy::eips::BlockNumberOrTag;
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::network::EthereumWallet;
-use alloy::primitives::{Address, Bytes, FixedBytes, U256};
+use alloy::primitives::{Address, Bytes, FixedBytes, B256, U256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy::signers::local::LocalSigner;
 use anyhow::{anyhow, bail, Context};
@@ -34,7 +34,7 @@ use kailua_common::blobs::hash_to_fe;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::client::config_hash;
 use kailua_common::journal::ProofJournal;
-use kailua_common::precondition::{precondition_hash, PreconditionValidationData};
+use kailua_common::precondition::{divergence_precondition_hash, PreconditionValidationData};
 use kailua_contracts::*;
 use kailua_host::fetch_rollup_config;
 use op_alloy_protocol::BlockInfo;
@@ -194,6 +194,7 @@ pub async fn handle_proposals(
             };
             // skip this proposal if it has no contender
             let Some(contender) = proposal.contender else {
+                info!("Skipping proposal {proposal_index} with no contender.");
                 continue;
             };
             // request a proof of the match results
@@ -234,7 +235,7 @@ pub async fn handle_proposals(
                 ._0;
             // Prove if unproven
             if proof_status == 0 {
-                request_proof(
+                request_fault_proof(
                     &mut channel,
                     &kailua_db.config,
                     &contender,
@@ -251,7 +252,7 @@ pub async fn handle_proposals(
             }
         }
 
-        // publish computed proofs and resolve proven challenges
+        // publish computed fault proofs and resolve proven challenges
         while !channel.receiver.is_empty() {
             let Message::Proof(proposal_index, proof) = channel
                 .receiver
@@ -261,28 +262,32 @@ pub async fn handle_proposals(
             else {
                 bail!("Unexpected message type.");
             };
-            let proposal = kailua_db.get_local_proposal(&proposal_index).unwrap();
-            let proposal_parent = kailua_db.get_local_proposal(&proposal.parent).unwrap();
-            let proposal_parent_contract =
-                proposal_parent.tournament_contract_instance(&validator_provider);
+            let opponent = kailua_db.get_local_proposal(&proposal_index).unwrap();
+            let parent = kailua_db.get_local_proposal(&opponent.parent).unwrap();
+            let parent_contract = parent.tournament_contract_instance(&validator_provider);
             let proof_journal = ProofJournal::decode_packed(proof.journal().as_ref())?;
             info!("Proof journal: {:?}", proof_journal);
-            let contender_index = proposal.contender.unwrap();
+            let contender_index = opponent.contender.unwrap();
             let contender = kailua_db.get_local_proposal(&contender_index).unwrap();
 
-            let u_index = proposal_parent
+            let u_index = parent
                 .child_index(contender_index)
                 .expect("Could not look up contender's index in parent tournament");
-            let v_index = proposal_parent
-                .child_index(proposal.index)
+            let v_index = parent
+                .child_index(opponent.index)
                 .expect("Could not look up contender's index in parent tournament");
 
-            let challenge_position = (proof_journal.claimed_l2_block_number
-                - proposal_parent.output_block_number)
-                / kailua_db.config.output_block_span
-                - 1;
+            // The index of the intermediate output to challenge
+            // ZERO for trail data challenges
+            let challenge_position = contender
+                .divergence_point(&opponent)
+                .expect("Equivalent proposals") as u64;
+            // let challenge_position = ((proof_journal.claimed_l2_block_number
+            //     - parent.output_block_number)
+            //     / kailua_db.config.output_block_span)
+            //     .saturating_sub(1);
 
-            let expected_image_id = proposal_parent_contract.imageId().stall().await.imageId_.0;
+            let expected_image_id = parent_contract.imageId().stall().await.imageId_.0;
 
             // patch the proof if in dev mode
             #[cfg(feature = "devnet")]
@@ -384,37 +389,63 @@ pub async fn handle_proposals(
                 }
             }
 
-            let contender_output = contender.output_at(challenge_position);
-            if hash_to_fe(contender_output) != hash_to_fe(proof_journal.claimed_l2_output_root) {
-                warn!(
-                    "Contender output fe {contender_output} doesn't match proof fe {}",
-                    hash_to_fe(proof_journal.claimed_l2_output_root)
-                );
-            }
-            let proposal_output = proposal.output_at(challenge_position);
-            if hash_to_fe(proposal_output) != hash_to_fe(proof_journal.claimed_l2_output_root) {
-                warn!(
-                    "Proposal output fe {proposal_output} doesn't match proof fe {}",
-                    hash_to_fe(proof_journal.claimed_l2_output_root)
-                );
-            }
-            let op_node_output = op_node_provider
-                .output_at_block(proof_journal.claimed_l2_block_number)
-                .await?;
-            if op_node_output != proof_journal.claimed_l2_output_root {
-                error!(
-                    "Local op node output {op_node_output} doesn't match proof {}",
-                    proof_journal.claimed_l2_output_root
-                );
-            } else {
-                info!(
-                    "Proven output matches local op node output {}:{op_node_output}.",
+            // sanity check faulty output proofs
+            let is_output_fault_proof =
+                proof_journal.claimed_l2_block_number > parent.output_block_number;
+            if is_output_fault_proof {
+                let contender_output = contender.output_at(challenge_position);
+                if hash_to_fe(contender_output) != hash_to_fe(proof_journal.claimed_l2_output_root)
+                {
+                    warn!(
+                        "Contender output fe {contender_output} doesn't match proof fe {}",
+                        hash_to_fe(proof_journal.claimed_l2_output_root)
+                    );
+                }
+                let proposal_output = opponent.output_at(challenge_position);
+                if hash_to_fe(proposal_output) != hash_to_fe(proof_journal.claimed_l2_output_root) {
+                    warn!(
+                        "Proposal output fe {proposal_output} doesn't match proof fe {}",
+                        hash_to_fe(proof_journal.claimed_l2_output_root)
+                    );
+                }
+                let op_node_output = op_node_provider
+                    .output_at_block(proof_journal.claimed_l2_block_number)
+                    .await?;
+                if op_node_output != proof_journal.claimed_l2_output_root {
+                    error!(
+                        "Local op node output {op_node_output} doesn't match proof {}",
+                        proof_journal.claimed_l2_output_root
+                    );
+                } else {
+                    info!(
+                        "Proven output matches local op node output {}:{op_node_output}.",
+                        proof_journal.claimed_l2_block_number
+                    );
+                }
+
+                if opponent.l1_head != proof_journal.l1_head {
+                    warn!(
+                        "L1 head mismatch. Found {}, expected {}.",
+                        proof_journal.l1_head, opponent.l1_head
+                    );
+                } else {
+                    info!("Proof L1 head confirmed.");
+                }
+
+                let expected_block_number = parent.output_block_number
+                    + (challenge_position + 1) * kailua_db.config.output_block_span;
+                if expected_block_number != proof_journal.claimed_l2_block_number {
+                    warn!(
+                    "Claimed l2 block number mismatch. Found {}, expected {expected_block_number}.",
                     proof_journal.claimed_l2_block_number
                 );
+                } else {
+                    info!("Claimed l2 block number confirmed.");
+                }
             }
 
             // only prove unproven games
-            let proof_status = proposal_parent_contract
+            let proof_status = parent_contract
                 .proofStatus(U256::from(u_index), U256::from(v_index))
                 .stall()
                 .await
@@ -432,151 +463,169 @@ pub async fn handle_proposals(
             let mut proofs = [vec![], vec![]];
             let mut commitments = [vec![], vec![]];
 
-            // kzg proofs for agreed output hashes
-            if challenge_position > 0 {
+            // kzg proofs for agreed output hashes (or for conflicting trail data)
+            if !is_output_fault_proof || challenge_position > 0 {
                 commitments[0].push(contender.io_commitment_for(challenge_position - 1));
                 proofs[0].push(contender.io_proof_for(challenge_position - 1)?);
 
-                commitments[1].push(proposal.io_commitment_for(challenge_position - 1));
-                proofs[1].push(proposal.io_proof_for(challenge_position - 1)?);
+                commitments[1].push(opponent.io_commitment_for(challenge_position - 1));
+                proofs[1].push(opponent.io_proof_for(challenge_position - 1)?);
             }
-            // kzg proofs for claimed output hashes
-            if proof_journal.claimed_l2_block_number < proposal.output_block_number {
+
+            // kzg proofs for claimed output hashes (no trail data)
+            if is_output_fault_proof
+                && proof_journal.claimed_l2_block_number != opponent.output_block_number
+            {
                 commitments[0].push(contender.io_commitment_for(challenge_position));
                 proofs[0].push(contender.io_proof_for(challenge_position)?);
 
-                commitments[1].push(proposal.io_commitment_for(challenge_position));
-                proofs[1].push(proposal.io_proof_for(challenge_position)?);
+                commitments[1].push(opponent.io_commitment_for(challenge_position));
+                proofs[1].push(opponent.io_proof_for(challenge_position)?);
             }
 
             info!(
-                "Submitting proof to tournament at index {} for match between children {u_index} and {v_index} over output {challenge_position} with {} kzg proof(s).",
-                proposal_parent.index,
+                "Submitting fault proof to tournament at index {} for match between children \
+                {u_index} and {v_index} over challenge position {challenge_position} with {} kzg \
+                proof(s).",
+                parent.index,
                 proofs[0].len() + proofs[1].len()
             );
 
-            let contender_contract = contender.tournament_contract_instance(&validator_provider);
-            let proposal_contract = proposal.tournament_contract_instance(&validator_provider);
+            // sanity check kzg proofs for faulty outputs
+            if is_output_fault_proof {
+                let contender_contract =
+                    contender.tournament_contract_instance(&validator_provider);
+                let proposal_contract = opponent.tournament_contract_instance(&validator_provider);
 
-            if proof_journal.claimed_l2_block_number == proposal.output_block_number {
-                if contender.output_root != contender.output_at(challenge_position) {
-                    warn!(
-                        "Contender proposed output root {} does not match submitted {}",
-                        contender.output_root,
-                        contender.output_at(challenge_position)
+                if proof_journal.claimed_l2_block_number == opponent.output_block_number {
+                    if contender.output_root != contender.output_at(challenge_position) {
+                        warn!(
+                            "Contender proposed output root {} does not match submitted {}",
+                            contender.output_root,
+                            contender.output_at(challenge_position)
+                        );
+                    } else {
+                        info!("Contender proposed output confirmed.");
+                    }
+                    if opponent.output_root != opponent.output_at(challenge_position) {
+                        warn!(
+                            "Proposal proposed output root {} does not match submitted {}",
+                            opponent.output_root,
+                            opponent.output_at(challenge_position)
+                        );
+                    } else {
+                        info!("Proposal proposed output confirmed.");
+                    }
+                } else {
+                    let contender_has_output = contender_contract
+                        .verifyIntermediateOutput(
+                            challenge_position,
+                            contender.output_at(challenge_position),
+                            commitments[0].last().unwrap().clone(),
+                            proofs[0].last().unwrap().clone(),
+                        )
+                        .stall()
+                        .await
+                        .success;
+                    if !contender_has_output {
+                        warn!("Could not verify proposed output for contender");
+                    } else {
+                        info!("Contender proposed output confirmed.");
+                    }
+                    let proposal_has_output = proposal_contract
+                        .verifyIntermediateOutput(
+                            challenge_position,
+                            opponent.output_at(challenge_position),
+                            commitments[1].last().unwrap().clone(),
+                            proofs[1].last().unwrap().clone(),
+                        )
+                        .stall()
+                        .await
+                        .success;
+                    if !proposal_has_output {
+                        warn!("Could not verify proposed output for proposal");
+                    } else {
+                        info!("Proposal proposed output confirmed.");
+                    }
+                }
+
+                let is_agreed_output_confirmed = if challenge_position == 0 {
+                    let parent_output_matches =
+                        parent.output_root == proof_journal.agreed_l2_output_root;
+                    if !parent_output_matches {
+                        warn!(
+                            "Parent claim {} is last common output and does not match {}",
+                            parent.output_root, proof_journal.agreed_l2_output_root
+                        );
+                    }
+                    parent_output_matches
+                } else {
+                    let contender_has_output = contender_contract
+                        .verifyIntermediateOutput(
+                            challenge_position - 1,
+                            proof_journal.agreed_l2_output_root,
+                            commitments[0].first().unwrap().clone(),
+                            proofs[0].first().unwrap().clone(),
+                        )
+                        .stall()
+                        .await
+                        .success;
+                    if !contender_has_output {
+                        warn!("Could not verify last common output for contender");
+                    } else {
+                        info!("Contender common output confirmed.");
+                    }
+                    let proposal_has_output = proposal_contract
+                        .verifyIntermediateOutput(
+                            challenge_position - 1,
+                            proof_journal.agreed_l2_output_root,
+                            commitments[1].first().unwrap().clone(),
+                            proofs[1].first().unwrap().clone(),
+                        )
+                        .stall()
+                        .await
+                        .success;
+                    if !proposal_has_output {
+                        warn!("Could not verify last common output for proposal");
+                    } else {
+                        info!("Proposal common output confirmed.");
+                    }
+                    contender_has_output && proposal_has_output
+                };
+                if is_agreed_output_confirmed {
+                    info!(
+                        "Confirmed last common output: {}",
+                        proof_journal.agreed_l2_output_root
                     );
-                } else {
-                    info!("Contender proposed output confirmed.");
-                }
-                if proposal.output_root != proposal.output_at(challenge_position) {
-                    warn!(
-                        "Proposal proposed output root {} does not match submitted {}",
-                        proposal.output_root,
-                        proposal.output_at(challenge_position)
-                    );
-                } else {
-                    info!("Proposal proposed output confirmed.");
-                }
-            } else {
-                let contender_has_output = contender_contract
-                    .verifyIntermediateOutput(
-                        challenge_position,
-                        contender.output_at(challenge_position),
-                        commitments[0].last().unwrap().clone(),
-                        proofs[0].last().unwrap().clone(),
-                    )
-                    .stall()
-                    .await
-                    .success;
-                if !contender_has_output {
-                    warn!("Could not verify proposed output for contender");
-                } else {
-                    info!("Contender proposed output confirmed.");
-                }
-                let proposal_has_output = proposal_contract
-                    .verifyIntermediateOutput(
-                        challenge_position,
-                        proposal.output_at(challenge_position),
-                        commitments[1].last().unwrap().clone(),
-                        proofs[1].last().unwrap().clone(),
-                    )
-                    .stall()
-                    .await
-                    .success;
-                if !proposal_has_output {
-                    warn!("Could not verify proposed output for proposal");
-                } else {
-                    info!("Proposal proposed output confirmed.");
                 }
             }
 
-            let is_agreed_output_confirmed = if challenge_position == 0 {
-                let parent_output_matches =
-                    proposal_parent.output_root == proof_journal.agreed_l2_output_root;
-                if !parent_output_matches {
-                    warn!(
-                        "Parent claim {} is last common output and does not match {}",
-                        proposal_parent.output_root, proof_journal.agreed_l2_output_root
-                    );
-                }
-                parent_output_matches
+            let possible_precondition_hash = if !opponent.has_precondition_for(challenge_position) {
+                B256::ZERO
             } else {
-                let contender_has_output = contender_contract
-                    .verifyIntermediateOutput(
-                        challenge_position - 1,
-                        proof_journal.agreed_l2_output_root,
-                        commitments[0].first().unwrap().clone(),
-                        proofs[0].first().unwrap().clone(),
-                    )
-                    .stall()
-                    .await
-                    .success;
-                if !contender_has_output {
-                    warn!("Could not verify last common output for contender");
+                // Normalize the conflicting blob fe index
+                let normalized_position = if is_output_fault_proof {
+                    challenge_position
                 } else {
-                    info!("Contender common output confirmed.");
-                }
-                let proposal_has_output = proposal_contract
-                    .verifyIntermediateOutput(
-                        challenge_position - 1,
-                        proof_journal.agreed_l2_output_root,
-                        commitments[1].first().unwrap().clone(),
-                        proofs[1].first().unwrap().clone(),
-                    )
-                    .stall()
-                    .await
-                    .success;
-                if !proposal_has_output {
-                    warn!("Could not verify last common output for proposal");
-                } else {
-                    info!("Proposal common output confirmed.");
-                }
-                contender_has_output && proposal_has_output
+                    challenge_position - 1
+                };
+                divergence_precondition_hash(
+                    &(normalized_position % FIELD_ELEMENTS_PER_BLOB),
+                    &contender.io_blob_for(normalized_position).0,
+                    &opponent.io_blob_for(normalized_position).0,
+                )
             };
-            if is_agreed_output_confirmed {
-                info!(
-                    "Confirmed last common output: {}",
-                    proof_journal.agreed_l2_output_root
-                );
-            }
 
-            let possible_precondition_hash = precondition_hash(
-                &contender.io_blob_for(challenge_position).0,
-                &proposal.io_blob_for(challenge_position).0,
-            );
-            if proofs[0].len() == 2
-                && possible_precondition_hash != proof_journal.precondition_output
-            {
-                warn!("Possible precondition hash mismatch. Found {}, computed {possible_precondition_hash}", proof_journal.precondition_output);
+            if possible_precondition_hash != proof_journal.precondition_output {
+                warn!(
+                    "Possible precondition hash mismatch. Found {}, computed {}",
+                    possible_precondition_hash, proof_journal.precondition_output
+                );
             } else {
                 info!("Proof Precondition hash confirmed.")
             }
 
-            let config_hash = proposal_parent_contract
-                .configHash()
-                .stall()
-                .await
-                .configHash_;
+            let config_hash = parent_contract.configHash().stall().await.configHash_;
             if config_hash != proof_journal.config_hash {
                 warn!(
                     "Config hash mismatch. Found {}, expected {config_hash}.",
@@ -586,55 +635,54 @@ pub async fn handle_proposals(
                 info!("Proof Config hash confirmed.");
             }
 
-            if proposal.l1_head != proof_journal.l1_head {
-                warn!(
-                    "L1 head mismatch. Found {}, expected {}.",
-                    proof_journal.l1_head, proposal.l1_head
-                );
+            let transaction_dispatch = if is_output_fault_proof {
+                parent_contract
+                    .proveOutputFault(
+                        proof_journal.payout_recipient,
+                        [u_index, v_index, challenge_position],
+                        encoded_seal.clone(),
+                        proof_journal.agreed_l2_output_root,
+                        [
+                            contender.output_at(challenge_position),
+                            opponent.output_at(challenge_position),
+                        ],
+                        proof_journal.claimed_l2_output_root,
+                        commitments,
+                        proofs,
+                    )
+                    .send()
+                    .await
+                    .context("proveOutputFault (send)")
             } else {
-                info!("Proof L1 head confirmed.");
-            }
+                parent_contract
+                    .proveTrailFault(
+                        proof_journal.payout_recipient,
+                        [u_index, v_index, challenge_position],
+                        encoded_seal.clone(),
+                        [
+                            contender.output_at(challenge_position),
+                            opponent.output_at(challenge_position),
+                        ],
+                        commitments,
+                        proofs,
+                    )
+                    .send()
+                    .await
+                    .context("proveTrailFault (send)")
+            };
 
-            let expected_block_number = proposal_parent.output_block_number
-                + (challenge_position + 1) * kailua_db.config.output_block_span;
-            if expected_block_number != proof_journal.claimed_l2_block_number {
-                warn!(
-                    "Claimed l2 block number mismatch. Found {}, expected {expected_block_number}.",
-                    proof_journal.claimed_l2_block_number
-                );
-            } else {
-                info!("Claimed l2 block number confirmed.");
-            }
-
-            match proposal_parent_contract
-                .prove(
-                    proof_journal.payout_recipient,
-                    [u_index, v_index, challenge_position],
-                    encoded_seal.clone(),
-                    proof_journal.agreed_l2_output_root,
-                    [
-                        contender.output_at(challenge_position),
-                        proposal.output_at(challenge_position),
-                    ],
-                    proof_journal.claimed_l2_output_root,
-                    commitments,
-                    proofs,
-                )
-                .send()
-                .await
-                .context("prove (send)")
-            {
+            match transaction_dispatch {
                 Ok(txn) => match txn.get_receipt().await.context("prove (get_receipt)") {
                     Ok(receipt) => {
                         info!("Proof submitted: {receipt:?}");
-                        let proof_status = proposal_parent_contract
+                        let proof_status = parent_contract
                             .proofStatus(U256::from(u_index), U256::from(v_index))
                             .stall()
                             .await
                             ._0;
                         info!(
                             "Match between {contender_index} and {} proven: {proof_status}",
-                            proposal.index
+                            opponent.index
                         );
                     }
                     Err(e) => {
@@ -649,7 +697,7 @@ pub async fn handle_proposals(
     }
 }
 
-async fn request_proof(
+async fn request_fault_proof(
     channel: &mut DuplexChannel<Message>,
     config: &Config,
     contender: &Proposal,
@@ -658,15 +706,23 @@ async fn request_proof(
     l2_node_provider: &ReqwestProvider,
     op_node_provider: &OpNodeProvider,
 ) -> anyhow::Result<()> {
-    let challenge_point = contender
+    let mut challenge_point = contender
         .divergence_point(proposal)
         .expect("Contender does not diverge from proposal.") as u64;
 
     // Read additional data for Kona invocation
     info!("Requesting proof for proposal {}.", proposal.index);
-    let agreed_l2_head_number = proposal.output_block_number
-        - config.output_block_span * (proposal.io_field_elements.len() as u64 + 1)
-        + config.output_block_span * challenge_point; // the challenge point is zero indexed, so it cancels out
+    let io_count = proposal.io_field_elements.len() as u64;
+    let is_output_fault = challenge_point <= io_count;
+    let agreed_l2_head_number = if is_output_fault {
+        // output commitment challenges start from the last common transition
+        proposal.output_block_number
+            - config.output_block_span * (io_count + 1) // walk back to the starting block number
+            + config.output_block_span * challenge_point // jump to zero-indexed challenge point
+    } else {
+        // trail data challenges assume the starting block hash
+        proposal.output_block_number - config.output_block_span * (io_count + 1)
+    };
     debug!("l2_head_number {:?}", &agreed_l2_head_number);
     let agreed_l2_head_hash = l2_node_provider
         .get_block_by_number(
@@ -683,7 +739,15 @@ async fn request_proof(
         .output_at_block(agreed_l2_head_number)
         .await
         .context("output_at_block")?;
-    let claimed_l2_block_number = agreed_l2_head_number + config.output_block_span;
+
+    // Prepare expected output commitment
+    let claimed_l2_block_number = if is_output_fault {
+        // output commitment challenges target the first bad transition
+        agreed_l2_head_number + config.output_block_span
+    } else {
+        // trail data challenges do not derive any l2 blocks
+        agreed_l2_head_number
+    };
     let claimed_l2_output_root = op_node_provider
         .output_at_block(claimed_l2_block_number)
         .await
@@ -691,6 +755,11 @@ async fn request_proof(
 
     // Prepare precondition validation data
     let precondition_validation_data = if proposal.has_precondition_for(challenge_point) {
+        // Normalize the challenge_point as the blob field element index
+        if !is_output_fault {
+            challenge_point -= 1;
+        }
+
         let (u_blob_hash, u_blob) = contender.io_blob_for(challenge_point);
         let u_blob_block_parent = l1_node_provider
             .get_block_by_hash(contender.l1_head, BlockTransactionsKind::Hashes)
@@ -722,44 +791,48 @@ async fn request_proof(
             .expect("v_blob_block not found");
 
         info!(
-            "Fetched blobs {}:{u_blob_hash} and {}:{v_blob_hash} for challenge point {challenge_point}",
+            "Fetched blobs {}:{u_blob_hash} and {}:{v_blob_hash} for challenge point {challenge_point}/{is_output_fault}",
             u_blob.index,
             v_blob.index,
         );
 
-        Some(PreconditionValidationData {
-            validated_blobs: [
-                // u's blob (contender)
-                BlobFetchRequest {
-                    block_ref: BlockInfo {
-                        hash: u_blob_block.header.hash,
-                        number: u_blob_block.header.number,
-                        parent_hash: u_blob_block.header.parent_hash,
-                        timestamp: u_blob_block.header.timestamp,
-                    },
-                    blob_hash: IndexedBlobHash {
-                        index: u_blob.index,
-                        hash: u_blob_hash,
-                    },
+        let validated_blobs = [
+            // u's blob (contender)
+            BlobFetchRequest {
+                block_ref: BlockInfo {
+                    hash: u_blob_block.header.hash,
+                    number: u_blob_block.header.number,
+                    parent_hash: u_blob_block.header.parent_hash,
+                    timestamp: u_blob_block.header.timestamp,
                 },
-                // v's blob (proposal)
-                BlobFetchRequest {
-                    block_ref: BlockInfo {
-                        hash: v_blob_block.header.hash,
-                        number: v_blob_block.header.number,
-                        parent_hash: v_blob_block.header.parent_hash,
-                        timestamp: v_blob_block.header.timestamp,
-                    },
-                    blob_hash: IndexedBlobHash {
-                        index: v_blob.index,
-                        hash: v_blob_hash,
-                    },
+                blob_hash: IndexedBlobHash {
+                    index: u_blob.index,
+                    hash: u_blob_hash,
                 },
-            ],
-        })
+            },
+            // v's blob (proposal)
+            BlobFetchRequest {
+                block_ref: BlockInfo {
+                    hash: v_blob_block.header.hash,
+                    number: v_blob_block.header.number,
+                    parent_hash: v_blob_block.header.parent_hash,
+                    timestamp: v_blob_block.header.timestamp,
+                },
+                blob_hash: IndexedBlobHash {
+                    index: v_blob.index,
+                    hash: v_blob_hash,
+                },
+            },
+        ];
+
+        Some(PreconditionValidationData::Fault(
+            challenge_point % FIELD_ELEMENTS_PER_BLOB,
+            Box::new(validated_blobs),
+        ))
     } else {
         None
     };
+
     // Message proving task
     channel
         .sender
@@ -865,27 +938,30 @@ pub async fn handle_proofs(
         ];
         // precondition data
         if let Some(precondition_data) = precondition_validation_data {
+            let (block_hashes, blob_hashes): (Vec<_>, Vec<_>) = precondition_data
+                .blob_fetch_requests()
+                .iter()
+                .map(|r| (r.block_ref.hash.to_string(), r.blob_hash.hash.to_string()))
+                .unzip();
+            let params = match precondition_data {
+                PreconditionValidationData::Fault(agreement_index, _) => vec![agreement_index],
+                PreconditionValidationData::Validity(
+                    proposal_output_count,
+                    output_block_span,
+                    _,
+                ) => vec![proposal_output_count, output_block_span],
+            }
+            .into_iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>();
+
             proving_args.extend(vec![
-                String::from("--u-block-hash"),
-                precondition_data.validated_blobs[0]
-                    .block_ref
-                    .hash
-                    .to_string(),
-                String::from("--u-blob-kzg-hash"),
-                precondition_data.validated_blobs[0]
-                    .blob_hash
-                    .hash
-                    .to_string(),
-                String::from("--v-block-hash"),
-                precondition_data.validated_blobs[1]
-                    .block_ref
-                    .hash
-                    .to_string(),
-                String::from("--v-blob-kzg-hash"),
-                precondition_data.validated_blobs[1]
-                    .blob_hash
-                    .hash
-                    .to_string(),
+                String::from("--precondition-params"),
+                params.join(","),
+                String::from("--precondition-block-hashes"),
+                block_hashes.join(","),
+                String::from("--precondition-blob-hashes"),
+                blob_hashes.join(","),
             ]);
         }
         // boundless args

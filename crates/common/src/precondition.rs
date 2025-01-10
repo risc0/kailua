@@ -20,7 +20,7 @@ use std::iter::once;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum PreconditionValidationData {
-    Fault(u64, [BlobFetchRequest; 2]),
+    Fault(u64, Box<[BlobFetchRequest; 2]>),
     Validity(u64, u64, Vec<BlobFetchRequest>),
 }
 

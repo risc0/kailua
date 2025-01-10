@@ -19,7 +19,7 @@ use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy_chains::NamedChain;
 use alloy_eips::eip4844::IndexedBlobHash;
 use alloy_primitives::Address;
-use anyhow::{bail, Context};
+use anyhow::bail;
 use boundless_market::storage::StorageProviderConfig;
 use clap::Parser;
 use kailua_client::{parse_address, parse_b256, BoundlessArgs};
@@ -36,7 +36,6 @@ use serde_json::{json, Value};
 use std::env::set_var;
 use std::iter::zip;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
@@ -408,7 +407,7 @@ pub async fn fetch_precondition_data(
             }
             PreconditionValidationData::Fault(
                 cfg.precondition_params[0],
-                [
+                Box::new([
                     get_blob_fetch_request(
                         &l1_provider,
                         cfg.precondition_block_hashes[0],
@@ -421,7 +420,7 @@ pub async fn fetch_precondition_data(
                         cfg.precondition_blob_hashes[1],
                     )
                     .await?,
-                ],
+                ]),
             )
         } else if cfg.precondition_params.len() == 2 {
             let mut fetch_requests = Vec::with_capacity(cfg.precondition_block_hashes.len());
