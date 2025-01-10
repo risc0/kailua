@@ -129,7 +129,6 @@ prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data 
     --agreed-l2-output-root $AGREED_L2_OUTPUT_ROOT \
     --claimed-l2-output-root $CLAIMED_L2_OUTPUT_ROOT \
     --claimed-l2-block-number $CLAIMED_L2_BLOCK_NUMBER \
-    --block-count {{block_count}} \
     --l2-chain-id $L2_CHAIN_ID \
     --l1-node-address $L1_NODE_ADDRESS \
     --l1-beacon-address $L1_BEACON_ADDRESS \

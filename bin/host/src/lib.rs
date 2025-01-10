@@ -19,7 +19,7 @@ use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy_chains::NamedChain;
 use alloy_eips::eip4844::IndexedBlobHash;
 use alloy_primitives::Address;
-use anyhow::bail;
+use anyhow::{bail, Context};
 use boundless_market::storage::StorageProviderConfig;
 use clap::Parser;
 use kailua_client::{parse_address, parse_b256, BoundlessArgs};
@@ -36,6 +36,7 @@ use serde_json::{json, Value};
 use std::env::set_var;
 use std::iter::zip;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
@@ -63,9 +64,6 @@ pub struct KailuaHostCli {
     #[clap(long, value_parser = parse_address, env)]
     pub payout_recipient_address: Option<Address>,
 
-    #[clap(long, default_value_t = 1, env)]
-    /// Number of blocks to build in a single proof
-    pub block_count: u64,
     #[clap(long, value_delimiter = ',', env)]
     pub precondition_params: Vec<u64>,
     #[clap(long, value_parser = parse_b256, value_delimiter = ',', env)]
@@ -310,8 +308,14 @@ pub async fn zeth_execution_preflight(
         {
             info!("Performing zeth-optimism preflight.");
             let kona_cfg = cfg.kona.clone();
-            let preflight_start = kona_cfg.claimed_l2_block_number - cfg.block_count + 1;
-            let block_count = cfg.block_count;
+            let (_, _, l2_provider) = kona_cfg.create_providers().await?;
+            let preflight_start = l2_provider
+                .get_block_by_hash(kona_cfg.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
+                .await?
+                .unwrap()
+                .header
+                .number;
+            let block_count = kona_cfg.claimed_l2_block_number - preflight_start;
             // Fetch all the initial data
             let preflight_data: StatelessClientData<
                 <OpRethCoreDriver as CoreDriver>::Block,
