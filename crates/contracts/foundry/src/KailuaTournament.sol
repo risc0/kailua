@@ -295,6 +295,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             }
             // If the opponent proposal is an identical twin, skip it
             if (contender.rootClaim().raw() == opponent.rootClaim().raw()) {
+                // The equivalence of intermediate output commitments matters because one proposal
+                // may be more defensible than the other based on the io data.
                 if (contender.blobsHash() == opponent.blobsHash()) {
                     // The opponent is an unjustified duplicate proposal. Ignore it.
                     continue;
@@ -396,7 +398,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
         // Calculate the expected precondition hash
         bytes32 preconditionHash =
-            sha256(abi.encodePacked(PROPOSAL_OUTPUT_COUNT - 1, OUTPUT_BLOCK_SPAN, validChildBlobsHash));
+            sha256(abi.encodePacked(uint64(PROPOSAL_OUTPUT_COUNT), uint64(OUTPUT_BLOCK_SPAN), validChildBlobsHash));
 
         // Calculate the expected block number
         uint64 claimBlockNumber = uint64(l2BlockNumber() + PROPOSAL_OUTPUT_COUNT * OUTPUT_BLOCK_SPAN);
@@ -443,8 +445,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         bytes calldata kzgProof
     ) external virtual returns (bool success);
 
-    /// @notice Proves which parties are faulty in a tournament match
-    function proveFault(
+    /// @notice Proves which parties computed a wrong output commitment in a tournament match
+    function proveOutputFault(
         address payoutRecipient,
         uint64[3] calldata uvo,
         bytes calldata encodedSeal,
@@ -473,15 +475,16 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             revert NoConflict();
         }
 
+        // INVARIANT: Proofs can only pertain to computed outputs
+        if (uvo[2] >= PROPOSAL_OUTPUT_COUNT) {
+            revert InvalidDisputedClaimIndex();
+        }
+
         bytes32 preconditionHash = bytes32(0x0);
         // INVARIANT: Published data is equivalent until divergent blob
         if (uvo[2] > 0) {
             // Find the divergent blob index
             uint256 divergentBlobIndex = KailuaLib.blobIndex(uvo[2]);
-            if (uvo[2] == PROPOSAL_OUTPUT_COUNT - 1) {
-                // If the only difference is the root claim, require all blobs to be equal.
-                divergentBlobIndex = PROPOSAL_BLOBS;
-            }
             // Ensure blob hashes are equal until divergence
             for (uint256 i = 0; i < divergentBlobIndex; i++) {
                 if (childContracts[0].proposalBlobHashes(i).raw() != childContracts[1].proposalBlobHashes(i).raw()) {
@@ -491,9 +494,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                 }
             }
             // Update required precondition hash from proof if not at a boundary
-            if (KailuaLib.blobPosition(uvo[2]) != 0 && uvo[2] < PROPOSAL_OUTPUT_COUNT - 1) {
+            uint64 blobAgreementIndex = uint64(KailuaLib.blobPosition(uvo[2]));
+            if (blobAgreementIndex != 0) {
                 preconditionHash = sha256(
                     abi.encodePacked(
+                        blobAgreementIndex,
                         childContracts[0].proposalBlobHashes(divergentBlobIndex).raw(),
                         childContracts[1].proposalBlobHashes(divergentBlobIndex).raw()
                     )
@@ -549,8 +554,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             );
         }
 
+        // Construct the expected journal
         {
-            // Construct the expected journal
             uint64 claimBlockNumber = uint64(l2BlockNumber() + (uvo[2] + 1) * OUTPUT_BLOCK_SPAN);
             bytes32 journalDigest = sha256(
                 abi.encodePacked(
@@ -575,10 +580,134 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             RISC_ZERO_VERIFIER.verify(encodedSeal, FPVM_IMAGE_ID, journalDigest);
         }
 
-        // Update proof status based on normalized hashes
-        if (KailuaLib.hashToFe(proposedOutput[0]) != KailuaLib.hashToFe(computedOutput)) {
+        resolveDispute(payoutRecipient, uvo, proposedOutput, computedOutput);
+    }
+
+    /// @notice Proves which parties published invalid trailing data in a tournament match
+    function proveTrailFault(
+        address payoutRecipient,
+        uint64[3] calldata uvo,
+        bytes calldata encodedSeal,
+        bytes32[2] calldata proposedOutput,
+        bytes[][2] calldata blobCommitments,
+        bytes[][2] calldata kzgProofs
+    ) external {
+        KailuaTournament[2] memory childContracts = [children[uvo[0]], children[uvo[1]]];
+        // INVARIANT: Proofs cannot be submitted unless the children are playing.
+        if (childContracts[0].status() != GameStatus.IN_PROGRESS) {
+            revert GameNotInProgress();
+        }
+        if (childContracts[1].status() != GameStatus.IN_PROGRESS) {
+            revert GameNotInProgress();
+        }
+
+        // INVARIANT: Proofs can only be submitted once
+        if (proofStatus[uvo[0]][uvo[1]] != ProofStatus.NONE) {
+            revert AlreadyProven();
+        }
+
+        // INVARIANT: Proofs can only argue on divergence points
+        if (proposedOutput[0] == proposedOutput[1]) {
+            revert NoConflict();
+        }
+
+        // INVARIANT: Proofs can only be accepted for equivalent proposals
+        if (childContracts[0].rootClaim().raw() != childContracts[1].rootClaim().raw()) {
+            revert InvalidDisputedClaimIndex();
+        }
+
+        // INVARIANT: Proofs can only pertain to trailing blob data
+        if (uvo[2] < PROPOSAL_OUTPUT_COUNT) {
+            revert InvalidDataRemainder();
+        }
+
+        // Shift the index down by one
+        uint64 trailingOutput = uvo[2] - 1;
+
+        // Find the divergent blob index
+        uint256 divergentBlobIndex = KailuaLib.blobIndex(trailingOutput);
+        // NOTE: verifyIntermediateOutput success implies divergentBlobIndex < PROPOSAL_BLOBS
+        // Ensure blob hashes are equal until divergence
+        for (uint256 i = 0; i < divergentBlobIndex; i++) {
+            if (childContracts[0].proposalBlobHashes(i).raw() != childContracts[1].proposalBlobHashes(i).raw()) {
+                revert BlobHashMismatch(
+                    childContracts[0].proposalBlobHashes(i).raw(), childContracts[1].proposalBlobHashes(i).raw()
+                );
+            }
+        }
+        // Update required precondition hash from proof
+        uint64 blobAgreementIndex = uint64(KailuaLib.blobPosition(trailingOutput));
+        require(blobAgreementIndex > 0, "Trail data does not exist at boundaries");
+        bytes32 preconditionHash = sha256(
+            abi.encodePacked(
+                blobAgreementIndex,
+                childContracts[0].proposalBlobHashes(divergentBlobIndex).raw(),
+                childContracts[1].proposalBlobHashes(divergentBlobIndex).raw()
+            )
+        );
+
+        // Validate the claimed output roots publications
+        {
+            require(
+                childContracts[0].verifyIntermediateOutput(
+                    trailingOutput,
+                    proposedOutput[0],
+                    blobCommitments[0][blobCommitments[0].length - 1],
+                    kzgProofs[0][kzgProofs[0].length - 1]
+                ),
+                "bad left child proposedOutput kzg proof"
+            );
+
+            require(
+                childContracts[1].verifyIntermediateOutput(
+                    trailingOutput,
+                    proposedOutput[1],
+                    blobCommitments[1][blobCommitments[1].length - 1],
+                    kzgProofs[1][kzgProofs[1].length - 1]
+                ),
+                "bad right child proposedOutput kzg proof"
+            );
+        }
+
+        // Construct the expected precondition-only journal
+        {
+            bytes32 journalDigest = sha256(
+                abi.encodePacked(
+                    // The address of the recipient of the payout for this proof
+                    payoutRecipient,
+                    // The blob equivalence precondition hash
+                    preconditionHash,
+                    // The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
+                    l1Head().raw(),
+                    // The latest finalized L2 output root.
+                    rootClaim().raw(),
+                    // The L2 output root claim.
+                    rootClaim().raw(),
+                    // The L2 claim block number.
+                    uint64(l2BlockNumber()),
+                    // The rollup configuration hash
+                    ROLLUP_CONFIG_HASH
+                )
+            );
+
+            // reverts on failure
+            RISC_ZERO_VERIFIER.verify(encodedSeal, FPVM_IMAGE_ID, journalDigest);
+        }
+
+        // Update dispute status based on trailing data
+        resolveDispute(payoutRecipient, uvo, proposedOutput, bytes32(0x0));
+    }
+
+    function resolveDispute(
+        address payoutRecipient,
+        uint64[3] calldata uvo,
+        bytes32[2] calldata proposedOutput,
+        bytes32 expectedOutput
+    ) internal {
+        // Update proof status based on expected output
+        if (KailuaLib.hashToFe(proposedOutput[0]) != KailuaLib.hashToFe(expectedOutput)) {
             // u lose
-            if (KailuaLib.hashToFe(proposedOutput[1]) != KailuaLib.hashToFe(computedOutput)) {
+            if (KailuaLib.hashToFe(proposedOutput[1]) != KailuaLib.hashToFe(expectedOutput)) {
                 // v lose
                 proofStatus[uvo[0]][uvo[1]] = ProofStatus.U_LOSE_V_LOSE;
             } else {
@@ -590,6 +719,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             proofStatus[uvo[0]][uvo[1]] = ProofStatus.U_WIN_V_LOSE;
         }
 
+        // Announce proof status
         emit Proven(uvo[0], uvo[1], proofStatus[uvo[0]][uvo[1]]);
 
         // Set the game's prover address
