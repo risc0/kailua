@@ -53,7 +53,7 @@ Kailua enables rollup operators to add a new fault proof contract, compatible wi
 
 ## Questions, Feedback, and Collaborations
 
-We'd love to hear from you on [Discord][discord] or [Twitter][twitter].
+We'd love to hear from you on [Discord][discord] or [X (formerly Twitter)][twitter].
 
 [bonsai access]: https://bonsai.xyz/apply
 [cargo-risczero]: https://docs.rs/cargo-risczero
@@ -68,7 +68,7 @@ We'd love to hear from you on [Discord][discord] or [Twitter][twitter].
 [risc0-zkvm]: https://docs.rs/risc0-zkvm
 [rustup]: https://rustup.rs
 [rust-toolchain]: rust-toolchain.toml
-[twitter]: https://twitter.com/risczero
+[twitter]: https://x.com/risczero
 [zkvm-overview]: https://dev.risczero.com/zkvm
 [zkhack-iii]: https://www.youtube.com/watch?v=Yg_BGqj_6lg&list=PLcPzhUaCxlCgig7ofeARMPwQ8vbuD6hC5&index=5
 [kona]: https://github.com/anton-rs/kona
