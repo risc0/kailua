@@ -34,6 +34,7 @@ use op_alloy_protocol::BlockInfo;
 use op_alloy_registry::Registry;
 use serde_json::{json, Value};
 use std::env::set_var;
+use std::iter::zip;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -65,14 +66,12 @@ pub struct KailuaHostCli {
     #[clap(long, default_value_t = 1, env)]
     /// Number of blocks to build in a single proof
     pub block_count: u64,
-    #[clap(long, value_parser = parse_b256, env)]
-    pub u_block_hash: Option<B256>,
-    #[clap(long, value_parser = parse_b256, env)]
-    pub u_blob_kzg_hash: Option<B256>,
-    #[clap(long, value_parser = parse_b256, env)]
-    pub v_block_hash: Option<B256>,
-    #[clap(long, value_parser = parse_b256, env)]
-    pub v_blob_kzg_hash: Option<B256>,
+    #[clap(long, value_delimiter = ',', env)]
+    pub precondition_params: Vec<u64>,
+    #[clap(long, value_parser = parse_b256, value_delimiter = ',', env)]
+    pub precondition_block_hashes: Vec<B256>,
+    #[clap(long, value_parser = parse_b256, value_delimiter = ',', env)]
+    pub precondition_blob_hashes: Vec<B256>,
 
     #[clap(flatten)]
     pub boundless_args: Option<BoundlessArgs>,
@@ -380,31 +379,64 @@ pub async fn fetch_precondition_data(
 ) -> anyhow::Result<Option<PreconditionValidationData>> {
     // Determine precondition hash
     let hash_arguments = [
-        cfg.u_block_hash,
-        cfg.u_blob_kzg_hash,
-        cfg.v_block_hash,
-        cfg.v_blob_kzg_hash,
+        cfg.precondition_params.is_empty(),
+        cfg.precondition_block_hashes.is_empty(),
+        cfg.precondition_blob_hashes.is_empty(),
     ];
 
     // fetch necessary data to validate blob equivalence precondition
-    if hash_arguments.iter().all(|arg| arg.is_some()) {
+    if hash_arguments.iter().all(|arg| !arg) {
         let (l1_provider, _, _) = cfg.kona.create_providers().await?;
-        let precondition_validation_data = PreconditionValidationData {
-            validated_blobs: [
-                get_blob_fetch_request(
-                    &l1_provider,
-                    cfg.u_block_hash.unwrap(),
-                    cfg.u_blob_kzg_hash.unwrap(),
-                )
-                .await?,
-                get_blob_fetch_request(
-                    &l1_provider,
-                    cfg.v_block_hash.unwrap(),
-                    cfg.v_blob_kzg_hash.unwrap(),
-                )
-                .await?,
-            ],
+        if cfg.precondition_block_hashes.len() != cfg.precondition_blob_hashes.len() {
+            bail!(
+                "Blob reference mismatch. Found {} block hashes and {} blob hashes",
+                cfg.precondition_block_hashes.len(),
+                cfg.precondition_blob_hashes.len()
+            );
+        }
+
+        let precondition_validation_data = if cfg.precondition_params.len() == 1 {
+            if cfg.precondition_block_hashes.len() != 2 {
+                bail!(
+                    "Expected exactly 2 blob references. Found {}",
+                    cfg.precondition_block_hashes.len()
+                );
+            }
+            PreconditionValidationData::Fault(
+                cfg.precondition_params[0],
+                [
+                    get_blob_fetch_request(
+                        &l1_provider,
+                        cfg.precondition_block_hashes[0],
+                        cfg.precondition_blob_hashes[0],
+                    )
+                    .await?,
+                    get_blob_fetch_request(
+                        &l1_provider,
+                        cfg.precondition_block_hashes[1],
+                        cfg.precondition_blob_hashes[1],
+                    )
+                    .await?,
+                ],
+            )
+        } else if cfg.precondition_params.len() == 2 {
+            let mut fetch_requests = Vec::with_capacity(cfg.precondition_block_hashes.len());
+            for (block_hash, blob_hash) in zip(
+                cfg.precondition_block_hashes.iter(),
+                cfg.precondition_blob_hashes.iter(),
+            ) {
+                fetch_requests
+                    .push(get_blob_fetch_request(&l1_provider, *block_hash, *blob_hash).await?);
+            }
+            PreconditionValidationData::Validity(
+                cfg.precondition_params[0],
+                cfg.precondition_params[1],
+                fetch_requests,
+            )
+        } else {
+            bail!("Too many precondition_params values provided");
         };
+
         let kv_store = cfg.kona.construct_kv_store();
         let mut store = kv_store.write().await;
         let hash = precondition_validation_data.hash();
@@ -413,8 +445,9 @@ pub async fn fetch_precondition_data(
             precondition_validation_data.to_vec(),
         )?;
         set_var("PRECONDITION_VALIDATION_DATA_HASH", hash.to_string());
+        info!("Precondition data hash: {hash}");
         Ok(Some(precondition_validation_data))
-    } else if hash_arguments.iter().any(|arg| arg.is_some()) {
+    } else if hash_arguments.iter().any(|arg| !arg) {
         bail!("Insufficient number of arguments provided for precondition hash.")
     } else {
         warn!("Proving without a precondition hash.");
