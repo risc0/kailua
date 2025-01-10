@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::blobs;
+use crate::blobs::hash_to_fe;
 use crate::precondition::PreconditionValidationData;
-use alloy_eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
+use alloy_eips::eip4844::{Blob, FIELD_ELEMENTS_PER_BLOB};
 use alloy_primitives::{Address, B256};
 use anyhow::{bail, Context};
 use kona_derive::traits::BlobProvider;
@@ -45,43 +45,32 @@ where
 {
     kona_proof::block_on(async move {
         ////////////////////////////////////////////////////////////////
-        //                        PRECONDITION                        //
-        ////////////////////////////////////////////////////////////////
-
-        log("PRECONDITION");
-        let precondition_hash = validate_precondition(
-            precondition_validation_data_hash,
-            oracle.clone(),
-            boot.clone(),
-            &mut beacon,
-        )
-        .await?;
-
-        ////////////////////////////////////////////////////////////////
         //                          PROLOGUE                          //
         ////////////////////////////////////////////////////////////////
         log("PROLOGUE");
 
+        let precondition_data = load_precondition_data(
+            precondition_validation_data_hash,
+            oracle.clone(),
+            &mut beacon,
+        )
+        .await?;
+
         let mut l1_provider = OracleL1ChainProvider::new(boot.clone(), oracle.clone());
         let mut l2_provider = OracleL2ChainProvider::new(boot.clone(), oracle.clone());
 
-        // If the claimed L2 block number is less than the safe head of the L2 chain, the claim is
-        // invalid.
+        // If the claimed L2 block number is less than or equal to the safe head of the L2 chain,
+        // the claim is invalid.
         let safe_head = l2_provider.agreed_l2_block_header().await?;
         if boot.claimed_l2_block_number < safe_head.number {
-            bail!("Invalid Claim");
+            bail!("Invalid claim");
         }
-
-        // In the case where the agreed upon L2 output root is the same as the claimed L2 output root,
-        // trace extension is detected and we can skip the derivation and execution steps.
-        if boot.agreed_l2_output_root == boot.claimed_l2_output_root {
-            return Ok((precondition_hash, Some(boot.claimed_l2_output_root)));
-        }
+        let safe_head_number = safe_head.number;
 
         ////////////////////////////////////////////////////////////////
         //                   DERIVATION & EXECUTION                   //
         ////////////////////////////////////////////////////////////////
-        log("DERIVATION");
+        log("DERIVATION & EXECUTION");
         // Create a new derivation driver with the given boot information and oracle.
         let cursor =
             new_pipeline_cursor(&boot, safe_head, &mut l1_provider, &mut l2_provider).await?;
@@ -102,22 +91,47 @@ where
 
         // Run the derivation pipeline until we are able to produce the output root of the claimed
         // L2 block.
-        log("ADVANCE");
-        let (number, output_root) = driver
-            .advance_to_target(&boot.rollup_config, Some(boot.claimed_l2_block_number))
-            .await?;
+        let expected_output_count = (boot.claimed_l2_block_number - safe_head_number) as usize;
+        let mut output_roots = Vec::with_capacity(expected_output_count);
+        for starting_block in safe_head_number..boot.claimed_l2_block_number {
+            // Advance to the next target
+            let (output_number, output_root) = driver
+                .advance_to_target(&boot.rollup_config, Some(starting_block + 1))
+                .await?;
+            // Stop if nothing new was derived
+            if output_number == starting_block {
+                // A mismatch indicates that there is insufficient L1 data available to produce
+                // an L2 output root at the claimed block number
+                log(&format!(
+                    "OUTPUT: {output_number}|{}",
+                    boot.claimed_l2_block_number
+                ));
+                break;
+            }
+            // Append newly computed output root
+            output_roots.push(output_root);
+        }
 
-        // None indicates that there is insufficient L1 data available to produce an L2
-        // output root at the claimed block number
-        log(&format!(
-            "OUTPUT: {number}|{}",
-            boot.claimed_l2_block_number
-        ));
+        ////////////////////////////////////////////////////////////////
+        //                          EPILOGUE                          //
+        ////////////////////////////////////////////////////////////////
+        log("EPILOGUE");
 
-        if number < boot.claimed_l2_block_number {
+        let precondition_hash = precondition_data
+            .map(|(precondition_validation_data, blobs)| {
+                validate_precondition(precondition_validation_data, blobs, &output_roots)
+            })
+            .unwrap_or(Ok(B256::ZERO))?;
+
+        if output_roots.len() != expected_output_count {
+            // Not enough data to derive output root at claimed height
             Ok((precondition_hash, None))
+        } else if output_roots.is_empty() {
+            // Claimed output height is equal to agreed output height
+            Ok((precondition_hash, Some(boot.agreed_l2_output_root)))
         } else {
-            Ok((precondition_hash, Some(output_root)))
+            // Derived output root at future height
+            Ok((precondition_hash, output_roots.pop()))
         }
     })
 }
@@ -251,21 +265,19 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
     Ok::<[u8; 32], anyhow::Error>(digest.as_bytes().try_into()?)
 }
 
-pub async fn validate_precondition<
+pub async fn load_precondition_data<
     O: CommsClient + Send + Sync + Debug,
     B: BlobProvider + Send + Sync + Debug + Clone,
 >(
     precondition_data_hash: B256,
     oracle: Arc<O>,
-    boot: Arc<BootInfo>,
     beacon: &mut B,
-) -> anyhow::Result<B256>
+) -> anyhow::Result<Option<(PreconditionValidationData, Vec<Blob>)>>
 where
     <B as BlobProvider>::Error: Debug,
 {
-    // There is no condition to validate at blob boundaries
     if precondition_data_hash.is_zero() {
-        return Ok(B256::ZERO);
+        return Ok(None);
     }
     // Read the blob references to fetch
     let precondition_validation_data: PreconditionValidationData = pot::from_slice(
@@ -277,15 +289,14 @@ where
             .await
             .map_err(OracleProviderError::Preimage)?,
     )?;
-    let precondition_hash = precondition_validation_data.precondition_hash();
-    // Read the blobs to validate
     let mut blobs = Vec::new();
-    for request in precondition_validation_data.validated_blobs {
+    // Read the blobs to validate divergence
+    for request in precondition_validation_data.blob_fetch_requests() {
         #[cfg(not(target_os = "zkvm"))]
         let expected_hash = request.blob_hash.hash;
 
         let response = beacon
-            .get_blobs(&request.block_ref, &[request.blob_hash])
+            .get_blobs(&request.block_ref, &[request.blob_hash.clone()])
             .await
             .unwrap();
         let blob = *response[0];
@@ -302,25 +313,67 @@ where
 
         blobs.push(blob);
     }
-    // Check equivalence until divergence point
-    for i in 0..FIELD_ELEMENTS_PER_BLOB {
-        let index = 32 * i as usize;
-        if blobs[0][index..index + 32] != blobs[1][index..index + 32] {
-            let agreed_l2_output_root_fe = blobs::hash_to_fe(boot.agreed_l2_output_root);
-            if i == 0 {
-                bail!("Precondition validation failed at first element");
-            } else if &blobs[0][index - 32..index] != agreed_l2_output_root_fe.as_slice() {
+
+    Ok(Some((precondition_validation_data, blobs)))
+}
+
+pub fn validate_precondition(
+    precondition_validation_data: PreconditionValidationData,
+    blobs: Vec<Blob>,
+    output_roots: &[B256],
+) -> anyhow::Result<B256> {
+    let precondition_hash = precondition_validation_data.precondition_hash();
+    match precondition_validation_data {
+        PreconditionValidationData::Fault(agreement_index, _) => {
+            // Check equivalence of two blobs until potential divergence point
+            if agreement_index == 0 {
+                bail!("Unexpected agreement index 0");
+            } else if agreement_index > FIELD_ELEMENTS_PER_BLOB {
+                bail!("Agreement index value {agreement_index} exceeds {FIELD_ELEMENTS_PER_BLOB}");
+            }
+            for i in 0..agreement_index {
+                let index = 32 * i as usize;
+                if blobs[0][index..index + 32] != blobs[1][index..index + 32] {
+                    bail!("Elements at position {i} in blobs are not equal.");
+                }
+            }
+        }
+        PreconditionValidationData::Validity(proposal_output_count, output_block_span, _) => {
+            // Verify that number of validated blocks matches expected output count
+            let expected_output_count = proposal_output_count * output_block_span;
+            if output_roots.len() != expected_output_count as usize {
                 bail!(
-                    "Agreed output {} not found in contender blob before sub-offset {i}",
-                    boot.agreed_l2_output_root
-                );
-            } else if &blobs[1][index - 32..index] != agreed_l2_output_root_fe.as_slice() {
-                bail!(
-                    "Agreed output {} not found in proposal before sub-offset {i}",
-                    boot.agreed_l2_output_root
+                    "Expected {} output roots but got {}",
+                    expected_output_count,
+                    output_roots.len()
                 );
             }
-            break;
+            // Verify fe equivalence to computed outputs for all but last output
+            let mut computed_root_iter = output_roots.iter().peekable();
+            let mut last_computed_root = computed_root_iter
+                .nth(output_block_span as usize - 1)
+                .unwrap();
+            for (b, blob) in blobs.into_iter().enumerate() {
+                for i in 0..FIELD_ELEMENTS_PER_BLOB {
+                    let index = 32 * i as usize;
+                    let blob_fe_slice = &blob[index..index + 32];
+                    if computed_root_iter.peek().is_none() {
+                        // non-zero trailing data can lead to a non-canonical blobs hash
+                        if blob_fe_slice != B256::ZERO.as_slice() {
+                            bail!("Found non-canonical non-zero trailing data in blob {b}.")
+                        }
+                    } else if blob_fe_slice != hash_to_fe(*last_computed_root).as_slice() {
+                        bail!(
+                            "Bad fe #{i} in blob {b}: Expected {} found {} ",
+                            hash_to_fe(*last_computed_root),
+                            B256::try_from(blob_fe_slice)?
+                        );
+                    }
+                    last_computed_root = computed_root_iter
+                        .nth(output_block_span as usize - 1)
+                        .unwrap();
+                }
+            }
         }
     }
     // Return the precondition hash
