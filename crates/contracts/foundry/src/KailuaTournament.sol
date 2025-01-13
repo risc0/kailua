@@ -494,11 +494,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                 }
             }
             // Update required precondition hash from proof if not at a boundary
-            uint64 blobAgreementIndex = uint64(KailuaLib.blobPosition(uvo[2]));
-            if (blobAgreementIndex != 0) {
+            uint64 divergenceIndex = uint64(KailuaLib.fieldElementIndex(uvo[2]));
+            if (divergenceIndex != 0) {
                 preconditionHash = sha256(
                     abi.encodePacked(
-                        blobAgreementIndex,
+                        divergenceIndex,
                         childContracts[0].proposalBlobHashes(divergentBlobIndex).raw(),
                         childContracts[1].proposalBlobHashes(divergentBlobIndex).raw()
                     )
@@ -621,28 +621,32 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             revert InvalidDataRemainder();
         }
 
-        // Shift the index down by one
-        uint64 trailingOutput = uvo[2] - 1;
+        // Because the root claim is considered the last published output, we shift the output offset down by one to
+        // correctly point to the target trailing zero output
+        uint64 trailOffset = uvo[2] - 1;
 
-        // Find the divergent blob index
-        uint256 divergentBlobIndex = KailuaLib.blobIndex(trailingOutput);
-        // NOTE: verifyIntermediateOutput success implies divergentBlobIndex < PROPOSAL_BLOBS
+        // INVARIANT: The trail divergence occurs at the last blob
+        if (KailuaLib.blobIndex(trailOffset) != PROPOSAL_BLOBS - 1) {
+            revert InvalidDisputedClaimIndex();
+        }
+
         // Ensure blob hashes are equal until divergence
-        for (uint256 i = 0; i < divergentBlobIndex; i++) {
+        for (uint256 i = 0; i < PROPOSAL_BLOBS - 1; i++) {
             if (childContracts[0].proposalBlobHashes(i).raw() != childContracts[1].proposalBlobHashes(i).raw()) {
                 revert BlobHashMismatch(
                     childContracts[0].proposalBlobHashes(i).raw(), childContracts[1].proposalBlobHashes(i).raw()
                 );
             }
         }
+
         // Update required precondition hash from proof
-        uint64 blobAgreementIndex = uint64(KailuaLib.blobPosition(trailingOutput));
-        require(blobAgreementIndex > 0, "Trail data does not exist at boundaries");
+        uint64 divergenceIndex = uint64(KailuaLib.fieldElementIndex(trailOffset));
+        require(divergenceIndex > 0, "Trail data does not exist at boundaries");
         bytes32 preconditionHash = sha256(
             abi.encodePacked(
-                blobAgreementIndex,
-                childContracts[0].proposalBlobHashes(divergentBlobIndex).raw(),
-                childContracts[1].proposalBlobHashes(divergentBlobIndex).raw()
+                divergenceIndex,
+                childContracts[0].proposalBlobHashes(PROPOSAL_BLOBS - 1).raw(),
+                childContracts[1].proposalBlobHashes(PROPOSAL_BLOBS - 1).raw()
             )
         );
 
@@ -650,7 +654,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         {
             require(
                 childContracts[0].verifyIntermediateOutput(
-                    trailingOutput,
+                    trailOffset,
                     proposedOutput[0],
                     blobCommitments[0][blobCommitments[0].length - 1],
                     kzgProofs[0][kzgProofs[0].length - 1]
@@ -660,7 +664,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
             require(
                 childContracts[1].verifyIntermediateOutput(
-                    trailingOutput,
+                    trailOffset,
                     proposedOutput[1],
                     blobCommitments[1][blobCommitments[1].length - 1],
                     kzgProofs[1][kzgProofs[1].length - 1]

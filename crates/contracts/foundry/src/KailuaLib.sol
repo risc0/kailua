@@ -151,12 +151,12 @@ library KailuaLib {
     /// @notice The po2 for the number of field elements in a single blob
     uint256 internal constant FIELD_ELEMENTS_PER_BLOB_PO2 = 12;
 
-    function blobIndex(uint256 element) internal pure returns (uint256 index) {
-        index = element / (1 << FIELD_ELEMENTS_PER_BLOB_PO2);
+    function blobIndex(uint256 outputOffset) internal pure returns (uint256 index) {
+        index = outputOffset / (1 << FIELD_ELEMENTS_PER_BLOB_PO2);
     }
 
-    function blobPosition(uint256 element) internal pure returns (uint256 position) {
-        position = element % (1 << FIELD_ELEMENTS_PER_BLOB_PO2);
+    function fieldElementIndex(uint256 outputOffset) internal pure returns (uint256 position) {
+        position = outputOffset % (1 << FIELD_ELEMENTS_PER_BLOB_PO2);
     }
 
     function versionedKZGHash(bytes calldata blobCommitment) internal pure returns (bytes32 hash) {

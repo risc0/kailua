@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::db::proposal::Proposal;
+use crate::db::proposal::{Proposal, ELIMINATIONS_LIMIT};
 use crate::db::KailuaDB;
 use crate::providers::beacon::BlobProvider;
 use crate::providers::optimism::OpNodeProvider;
@@ -21,7 +21,7 @@ use alloy::consensus::BlockHeader;
 use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::network::{BlockResponse, EthereumWallet};
-use alloy::primitives::Bytes;
+use alloy::primitives::{Bytes, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
@@ -172,24 +172,57 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                 continue;
             }
 
-            // Check if claim won in tournament
-            if proposal.has_parent()
-                && !proposal
-                    .fetch_parent_tournament_survivor_status(&proposer_provider)
-                    .await
-                    .unwrap_or_default()
-                    .unwrap_or_default()
-            {
-                info!("Waiting for more proofs to resolve proposer as survivor");
-                break;
-            }
-
             // Check for timeout
             let challenger_duration = proposal
                 .fetch_current_challenger_duration(&proposer_provider)
                 .await?;
             if challenger_duration > 0 {
                 info!("Waiting for {challenger_duration} more seconds before resolution.");
+                break;
+            }
+
+            // Check if can prune next set of children in parent tournament
+            if proposal.has_parent() {
+                let can_resolve = loop {
+                    let Ok(result) = parent_contract
+                        .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
+                        .call()
+                        .await
+                    else {
+                        break false;
+                    };
+
+                    // Final prune will be during resolution
+                    if !result.survivor.is_zero() {
+                        break true;
+                    }
+
+                    // Prune next set of children
+                    info!("Eliminating {ELIMINATIONS_LIMIT} opponents before resolution.");
+                    parent_contract
+                        .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
+                        .send()
+                        .await
+                        .context("KailuaTournament::pruneChildren (send)")?
+                        .get_receipt()
+                        .await
+                        .context("KailuaTournament::pruneChildren (get_receipt)")?;
+                };
+                // Some disputes are still unresolved
+                if !can_resolve {
+                    info!("Waiting for more proofs to resolve proposer as survivor");
+                    break;
+                }
+            }
+
+            // Check if claim won in tournament
+            if !proposal
+                .fetch_parent_tournament_survivor_status(&proposer_provider)
+                .await
+                .unwrap_or_default()
+                .unwrap_or_default()
+            {
+                error!("Failed to determine proposal as next survivor.");
                 break;
             }
 

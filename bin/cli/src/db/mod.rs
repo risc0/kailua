@@ -287,38 +287,38 @@ impl KailuaDB {
 
     pub fn determine_tournament_participation(
         &mut self,
-        proposal: &mut Proposal,
+        opponent: &mut Proposal,
     ) -> anyhow::Result<bool> {
-        if !proposal.has_parent() {
+        if !opponent.has_parent() {
             return Ok(true);
         }
 
-        let mut parent = self.get_local_proposal(&proposal.parent).unwrap().clone();
+        let mut parent = self.get_local_proposal(&opponent.parent).unwrap().clone();
         // Ignore self-conflict
         if parent
             .survivor
             .map(|contender| {
-                self.get_local_proposal(&contender).unwrap().proposer == proposal.proposer
+                self.get_local_proposal(&contender).unwrap().proposer == opponent.proposer
             })
             .unwrap_or_default()
         {
             return Ok(false);
         }
         // Participate in tournament only if this is a correct or first bad proposal
-        if self.was_proposer_eliminated_before(proposal) {
+        if self.was_proposer_eliminated_before(opponent) {
             return Ok(false);
         }
-        // Skip non-canonical tournaments
+        // Skip proposals to extend non-canonical tournaments
         if !parent.canonical.unwrap_or_default() {
             return Ok(false);
         }
         // Update the contender
-        proposal.contender = parent.survivor;
+        opponent.contender = parent.survivor;
         // Append child to parent
-        if !parent.append_child(proposal.index) {
+        if !parent.append_child(opponent.index) {
             warn!(
                 "Attempted out of order child {} insertion into parent {} ",
-                proposal.index, parent.index
+                opponent.index, parent.index
             );
         }
         // Determine survivorship
@@ -328,16 +328,16 @@ impl KailuaDB {
                 !self
                     .get_local_proposal(&contender)
                     .unwrap()
-                    .wins_against(proposal, self.config.timeout)
+                    .wins_against(opponent, self.config.timeout)
             })
             .unwrap_or(true)
         {
             // If the old survivor (if any) is defeated,
             // set this proposal as the new survivor
-            parent.survivor = Some(proposal.index);
+            parent.survivor = Some(opponent.index);
         }
         // Commit updated parent data
-        self.set_local_proposal(proposal.parent, &parent)?;
+        self.set_local_proposal(opponent.parent, &parent)?;
         Ok(true)
     }
 

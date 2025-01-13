@@ -324,22 +324,30 @@ pub fn validate_precondition(
 ) -> anyhow::Result<B256> {
     let precondition_hash = precondition_validation_data.precondition_hash();
     match precondition_validation_data {
-        PreconditionValidationData::Fault(agreement_index, _) => {
+        PreconditionValidationData::Fault(divergence_index, _) => {
             // Check equivalence of two blobs until potential divergence point
-            if agreement_index == 0 {
-                bail!("Unexpected agreement index 0");
-            } else if agreement_index > FIELD_ELEMENTS_PER_BLOB {
-                bail!("Agreement index value {agreement_index} exceeds {FIELD_ELEMENTS_PER_BLOB}");
+            if divergence_index == 0 {
+                bail!("Unexpected divergence index 0");
+            } else if divergence_index > FIELD_ELEMENTS_PER_BLOB {
+                bail!(
+                    "Divergence index value {divergence_index} exceeds {FIELD_ELEMENTS_PER_BLOB}"
+                );
             }
-            for i in 0..agreement_index {
+            // Check for equality
+            for i in 0..divergence_index {
                 let index = 32 * i as usize;
                 if blobs[0][index..index + 32] != blobs[1][index..index + 32] {
-                    bail!("Elements at position {i} in blobs are not equal.");
+                    bail!("Elements at equivalence position {i} in blobs are not equal.");
                 }
+            }
+            // Check for inequality
+            let index = 32 * divergence_index as usize;
+            if blobs[0][index..index + 32] == blobs[1][index..index + 32] {
+                bail!("Elements at divergence position {divergence_index} in blobs are equal.");
             }
         }
         PreconditionValidationData::Validity(proposal_output_count, output_block_span, _) => {
-            // Verify that number of validated blocks matches expected output count
+            // Verify that number of validated outputs matches expected count
             let expected_output_count = proposal_output_count * output_block_span;
             if output_roots.len() != expected_output_count as usize {
                 bail!(
@@ -353,15 +361,22 @@ pub fn validate_precondition(
             let mut last_computed_root = computed_root_iter
                 .nth(output_block_span as usize - 1)
                 .unwrap();
+            let num_blobs = blobs.len();
             for (b, blob) in blobs.into_iter().enumerate() {
                 for i in 0..FIELD_ELEMENTS_PER_BLOB {
                     let index = 32 * i as usize;
                     let blob_fe_slice = &blob[index..index + 32];
                     if computed_root_iter.peek().is_none() {
+                        // trailing data can only begin at last blob
+                        if b != num_blobs - 1 {
+                            bail!("Trailing data began before last blob");
+                        }
                         // non-zero trailing data can lead to a non-canonical blobs hash
                         if blob_fe_slice != B256::ZERO.as_slice() {
-                            bail!("Found non-canonical non-zero trailing data in blob {b}.")
+                            bail!("Found non-zero trailing data in blob {b}.")
                         }
+                        // last_computed_root now contains the published root claim
+                        continue;
                     } else if blob_fe_slice != hash_to_fe(*last_computed_root).as_slice() {
                         bail!(
                             "Bad fe #{i} in blob {b}: Expected {} found {} ",

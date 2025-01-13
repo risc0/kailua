@@ -137,8 +137,7 @@ pub fn field_elements(
     iterator: impl Iterator<Item = usize>,
 ) -> anyhow::Result<Vec<B256>> {
     let mut field_elements = vec![];
-    for i in iterator {
-        let index = 32 * i;
+    for index in iterator.map(|i| 32 * i) {
         let bytes: [u8; 32] = blob_data.blob.0[index..index + 32].try_into()?;
         field_elements.push(B256::from(bytes));
     }

@@ -21,7 +21,7 @@ use kailua_contracts::{
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::iter::repeat;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 pub const ELIMINATIONS_LIMIT: u64 = 128;
 
@@ -200,7 +200,7 @@ impl Proposal {
         provider: P,
     ) -> anyhow::Result<Option<Address>> {
         if !self.has_parent() {
-            return Ok(None);
+            return Ok(Some(self.contract));
         }
         let parent_tournament: Address = self
             .tournament_contract_instance(&provider)
@@ -233,14 +233,14 @@ impl Proposal {
         let survivor = self.fetch_parent_tournament_survivor(provider).await?;
         let is_survivor_expected = survivor.map(|survivor| survivor == self.contract);
         if !is_survivor_expected.unwrap_or_default() {
-            warn!(
+            error!(
                 "Current survivor: {survivor:?} (expecting {})",
                 self.contract
             );
         } else {
             info!("Survivor: {}", self.contract);
         }
-        Ok(survivor.map(|survivor| survivor == self.contract))
+        Ok(is_survivor_expected)
     }
 
     pub async fn fetch_finality<T: Transport + Clone, P: Provider<T, N>, N: Network>(
@@ -487,7 +487,10 @@ impl Proposal {
 
     pub fn io_proof_for(&self, position: u64) -> anyhow::Result<Bytes> {
         let io_blob = self.io_blob_for(position);
-        let (proof, _) = blob_fe_proof(&io_blob.1.blob, position as usize)?;
+        let (proof, _) = blob_fe_proof(
+            &io_blob.1.blob,
+            (position % FIELD_ELEMENTS_PER_BLOB) as usize,
+        )?;
         Ok(Bytes::from(proof.to_vec()))
     }
 
@@ -517,7 +520,7 @@ impl Proposal {
             }
             let end = (start + FIELD_ELEMENTS_PER_BLOB as usize).min(io_field_elements.len());
             let io_bytes = io_field_elements[start..end].concat();
-            // Encode as blob sidecar
+            // Encode as blob sidecar with zero-byte trail
             let blob = Blob::right_padding_from(io_bytes.as_slice());
             io_blobs.push(blob);
         }
