@@ -350,6 +350,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     function canIgnoreOpponent(KailuaTournament contender, KailuaTournament opponent) internal returns (bool) {
         address opponentProposer = KAILUA_TREASURY.proposerOf(address(opponent));
         uint256 eliminationRound = KAILUA_TREASURY.eliminationRound(opponentProposer);
+        // The opponent is not yet eliminated
         if (eliminationRound == 0 || eliminationRound > opponent.gameIndex()) {
             address contenderProposer = KAILUA_TREASURY.proposerOf(address(contender));
             // The opponent is fighting itself

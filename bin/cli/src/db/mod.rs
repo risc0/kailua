@@ -294,15 +294,19 @@ impl KailuaDB {
         }
 
         let mut parent = self.get_local_proposal(&opponent.parent).unwrap().clone();
-        // Ignore self-conflict
-        if parent
+        // Ignore skipped proposals
+        let contender = parent
             .survivor
-            .map(|contender| {
-                self.get_local_proposal(&contender).unwrap().proposer == opponent.proposer
-            })
-            .unwrap_or_default()
-        {
-            return Ok(false);
+            .map(|index| self.get_local_proposal(&index).unwrap());
+        if let Some(contender) = contender.as_ref() {
+            // Ignore self-conflict
+            if contender.proposer == opponent.proposer {
+                return Ok(false);
+            }
+            // Ignore duplicate proposals
+            if contender.divergence_point(opponent).is_none() {
+                return Ok(false);
+            }
         }
         // Participate in tournament only if this is a correct or first bad proposal
         if self.was_proposer_eliminated_before(opponent) {
@@ -321,15 +325,10 @@ impl KailuaDB {
                 opponent.index, parent.index
             );
         }
-        // Determine survivorship
-        if parent
-            .survivor
-            .map(|contender| {
-                !self
-                    .get_local_proposal(&contender)
-                    .unwrap()
-                    .wins_against(opponent, self.config.timeout)
-            })
+        // Determine if opponent is the next survivor
+        if contender
+            .as_ref()
+            .map(|contender| !contender.wins_against(opponent, self.config.timeout))
             .unwrap_or(true)
         {
             // If the old survivor (if any) is defeated,

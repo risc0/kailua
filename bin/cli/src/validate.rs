@@ -768,27 +768,32 @@ async fn request_fault_proof(
     channel: &mut DuplexChannel<Message>,
     config: &Config,
     contender: &Proposal,
-    proposal: &Proposal,
+    opponent: &Proposal,
     l1_node_provider: &ReqwestProvider,
     l2_node_provider: &ReqwestProvider,
     op_node_provider: &OpNodeProvider,
 ) -> anyhow::Result<()> {
-    let divergence_point = contender
-        .divergence_point(proposal)
-        .expect("Contender does not diverge from proposal.") as u64;
+    let Some(divergence_point) = contender.divergence_point(opponent) else {
+        error!(
+            "Contender {} does not diverge from opponent {}.",
+            contender.index, opponent.index
+        );
+        return Ok(());
+    };
+    let divergence_point = divergence_point as u64;
 
     // Read additional data for Kona invocation
-    info!("Requesting proof for proposal {}.", proposal.index);
-    let io_count = proposal.io_field_elements.len() as u64;
+    info!("Requesting proof for proposal {}.", opponent.index);
+    let io_count = opponent.io_field_elements.len() as u64;
     let is_output_fault = divergence_point <= io_count;
     let agreed_l2_head_number = if is_output_fault {
         // output commitment challenges start from the last common transition
-        proposal.output_block_number
+        opponent.output_block_number
             - config.output_block_span * (io_count + 1) // walk back to the starting block number
             + config.output_block_span * divergence_point // jump to zero-indexed challenge point
     } else {
         // trail data challenges assume the starting output
-        proposal.output_block_number - config.output_block_span * (io_count + 1)
+        opponent.output_block_number - config.output_block_span * (io_count + 1)
     };
     debug!("l2_head_number {:?}", &agreed_l2_head_number);
     let agreed_l2_head_hash = l2_node_provider
@@ -821,7 +826,7 @@ async fn request_fault_proof(
         .context("output_at_block")?;
 
     // Prepare precondition validation data
-    let precondition_validation_data = if proposal.has_precondition_for(divergence_point) {
+    let precondition_validation_data = if opponent.has_precondition_for(divergence_point) {
         // Normalize the challenge_position as the blob field element index
         let normalized_position = divergence_point - !is_output_fault as u64;
 
@@ -840,9 +845,9 @@ async fn request_fault_proof(
             .context("u_blob_block get_block_by_number")?
             .expect("u_blob_block not found");
 
-        let (v_blob_hash, v_blob) = proposal.io_blob_for(normalized_position);
+        let (v_blob_hash, v_blob) = opponent.io_blob_for(normalized_position);
         let v_blob_block_parent = l1_node_provider
-            .get_block_by_hash(proposal.l1_head, BlockTransactionsKind::Hashes)
+            .get_block_by_hash(opponent.l1_head, BlockTransactionsKind::Hashes)
             .await
             .context("v_blob_block_parent get_block_by_hash")?
             .expect("v_blob_block_parent not found");
@@ -902,9 +907,9 @@ async fn request_fault_proof(
     channel
         .sender
         .send(Message::Proposal {
-            index: proposal.index,
+            index: opponent.index,
             precondition_validation_data,
-            l1_head: proposal.l1_head,
+            l1_head: opponent.l1_head,
             agreed_l2_head_hash,
             agreed_l2_output_root,
             claimed_l2_block_number,
