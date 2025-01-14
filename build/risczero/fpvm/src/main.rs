@@ -31,15 +31,18 @@ fn main() {
     log("DESERIALIZE");
     let witness =
         rkyv::deserialize::<Witness, Error>(witness_access).expect("Failed to deserialize witness");
-    log("RUN");
+    log(&format!("ORACLE: {} PREIMAGES", witness.oracle_witness.data.len()));
     let oracle = Arc::new(PreloadedOracle::from(witness.oracle_witness));
+    log("BOOT");
     let boot = Arc::new(kona_proof::block_on(async {
         BootInfo::load(oracle.as_ref())
             .await
             .expect("Failed to load BootInfo")
     }));
+    log(&format!("BEACON: {} BLOBS", witness.blobs_witness.blobs.len()));
     let beacon = PreloadedBlobProvider::from(witness.blobs_witness);
     // Attempt to recompute the output hash at the target block number using kona
+    log("RUN");
     let (precondition_hash, real_output_hash) = kailua_common::client::run_client(
         witness.precondition_validation_data_hash,
         oracle.clone(),

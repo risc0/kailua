@@ -238,6 +238,7 @@ pub async fn handle_proposals(
                 request_fault_proof(
                     &mut channel,
                     &kailua_db.config,
+                    &proposal_parent,
                     &contender,
                     &proposal,
                     &eth_rpc_provider,
@@ -764,9 +765,11 @@ pub async fn handle_proposals(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn request_fault_proof(
     channel: &mut DuplexChannel<Message>,
     config: &Config,
+    parent: &Proposal,
     contender: &Proposal,
     opponent: &Proposal,
     l1_node_provider: &ReqwestProvider,
@@ -783,19 +786,25 @@ async fn request_fault_proof(
     let divergence_point = divergence_point as u64;
 
     // Read additional data for Kona invocation
-    info!("Requesting proof for proposal {}.", opponent.index);
+    info!(
+        "Requesting proof to settle dispute between {} and {} at point {divergence_point}.",
+        contender.index, opponent.index
+    );
     let io_count = opponent.io_field_elements.len() as u64;
     let is_output_fault = divergence_point <= io_count;
+
+    // Set L2 Head Number
     let agreed_l2_head_number = if is_output_fault {
         // output commitment challenges start from the last common transition
-        opponent.output_block_number
-            - config.output_block_span * (io_count + 1) // walk back to the starting block number
-            + config.output_block_span * divergence_point // jump to zero-indexed challenge point
+        parent.output_block_number + config.output_block_span * divergence_point
+    // jump to zero-indexed challenge point
     } else {
         // trail data challenges assume the starting output
-        opponent.output_block_number - config.output_block_span * (io_count + 1)
+        parent.output_block_number
     };
     debug!("l2_head_number {:?}", &agreed_l2_head_number);
+
+    // Get L2 head hash
     let agreed_l2_head_hash = l2_node_provider
         .get_block_by_number(
             BlockNumberOrTag::Number(agreed_l2_head_number),
@@ -807,6 +816,8 @@ async fn request_fault_proof(
         .header
         .hash;
     debug!("l2_head {:?}", &agreed_l2_head_hash);
+
+    // Get L2 head output root
     let agreed_l2_output_root = op_node_provider
         .output_at_block(agreed_l2_head_number)
         .await
@@ -903,13 +914,20 @@ async fn request_fault_proof(
         None
     };
 
+    // Set appropriate L1 head
+    let l1_head = if is_output_fault {
+        opponent.l1_head
+    } else {
+        parent.l1_head
+    };
+
     // Message proving task
     channel
         .sender
         .send(Message::Proposal {
             index: opponent.index,
             precondition_validation_data,
-            l1_head: opponent.l1_head,
+            l1_head,
             agreed_l2_head_hash,
             agreed_l2_output_root,
             claimed_l2_block_number,

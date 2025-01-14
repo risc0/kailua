@@ -17,6 +17,7 @@ use crate::propose::ProposeArgs;
 use crate::providers::optimism::OpNodeProvider;
 use crate::stall::Stall;
 use crate::KAILUA_GAME_TYPE;
+use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy::network::EthereumWallet;
 use alloy::primitives::{Bytes, B256, U256};
 use alloy::providers::ProviderBuilder;
@@ -136,13 +137,18 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
 
     // Prepare intermediate outputs
     let mut io_field_elements = vec![];
-    for i in 1..proposal_output_count {
+    let is_output_fault = faulty_block_number > proposal_block_count;
+    let normalized_fault_block_number =
+        faulty_block_number - (!is_output_fault as u64) * output_block_span;
+    for i in 1..FIELD_ELEMENTS_PER_BLOB {
         let io_block_number = parent_block_number + i * output_block_span;
 
-        let output = if io_block_number == faulty_block_number {
+        let output = if io_block_number == normalized_fault_block_number {
             faulty_root_claim
-        } else {
+        } else if io_block_number < proposal_block_count {
             op_node_provider.output_at_block(io_block_number).await?
+        } else {
+            B256::ZERO
         };
         io_field_elements.push(hash_to_fe(output));
     }
