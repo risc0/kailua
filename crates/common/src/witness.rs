@@ -27,6 +27,8 @@ pub struct Witness {
     pub payout_recipient_address: Address,
     #[rkyv(with = B256Def)]
     pub precondition_validation_data_hash: B256,
+    pub stitched_boot_info: Vec<StitchedBootInfo>,
+    pub fpvm_image_id: [u8; 32],
 }
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
@@ -50,4 +52,21 @@ impl From<AddressDef> for Address {
     fn from(value: AddressDef) -> Self {
         Address::new(value.0)
     }
+}
+
+#[derive(
+    Clone, Debug, Default, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
+)]
+pub struct StitchedBootInfo {
+    /// The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
+    #[rkyv(with = B256Def)]
+    pub l1_head: B256,
+    /// The agreed upon safe L2 output root.
+    #[rkyv(with = B256Def)]
+    pub agreed_l2_output_root: B256,
+    /// The L2 output root claim.
+    #[rkyv(with = B256Def)]
+    pub claimed_l2_output_root: B256,
+    /// The L2 claim block number.
+    pub claimed_l2_block_number: u64,
 }

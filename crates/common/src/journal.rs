@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::witness::StitchedBootInfo;
 use alloy_primitives::{Address, B256};
 use anyhow::Context;
 use kona_proof::BootInfo;
@@ -33,11 +34,19 @@ pub struct ProofJournal {
     pub claimed_l2_block_number: u64,
     /// The configuration hash.
     pub config_hash: B256,
+    /// The FPVM image id
+    pub fpvm_image_id: [u8; 32],
 }
 
 impl ProofJournal {
-    pub fn new(payout_recipient: Address, precondition_output: B256, boot_info: &BootInfo) -> Self {
+    pub fn new(
+        fpvm_image_id: [u8; 32],
+        payout_recipient: Address,
+        precondition_output: B256,
+        boot_info: &BootInfo,
+    ) -> Self {
         Self {
+            fpvm_image_id,
             payout_recipient,
             precondition_output,
             l1_head: boot_info.l1_head,
@@ -45,6 +54,25 @@ impl ProofJournal {
             claimed_l2_output_root: boot_info.claimed_l2_output_root,
             claimed_l2_block_number: boot_info.claimed_l2_block_number,
             config_hash: B256::from(crate::client::config_hash(&boot_info.rollup_config).unwrap()),
+        }
+    }
+
+    pub fn new_stitched(
+        fpvm_image_id: [u8; 32],
+        payout_recipient: Address,
+        precondition_output: B256,
+        config_hash: B256,
+        boot_info: &StitchedBootInfo,
+    ) -> Self {
+        Self {
+            fpvm_image_id,
+            payout_recipient,
+            precondition_output,
+            l1_head: boot_info.l1_head,
+            agreed_l2_output_root: boot_info.agreed_l2_output_root,
+            claimed_l2_output_root: boot_info.claimed_l2_output_root,
+            claimed_l2_block_number: boot_info.claimed_l2_block_number,
+            config_hash,
         }
     }
 }
@@ -59,6 +87,7 @@ impl ProofJournal {
             self.claimed_l2_output_root.as_slice(),
             self.claimed_l2_block_number.to_be_bytes().as_slice(),
             self.config_hash.as_slice(),
+            self.fpvm_image_id.as_slice(),
         ]
         .concat()
     }
@@ -80,6 +109,7 @@ impl ProofJournal {
                     .context("claimed_l2_block_number")?,
             ),
             config_hash: encoded[156..188].try_into().context("config_hash")?,
+            fpvm_image_id: encoded[188..220].try_into().context("fpvm_image_id")?,
         })
     }
 }

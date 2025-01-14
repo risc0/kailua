@@ -165,13 +165,21 @@ where
         // We use the zero claim hash to denote that the data as of l1 head is insufficient
         assert_eq!(boot.claimed_l2_output_root, B256::ZERO);
     }
+    let fpvm_image_id = bytemuck::cast::<_, [u8; 32]>(KAILUA_FPVM_ID);
     let witness = Witness {
         oracle_witness: core::mem::take(oracle_witness.lock().unwrap().deref_mut()),
         blobs_witness: core::mem::take(blobs_witness.lock().unwrap().deref_mut()),
         payout_recipient_address: payout_recipient,
         precondition_validation_data_hash,
+        stitched_boot_info: vec![], // todo: consider combined assumptions
+        fpvm_image_id,
     };
-    let journal_output = ProofJournal::new(payout_recipient, precondition_hash, boot.as_ref());
+    let journal_output = ProofJournal::new(
+        fpvm_image_id,
+        payout_recipient,
+        precondition_hash,
+        boot.as_ref(),
+    );
     Ok((journal_output, witness))
 }
 
