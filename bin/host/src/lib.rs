@@ -430,6 +430,7 @@ pub async fn fetch_precondition_data(
             PreconditionValidationData::Validity(
                 cfg.precondition_params[0],
                 cfg.precondition_params[1],
+                cfg.precondition_params[2],
                 fetch_requests,
             )
         } else {

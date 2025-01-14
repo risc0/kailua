@@ -21,7 +21,7 @@ use std::iter::once;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum PreconditionValidationData {
     Fault(u64, Box<[BlobFetchRequest; 2]>),
-    Validity(u64, u64, Vec<BlobFetchRequest>),
+    Validity(u64, u64, u64, Vec<BlobFetchRequest>),
 }
 
 impl PreconditionValidationData {
@@ -37,7 +37,7 @@ impl PreconditionValidationData {
     pub fn blob_fetch_requests(&self) -> &[BlobFetchRequest] {
         match self {
             PreconditionValidationData::Fault(_, requests) => requests.as_slice(),
-            PreconditionValidationData::Validity(_, _, requests) => requests.as_slice(),
+            PreconditionValidationData::Validity(_, _, _, requests) => requests.as_slice(),
         }
     }
 
@@ -51,10 +51,12 @@ impl PreconditionValidationData {
                 )
             }
             PreconditionValidationData::Validity(
+                global_l2_head_number,
                 proposal_output_count,
                 output_block_span,
                 blobs,
             ) => equivalence_precondition_hash(
+                global_l2_head_number,
                 proposal_output_count,
                 output_block_span,
                 blobs.iter().map(|b| &b.blob_hash.hash),
@@ -81,13 +83,16 @@ pub fn divergence_precondition_hash(
 }
 
 pub fn equivalence_precondition_hash<'a>(
+    global_l2_head_number: &u64,
     proposal_output_count: &u64,
     output_block_span: &u64,
     blob_hashes: impl Iterator<Item = &'a B256>,
 ) -> B256 {
+    let ghn_bytes = global_l2_head_number.to_be_bytes();
     let poc_bytes = proposal_output_count.to_be_bytes();
     let obs_bytes = output_block_span.to_be_bytes();
-    let all_bytes = once(poc_bytes.as_slice())
+    let all_bytes = once(ghn_bytes.as_slice())
+        .chain(once(poc_bytes.as_slice()))
         .chain(once(obs_bytes.as_slice()))
         .chain(blob_hashes.map(|h| h.as_slice()))
         .collect::<Vec<_>>()

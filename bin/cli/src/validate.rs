@@ -1028,10 +1028,15 @@ pub async fn handle_proofs(
             let params = match precondition_data {
                 PreconditionValidationData::Fault(agreement_index, _) => vec![agreement_index],
                 PreconditionValidationData::Validity(
+                    global_l2_head_number,
                     proposal_output_count,
                     output_block_span,
                     _,
-                ) => vec![proposal_output_count, output_block_span],
+                ) => vec![
+                    global_l2_head_number,
+                    proposal_output_count,
+                    output_block_span,
+                ],
             }
             .into_iter()
             .map(|p| p.to_string())

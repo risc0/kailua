@@ -28,6 +28,7 @@ use kona_proof::sync::new_pipeline_cursor;
 use kona_proof::{BootInfo, FlushableCache};
 use op_alloy_genesis::RollupConfig;
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
+use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -119,7 +120,12 @@ where
 
         let precondition_hash = precondition_data
             .map(|(precondition_validation_data, blobs)| {
-                validate_precondition(precondition_validation_data, blobs, &output_roots)
+                validate_precondition(
+                    precondition_validation_data,
+                    blobs,
+                    safe_head_number,
+                    &output_roots,
+                )
             })
             .unwrap_or(Ok(B256::ZERO))?;
 
@@ -320,6 +326,7 @@ where
 pub fn validate_precondition(
     precondition_validation_data: PreconditionValidationData,
     blobs: Vec<Blob>,
+    local_l2_head_number: u64,
     output_roots: &[B256],
 ) -> anyhow::Result<B256> {
     let precondition_hash = precondition_validation_data.precondition_hash();
@@ -346,47 +353,70 @@ pub fn validate_precondition(
                 bail!("Elements at divergence position {divergence_index} in blobs are equal.");
             }
         }
-        PreconditionValidationData::Validity(proposal_output_count, output_block_span, _) => {
-            // Verify that number of validated outputs matches expected count
-            let expected_output_count = proposal_output_count * output_block_span;
-            if output_roots.len() != expected_output_count as usize {
+        PreconditionValidationData::Validity(
+            global_l2_head_number,
+            proposal_output_count,
+            output_block_span,
+            _,
+        ) => {
+            // Ensure local and global block ranges match
+            if global_l2_head_number > local_l2_head_number {
                 bail!(
-                    "Expected {} output roots but got {}",
-                    expected_output_count,
-                    output_roots.len()
-                );
+                    "Validity precondition global starting block #{} > local agreed l2 head #{}",
+                    global_l2_head_number,
+                    local_l2_head_number
+                )
+            } else if output_roots.is_empty() {
+                bail!("No output roots to check for validity precondition.")
             }
-            // Verify fe equivalence to computed outputs for all but last output
-            let mut computed_root_iter = output_roots.iter().peekable();
-            let mut last_computed_root = computed_root_iter
-                .nth(output_block_span as usize - 1)
-                .unwrap();
-            let num_blobs = blobs.len();
-            for (b, blob) in blobs.into_iter().enumerate() {
-                for i in 0..FIELD_ELEMENTS_PER_BLOB {
-                    let index = 32 * i as usize;
-                    let blob_fe_slice = &blob[index..index + 32];
-                    if computed_root_iter.peek().is_none() {
-                        // trailing data can only begin at last blob
-                        if b != num_blobs - 1 {
-                            bail!("Trailing data began before last blob");
+            // Calculate blob index pointer
+            let max_block_number =
+                global_l2_head_number + proposal_output_count * output_block_span;
+            for (i, output_root) in output_roots.iter().enumerate() {
+                let output_block_number = local_l2_head_number + i as u64 + 1;
+                if output_block_number > max_block_number {
+                    // We should not derive outputs beyond the proposal root claim
+                    bail!("Output block #{output_block_number} > max block #{max_block_number}.");
+                } else if output_block_number % output_block_span != 0 {
+                    // We only check equivalence every output_block_span blocks
+                    continue;
+                }
+                let output_offset =
+                    (output_block_number - global_l2_head_number) / output_block_span;
+                let blob_index = (output_offset / FIELD_ELEMENTS_PER_BLOB) as usize;
+                let fe_position = (output_offset % FIELD_ELEMENTS_PER_BLOB) as usize;
+                let blob_fe_index = 32 * fe_position;
+                // Verify fe equivalence to computed outputs for all but last output
+                match output_offset.cmp(&proposal_output_count) {
+                    Ordering::Less => {
+                        // verify equivalence to blob
+                        let blob_fe_slice = &blobs[blob_index][blob_fe_index..blob_fe_index + 32];
+                        if blob_fe_slice != hash_to_fe(*output_root).as_slice() {
+                            bail!(
+                                "Bad fe #{i} in blob {blob_index}: Expected {} found {} ",
+                                hash_to_fe(*output_root),
+                                B256::try_from(blob_fe_slice)?
+                            );
                         }
-                        // non-zero trailing data can lead to a non-canonical blobs hash
-                        if blob_fe_slice != B256::ZERO.as_slice() {
-                            bail!("Found non-zero trailing data in blob {b}.")
+                    }
+                    Ordering::Equal => {
+                        // verify zeroed trail data
+                        if blob_index != blobs.len() - 1 {
+                            bail!(
+                                "Expected trail data to begin at blob {blob_index}/{}",
+                                blobs.len()
+                            );
+                        } else if blobs[blob_index][blob_fe_index..].iter().any(|b| b != &0u8) {
+                            bail!("Found non-zero trail data in blob {blob_index}");
                         }
-                        // last_computed_root now contains the published root claim
-                        continue;
-                    } else if blob_fe_slice != hash_to_fe(*last_computed_root).as_slice() {
-                        bail!(
-                            "Bad fe #{i} in blob {b}: Expected {} found {} ",
-                            hash_to_fe(*last_computed_root),
-                            B256::try_from(blob_fe_slice)?
+                    }
+                    Ordering::Greater => {
+                        // (output_block_number <= max_block_number) implies:
+                        // (output_offset <= proposal_output_count)
+                        unreachable!(
+                            "Output offset {output_offset} > output count {proposal_output_count}."
                         );
                     }
-                    last_computed_root = computed_root_iter
-                        .nth(output_block_span as usize - 1)
-                        .unwrap();
                 }
             }
         }
