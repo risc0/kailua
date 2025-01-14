@@ -25,8 +25,7 @@ async fn main() -> anyhow::Result<()> {
     let payout_recipient_address = args.payout_recipient_address.unwrap_or_default();
 
     kailua_client::run_client(
-        args.boundless_args,
-        args.boundless_storage_config,
+        args.boundless,
         ORACLE_READER,
         HINT_WRITER,
         payout_recipient_address,

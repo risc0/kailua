@@ -37,7 +37,6 @@ kona-preimage.workspace = true
 
 # zkVM
 bonsai-sdk.workspace = true
-boundless-market.workspace = true
 risc0-zkvm.workspace = true
 
 # Zeth

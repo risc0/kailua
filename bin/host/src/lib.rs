@@ -20,9 +20,9 @@ use alloy_chains::NamedChain;
 use alloy_eips::eip4844::IndexedBlobHash;
 use alloy_primitives::Address;
 use anyhow::bail;
-use boundless_market::storage::StorageProviderConfig;
 use clap::Parser;
-use kailua_client::{parse_address, parse_b256, BoundlessArgs};
+use kailua_client::boundless::BoundlessArgs;
+use kailua_client::{parse_address, parse_b256};
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
 use kona_host::fetcher::Fetcher;
@@ -71,10 +71,7 @@ pub struct KailuaHostCli {
     pub precondition_blob_hashes: Vec<B256>,
 
     #[clap(flatten)]
-    pub boundless_args: Option<BoundlessArgs>,
-    /// Storage provider to use for elf and input
-    #[clap(flatten)]
-    pub boundless_storage_config: Option<StorageProviderConfig>,
+    pub boundless: BoundlessArgs,
 }
 
 /// Starts the [PreimageServer] and the client program in separate threads. The client program is
@@ -117,8 +114,7 @@ pub async fn start_server_and_native_client(
 
     // Start the client program in a separate child process.
     let program_task = task::spawn(kailua_client::run_client(
-        args.boundless_args,
-        args.boundless_storage_config,
+        args.boundless,
         OracleReader::new(preimage_chan.client),
         HintWriter::new(hint_chan.client),
         args.payout_recipient_address.unwrap_or_default(),

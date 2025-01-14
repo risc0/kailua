@@ -27,9 +27,9 @@ use alloy::primitives::{Address, Bytes, FixedBytes, B256, U256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy::signers::local::LocalSigner;
 use anyhow::{anyhow, bail, Context};
-use boundless_market::storage::StorageProviderConfig;
+use kailua_client::boundless::BoundlessArgs;
+use kailua_client::parse_address;
 use kailua_client::proof::{fpvm_proof_file_name, Proof};
-use kailua_client::{parse_address, BoundlessArgs};
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::client::config_hash;
@@ -66,10 +66,7 @@ pub struct ValidateArgs {
     pub payout_recipient_address: Option<Address>,
 
     #[clap(flatten)]
-    pub boundless_args: Option<BoundlessArgs>,
-    /// Storage provider to use for elf and input
-    #[clap(flatten)]
-    pub boundless_storage_config: Option<StorageProviderConfig>,
+    pub boundless: BoundlessArgs,
 }
 
 pub async fn validate(args: ValidateArgs, data_dir: PathBuf) -> anyhow::Result<()> {
@@ -325,17 +322,13 @@ pub async fn handle_proposals(
                                         .iter()
                                         .map(|n| risc0_zkvm::sha::Digest::from(n.0))
                                         .collect();
-                                    // derive the root
-                                    let set_builder_root = risc0_aggregation::merkle_path_root(
-                                        &fpvm_claim_digest,
-                                        set_builder_siblings,
-                                    );
                                     // construct set builder root from merkle proof
-                                    let set_builder_journal = risc0_aggregation::GuestOutput::new(
-                                        risc0_zkvm::sha::Digest::from(crate::SET_BUILDER_ID.0),
-                                        set_builder_root,
-                                    )
-                                    .abi_encode();
+                                    let set_builder_journal =
+                                        kailua_client::boundless::encoded_set_builder_journal(
+                                            &fpvm_claim_digest,
+                                            set_builder_siblings,
+                                            risc0_zkvm::sha::Digest::from(crate::SET_BUILDER_ID.0),
+                                        );
                                     // create fake proof for the root
                                     let set_builder_seal = risc0_ethereum_contracts::encode_seal(
                                         &risc0_zkvm::Receipt::new(
@@ -359,8 +352,9 @@ pub async fn handle_proposals(
                                     warn!(
                                         "DEVNET-ONLY: Patching proof with faux set verifier seal."
                                     );
-                                    let selector =
-                                        kailua_client::set_verifier_selector(crate::SET_BUILDER_ID);
+                                    let selector = kailua_client::boundless::set_verifier_selector(
+                                        crate::SET_BUILDER_ID,
+                                    );
                                     *seal_data =
                                         [selector.as_slice(), seal.abi_encode().as_slice()]
                                             .concat();
@@ -1053,8 +1047,8 @@ pub async fn handle_proofs(
             ]);
         }
         // boundless args
-        if let Some(boundless_args) = &args.boundless_args {
-            proving_args.extend(boundless_args.to_arg_vec(&args.boundless_storage_config));
+        if let Some(market) = &args.boundless.market {
+            proving_args.extend(market.to_arg_vec(&args.boundless.storage));
         }
         // verbosity level
         if args.core.v > 0 {
@@ -1131,7 +1125,8 @@ fn needs_selector_patch(proof: &Proof) -> bool {
     match proof {
         Proof::ZKVMReceipt(_) => false,
         Proof::BoundlessSeal(seal, _) => {
-            &seal[..4] != kailua_client::set_verifier_selector(crate::SET_BUILDER_ID).as_slice()
+            &seal[..4]
+                != kailua_client::boundless::set_verifier_selector(crate::SET_BUILDER_ID).as_slice()
         }
     }
 }
