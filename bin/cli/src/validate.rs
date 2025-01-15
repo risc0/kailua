@@ -18,7 +18,7 @@ use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
 use crate::providers::beacon::BlobProvider;
 use crate::providers::optimism::OpNodeProvider;
-use crate::{stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
+use crate::{stall::Stall, CoreArgs, KAILUA_GAME_TYPE, SET_BUILDER_ID};
 use alloy::eips::eip4844::{IndexedBlobHash, FIELD_ELEMENTS_PER_BLOB};
 use alloy::eips::BlockNumberOrTag;
 use alloy::network::primitives::BlockTransactionsKind;
@@ -330,99 +330,15 @@ pub async fn handle_proposals(
                 .divergence_point(&opponent)
                 .expect("Equivalent proposals") as u64;
 
-            let expected_image_id = parent_contract.imageId().stall().await.imageId_.0;
+            let expected_fpvm_image_id = parent_contract.imageId().stall().await.imageId_.0;
 
             // patch the proof if in dev mode
             #[cfg(feature = "devnet")]
-            let proof = if is_dev_mode() || needs_selector_patch(&proof) {
-                use alloy::sol_types::SolValue;
-                use risc0_zkvm::sha::Digestible;
-
-                let mut proof = proof;
-                match &mut proof {
-                    Proof::ZKVMReceipt(receipt) => {
-                        // Patch the image id of the receipt to match the expected one
-                        if let risc0_zkvm::InnerReceipt::Fake(fake_inner_receipt) =
-                            &mut receipt.inner
-                        {
-                            if let risc0_zkvm::MaybePruned::Value(claim) =
-                                &mut fake_inner_receipt.claim
-                            {
-                                warn!("DEVNET-ONLY: Patching fake receipt image id to match game contract.");
-                                claim.pre =
-                                    risc0_zkvm::MaybePruned::Pruned(expected_image_id.into());
-                            }
-                        }
-                    }
-                    Proof::BoundlessSeal(seal_data, journal) => {
-                        // Amend the seal with a fake proof for the set root
-                        match kailua_contracts::SetVerifierSeal::abi_decode(&seal_data[4..], true) {
-                            Ok(mut seal) => {
-                                if seal.rootSeal.is_empty() {
-                                    // build the claim for the fpvm
-                                    let fpvm_claim_digest = risc0_zkvm::ReceiptClaim::ok(
-                                        risc0_zkvm::sha::Digest::from(kailua_build::KAILUA_FPVM_ID),
-                                        journal.bytes.clone(),
-                                    )
-                                    .digest();
-                                    // convert the merkle path into Digest instances
-                                    let set_builder_siblings: Vec<_> = seal
-                                        .path
-                                        .iter()
-                                        .map(|n| risc0_zkvm::sha::Digest::from(n.0))
-                                        .collect();
-                                    // construct set builder root from merkle proof
-                                    let set_builder_journal =
-                                        kailua_client::boundless::encoded_set_builder_journal(
-                                            &fpvm_claim_digest,
-                                            set_builder_siblings,
-                                            risc0_zkvm::sha::Digest::from(crate::SET_BUILDER_ID.0),
-                                        );
-                                    // create fake proof for the root
-                                    let set_builder_seal = risc0_ethereum_contracts::encode_seal(
-                                        &risc0_zkvm::Receipt::new(
-                                            risc0_zkvm::InnerReceipt::Fake(
-                                                risc0_zkvm::FakeReceipt::new(
-                                                    risc0_zkvm::ReceiptClaim::ok(
-                                                        risc0_zkvm::sha::Digest::from(
-                                                            crate::SET_BUILDER_ID.0,
-                                                        ),
-                                                        set_builder_journal.clone(),
-                                                    ),
-                                                ),
-                                            ),
-                                            set_builder_journal.clone(),
-                                        ),
-                                    )
-                                    .context("encode_seal (fake boundless)")?;
-                                    // replace empty root seal with constructed fake proof
-                                    seal.rootSeal = set_builder_seal.into();
-                                    // amend proof
-                                    warn!(
-                                        "DEVNET-ONLY: Patching proof with faux set verifier seal."
-                                    );
-                                    let selector = kailua_client::boundless::set_verifier_selector(
-                                        crate::SET_BUILDER_ID,
-                                    );
-                                    *seal_data =
-                                        [selector.as_slice(), seal.abi_encode().as_slice()]
-                                            .concat();
-                                }
-                            }
-                            Err(e) => {
-                                error!("Could not abi decode seal from boundless: {e:?}")
-                            }
-                        }
-                    }
-                }
-                proof
-            } else {
-                proof
-            };
+            let proof = maybe_patch_proof(proof, expected_fpvm_image_id, SET_BUILDER_ID.0)?;
 
             // verify that the zkvm receipt is valid
             if let Some(receipt) = proof.as_receipt() {
-                if let Err(e) = receipt.verify(expected_image_id) {
+                if let Err(e) = receipt.verify(expected_fpvm_image_id) {
                     error!("Could not verify receipt against image id in contract: {e:?}");
                 } else {
                     info!("Receipt validated.");
@@ -1249,12 +1165,92 @@ pub async fn handle_proof_requests(
 }
 
 #[cfg(feature = "devnet")]
-fn needs_selector_patch(proof: &Proof) -> bool {
-    match proof {
-        Proof::ZKVMReceipt(_) => false,
-        Proof::BoundlessSeal(seal, _) => {
-            &seal[..4]
-                != kailua_client::boundless::set_verifier_selector(crate::SET_BUILDER_ID).as_slice()
+fn maybe_patch_proof(
+    mut proof: Proof,
+    expected_fpvm_image_id: [u8; 32],
+    expected_set_builder_image_id: [u8; 32],
+) -> anyhow::Result<Proof> {
+    // Return the proof if we can't patch it
+    if !is_dev_mode() {
+        return Ok(proof);
+    }
+
+    use alloy::sol_types::SolValue;
+    use risc0_zkvm::sha::Digestible;
+
+    let expected_fpvm_image_id = risc0_zkvm::sha::Digest::from(expected_fpvm_image_id);
+
+    match &mut proof {
+        Proof::ZKVMReceipt(receipt) => {
+            // Patch the image id of the receipt to match the expected one
+            if let risc0_zkvm::InnerReceipt::Fake(fake_inner_receipt) = &mut receipt.inner {
+                if let risc0_zkvm::MaybePruned::Value(claim) = &mut fake_inner_receipt.claim {
+                    warn!("DEVNET-ONLY: Patching fake receipt image id to match game contract.");
+                    claim.pre = risc0_zkvm::MaybePruned::Pruned(expected_fpvm_image_id);
+                }
+            }
+        }
+        Proof::BoundlessSeal(seal_data, journal) => {
+            let expected_boundless_selector = kailua_client::boundless::set_verifier_selector(
+                expected_set_builder_image_id.into(),
+            );
+            let expected_set_builder_image_id =
+                risc0_zkvm::sha::Digest::from(expected_set_builder_image_id);
+            // Just use the proof if everything is in order
+            if &seal_data[..4] == expected_boundless_selector.as_slice() {
+                return Ok(proof);
+            }
+            // Amend the seal with a fake proof for the set root
+            match kailua_contracts::SetVerifierSeal::abi_decode(&seal_data[4..], true) {
+                Ok(mut seal) => {
+                    if seal.rootSeal.is_empty() {
+                        // build the claim for the fpvm
+                        let fpvm_claim_digest = risc0_zkvm::ReceiptClaim::ok(
+                            expected_fpvm_image_id,
+                            journal.bytes.clone(),
+                        )
+                        .digest();
+                        // convert the merkle path into Digest instances
+                        let set_builder_siblings: Vec<_> = seal
+                            .path
+                            .iter()
+                            .map(|n| risc0_zkvm::sha::Digest::from(n.0))
+                            .collect();
+                        // construct set builder root from merkle proof
+                        let set_builder_journal =
+                            kailua_client::boundless::encoded_set_builder_journal(
+                                &fpvm_claim_digest,
+                                set_builder_siblings,
+                                expected_set_builder_image_id,
+                            );
+                        // create fake proof for the root
+                        let set_builder_seal =
+                            risc0_ethereum_contracts::encode_seal(&risc0_zkvm::Receipt::new(
+                                risc0_zkvm::InnerReceipt::Fake(risc0_zkvm::FakeReceipt::new(
+                                    risc0_zkvm::ReceiptClaim::ok(
+                                        expected_set_builder_image_id,
+                                        set_builder_journal.clone(),
+                                    ),
+                                )),
+                                set_builder_journal.clone(),
+                            ))
+                            .context("encode_seal (fake boundless)")?;
+                        // replace empty root seal with constructed fake proof
+                        seal.rootSeal = set_builder_seal.into();
+                        // amend proof
+                        warn!("DEVNET-ONLY: Patching proof with faux set verifier seal.");
+                        *seal_data = [
+                            expected_boundless_selector.as_slice(),
+                            seal.abi_encode().as_slice(),
+                        ]
+                        .concat();
+                    }
+                }
+                Err(e) => {
+                    error!("Could not abi decode seal from boundless: {e:?}")
+                }
+            }
         }
     }
+    Ok(proof)
 }
