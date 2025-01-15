@@ -58,6 +58,9 @@ pub struct ValidateArgs {
     /// Path to the kailua host binary to use for proving
     #[clap(long, env)]
     pub kailua_host: PathBuf,
+    /// Fast-forward block height
+    #[clap(long, env, required = false, default_value_t = 0)]
+    pub fast_forward_target: u64,
 
     /// Secret key of L1 wallet to use for challenging and proving outputs
     #[clap(long, env)]
@@ -79,9 +82,9 @@ pub async fn validate(args: ValidateArgs, data_dir: PathBuf) -> anyhow::Result<(
         args.clone(),
         data_dir.clone(),
     ));
-    let handle_proofs = spawn(handle_proofs(channel_pair.1, args, data_dir));
+    let handle_proof_requests = spawn(handle_proof_requests(channel_pair.1, args, data_dir));
 
-    let (proposals_task, proofs_task) = try_join!(handle_proposals, handle_proofs)?;
+    let (proposals_task, proofs_task) = try_join!(handle_proposals, handle_proof_requests)?;
     proposals_task.context("handle_proposals")?;
     proofs_task.context("handle_proofs")?;
 
@@ -184,26 +187,44 @@ pub async fn handle_proposals(
             .context("load_proposals")?;
 
         // check new proposals for fault and queue potential responses
-        for proposal_index in loaded_proposals {
-            let Some(proposal) = kailua_db.get_local_proposal(&proposal_index) else {
-                error!("Proposal {proposal_index} missing from database.");
+        for opponent_index in loaded_proposals {
+            let Some(opponent) = kailua_db.get_local_proposal(&opponent_index) else {
+                error!("Proposal {opponent_index} missing from database.");
+                continue;
+            };
+            // fetch canonical status of proposal
+            let Some(is_proposal_canonical) = opponent.canonical else {
+                error!("Canonical status of proposal {opponent_index} unknown");
                 continue;
             };
             // skip this proposal if it has no contender
-            let Some(contender) = proposal.contender else {
-                info!("Skipping proposal {proposal_index} with no contender.");
+            let Some(contender_index) = opponent.contender else {
+                info!("Skipping proposal {opponent_index} with no contender.");
                 continue;
             };
-            // request a proof of the match results
-            let Some(contender) = kailua_db.get_local_proposal(&contender) else {
-                error!("Contender {contender} missing from database.");
+            // fetch contender
+            let Some(contender) = kailua_db.get_local_proposal(&contender_index) else {
+                error!("Contender {contender_index} missing from database.");
+                continue;
+            };
+            // fetch canonical status of contender
+            let Some(is_contender_canonical) = contender.canonical else {
+                error!("Contender {contender_index} canonical status unknown.");
+                continue;
+            };
+            // skip this proposal if it has a canonical contender being fast-forwarded
+            if is_contender_canonical && opponent.output_block_number <= args.fast_forward_target {
+                info!(
+                    "Skipping fault proving for proposal {opponent_index} assuming ongoing \
+                    validity proof generation for {contender_index}"
+                );
                 continue;
             };
             // Look up parent proposal
-            let Some(proposal_parent) = kailua_db.get_local_proposal(&proposal.parent) else {
+            let Some(proposal_parent) = kailua_db.get_local_proposal(&opponent.parent) else {
                 error!(
                     "Proposal {} parent {} missing from database.",
-                    proposal.index, proposal.parent
+                    opponent.index, opponent.parent
                 );
                 continue;
             };
@@ -217,37 +238,64 @@ pub async fn handle_proposals(
                 );
                 continue;
             };
-            let Some(v_index) = proposal_parent.child_index(proposal.index) else {
+            let Some(v_index) = proposal_parent.child_index(opponent.index) else {
                 error!(
                     "Could not look up proposal {} index in parent tournament {}",
-                    proposal.index, proposal_parent.index
+                    opponent.index, proposal_parent.index
                 );
                 continue;
             };
+            // prove the validity of this proposal if it is canon of height below the target
+            if is_proposal_canonical && opponent.output_block_number <= args.fast_forward_target {
+                // Check that proof has not already been posted
+                if proposal_parent_contract
+                    .proofStatus(U256::ZERO, U256::ZERO)
+                    .stall()
+                    .await
+                    ._0
+                    != 0
+                {
+                    info!("Validity proof for {opponent_index} already submitted");
+                    continue;
+                }
+
+                // Prove if unproven
+                request_validity_proof(
+                    &mut channel,
+                    &kailua_db.config,
+                    &proposal_parent,
+                    &opponent,
+                    &eth_rpc_provider,
+                    &op_geth_provider,
+                )
+                .await?;
+                continue;
+            }
+            // generate a fault proof to settle dispute between opponent and contender
             // Check that proof had not already been posted
             let proof_status = proposal_parent_contract
                 .proofStatus(U256::from(u_index), U256::from(v_index))
                 .stall()
                 .await
                 ._0;
-            // Prove if unproven
-            if proof_status == 0 {
-                request_fault_proof(
-                    &mut channel,
-                    &kailua_db.config,
-                    &proposal_parent,
-                    &contender,
-                    &proposal,
-                    &eth_rpc_provider,
-                    &op_geth_provider,
-                    &op_node_provider,
-                )
-                .await?;
-            } else {
+            if proof_status != 0 {
                 info!(
                     "Match between children {u_index} and {v_index} already proven {proof_status}"
                 );
+                continue;
             }
+            // Prove if unproven
+            request_fault_proof(
+                &mut channel,
+                &kailua_db.config,
+                &proposal_parent,
+                &contender,
+                &opponent,
+                &eth_rpc_provider,
+                &op_geth_provider,
+                &op_node_provider,
+            )
+            .await?;
         }
 
         // publish computed fault proofs and resolve proven challenges
@@ -931,7 +979,81 @@ async fn request_fault_proof(
     Ok(())
 }
 
-pub async fn handle_proofs(
+async fn request_validity_proof(
+    channel: &mut DuplexChannel<Message>,
+    config: &Config,
+    parent: &Proposal,
+    proposal: &Proposal,
+    l1_node_provider: &ReqwestProvider,
+    l2_node_provider: &ReqwestProvider,
+) -> anyhow::Result<()> {
+    let precondition_validation_data = if config.proposal_output_count > 1 {
+        let mut validated_blobs = Vec::with_capacity(proposal.io_blobs.len());
+        for (blob_hash, blob) in &proposal.io_blobs {
+            let block_parent = l1_node_provider
+                .get_block_by_hash(proposal.l1_head, BlockTransactionsKind::Hashes)
+                .await
+                .context("block_parent get_block_by_hash")?
+                .expect("block_parent not found");
+            let block = l1_node_provider
+                .get_block_by_number(
+                    BlockNumberOrTag::Number(block_parent.header.number + 1),
+                    BlockTransactionsKind::Hashes,
+                )
+                .await
+                .context("block get_block_by_number")?
+                .expect("block not found");
+            validated_blobs.push(BlobFetchRequest {
+                block_ref: BlockInfo {
+                    hash: block.header.hash,
+                    number: block.header.number,
+                    parent_hash: block.header.parent_hash,
+                    timestamp: block.header.timestamp,
+                },
+                blob_hash: IndexedBlobHash {
+                    index: blob.index,
+                    hash: *blob_hash,
+                },
+            })
+        }
+        Some(PreconditionValidationData::Validity(
+            parent.output_block_number,
+            config.proposal_output_count,
+            config.output_block_span,
+            validated_blobs,
+        ))
+    } else {
+        None
+    };
+    // Get L2 head hash
+    let agreed_l2_head_hash = l2_node_provider
+        .get_block_by_number(
+            BlockNumberOrTag::Number(parent.output_block_number),
+            BlockTransactionsKind::Hashes,
+        )
+        .await
+        .context("agreed_l2_head_hash")?
+        .expect("Agreed l2 head not found")
+        .header
+        .hash;
+    debug!("l2_head {:?}", &agreed_l2_head_hash);
+    // Message proving task
+    channel
+        .sender
+        .send(Message::Proposal {
+            index: proposal.index,
+            precondition_validation_data,
+            l1_head: proposal.l1_head,
+            agreed_l2_head_hash,
+            agreed_l2_output_root: parent.output_root,
+            claimed_l2_block_number: proposal.output_block_number,
+            claimed_l2_output_root: proposal.output_root,
+        })
+        .await?;
+    Ok(())
+}
+
+pub async fn handle_proof_requests(
     mut channel: DuplexChannel<Message>,
     args: ValidateArgs,
     data_dir: PathBuf,
