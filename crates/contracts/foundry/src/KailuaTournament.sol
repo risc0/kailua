@@ -225,21 +225,14 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         KailuaTournament contender = children[u];
         for (; v < children.length && eliminationLimit > 0; (v++, eliminationLimit--)) {
             KailuaTournament opponent = children[v];
-            // If the opponent proposer is eliminated or has the same identity, skip
-            if (canIgnoreOpponent(contender, opponent)) {
-                continue;
-            }
             // If the contender hasn't been challenged for as long as the timeout, declare them winner
             if (contender.getChallengerDuration(opponent.createdAt().raw()).raw() == 0) {
                 // Note: This implies eliminationLimit > 0
                 break;
             }
-            // If the opponent proposal is an identical twin, skip it
-            if (opponent.rootClaim().raw() == validChildRootClaim) {
-                if (opponent.blobsHash() == validChildBlobsHash) {
-                    // The opponent is an unjustified duplicate proposal. Ignore it.
-                    continue;
-                }
+            // If the opponent proposer is eliminated or has the same identity, skip
+            if (canIgnoreOpponent(contender, opponent)) {
+                continue;
             }
             // eliminate the opponent
             if (provenAt[0][0].raw() < provenAt[u][v].raw()) {
@@ -284,32 +277,23 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         KailuaTournament contender = children[u];
         for (; v < children.length && eliminationLimit > 0; (v++, eliminationLimit--)) {
             KailuaTournament opponent = children[v];
-            // If the opponent proposer is eliminated or has the same identity, skip
-            if (canIgnoreOpponent(contender, opponent)) {
-                continue;
-            }
             // If the contender hasn't been challenged for as long as the timeout, declare them winner
             if (contender.getChallengerDuration(opponent.createdAt().raw()).raw() == 0) {
                 // Note: This implies eliminationLimit > 0
                 break;
             }
-            // If the opponent proposal is an identical twin, skip it
-            if (contender.rootClaim().raw() == opponent.rootClaim().raw()) {
-                // The equivalence of intermediate output commitments matters because one proposal
-                // may be more defensible than the other based on the io data.
-                if (contender.blobsHash() == opponent.blobsHash()) {
-                    // The opponent is an unjustified duplicate proposal. Ignore it.
-                    continue;
-                }
+            // If the opponent proposer is eliminated, duplicated, or has the same identity, skip
+            if (canIgnoreOpponent(contender, opponent)) {
+                continue;
             }
             // Check if the result of playing this match is available
-            ProofStatus proven = proofStatus[u][v];
+            ProofStatus faultProven = proofStatus[u][v];
             // We must wait for more proofs if the result is unavailable
-            if (proven == ProofStatus.NONE) {
+            if (faultProven == ProofStatus.NONE) {
                 revert NotProven();
             }
             // Otherwise decide winner
-            if (proven == ProofStatus.U_LOSE_V_WIN) {
+            if (faultProven == ProofStatus.U_LOSE_V_WIN) {
                 // u was shown as faulty (beat by v)
                 // eliminate the contender
                 KAILUA_TREASURY.eliminate(address(contender), prover[u][v]);
@@ -348,6 +332,16 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
     /// @notice Returns true if the opposing proposal can be ignored by the contender
     function canIgnoreOpponent(KailuaTournament contender, KailuaTournament opponent) internal returns (bool) {
+        // If the opponent proposal is an identical twin, skip it
+        if (contender.rootClaim().raw() == opponent.rootClaim().raw()) {
+            // The equivalence of intermediate output commitments matters because one proposal
+            // may be more defensible than the other based on the io data.
+            if (contender.blobsHash() == opponent.blobsHash()) {
+                // The opponent is an unjustified duplicate proposal. Ignore it.
+                return true;
+            }
+        }
+        // Check proposer identity
         address opponentProposer = KAILUA_TREASURY.proposerOf(address(opponent));
         uint256 eliminationRound = KAILUA_TREASURY.eliminationRound(opponentProposer);
         // The opponent is not yet eliminated
