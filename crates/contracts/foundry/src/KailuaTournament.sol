@@ -475,7 +475,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         }
 
         // INVARIANT: Proofs can only argue on divergence points
-        if (proposedOutput[0] == proposedOutput[1]) {
+        if (KailuaLib.hashToFe(proposedOutput[0]) == KailuaLib.hashToFe(proposedOutput[1])) {
             revert NoConflict();
         }
 
@@ -611,7 +611,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         }
 
         // INVARIANT: Proofs can only argue on divergence points
-        if (proposedOutput[0] == proposedOutput[1]) {
+        if (KailuaLib.hashToFe(proposedOutput[0]) == KailuaLib.hashToFe(proposedOutput[1])) {
             revert NoConflict();
         }
 
