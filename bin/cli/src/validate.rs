@@ -245,21 +245,23 @@ pub async fn handle_proposals(
                 );
                 continue;
             };
+            // Check that a validity proof has not already been posted
+            if proposal_parent_contract
+                .proofStatus(U256::ZERO, U256::ZERO)
+                .stall()
+                .await
+                ._0
+                != 0
+            {
+                info!(
+                    "Validity proof settling all disputes in tournament {} already submitted",
+                    proposal_parent.index
+                );
+                continue;
+            }
             // prove the validity of this proposal if it is canon of height below the target
             if is_proposal_canonical && opponent.output_block_number <= args.fast_forward_target {
-                // Check that proof has not already been posted
-                if proposal_parent_contract
-                    .proofStatus(U256::ZERO, U256::ZERO)
-                    .stall()
-                    .await
-                    ._0
-                    != 0
-                {
-                    info!("Validity proof for {opponent_index} already submitted");
-                    continue;
-                }
-
-                // Prove if unproven
+                // Prove full validity
                 request_validity_proof(
                     &mut channel,
                     &kailua_db.config,
@@ -271,8 +273,7 @@ pub async fn handle_proposals(
                 .await?;
                 continue;
             }
-            // generate a fault proof to settle dispute between opponent and contender
-            // Check that proof had not already been posted
+            // Check that a fault proof had not already been posted
             let proof_status = proposal_parent_contract
                 .proofStatus(U256::from(u_index), U256::from(v_index))
                 .stall()
@@ -284,7 +285,7 @@ pub async fn handle_proposals(
                 );
                 continue;
             }
-            // Prove if unproven
+            // Prove fault
             request_fault_proof(
                 &mut channel,
                 &kailua_db.config,
