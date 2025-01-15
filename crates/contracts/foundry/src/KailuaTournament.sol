@@ -398,8 +398,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         validChildBlobsHash = childContract.blobsHash();
 
         // Calculate the expected precondition hash
-        bytes32 preconditionHash =
-            sha256(abi.encodePacked(uint64(PROPOSAL_OUTPUT_COUNT), uint64(OUTPUT_BLOCK_SPAN), validChildBlobsHash));
+        bytes32 preconditionHash = sha256(
+            abi.encodePacked(
+                uint64(l2BlockNumber()), uint64(PROPOSAL_OUTPUT_COUNT), uint64(OUTPUT_BLOCK_SPAN), validChildBlobsHash
+            )
+        );
 
         // Calculate the expected block number
         uint64 claimBlockNumber = uint64(l2BlockNumber() + PROPOSAL_OUTPUT_COUNT * OUTPUT_BLOCK_SPAN);
