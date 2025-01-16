@@ -372,7 +372,7 @@ pub fn validate_precondition(
             // Calculate blob index pointer
             let max_block_number =
                 global_l2_head_number + proposal_output_count * output_block_span;
-            for (i, output_root) in output_roots.iter().enumerate() {
+            for (i, output_hash) in output_roots.iter().enumerate() {
                 let output_block_number = local_l2_head_number + i as u64 + 1;
                 if output_block_number > max_block_number {
                     // We should not derive outputs beyond the proposal root claim
@@ -391,10 +391,12 @@ pub fn validate_precondition(
                     Ordering::Less => {
                         // verify equivalence to blob
                         let blob_fe_slice = &blobs[blob_index][blob_fe_index..blob_fe_index + 32];
-                        if blob_fe_slice != hash_to_fe(*output_root).as_slice() {
+                        let output_fe = hash_to_fe(*output_hash);
+                        let output_fe_bytes = output_fe.to_be_bytes::<32>();
+                        if blob_fe_slice != output_fe_bytes.as_slice() {
                             bail!(
                                 "Bad fe #{i} in blob {blob_index}: Expected {} found {} ",
-                                hash_to_fe(*output_root),
+                                output_fe,
                                 B256::try_from(blob_fe_slice)?
                             );
                         }

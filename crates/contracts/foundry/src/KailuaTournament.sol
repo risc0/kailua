@@ -444,7 +444,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     /// @notice Verifies that an intermediate output was part of the proposal
     function verifyIntermediateOutput(
         uint64 outputNumber,
-        bytes32 outputHash,
+        uint256 outputFe,
         bytes calldata blobCommitment,
         bytes calldata kzgProof
     ) external virtual returns (bool success);
@@ -454,9 +454,9 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         address payoutRecipient,
         uint64[3] calldata uvo,
         bytes calldata encodedSeal,
-        bytes32 acceptedOutput,
-        bytes32[2] calldata proposedOutput,
-        bytes32 computedOutput,
+        bytes32 acceptedOutputHash,
+        uint256[2] calldata proposedOutputFe,
+        bytes32 computedOutputHash,
         bytes[][2] calldata blobCommitments,
         bytes[][2] calldata kzgProofs
     ) external {
@@ -475,7 +475,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         }
 
         // INVARIANT: Proofs can only argue on divergence points
-        if (KailuaLib.hashToFe(proposedOutput[0]) == KailuaLib.hashToFe(proposedOutput[1])) {
+        if (proposedOutputFe[0] == proposedOutputFe[1]) {
             revert NoConflict();
         }
 
@@ -512,20 +512,22 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
         // Validate the common output root.
         if (uvo[2] == 0) {
+            // Note: acceptedOutputHash cannot be a reduced fe because the comparison below will fail
             // The safe output is the parent game's output when proving the first output
-            require(acceptedOutput == rootClaim().raw(), "bad acceptedOutput");
+            require(acceptedOutputHash == rootClaim().raw(), "bad acceptedOutput");
         } else {
+            // Note: acceptedOutputHash cannot be a reduced fe because the journal would not be provable
+            uint256 acceptedOutputFe = KailuaLib.hashToFe(acceptedOutputHash);
             // Prove common output publication
             require(
                 childContracts[0].verifyIntermediateOutput(
-                    uvo[2] - 1, acceptedOutput, blobCommitments[0][0], kzgProofs[0][0]
+                    uvo[2] - 1, acceptedOutputFe, blobCommitments[0][0], kzgProofs[0][0]
                 ),
                 "bad left child acceptedOutput kzg proof"
             );
-
             require(
                 childContracts[1].verifyIntermediateOutput(
-                    uvo[2] - 1, acceptedOutput, blobCommitments[1][0], kzgProofs[1][0]
+                    uvo[2] - 1, acceptedOutputFe, blobCommitments[1][0], kzgProofs[1][0]
                 ),
                 "bad right child acceptedOutput kzg proof"
             );
@@ -533,14 +535,20 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
         // Validate the claimed output roots.
         if (uvo[2] == PROPOSAL_OUTPUT_COUNT - 1) {
-            require(proposedOutput[0] == childContracts[0].rootClaim().raw(), "bad proposedOutput[0]");
-            require(proposedOutput[1] == childContracts[1].rootClaim().raw(), "bad proposedOutput[1]");
+            // Note: proposedOutputFe[] members must be canonical points or comparisons below will fail
+            require(
+                proposedOutputFe[0] == KailuaLib.hashToFe(childContracts[0].rootClaim().raw()), "bad proposedOutput[0]"
+            );
+            require(
+                proposedOutputFe[1] == KailuaLib.hashToFe(childContracts[1].rootClaim().raw()), "bad proposedOutput[1]"
+            );
         } else {
+            // Note: proposedOutputFe[] members must be canonical points or point eval precompile calls will fail
             // Prove divergent output publication
             require(
                 childContracts[0].verifyIntermediateOutput(
                     uvo[2],
-                    proposedOutput[0],
+                    proposedOutputFe[0],
                     blobCommitments[0][blobCommitments[0].length - 1],
                     kzgProofs[0][kzgProofs[0].length - 1]
                 ),
@@ -550,7 +558,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             require(
                 childContracts[1].verifyIntermediateOutput(
                     uvo[2],
-                    proposedOutput[1],
+                    proposedOutputFe[1],
                     blobCommitments[1][blobCommitments[1].length - 1],
                     kzgProofs[1][kzgProofs[1].length - 1]
                 ),
@@ -570,13 +578,15 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                     // The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
                     childContracts[1].l1Head().raw(),
                     // The latest finalized L2 output root.
-                    acceptedOutput,
+                    acceptedOutputHash,
                     // The L2 output root claim.
-                    computedOutput,
+                    computedOutputHash,
                     // The L2 claim block number.
                     claimBlockNumber,
                     // The rollup configuration hash
-                    ROLLUP_CONFIG_HASH
+                    ROLLUP_CONFIG_HASH,
+                    // The FPVM Image ID
+                    FPVM_IMAGE_ID
                 )
             );
 
@@ -584,7 +594,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             RISC_ZERO_VERIFIER.verify(encodedSeal, FPVM_IMAGE_ID, journalDigest);
         }
 
-        resolveDispute(payoutRecipient, uvo, proposedOutput, computedOutput);
+        resolveDispute(payoutRecipient, uvo, proposedOutputFe, KailuaLib.hashToFe(computedOutputHash));
     }
 
     /// @notice Proves which parties published invalid trailing data in a tournament match
@@ -592,7 +602,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         address payoutRecipient,
         uint64[3] calldata uvo,
         bytes calldata encodedSeal,
-        bytes32[2] calldata proposedOutput,
+        uint256[2] calldata proposedOutputFe,
         bytes[][2] calldata blobCommitments,
         bytes[][2] calldata kzgProofs
     ) external {
@@ -611,7 +621,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         }
 
         // INVARIANT: Proofs can only argue on divergence points
-        if (KailuaLib.hashToFe(proposedOutput[0]) == KailuaLib.hashToFe(proposedOutput[1])) {
+        if (proposedOutputFe[0] == proposedOutputFe[1]) {
             revert NoConflict();
         }
 
@@ -656,10 +666,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
         // Validate the claimed output roots publications
         {
+            // Note: proposedOutputFe[] must contain canonical field elements or point eval precompile calls will fail
             require(
                 childContracts[0].verifyIntermediateOutput(
                     trailOffset,
-                    proposedOutput[0],
+                    proposedOutputFe[0],
                     blobCommitments[0][blobCommitments[0].length - 1],
                     kzgProofs[0][kzgProofs[0].length - 1]
                 ),
@@ -669,7 +680,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             require(
                 childContracts[1].verifyIntermediateOutput(
                     trailOffset,
-                    proposedOutput[1],
+                    proposedOutputFe[1],
                     blobCommitments[1][blobCommitments[1].length - 1],
                     kzgProofs[1][kzgProofs[1].length - 1]
                 ),
@@ -694,7 +705,9 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                     // The L2 claim block number.
                     uint64(l2BlockNumber()),
                     // The rollup configuration hash
-                    ROLLUP_CONFIG_HASH
+                    ROLLUP_CONFIG_HASH,
+                    // The FPVM Image ID
+                    FPVM_IMAGE_ID
                 )
             );
 
@@ -703,19 +716,19 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         }
 
         // Update dispute status based on trailing data
-        resolveDispute(payoutRecipient, uvo, proposedOutput, bytes32(0x0));
+        resolveDispute(payoutRecipient, uvo, proposedOutputFe, 0x0);
     }
 
     function resolveDispute(
         address payoutRecipient,
         uint64[3] calldata uvo,
-        bytes32[2] calldata proposedOutput,
-        bytes32 expectedOutput
+        uint256[2] calldata proposedOutputFe,
+        uint256 expectedOutputFe
     ) internal {
         // Update proof status based on expected output
-        if (KailuaLib.hashToFe(proposedOutput[0]) != KailuaLib.hashToFe(expectedOutput)) {
+        if (proposedOutputFe[0] != expectedOutputFe) {
             // u lose
-            if (KailuaLib.hashToFe(proposedOutput[1]) != KailuaLib.hashToFe(expectedOutput)) {
+            if (proposedOutputFe[1] != expectedOutputFe) {
                 // v lose
                 proofStatus[uvo[0]][uvo[1]] = ProofStatus.U_LOSE_V_LOSE;
             } else {

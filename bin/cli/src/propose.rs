@@ -298,11 +298,11 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         for i in 1..kailua_db.config.proposal_output_count {
             let io_block_number =
                 canonical_tip.output_block_number + i * kailua_db.config.output_block_span;
-            let Ok(output) = op_node_provider.output_at_block(io_block_number).await else {
+            let Ok(output_hash) = op_node_provider.output_at_block(io_block_number).await else {
                 error!("Could not retrieve intermediate output at block #{io_block_number}.");
                 break;
             };
-            io_field_elements.push(hash_to_fe(output));
+            io_field_elements.push(hash_to_fe(output_hash));
         }
         if io_field_elements.len() as u64 != kailua_db.config.proposal_output_count - 1 {
             error!("Could not gather all necessary intermediate outputs.");

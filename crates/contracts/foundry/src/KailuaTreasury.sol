@@ -96,7 +96,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     // ------------------------------
 
     /// @inheritdoc KailuaTournament
-    function verifyIntermediateOutput(uint64, bytes32, bytes calldata, bytes calldata)
+    function verifyIntermediateOutput(uint64, uint256, bytes calldata, bytes calldata)
         external
         pure
         override

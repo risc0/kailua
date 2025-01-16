@@ -143,14 +143,14 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     for i in 1..FIELD_ELEMENTS_PER_BLOB {
         let io_block_number = parent_block_number + i * output_block_span;
 
-        let output = if io_block_number == normalized_fault_block_number {
+        let output_hash = if io_block_number == normalized_fault_block_number {
             faulty_root_claim
         } else if io_block_number < proposal_block_count {
             op_node_provider.output_at_block(io_block_number).await?
         } else {
             B256::ZERO
         };
-        io_field_elements.push(hash_to_fe(output));
+        io_field_elements.push(hash_to_fe(output_hash));
     }
     let sidecar = Proposal::create_sidecar(&io_field_elements)?;
 

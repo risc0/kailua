@@ -35,8 +35,8 @@ pub struct Proposal {
     // claim data
     pub created_at: u64,
     pub io_blobs: Vec<(B256, BlobData)>,
-    pub io_field_elements: Vec<B256>,
-    pub trail_field_elements: Vec<B256>,
+    pub io_field_elements: Vec<U256>,
+    pub trail_field_elements: Vec<U256>,
     pub output_root: B256,
     pub output_block_number: u64,
     pub l1_head: B256,
@@ -315,17 +315,17 @@ impl Proposal {
                 config.proposal_output_count - 1
             );
             // output commitments
-            for (i, output_hash) in self.io_field_elements.iter().enumerate() {
+            for (i, output_fe) in self.io_field_elements.iter().enumerate() {
                 let io_number = starting_block_number + (i as u64 + 1) * config.output_block_span;
-                if let Ok(local_output) = op_node_provider.output_at_block(io_number).await {
-                    self.correct_io[i] = Some(&hash_to_fe(local_output) == output_hash);
+                if let Ok(output_hash) = op_node_provider.output_at_block(io_number).await {
+                    self.correct_io[i] = Some(&hash_to_fe(output_hash) == output_fe);
                 } else {
                     error!("Could not get output hash {io_number} from op node");
                 }
             }
             // trail data
-            for (i, output_hash) in self.trail_field_elements.iter().enumerate() {
-                self.correct_trail[i] = Some(output_hash.is_zero());
+            for (i, output_fe) in self.trail_field_elements.iter().enumerate() {
+                self.correct_trail[i] = Some(output_fe.is_zero());
             }
         }
         // Return correctness
@@ -494,7 +494,7 @@ impl Proposal {
         Ok(Bytes::from(proof.to_vec()))
     }
 
-    pub fn output_at(&self, position: u64) -> B256 {
+    pub fn output_fe_at(&self, position: u64) -> U256 {
         let io_count = self.io_field_elements.len() as u64;
         match position.cmp(&io_count) {
             Ordering::Less => self
@@ -502,7 +502,7 @@ impl Proposal {
                 .get(position as usize)
                 .copied()
                 .unwrap(),
-            Ordering::Equal => self.output_root,
+            Ordering::Equal => hash_to_fe(self.output_root),
             Ordering::Greater => self
                 .trail_field_elements
                 .get((position - io_count - 1) as usize)
@@ -511,7 +511,7 @@ impl Proposal {
         }
     }
 
-    pub fn create_sidecar(io_field_elements: &[B256]) -> anyhow::Result<BlobTransactionSidecar> {
+    pub fn create_sidecar(io_field_elements: &[U256]) -> anyhow::Result<BlobTransactionSidecar> {
         let mut io_blobs = vec![];
         loop {
             let start = io_blobs.len() * FIELD_ELEMENTS_PER_BLOB as usize;
@@ -519,7 +519,11 @@ impl Proposal {
                 break;
             }
             let end = (start + FIELD_ELEMENTS_PER_BLOB as usize).min(io_field_elements.len());
-            let io_bytes = io_field_elements[start..end].concat();
+            let io_bytes = io_field_elements[start..end]
+                .iter()
+                .map(|e| e.to_be_bytes::<32>())
+                .collect::<Vec<_>>()
+                .concat();
             // Encode as blob sidecar with zero-byte trail
             let blob = Blob::right_padding_from(io_bytes.as_slice());
             io_blobs.push(blob);

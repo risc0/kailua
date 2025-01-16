@@ -164,26 +164,26 @@ library KailuaLib {
         hash = ((sha256(blobCommitment) << 8) >> 8) | KZG_COMMITMENT_VERSION;
     }
 
-    function hashToFe(bytes32 hash) internal pure returns (bytes32 fe) {
-        fe = ((hash << 2) >> 2);
+    function hashToFe(bytes32 hash) internal pure returns (uint256 fe) {
+        fe = uint256(hash) % BLS_MODULUS;
     }
 
     function verifyKZGBlobProof(
-        bytes32 versionedHash,
+        bytes32 versionedBlobHash,
         uint32 index,
-        bytes32 value,
+        uint256 value,
         bytes calldata blobCommitment,
         bytes calldata proof
     ) internal returns (bool success) {
         uint256 rootOfUnity = modExp(reverseBits(index));
-
-        bytes memory kzgCallData = abi.encodePacked(
-            versionedHash, // proposalBlobHash().raw(),
-            rootOfUnity,
-            hashToFe(value),
-            blobCommitment,
-            proof
-        );
+        // Byte range	Name	        Description
+        // [0:32]	    versioned_hash	Reference to a blob in the execution layer.
+        // [32:64]	    x	            x-coordinate at which the blob is being evaluated.
+        // [64:96]	    y	            y-coordinate at which the blob is being evaluated.
+        // [96:144]	    commitment	    Commitment to the blob being evaluated.
+        // [144:192]	proof	        Proof associated with the commitment.
+        bytes memory kzgCallData = abi.encodePacked(versionedBlobHash, rootOfUnity, value, blobCommitment, proof);
+        // The precompile will reject non-canonical field elements (i.e. value must be less than BLS_MODULUS).
         (success,) = KZG.call(kzgCallData);
     }
 

@@ -13,9 +13,10 @@
 // limitations under the License.
 
 use alloy_eips::eip4844::{
-    kzg_to_versioned_hash, Blob, IndexedBlobHash, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB,
+    kzg_to_versioned_hash, Blob, IndexedBlobHash, BLS_MODULUS, BYTES_PER_BLOB,
+    FIELD_ELEMENTS_PER_BLOB,
 };
-use alloy_primitives::B256;
+use alloy_primitives::{B256, U256};
 use alloy_rpc_types_beacon::sidecar::BlobData;
 use async_trait::async_trait;
 use c_kzg::{ethereum_kzg_settings, Bytes48};
@@ -124,27 +125,26 @@ impl BlobProvider for PreloadedBlobProvider {
     }
 }
 
-pub fn intermediate_outputs(blob_data: &BlobData, blocks: usize) -> anyhow::Result<Vec<B256>> {
+pub fn intermediate_outputs(blob_data: &BlobData, blocks: usize) -> anyhow::Result<Vec<U256>> {
     field_elements(blob_data, 0..blocks)
 }
 
-pub fn trail_data(blob_data: &BlobData, blocks: usize) -> anyhow::Result<Vec<B256>> {
+pub fn trail_data(blob_data: &BlobData, blocks: usize) -> anyhow::Result<Vec<U256>> {
     field_elements(blob_data, blocks..FIELD_ELEMENTS_PER_BLOB as usize)
 }
 
 pub fn field_elements(
     blob_data: &BlobData,
     iterator: impl Iterator<Item = usize>,
-) -> anyhow::Result<Vec<B256>> {
+) -> anyhow::Result<Vec<U256>> {
     let mut field_elements = vec![];
     for index in iterator.map(|i| 32 * i) {
         let bytes: [u8; 32] = blob_data.blob.0[index..index + 32].try_into()?;
-        field_elements.push(B256::from(bytes));
+        field_elements.push(U256::from_be_bytes(bytes));
     }
     Ok(field_elements)
 }
 
-pub fn hash_to_fe(mut hash: B256) -> B256 {
-    hash.0[0] &= u8::MAX >> 2;
-    hash
+pub fn hash_to_fe(hash: B256) -> U256 {
+    U256::from_be_bytes(hash.0).reduce_mod(BLS_MODULUS)
 }
