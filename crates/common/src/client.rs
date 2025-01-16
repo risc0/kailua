@@ -382,12 +382,12 @@ pub fn validate_precondition(
                     continue;
                 }
                 let output_offset =
-                    (output_block_number - global_l2_head_number) / output_block_span;
+                    ((output_block_number - global_l2_head_number) / output_block_span) - 1;
                 let blob_index = (output_offset / FIELD_ELEMENTS_PER_BLOB) as usize;
                 let fe_position = (output_offset % FIELD_ELEMENTS_PER_BLOB) as usize;
                 let blob_fe_index = 32 * fe_position;
                 // Verify fe equivalence to computed outputs for all but last output
-                match output_offset.cmp(&proposal_output_count) {
+                match output_offset.cmp(&(proposal_output_count - 1)) {
                     Ordering::Less => {
                         // verify equivalence to blob
                         let blob_fe_slice = &blobs[blob_index][blob_fe_index..blob_fe_index + 32];
@@ -395,8 +395,11 @@ pub fn validate_precondition(
                         let output_fe_bytes = output_fe.to_be_bytes::<32>();
                         if blob_fe_slice != output_fe_bytes.as_slice() {
                             bail!(
-                                "Bad fe #{i} in blob {blob_index}: Expected {} found {} ",
-                                output_fe,
+                                "Bad fe #{} in blob {} for block #{}: Expected {} found {} ",
+                                fe_position,
+                                blob_index,
+                                output_block_number,
+                                B256::try_from(output_fe_bytes.as_slice())?,
                                 B256::try_from(blob_fe_slice)?
                             );
                         }

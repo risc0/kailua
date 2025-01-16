@@ -14,6 +14,7 @@ use alloy::transports::Transport;
 use alloy_rpc_types_beacon::sidecar::BlobData;
 use anyhow::{bail, Context};
 use kailua_common::blobs::{hash_to_fe, intermediate_outputs, trail_data};
+use kailua_common::precondition::blobs_hash;
 use kailua_contracts::{
     KailuaGame::KailuaGameInstance, KailuaTournament::KailuaTournamentInstance,
     KailuaTreasury::KailuaTreasuryInstance, *,
@@ -254,6 +255,23 @@ impl Proposal {
                 .await
                 ._0,
         )
+    }
+
+    pub async fn fetch_is_successor_validity_proven<
+        T: Transport + Clone,
+        P: Provider<T, N>,
+        N: Network,
+    >(
+        &self,
+        provider: P,
+    ) -> anyhow::Result<bool> {
+        Ok(self
+            .tournament_contract_instance(provider)
+            .provenAt(U256::ZERO, U256::ZERO)
+            .stall()
+            .await
+            ._0
+            > 0)
     }
 
     pub async fn fetch_current_challenger_duration<
@@ -529,5 +547,9 @@ impl Proposal {
             io_blobs.push(blob);
         }
         blob_sidecar(io_blobs)
+    }
+
+    pub fn blobs_hash(&self) -> B256 {
+        blobs_hash(self.io_blobs.iter().map(|(h, _)| h))
     }
 }

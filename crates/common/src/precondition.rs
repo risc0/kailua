@@ -41,6 +41,10 @@ impl PreconditionValidationData {
         }
     }
 
+    pub fn blobs_hash(&self) -> B256 {
+        blobs_hash(self.blob_fetch_requests().iter().map(|b| &b.blob_hash.hash))
+    }
+
     pub fn precondition_hash(&self) -> B256 {
         match self {
             PreconditionValidationData::Fault(agreement_index, divergent_blobs) => {
@@ -59,7 +63,7 @@ impl PreconditionValidationData {
                 global_l2_head_number,
                 proposal_output_count,
                 output_block_span,
-                blobs.iter().map(|b| &b.blob_hash.hash),
+                blobs_hash(blobs.iter().map(|b| &b.blob_hash.hash)),
             ),
         }
     }
@@ -82,11 +86,11 @@ pub fn divergence_precondition_hash(
     B256::from_slice(digest.as_bytes())
 }
 
-pub fn equivalence_precondition_hash<'a>(
+pub fn equivalence_precondition_hash(
     global_l2_head_number: &u64,
     proposal_output_count: &u64,
     output_block_span: &u64,
-    blob_hashes: impl Iterator<Item = &'a B256>,
+    blobs_hash: B256,
 ) -> B256 {
     let ghn_bytes = global_l2_head_number.to_be_bytes();
     let poc_bytes = proposal_output_count.to_be_bytes();
@@ -94,9 +98,18 @@ pub fn equivalence_precondition_hash<'a>(
     let all_bytes = once(ghn_bytes.as_slice())
         .chain(once(poc_bytes.as_slice()))
         .chain(once(obs_bytes.as_slice()))
-        .chain(blob_hashes.map(|h| h.as_slice()))
+        .chain(once(blobs_hash.as_slice()))
         .collect::<Vec<_>>()
         .concat();
     let digest = *SHA2::hash_bytes(&all_bytes);
+    B256::from_slice(digest.as_bytes())
+}
+
+pub fn blobs_hash<'a>(blob_hashes: impl Iterator<Item = &'a B256>) -> B256 {
+    let blobs_hash_bytes = blob_hashes
+        .map(|h| h.as_slice())
+        .collect::<Vec<_>>()
+        .concat();
+    let digest = *SHA2::hash_bytes(&blobs_hash_bytes);
     B256::from_slice(digest.as_bytes())
 }

@@ -85,7 +85,7 @@ fn main() {
         );
         // Require proof assumption
         env::verify(
-            witness.fpvm_image_id,
+            witness.fpvm_image_id.0,
             &ProofJournal::new_stitched(
                 witness.fpvm_image_id,
                 witness.payout_recipient_address,

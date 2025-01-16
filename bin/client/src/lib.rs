@@ -165,7 +165,7 @@ where
         // We use the zero claim hash to denote that the data as of l1 head is insufficient
         assert_eq!(boot.claimed_l2_output_root, B256::ZERO);
     }
-    let fpvm_image_id = bytemuck::cast::<_, [u8; 32]>(KAILUA_FPVM_ID);
+    let fpvm_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(KAILUA_FPVM_ID));
     let witness = Witness {
         oracle_witness: core::mem::take(oracle_witness.lock().unwrap().deref_mut()),
         blobs_witness: core::mem::take(blobs_witness.lock().unwrap().deref_mut()),

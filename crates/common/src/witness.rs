@@ -28,7 +28,8 @@ pub struct Witness {
     #[rkyv(with = B256Def)]
     pub precondition_validation_data_hash: B256,
     pub stitched_boot_info: Vec<StitchedBootInfo>,
-    pub fpvm_image_id: [u8; 32],
+    #[rkyv(with = B256Def)]
+    pub fpvm_image_id: B256,
 }
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]

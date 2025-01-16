@@ -34,7 +34,9 @@ use kailua_common::blobs::hash_to_fe;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::client::config_hash;
 use kailua_common::journal::ProofJournal;
-use kailua_common::precondition::{divergence_precondition_hash, PreconditionValidationData};
+use kailua_common::precondition::{
+    divergence_precondition_hash, equivalence_precondition_hash, PreconditionValidationData,
+};
 use kailua_contracts::*;
 use kailua_host::fetch_rollup_config;
 use op_alloy_protocol::BlockInfo;
@@ -192,12 +194,53 @@ pub async fn handle_proposals(
                 error!("Proposal {opponent_index} missing from database.");
                 continue;
             };
+            // Look up parent proposal
+            let Some(proposal_parent) = kailua_db.get_local_proposal(&opponent.parent) else {
+                error!(
+                    "Proposal {} parent {} missing from database.",
+                    opponent.index, opponent.parent
+                );
+                continue;
+            };
+            let proposal_parent_contract =
+                proposal_parent.tournament_contract_instance(&validator_provider);
+            // Check that a validity proof has not already been posted
+            if proposal_parent_contract
+                .proofStatus(U256::ZERO, U256::ZERO)
+                .stall()
+                .await
+                ._0
+                != 0
+            {
+                info!(
+                    "Validity proof settling all disputes in tournament {} already submitted",
+                    proposal_parent.index
+                );
+                continue;
+            }
             // fetch canonical status of proposal
-            let Some(is_proposal_canonical) = opponent.canonical else {
+            let Some(is_opponent_canonical) = opponent.canonical else {
                 error!("Canonical status of proposal {opponent_index} unknown");
                 continue;
             };
-            // skip this proposal if it has no contender
+            // prove the validity of this proposal if it is canon game of height below the ff-target
+            if opponent.has_parent()
+                && is_opponent_canonical
+                && opponent.output_block_number <= args.fast_forward_target
+            {
+                // Prove full validity
+                request_validity_proof(
+                    &mut channel,
+                    &kailua_db.config,
+                    &proposal_parent,
+                    &opponent,
+                    &eth_rpc_provider,
+                    &op_geth_provider,
+                )
+                .await?;
+                continue;
+            }
+            // skip fault proving this proposal if it has no contender
             let Some(contender_index) = opponent.contender else {
                 info!("Skipping proposal {opponent_index} with no contender.");
                 continue;
@@ -220,16 +263,6 @@ pub async fn handle_proposals(
                 );
                 continue;
             };
-            // Look up parent proposal
-            let Some(proposal_parent) = kailua_db.get_local_proposal(&opponent.parent) else {
-                error!(
-                    "Proposal {} parent {} missing from database.",
-                    opponent.index, opponent.parent
-                );
-                continue;
-            };
-            let proposal_parent_contract =
-                proposal_parent.tournament_contract_instance(&validator_provider);
             // Look up indices of children in parent
             let Some(u_index) = proposal_parent.child_index(contender.index) else {
                 error!(
@@ -245,34 +278,6 @@ pub async fn handle_proposals(
                 );
                 continue;
             };
-            // Check that a validity proof has not already been posted
-            if proposal_parent_contract
-                .proofStatus(U256::ZERO, U256::ZERO)
-                .stall()
-                .await
-                ._0
-                != 0
-            {
-                info!(
-                    "Validity proof settling all disputes in tournament {} already submitted",
-                    proposal_parent.index
-                );
-                continue;
-            }
-            // prove the validity of this proposal if it is canon of height below the target
-            if is_proposal_canonical && opponent.output_block_number <= args.fast_forward_target {
-                // Prove full validity
-                request_validity_proof(
-                    &mut channel,
-                    &kailua_db.config,
-                    &proposal_parent,
-                    &opponent,
-                    &eth_rpc_provider,
-                    &op_geth_provider,
-                )
-                .await?;
-                continue;
-            }
             // Check that a fault proof had not already been posted
             let proof_status = proposal_parent_contract
                 .proofStatus(U256::from(u_index), U256::from(v_index))
@@ -311,12 +316,147 @@ pub async fn handle_proposals(
             };
             let opponent = kailua_db.get_local_proposal(&proposal_index).unwrap();
             let parent = kailua_db.get_local_proposal(&opponent.parent).unwrap();
+            // Abort early if a validity proof is already submitted in this tournament
+            if parent
+                .fetch_is_successor_validity_proven(&validator_provider)
+                .await?
+            {
+                info!(
+                    "Skipping proof submission in tournament {} with validity proof.",
+                    parent.index
+                );
+                continue;
+            }
             let parent_contract = parent.tournament_contract_instance(&validator_provider);
+            let expected_fpvm_image_id = parent_contract.imageId().stall().await.imageId_.0;
+            // patch the proof if in dev mode
+            #[cfg(feature = "devnet")]
+            let proof = maybe_patch_proof(proof, expected_fpvm_image_id, SET_BUILDER_ID.0)?;
+            // verify that the zkvm receipt is valid
+            if let Some(receipt) = proof.as_receipt() {
+                if let Err(e) = receipt.verify(expected_fpvm_image_id) {
+                    error!("Could not verify receipt against image id in contract: {e:?}");
+                } else {
+                    info!("Receipt validated.");
+                }
+            }
+            // Decode ProofJournal
             let proof_journal = ProofJournal::decode_packed(proof.journal().as_ref())?;
             info!("Proof journal: {:?}", proof_journal);
+            // encode seal data
+            let encoded_seal = Bytes::from(proof.encoded_seal()?);
+
+            let opponent_contract = opponent.tournament_contract_instance(&validator_provider);
+            // Check if proof is a viable validity proof
+            if proof_journal.l1_head == opponent.l1_head
+                && proof_journal.agreed_l2_output_root == parent.output_root
+                && proof_journal.claimed_l2_output_root == opponent.output_root
+            {
+                let v_index = parent
+                    .child_index(opponent.index)
+                    .expect("Could not look up contender's index in parent tournament");
+                info!(
+                    "Submitting validity proof to tournament at index {} for child at index {v_index}.",
+                    parent.index,
+                );
+
+                // sanity check proof journal fields
+                {
+                    let contract_blobs_hash =
+                        opponent_contract.blobsHash().stall().await.blobsHash_;
+                    if opponent.blobs_hash() != contract_blobs_hash {
+                        warn!(
+                            "Local proposal blobs hash {} doesn't match contract blobs hash {}",
+                            opponent.blobs_hash(),
+                            contract_blobs_hash
+                        )
+                    } else {
+                        info!("Blobs hash {} confirmed", contract_blobs_hash);
+                    }
+                    let precondition_hash = equivalence_precondition_hash(
+                        &parent.output_block_number,
+                        &kailua_db.config.proposal_output_count,
+                        &kailua_db.config.output_block_span,
+                        contract_blobs_hash,
+                    );
+                    if proof_journal.precondition_output != precondition_hash {
+                        warn!(
+                            "Proof precondition hash {} does not match expected value {}",
+                            proof_journal.precondition_output, precondition_hash
+                        );
+                    } else {
+                        info!("Precondition hash {precondition_hash} confirmed.")
+                    }
+                    let config_hash = opponent_contract.configHash().stall().await.configHash_;
+                    if proof_journal.config_hash != config_hash {
+                        warn!(
+                            "Proof config hash {} does not match contract hash {config_hash}",
+                            proof_journal.config_hash
+                        );
+                    } else {
+                        info!("Config hash {} confirmed.", proof_journal.config_hash);
+                    }
+                    if proof_journal.fpvm_image_id.0 != expected_fpvm_image_id {
+                        warn!(
+                            "Proof FPVM Image ID {} does not match expected {}",
+                            proof_journal.fpvm_image_id,
+                            B256::from(expected_fpvm_image_id)
+                        );
+                    } else {
+                        info!("FPVM Image ID {} confirmed", proof_journal.fpvm_image_id);
+                    }
+                    let expected_block_number = parent.output_block_number
+                        + kailua_db.config.proposal_output_count
+                            * kailua_db.config.output_block_span;
+                    if proof_journal.claimed_l2_block_number != expected_block_number {
+                        warn!(
+                            "Proof block number {} does not match expected {expected_block_number}",
+                            proof_journal.claimed_l2_block_number
+                        );
+                    } else {
+                        info!("Block number {expected_block_number} confirmed.");
+                    }
+                }
+
+                match parent_contract
+                    .proveValidity(
+                        proof_journal.payout_recipient,
+                        v_index,
+                        encoded_seal.clone(),
+                    )
+                    .send()
+                    .await
+                    .context("proveValidity (send)")
+                {
+                    Ok(txn) => match txn
+                        .get_receipt()
+                        .await
+                        .context("proveValidity (get_receipt)")
+                    {
+                        Ok(receipt) => {
+                            info!("Validity proof submitted: {receipt:?}");
+                            let proof_status = parent_contract
+                                .proofStatus(U256::ZERO, U256::ZERO)
+                                .stall()
+                                .await
+                                ._0;
+                            info!("Validity proven: {proof_status}");
+                        }
+                        Err(e) => {
+                            error!("Failed to confirm validity proof txn: {e:?}");
+                        }
+                    },
+                    Err(e) => {
+                        error!("Failed to send validity proof txn: {e:?}");
+                    }
+                }
+                // Skip fault proof submission logic
+                continue;
+            }
+
+            // Disputing children indices
             let contender_index = opponent.contender.unwrap();
             let contender = kailua_db.get_local_proposal(&contender_index).unwrap();
-
             let u_index = parent
                 .child_index(contender_index)
                 .expect("Could not look up contender's index in parent tournament");
@@ -329,21 +469,6 @@ pub async fn handle_proposals(
             let divergence_point = contender
                 .divergence_point(&opponent)
                 .expect("Equivalent proposals") as u64;
-
-            let expected_fpvm_image_id = parent_contract.imageId().stall().await.imageId_.0;
-
-            // patch the proof if in dev mode
-            #[cfg(feature = "devnet")]
-            let proof = maybe_patch_proof(proof, expected_fpvm_image_id, SET_BUILDER_ID.0)?;
-
-            // verify that the zkvm receipt is valid
-            if let Some(receipt) = proof.as_receipt() {
-                if let Err(e) = receipt.verify(expected_fpvm_image_id) {
-                    error!("Could not verify receipt against image id in contract: {e:?}");
-                } else {
-                    info!("Receipt validated.");
-                }
-            }
 
             // Proofs of faulty trail data do not derive outputs beyond the parent proposal claim
             let is_output_fault_proof =
@@ -435,20 +560,18 @@ pub async fn handle_proposals(
                 }
             }
 
-            // only prove unproven games
-            let proof_status = parent_contract
+            // Skip proof submission if already proven
+            let fault_proof_status = parent_contract
                 .proofStatus(U256::from(u_index), U256::from(v_index))
                 .stall()
                 .await
                 ._0;
-            if proof_status != 0 {
+            if fault_proof_status != 0 {
                 warn!("Skipping proof submission for already proven game at local index {proposal_index}.");
                 continue;
             } else {
-                info!("Proof status: {proof_status}");
+                info!("Fault proof status: {fault_proof_status}");
             }
-
-            let encoded_seal = Bytes::from(proof.encoded_seal()?);
 
             // create kzg proofs
             let mut proofs = [vec![], vec![]];
@@ -478,7 +601,6 @@ pub async fn handle_proposals(
             {
                 let contender_contract =
                     contender.tournament_contract_instance(&validator_provider);
-                let proposal_contract = opponent.tournament_contract_instance(&validator_provider);
 
                 if is_output_fault_proof {
                     if proof_journal.claimed_l2_block_number == opponent.output_block_number {
@@ -516,7 +638,7 @@ pub async fn handle_proposals(
                         } else {
                             info!("Contender proposed output confirmed.");
                         }
-                        let opponent_has_output = proposal_contract
+                        let opponent_has_output = opponent_contract
                             .verifyIntermediateOutput(
                                 divergence_point,
                                 opponent_output_fe,
@@ -566,7 +688,7 @@ pub async fn handle_proposals(
                         } else {
                             info!("Contender common output publication confirmed.");
                         }
-                        let proposal_has_output = proposal_contract
+                        let proposal_has_output = opponent_contract
                             .verifyIntermediateOutput(
                                 divergence_point - 1,
                                 agreed_l2_output_root_fe,
@@ -606,7 +728,7 @@ pub async fn handle_proposals(
                     } else {
                         info!("Contender divergent trail output confirmed.");
                     }
-                    if !proposal_contract
+                    if !opponent_contract
                         .verifyIntermediateOutput(
                             divergent_trail_point,
                             opponent_output_fe,
@@ -703,7 +825,7 @@ pub async fn handle_proposals(
             match transaction_dispatch {
                 Ok(txn) => match txn.get_receipt().await.context("prove (get_receipt)") {
                     Ok(receipt) => {
-                        info!("Proof submitted: {receipt:?}");
+                        info!("Fault proof submitted: {receipt:?}");
                         let proof_status = parent_contract
                             .proofStatus(U256::from(u_index), U256::from(v_index))
                             .stall()
@@ -715,11 +837,11 @@ pub async fn handle_proposals(
                         );
                     }
                     Err(e) => {
-                        error!("Failed to confirm proof txn: {e:?}");
+                        error!("Failed to confirm fault proof txn: {e:?}");
                     }
                 },
                 Err(e) => {
-                    error!("Failed to send proof txn: {e:?}");
+                    error!("Failed to send fault proof txn: {e:?}");
                 }
             }
         }
@@ -908,6 +1030,7 @@ async fn request_validity_proof(
 ) -> anyhow::Result<()> {
     let precondition_validation_data = if config.proposal_output_count > 1 {
         let mut validated_blobs = Vec::with_capacity(proposal.io_blobs.len());
+        debug_assert!(!proposal.io_blobs.is_empty());
         for (blob_hash, blob) in &proposal.io_blobs {
             let block_parent = l1_node_provider
                 .get_block_by_hash(proposal.l1_head, BlockTransactionsKind::Hashes)
@@ -935,6 +1058,7 @@ async fn request_validity_proof(
                 },
             })
         }
+        debug_assert!(!validated_blobs.is_empty());
         Some(PreconditionValidationData::Validity(
             parent.output_block_number,
             config.proposal_output_count,
@@ -1189,6 +1313,14 @@ fn maybe_patch_proof(
                 if let risc0_zkvm::MaybePruned::Value(claim) = &mut fake_inner_receipt.claim {
                     warn!("DEVNET-ONLY: Patching fake receipt image id to match game contract.");
                     claim.pre = risc0_zkvm::MaybePruned::Pruned(expected_fpvm_image_id);
+                    if let risc0_zkvm::MaybePruned::Value(Some(output)) = &mut claim.output {
+                        if let risc0_zkvm::MaybePruned::Value(journal) = &mut output.journal {
+                            let n = journal.len();
+                            journal[n - 32..n].copy_from_slice(expected_fpvm_image_id.as_bytes());
+                            receipt.journal.bytes[n - 32..n]
+                                .copy_from_slice(expected_fpvm_image_id.as_bytes());
+                        }
+                    }
                 }
             }
         }

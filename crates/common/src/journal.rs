@@ -35,12 +35,12 @@ pub struct ProofJournal {
     /// The configuration hash.
     pub config_hash: B256,
     /// The FPVM image id
-    pub fpvm_image_id: [u8; 32],
+    pub fpvm_image_id: B256,
 }
 
 impl ProofJournal {
     pub fn new(
-        fpvm_image_id: [u8; 32],
+        fpvm_image_id: B256,
         payout_recipient: Address,
         precondition_output: B256,
         boot_info: &BootInfo,
@@ -58,7 +58,7 @@ impl ProofJournal {
     }
 
     pub fn new_stitched(
-        fpvm_image_id: [u8; 32],
+        fpvm_image_id: B256,
         payout_recipient: Address,
         precondition_output: B256,
         config_hash: B256,

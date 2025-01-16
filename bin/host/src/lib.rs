@@ -418,7 +418,7 @@ pub async fn fetch_precondition_data(
                     .await?,
                 ]),
             )
-        } else if cfg.precondition_params.len() == 2 {
+        } else if cfg.precondition_params.len() == 3 {
             let mut fetch_requests = Vec::with_capacity(cfg.precondition_block_hashes.len());
             for (block_hash, blob_hash) in zip(
                 cfg.precondition_block_hashes.iter(),

@@ -195,7 +195,7 @@ contract KailuaGame is KailuaTournament {
         if (parentGame_.provenAt(0, 0).raw() > 0) {
             if (
                 rootClaim().raw() != parentGame_.validChildRootClaim()
-                    || blobsHash() == parentGame_.validChildBlobsHash()
+                    || blobsHash() != parentGame_.validChildBlobsHash()
             ) {
                 revert ProvenFaulty();
             }

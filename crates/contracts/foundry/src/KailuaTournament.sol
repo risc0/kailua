@@ -377,7 +377,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     /// @notice Proves that a proposal is valid
     function proveValidity(address payoutRecipient, uint64 childIndex, bytes calldata encodedSeal) external {
         KailuaTournament childContract = children[childIndex];
-        // INVARIANT: Can only proof unresolved proposals
+        // INVARIANT: Can only prove validity of unresolved proposals
         if (childContract.status() != GameStatus.IN_PROGRESS) {
             revert GameNotInProgress();
         }
@@ -423,7 +423,9 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                 // The claim block number
                 claimBlockNumber,
                 // The rollup configuration hash
-                ROLLUP_CONFIG_HASH
+                ROLLUP_CONFIG_HASH,
+                // The FPVM Image ID
+                FPVM_IMAGE_ID
             )
         );
 

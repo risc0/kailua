@@ -150,11 +150,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             let parent_contract = parent.tournament_contract_instance(&proposer_provider);
             info!("Parent Tournament Children:");
             for i in 0..u64::MAX {
-                if let Ok(res) = parent_contract
-                    .children(alloy::primitives::U256::from(i))
-                    .call()
-                    .await
-                {
+                if let Ok(res) = parent_contract.children(U256::from(i)).call().await {
                     info!("{}", res._0);
                 } else {
                     break;
@@ -172,11 +168,14 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                 continue;
             }
 
-            // Check for timeout
+            // Check for timeout and fast-forward status
             let challenger_duration = proposal
                 .fetch_current_challenger_duration(&proposer_provider)
                 .await?;
-            if challenger_duration > 0 {
+            let is_validity_proven = parent
+                .fetch_is_successor_validity_proven(&proposer_provider)
+                .await?;
+            if !is_validity_proven && challenger_duration > 0 {
                 info!("Waiting for {challenger_duration} more seconds before resolution.");
                 break;
             }
