@@ -1,6 +1,6 @@
 [workspace.package]
 edition = "2021"
-license = "MIT"
+license = "Apache-2.0"
 rust-version = "1.81"
 authors = ["hashcashier"]
 homepage = "https://risc0.github.io/kailua/"
