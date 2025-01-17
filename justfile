@@ -124,7 +124,7 @@ prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data 
   AGREED_L2_HEAD=$(cast block --rpc-url $L2_NODE_ADDRESS $((L2_BLOCK_NUMBER - 1)) -j | jq -r .hash)
 
   echo "Running host program with zk client program..."
-  ./target/{{target}}/kailua-host \
+  ./target/{{target}}/kailua-host single \
     --l1-head $L1_HEAD \
     --agreed-l2-head-hash $AGREED_L2_HEAD \
     --agreed-l2-output-root $AGREED_L2_OUTPUT_ROOT \
@@ -134,7 +134,6 @@ prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data 
     --l1-node-address $L1_NODE_ADDRESS \
     --l1-beacon-address $L1_BEACON_ADDRESS \
     --l2-node-address $L2_NODE_ADDRESS \
-    --op-node-address $OP_NODE_ADDRESS \
     --data-dir {{data}} \
     --native \
     {{verbosity}}
@@ -166,7 +165,7 @@ query block_number l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc:
 
 prove-offline block_number l2_claim l2_output_root l2_head l1_head l2_chain_id data target="release" verbosity="":
   echo "Running host program with zk client program..."
-  ./target/{{target}}/kailua-host \
+  ./target/{{target}}/kailua-host single \
     --l1-head {{l1_head}} \
     --agreed-l2-head-hash {{l2_head}} \
     --claimed-l2-output-root {{l2_claim}} \

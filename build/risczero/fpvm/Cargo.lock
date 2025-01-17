@@ -128,9 +128,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-primitives"
-version = "0.8.15"
+version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6259a506ab13e1d658796c31e6e39d2e2ee89243bcc505ddc613b35732e0a430"
+checksum = "ec878088ec6283ce1e90d280316aadd3d6ce3de06ff63d68953c855e7e447e92"
 dependencies = [
  "alloy-rlp",
  "bytes",
@@ -138,7 +138,6 @@ dependencies = [
  "const-hex",
  "derive_more",
  "hashbrown 0.15.0",
- "hex-literal",
  "indexmap",
  "itoa",
  "k256",
@@ -214,9 +213,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-sol-macro"
-version = "0.8.14"
+version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3bfd7853b65a2b4f49629ec975fee274faf6dff15ab8894c620943398ef283c0"
+checksum = "8d039d267aa5cbb7732fa6ce1fd9b5e9e29368f580f80ba9d7a8450c794de4b2"
 dependencies = [
  "alloy-sol-macro-expander",
  "alloy-sol-macro-input",
@@ -228,9 +227,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-sol-macro-expander"
-version = "0.8.14"
+version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82ec42f342d9a9261699f8078e57a7a4fda8aaa73c1a212ed3987080e6a9cd13"
+checksum = "620ae5eee30ee7216a38027dec34e0585c55099f827f92f50d11e3d2d3a4a954"
 dependencies = [
  "alloy-sol-macro-input",
  "const-hex",
@@ -246,9 +245,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-sol-macro-input"
-version = "0.8.14"
+version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed2c50e6a62ee2b4f7ab3c6d0366e5770a21cad426e109c2f40335a1b3aff3df"
+checksum = "ad9f7d057e00f8c5994e4ff4492b76532c51ead39353aa2ed63f8c50c0f4d52e"
 dependencies = [
  "const-hex",
  "dunce",
@@ -261,9 +260,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-sol-types"
-version = "0.8.14"
+version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9dc0fffe397aa17628160e16b89f704098bf3c9d74d5d369ebc239575936de5"
+checksum = "c1382302752cd751efd275f4d6ef65877ddf61e0e6f5ac84ef4302b79a33a31a"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-macro",
@@ -1595,9 +1594,9 @@ dependencies = [
  "kona-proof",
  "lazy_static",
  "lru",
+ "maili-genesis",
+ "maili-protocol",
  "op-alloy-consensus",
- "op-alloy-genesis",
- "op-alloy-protocol",
  "op-alloy-rpc-types-engine",
  "pot",
  "risc0-zkvm",
@@ -1631,8 +1630,8 @@ dependencies = [
 
 [[package]]
 name = "kona-derive"
-version = "0.2.1"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#85fcd17a2dbb70c962aea165297162c1a2b605e4"
+version = "0.2.3"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -1640,9 +1639,9 @@ dependencies = [
  "alloy-rlp",
  "alloy-rpc-types-engine",
  "async-trait",
+ "maili-genesis",
+ "maili-protocol",
  "op-alloy-consensus",
- "op-alloy-genesis",
- "op-alloy-protocol",
  "op-alloy-rpc-types-engine",
  "thiserror 2.0.9",
  "tracing",
@@ -1650,17 +1649,17 @@ dependencies = [
 
 [[package]]
 name = "kona-driver"
-version = "0.2.1"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#85fcd17a2dbb70c962aea165297162c1a2b605e4"
+version = "0.2.3"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
  "alloy-rlp",
  "async-trait",
  "kona-derive",
+ "maili-genesis",
+ "maili-protocol",
  "op-alloy-consensus",
- "op-alloy-genesis",
- "op-alloy-protocol",
  "op-alloy-rpc-types-engine",
  "spin",
  "thiserror 2.0.9",
@@ -1669,16 +1668,16 @@ dependencies = [
 
 [[package]]
 name = "kona-executor"
-version = "0.2.1"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#85fcd17a2dbb70c962aea165297162c1a2b605e4"
+version = "0.2.3"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
  "alloy-primitives",
  "alloy-rlp",
  "kona-mpt",
+ "maili-genesis",
  "op-alloy-consensus",
- "op-alloy-genesis",
  "op-alloy-rpc-types-engine",
  "revm",
  "thiserror 2.0.9",
@@ -1688,7 +1687,7 @@ dependencies = [
 [[package]]
 name = "kona-mpt"
 version = "0.1.2"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#85fcd17a2dbb70c962aea165297162c1a2b605e4"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -1700,7 +1699,7 @@ dependencies = [
 [[package]]
 name = "kona-preimage"
 version = "0.2.1"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#85fcd17a2dbb70c962aea165297162c1a2b605e4"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
 dependencies = [
  "alloy-primitives",
  "async-trait",
@@ -1712,8 +1711,8 @@ dependencies = [
 
 [[package]]
 name = "kona-proof"
-version = "0.2.1"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#85fcd17a2dbb70c962aea165297162c1a2b605e4"
+version = "0.2.3"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -1726,10 +1725,10 @@ dependencies = [
  "kona-mpt",
  "kona-preimage",
  "lru",
+ "maili-genesis",
+ "maili-protocol",
+ "maili-registry",
  "op-alloy-consensus",
- "op-alloy-genesis",
- "op-alloy-protocol",
- "op-alloy-registry",
  "op-alloy-rpc-types-engine",
  "serde",
  "serde_json",
@@ -1827,6 +1826,81 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "234cf4f4a04dc1f57e24b96cc0cd600cf2af460d4161ac5ecdd0af8e1f3b2a38"
 dependencies = [
  "hashbrown 0.15.0",
+]
+
+[[package]]
+name = "maili-consensus"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59cc5082a9b883b719fb3594257e56e9c6990cf49d7b41188adb51ab6c83cd1e"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-serde",
+ "serde",
+]
+
+[[package]]
+name = "maili-flz"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11418b80159f49d9a2f13909ca9e0921629647ee68bcf97adcac0dd14d4d32e6"
+
+[[package]]
+name = "maili-genesis"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a5680e0bb4c77bb98e8e9534dffd511ddd0d6ab7632514b54f2a09220d9337e"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-primitives",
+ "alloy-sol-types",
+ "serde",
+ "serde_repr",
+ "thiserror 2.0.9",
+]
+
+[[package]]
+name = "maili-protocol"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "262e3f2fc12df09d50db07e01b39d57fe25414bd42ede500d053c25fb7f0afcb"
+dependencies = [
+ "alloc-no-stdlib",
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-serde",
+ "alloy-sol-types",
+ "async-trait",
+ "brotli",
+ "derive_more",
+ "maili-consensus",
+ "maili-flz",
+ "maili-genesis",
+ "miniz_oxide 0.8.2",
+ "rand",
+ "serde",
+ "thiserror 2.0.9",
+ "tracing",
+ "unsigned-varint",
+]
+
+[[package]]
+name = "maili-registry"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c03aaeec37e2aa101dda748bd48b2d74726f9ea8ee4dc74782ac6f8934ae84c4"
+dependencies = [
+ "alloy-primitives",
+ "lazy_static",
+ "maili-genesis",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -2053,9 +2127,9 @@ checksum = "3fdb12b2476b595f9358c5161aa467c2438859caa136dec86c26fdd2efe17b92"
 
 [[package]]
 name = "op-alloy-consensus"
-version = "0.9.1"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "250244eadaf1a25e0e2ad263110ad2d1b43c2e57ddf4c025e71552d98196a8d3"
+checksum = "9e51ae52013aca0aa1ca3df7ecf0d276eb4214ec44aeb9c48651333e1459b3b5"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -2063,76 +2137,23 @@ dependencies = [
  "alloy-rlp",
  "alloy-serde",
  "derive_more",
+ "maili-consensus",
  "serde",
  "thiserror 2.0.9",
-]
-
-[[package]]
-name = "op-alloy-genesis"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98334a9cdccc5878e9d5c48afc9cc1b84da58dbc68d41f9488d8f71688b495d3"
-dependencies = [
- "alloy-consensus",
- "alloy-eips",
- "alloy-primitives",
- "alloy-sol-types",
- "serde",
- "serde_repr",
- "thiserror 2.0.9",
-]
-
-[[package]]
-name = "op-alloy-protocol"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "753762429c31f838b59c886b31456c9bf02fd38fb890621665523a9087ae06ae"
-dependencies = [
- "alloc-no-stdlib",
- "alloy-consensus",
- "alloy-eips",
- "alloy-primitives",
- "alloy-rlp",
- "alloy-serde",
- "alloy-sol-types",
- "async-trait",
- "brotli",
- "derive_more",
- "miniz_oxide 0.8.2",
- "op-alloy-consensus",
- "op-alloy-genesis",
- "serde",
- "thiserror 2.0.9",
- "tracing",
- "unsigned-varint",
-]
-
-[[package]]
-name = "op-alloy-registry"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "812e817159c7f8a451896fb0584132a1413d5579a3fe3f7b8756e333f0eb15ee"
-dependencies = [
- "alloy-primitives",
- "lazy_static",
- "op-alloy-genesis",
- "serde",
- "serde_json",
 ]
 
 [[package]]
 name = "op-alloy-rpc-types-engine"
-version = "0.9.1"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c43f00d4060a6a38f5bf0a8182b4cc4c7071e2bc96942f414619251b522169eb"
+checksum = "4265ced2d43294a2e369f3a627ab700b11472bb3fe01a823357f7c077093db70"
 dependencies = [
  "alloy-eips",
  "alloy-primitives",
  "alloy-rpc-types-engine",
  "alloy-serde",
- "derive_more",
+ "maili-protocol",
  "op-alloy-consensus",
- "op-alloy-protocol",
  "serde",
  "thiserror 2.0.9",
 ]
@@ -3270,9 +3291,9 @@ dependencies = [
 
 [[package]]
 name = "syn-solidity"
-version = "0.8.14"
+version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da0523f59468a2696391f2a772edc089342aacd53c3caa2ac3264e598edf119b"
+checksum = "b84e4d83a0a6704561302b917a932484e1cae2d8c6354c64be8b7bac1c1fe057"
 dependencies = [
  "paste",
  "proc-macro2",

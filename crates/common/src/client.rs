@@ -15,18 +15,19 @@
 use crate::blobs::hash_to_fe;
 use crate::precondition::PreconditionValidationData;
 use alloy_eips::eip4844::{Blob, FIELD_ELEMENTS_PER_BLOB};
-use alloy_primitives::{Address, B256};
+use alloy_primitives::{Address, Sealed, B256};
 use anyhow::{bail, Context};
 use kona_derive::traits::BlobProvider;
 use kona_driver::Driver;
+use kona_executor::TrieDBProvider;
 use kona_preimage::{CommsClient, PreimageKey, PreimageKeyType};
 use kona_proof::errors::OracleProviderError;
 use kona_proof::executor::KonaExecutor;
 use kona_proof::l1::{OracleL1ChainProvider, OraclePipeline};
 use kona_proof::l2::OracleL2ChainProvider;
 use kona_proof::sync::new_pipeline_cursor;
-use kona_proof::{BootInfo, FlushableCache};
-use op_alloy_genesis::RollupConfig;
+use kona_proof::{BootInfo, FlushableCache, HintType};
+use maili_genesis::RollupConfig;
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use std::cmp::Ordering;
 use std::fmt::Debug;
@@ -57,12 +58,19 @@ where
         )
         .await?;
 
-        let mut l1_provider = OracleL1ChainProvider::new(boot.clone(), oracle.clone());
-        let mut l2_provider = OracleL2ChainProvider::new(boot.clone(), oracle.clone());
+        let safe_head_hash = fetch_safe_head_hash(oracle.as_ref(), boot.as_ref()).await?;
+
+        let mut l1_provider = OracleL1ChainProvider::new(boot.l1_head, oracle.clone());
+        let mut l2_provider =
+            OracleL2ChainProvider::new(safe_head_hash, boot.rollup_config.clone(), oracle.clone());
 
         // If the claimed L2 block number is less than or equal to the safe head of the L2 chain,
         // the claim is invalid.
-        let safe_head = l2_provider.agreed_l2_block_header().await?;
+        // Fetch the safe head's block header.
+        let safe_head = l2_provider
+            .header_by_hash(safe_head_hash)
+            .map(|header| Sealed::new_unchecked(header, safe_head_hash))?;
+
         if boot.claimed_l2_block_number < safe_head.number {
             bail!("Invalid claim");
         }
@@ -73,8 +81,13 @@ where
         ////////////////////////////////////////////////////////////////
         log("DERIVATION & EXECUTION");
         // Create a new derivation driver with the given boot information and oracle.
-        let cursor =
-            new_pipeline_cursor(&boot, safe_head, &mut l1_provider, &mut l2_provider).await?;
+        let cursor = new_pipeline_cursor(
+            &boot.rollup_config,
+            safe_head,
+            &mut l1_provider,
+            &mut l2_provider,
+        )
+        .await?;
         l2_provider.set_cursor(cursor.clone());
 
         let cfg = Arc::new(boot.rollup_config.clone());
@@ -96,7 +109,7 @@ where
         let mut output_roots = Vec::with_capacity(expected_output_count);
         for starting_block in safe_head_number..boot.claimed_l2_block_number {
             // Advance to the next target
-            let (output_number, output_root) = driver
+            let (output_number, _, output_root) = driver
                 .advance_to_target(&boot.rollup_config, Some(starting_block + 1))
                 .await?;
             // Stop if nothing new was derived
@@ -140,6 +153,30 @@ where
             Ok((precondition_hash, output_roots.pop()))
         }
     })
+}
+
+/// Fetches the safe head hash of the L2 chain based on the agreed upon L2 output root in the
+/// [BootInfo].
+pub async fn fetch_safe_head_hash<O>(
+    caching_oracle: &O,
+    boot_info: &BootInfo,
+) -> Result<B256, OracleProviderError>
+where
+    O: CommsClient,
+{
+    let mut output_preimage = [0u8; 128];
+    HintType::StartingL2Output
+        .get_exact_preimage(
+            caching_oracle,
+            boot_info.agreed_l2_output_root,
+            PreimageKeyType::Keccak256,
+            &mut output_preimage,
+        )
+        .await?;
+
+    output_preimage[96..128]
+        .try_into()
+        .map_err(OracleProviderError::SliceConversion)
 }
 
 pub fn log(msg: &str) {

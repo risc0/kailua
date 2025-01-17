@@ -22,9 +22,10 @@ alloy-rlp.workspace = true
 alloy-primitives = { workspace = true, features = ["map-hashbrown"] }
 alloy-rpc-types-beacon.workspace = true
 
+maili-genesis = { workspace = true, features = ["serde"] }
+maili-protocol = { workspace = true, features = ["serde"] }
+
 op-alloy-consensus = { workspace = true, features = ["serde"] }
-op-alloy-genesis = { workspace = true, features = ["serde"] }
-op-alloy-protocol = { workspace = true, features = ["serde"] }
 op-alloy-rpc-types-engine = { workspace = true, features = ["serde"] }
 
 kona-driver.workspace = true

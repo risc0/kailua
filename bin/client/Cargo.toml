@@ -18,7 +18,8 @@ tokio.workspace = true
 
 alloy = { workspace = true, features = ["full", "kzg"] }
 alloy-primitives = { workspace = true, features = ["map-hashbrown"] }
-op-alloy-protocol.workspace = true
+
+maili-protocol.workspace = true
 
 kailua-build.workspace = true
 kailua-common.workspace = true

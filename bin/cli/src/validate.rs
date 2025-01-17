@@ -39,7 +39,7 @@ use kailua_common::precondition::{
 };
 use kailua_contracts::*;
 use kailua_host::fetch_rollup_config;
-use op_alloy_protocol::BlockInfo;
+use maili_protocol::BlockInfo;
 use risc0_zkvm::is_dev_mode;
 use std::path::{Path, PathBuf};
 use std::process::exit;
@@ -1157,6 +1157,7 @@ pub async fn handle_proof_requests(
         ]
         .concat();
         let mut proving_args = vec![
+            string::from("--single"), // single chain proving mode
             String::from("--payout-recipient-address"), // wallet address for payouts
             payout_recipient,
             String::from("--l1-head"), // l1 head from on-chain proposal
@@ -1177,8 +1178,6 @@ pub async fn handle_proof_requests(
             args.core.beacon_rpc_url.clone(),
             String::from("--l2-node-address"), // l2 el node
             args.core.op_geth_url.clone(),
-            String::from("--op-node-address"), // l2 cl node
-            args.core.op_node_url.clone(),
             String::from("--data-dir"), // path to cache
             data_dir.to_str().unwrap().to_string(),
             String::from("--native"), // run the client natively

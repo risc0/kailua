@@ -4542,7 +4542,7 @@ dependencies = [
  "kailua-host",
  "kona-derive",
  "kona-host",
- "op-alloy-protocol",
+ "maili-protocol",
  "risc0-ethereum-contracts",
  "risc0-zkvm",
  "rocksdb",
@@ -4577,7 +4577,7 @@ dependencies = [
  "kona-preimage",
  "kona-proof",
  "kona-std-fpvm",
- "op-alloy-protocol",
+ "maili-protocol",
  "risc0-aggregation",
  "risc0-ethereum-contracts",
  "risc0-zkvm",
@@ -4611,9 +4611,9 @@ dependencies = [
  "kona-proof",
  "lazy_static",
  "lru",
- "op-alloy-consensus 0.9.1",
- "op-alloy-genesis",
- "op-alloy-protocol",
+ "maili-genesis",
+ "maili-protocol",
+ "op-alloy-consensus 0.9.5",
  "op-alloy-rpc-types-engine",
  "pot",
  "risc0-zkvm",
@@ -4653,9 +4653,9 @@ dependencies = [
  "kona-derive",
  "kona-host",
  "kona-preimage",
- "op-alloy-genesis",
- "op-alloy-protocol",
- "op-alloy-registry",
+ "maili-genesis",
+ "maili-protocol",
+ "maili-registry",
  "risc0-zkvm",
  "serde",
  "serde_json",
@@ -4691,7 +4691,7 @@ dependencies = [
 [[package]]
 name = "kona-client"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#85fcd17a2dbb70c962aea165297162c1a2b605e4"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
 dependencies = [
  "alloy-consensus 0.9.2",
  "alloy-eips 0.9.2",
@@ -4706,12 +4706,13 @@ dependencies = [
  "kona-mpt",
  "kona-preimage",
  "kona-proof",
+ "kona-proof-interop",
  "kona-std-fpvm",
  "kona-std-fpvm-proc",
  "lru",
- "op-alloy-consensus 0.9.1",
- "op-alloy-genesis",
- "op-alloy-protocol",
+ "maili-genesis",
+ "maili-protocol",
+ "op-alloy-consensus 0.9.5",
  "op-alloy-rpc-types-engine",
  "revm 16.0.0",
  "serde",
@@ -4723,8 +4724,8 @@ dependencies = [
 
 [[package]]
 name = "kona-derive"
-version = "0.2.1"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#85fcd17a2dbb70c962aea165297162c1a2b605e4"
+version = "0.2.3"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
 dependencies = [
  "alloy-consensus 0.9.2",
  "alloy-eips 0.9.2",
@@ -4732,9 +4733,9 @@ dependencies = [
  "alloy-rlp",
  "alloy-rpc-types-engine 0.9.2",
  "async-trait",
- "op-alloy-consensus 0.9.1",
- "op-alloy-genesis",
- "op-alloy-protocol",
+ "maili-genesis",
+ "maili-protocol",
+ "op-alloy-consensus 0.9.5",
  "op-alloy-rpc-types-engine",
  "thiserror 2.0.9",
  "tracing",
@@ -4742,17 +4743,17 @@ dependencies = [
 
 [[package]]
 name = "kona-driver"
-version = "0.2.1"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#85fcd17a2dbb70c962aea165297162c1a2b605e4"
+version = "0.2.3"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
 dependencies = [
  "alloy-consensus 0.9.2",
  "alloy-primitives",
  "alloy-rlp",
  "async-trait",
  "kona-derive",
- "op-alloy-consensus 0.9.1",
- "op-alloy-genesis",
- "op-alloy-protocol",
+ "maili-genesis",
+ "maili-protocol",
+ "op-alloy-consensus 0.9.5",
  "op-alloy-rpc-types-engine",
  "spin",
  "thiserror 2.0.9",
@@ -4761,16 +4762,16 @@ dependencies = [
 
 [[package]]
 name = "kona-executor"
-version = "0.2.1"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#85fcd17a2dbb70c962aea165297162c1a2b605e4"
+version = "0.2.3"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
 dependencies = [
  "alloy-consensus 0.9.2",
  "alloy-eips 0.9.2",
  "alloy-primitives",
  "alloy-rlp",
  "kona-mpt",
- "op-alloy-consensus 0.9.1",
- "op-alloy-genesis",
+ "maili-genesis",
+ "op-alloy-consensus 0.9.5",
  "op-alloy-rpc-types-engine",
  "revm 16.0.0",
  "thiserror 2.0.9",
@@ -4780,7 +4781,7 @@ dependencies = [
 [[package]]
 name = "kona-host"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#85fcd17a2dbb70c962aea165297162c1a2b605e4"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
 dependencies = [
  "alloy-consensus 0.9.2",
  "alloy-eips 0.9.2",
@@ -4801,8 +4802,8 @@ dependencies = [
  "kona-preimage",
  "kona-proof",
  "kona-std-fpvm",
- "op-alloy-genesis",
- "op-alloy-protocol",
+ "maili-genesis",
+ "maili-protocol",
  "op-alloy-rpc-types-engine",
  "reqwest",
  "revm 16.0.0",
@@ -4815,9 +4816,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "kona-interop"
+version = "0.1.1"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+dependencies = [
+ "alloy-consensus 0.9.2",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-sol-types",
+ "async-trait",
+ "op-alloy-consensus 0.9.5",
+ "thiserror 2.0.9",
+ "tracing",
+]
+
+[[package]]
 name = "kona-mpt"
 version = "0.1.2"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#85fcd17a2dbb70c962aea165297162c1a2b605e4"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -4829,7 +4845,7 @@ dependencies = [
 [[package]]
 name = "kona-preimage"
 version = "0.2.1"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#85fcd17a2dbb70c962aea165297162c1a2b605e4"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
 dependencies = [
  "alloy-primitives",
  "async-channel",
@@ -4842,8 +4858,8 @@ dependencies = [
 
 [[package]]
 name = "kona-proof"
-version = "0.2.1"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#85fcd17a2dbb70c962aea165297162c1a2b605e4"
+version = "0.2.3"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
 dependencies = [
  "alloy-consensus 0.9.2",
  "alloy-eips 0.9.2",
@@ -4856,10 +4872,10 @@ dependencies = [
  "kona-mpt",
  "kona-preimage",
  "lru",
- "op-alloy-consensus 0.9.1",
- "op-alloy-genesis",
- "op-alloy-protocol",
- "op-alloy-registry",
+ "maili-genesis",
+ "maili-protocol",
+ "maili-registry",
+ "op-alloy-consensus 0.9.5",
  "op-alloy-rpc-types-engine",
  "serde",
  "serde_json",
@@ -4870,9 +4886,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "kona-proof-interop"
+version = "0.1.1"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+dependencies = [
+ "alloy-primitives",
+ "alloy-rlp",
+ "kona-interop",
+ "kona-preimage",
+ "kona-proof",
+ "maili-genesis",
+ "maili-registry",
+ "serde",
+ "serde_json",
+ "tracing",
+]
+
+[[package]]
 name = "kona-std-fpvm"
 version = "0.1.2"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#85fcd17a2dbb70c962aea165297162c1a2b605e4"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -4884,7 +4917,7 @@ dependencies = [
 [[package]]
 name = "kona-std-fpvm-proc"
 version = "0.1.2"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#85fcd17a2dbb70c962aea165297162c1a2b605e4"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -5081,6 +5114,81 @@ checksum = "6bd8c0d6c6ed0cd30b3652886bb8711dc4bb01d637a68105a3d5158039b418e6"
 dependencies = [
  "cc",
  "libc",
+]
+
+[[package]]
+name = "maili-consensus"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59cc5082a9b883b719fb3594257e56e9c6990cf49d7b41188adb51ab6c83cd1e"
+dependencies = [
+ "alloy-consensus 0.9.2",
+ "alloy-eips 0.9.2",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-serde 0.9.2",
+ "serde",
+]
+
+[[package]]
+name = "maili-flz"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11418b80159f49d9a2f13909ca9e0921629647ee68bcf97adcac0dd14d4d32e6"
+
+[[package]]
+name = "maili-genesis"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a5680e0bb4c77bb98e8e9534dffd511ddd0d6ab7632514b54f2a09220d9337e"
+dependencies = [
+ "alloy-consensus 0.9.2",
+ "alloy-eips 0.9.2",
+ "alloy-primitives",
+ "alloy-sol-types",
+ "serde",
+ "serde_repr",
+ "thiserror 2.0.9",
+]
+
+[[package]]
+name = "maili-protocol"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "262e3f2fc12df09d50db07e01b39d57fe25414bd42ede500d053c25fb7f0afcb"
+dependencies = [
+ "alloc-no-stdlib",
+ "alloy-consensus 0.9.2",
+ "alloy-eips 0.9.2",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-serde 0.9.2",
+ "alloy-sol-types",
+ "async-trait",
+ "brotli",
+ "derive_more 1.0.0",
+ "maili-consensus",
+ "maili-flz",
+ "maili-genesis",
+ "miniz_oxide",
+ "rand",
+ "serde",
+ "thiserror 2.0.9",
+ "tracing",
+ "unsigned-varint",
+]
+
+[[package]]
+name = "maili-registry"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c03aaeec37e2aa101dda748bd48b2d74726f9ea8ee4dc74782ac6f8934ae84c4"
+dependencies = [
+ "alloy-primitives",
+ "lazy_static",
+ "maili-genesis",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -5545,9 +5653,9 @@ dependencies = [
 
 [[package]]
 name = "op-alloy-consensus"
-version = "0.9.1"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "250244eadaf1a25e0e2ad263110ad2d1b43c2e57ddf4c025e71552d98196a8d3"
+checksum = "9e51ae52013aca0aa1ca3df7ecf0d276eb4214ec44aeb9c48651333e1459b3b5"
 dependencies = [
  "alloy-consensus 0.9.2",
  "alloy-eips 0.9.2",
@@ -5555,22 +5663,8 @@ dependencies = [
  "alloy-rlp",
  "alloy-serde 0.9.2",
  "derive_more 1.0.0",
+ "maili-consensus",
  "serde",
- "thiserror 2.0.9",
-]
-
-[[package]]
-name = "op-alloy-genesis"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98334a9cdccc5878e9d5c48afc9cc1b84da58dbc68d41f9488d8f71688b495d3"
-dependencies = [
- "alloy-consensus 0.9.2",
- "alloy-eips 0.9.2",
- "alloy-primitives",
- "alloy-sol-types",
- "serde",
- "serde_repr",
  "thiserror 2.0.9",
 ]
 
@@ -5586,44 +5680,6 @@ dependencies = [
  "alloy-rpc-types-eth 0.4.2",
  "op-alloy-consensus 0.4.0",
  "op-alloy-rpc-types",
-]
-
-[[package]]
-name = "op-alloy-protocol"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "753762429c31f838b59c886b31456c9bf02fd38fb890621665523a9087ae06ae"
-dependencies = [
- "alloc-no-stdlib",
- "alloy-consensus 0.9.2",
- "alloy-eips 0.9.2",
- "alloy-primitives",
- "alloy-rlp",
- "alloy-serde 0.9.2",
- "alloy-sol-types",
- "async-trait",
- "brotli",
- "derive_more 1.0.0",
- "miniz_oxide",
- "op-alloy-consensus 0.9.1",
- "op-alloy-genesis",
- "serde",
- "thiserror 2.0.9",
- "tracing",
- "unsigned-varint",
-]
-
-[[package]]
-name = "op-alloy-registry"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "812e817159c7f8a451896fb0584132a1413d5579a3fe3f7b8756e333f0eb15ee"
-dependencies = [
- "alloy-primitives",
- "lazy_static",
- "op-alloy-genesis",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -5645,17 +5701,16 @@ dependencies = [
 
 [[package]]
 name = "op-alloy-rpc-types-engine"
-version = "0.9.1"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c43f00d4060a6a38f5bf0a8182b4cc4c7071e2bc96942f414619251b522169eb"
+checksum = "4265ced2d43294a2e369f3a627ab700b11472bb3fe01a823357f7c077093db70"
 dependencies = [
  "alloy-eips 0.9.2",
  "alloy-primitives",
  "alloy-rpc-types-engine 0.9.2",
  "alloy-serde 0.9.2",
- "derive_more 1.0.0",
- "op-alloy-consensus 0.9.1",
- "op-alloy-protocol",
+ "maili-protocol",
+ "op-alloy-consensus 0.9.5",
  "serde",
  "thiserror 2.0.9",
 ]
@@ -9192,7 +9247,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

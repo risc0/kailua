@@ -22,7 +22,7 @@ use async_trait::async_trait;
 use c_kzg::{ethereum_kzg_settings, Bytes48};
 use kona_derive::errors::BlobProviderError;
 use kona_derive::traits::BlobProvider;
-use op_alloy_protocol::BlockInfo;
+use maili_protocol::BlockInfo;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

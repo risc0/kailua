@@ -20,9 +20,10 @@ alloy = { workspace = true, features = ["rlp", "reqwest"] }
 alloy-primitives = { workspace = true, features = ["map-hashbrown"] }
 alloy-chains.workspace = true
 alloy-eips.workspace = true
-op-alloy-genesis.workspace = true
-op-alloy-protocol.workspace = true
-op-alloy-registry.workspace = true
+
+maili-genesis.workspace = true
+maili-protocol.workspace = true
+maili-registry.workspace = true
 
 # Kailua
 kailua-build.workspace = true

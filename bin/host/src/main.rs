@@ -22,6 +22,7 @@ use kailua_host::{
 use kona_host::init_tracing_subscriber;
 use std::env::set_var;
 use std::path::Path;
+use kona_host::cli::HostMode;
 use tempfile::tempdir;
 use tracing::info;
 
@@ -44,12 +45,13 @@ async fn main() -> anyhow::Result<()> {
             }
             None => (B256::ZERO, B256::ZERO),
         };
+    let HostMode::Single(kona_cfg) = &args.kona.mode;
     let file_name = fpvm_proof_file_name(
         precondition_hash,
-        args.kona.l1_head,
-        args.kona.claimed_l2_output_root,
-        args.kona.claimed_l2_block_number,
-        args.kona.agreed_l2_output_root,
+        kona_cfg.l1_head,
+        kona_cfg.claimed_l2_output_root,
+        kona_cfg.claimed_l2_block_number,
+        kona_cfg.agreed_l2_output_root,
     );
     if let Ok(true) = Path::new(&file_name).try_exists() {
         info!("Proving skipped. Proof file {file_name} already exists.");

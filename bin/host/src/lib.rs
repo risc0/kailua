@@ -25,13 +25,13 @@ use kailua_client::boundless::BoundlessArgs;
 use kailua_client::{parse_address, parse_b256};
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
-use kona_host::fetcher::Fetcher;
+use kona_host::cli::HostMode;
 use kona_host::kv::SharedKeyValueStore;
-use kona_host::start_native_preimage_server;
+use kona_host::single::{start_native_preimage_server, SingleChainFetcher};
 use kona_preimage::{BidirectionalChannel, HintWriter, OracleReader, PreimageKey, PreimageKeyType};
-use op_alloy_genesis::RollupConfig;
-use op_alloy_protocol::BlockInfo;
-use op_alloy_registry::Registry;
+use maili_genesis::RollupConfig;
+use maili_protocol::BlockInfo;
+use maili_registry::Registry;
 use serde_json::{json, Value};
 use std::env::set_var;
 use std::iter::zip;
@@ -90,15 +90,16 @@ pub async fn start_server_and_native_client(
 ) -> anyhow::Result<i32> {
     let hint_chan = BidirectionalChannel::new()?;
     let preimage_chan = BidirectionalChannel::new()?;
-    let kv_store = args.kona.construct_kv_store();
-    let fetcher = if !args.kona.is_offline() {
-        let (l1_provider, blob_provider, l2_provider) = args.kona.create_providers().await?;
-        Some(Arc::new(RwLock::new(Fetcher::new(
+    let HostMode::Single(kona_cfg) = args.kona.mode;
+    let kv_store = kona_cfg.construct_kv_store();
+    let fetcher = if !kona_cfg.is_offline() {
+        let (l1_provider, blob_provider, l2_provider) = kona_cfg.create_providers().await?;
+        Some(Arc::new(RwLock::new(SingleChainFetcher::new(
             kv_store.clone(),
             l1_provider,
             blob_provider,
             l2_provider,
-            args.kona.agreed_l2_head_hash,
+            kona_cfg.agreed_l2_head_hash,
         ))))
     } else {
         None
@@ -133,20 +134,20 @@ pub async fn generate_rollup_config(
     cfg: &mut KailuaHostCli,
     tmp_dir: &TempDir,
 ) -> anyhow::Result<RollupConfig> {
+    let HostMode::Single(kona_cfg) = &mut cfg.kona.mode;
     // generate a RollupConfig for the target network
-    match cfg.kona.read_rollup_config().ok() {
+    match kona_cfg.read_rollup_config().ok() {
         Some(rollup_config) => Ok(rollup_config),
         None => {
             let registry = Registry::from_chain_list();
             let tmp_cfg_file = tmp_dir.path().join("rollup-config.json");
-            if let Some(rollup_config) = cfg
-                .kona
+            if let Some(rollup_config) = kona_cfg
                 .l2_chain_id
                 .and_then(|chain_id| registry.rollup_configs.get(&chain_id))
             {
                 info!(
                     "Loading config for rollup with chain id {} from registry",
-                    cfg.kona.l2_chain_id.unwrap()
+                    kona_cfg.l2_chain_id.unwrap()
                 );
                 let ser_config = serde_json::to_string(rollup_config)?;
                 fs::write(&tmp_cfg_file, &ser_config).await?;
@@ -157,7 +158,7 @@ pub async fn generate_rollup_config(
                         .clone()
                         .expect("Missing op-node-address")
                         .as_str(),
-                    cfg.kona
+                    kona_cfg
                         .l2_node_address
                         .clone()
                         .expect("Missing l2-node-address")
@@ -166,8 +167,8 @@ pub async fn generate_rollup_config(
                 )
                 .await?;
             }
-            cfg.kona.rollup_config_path = Some(tmp_cfg_file);
-            cfg.kona.read_rollup_config()
+            kona_cfg.rollup_config_path = Some(tmp_cfg_file);
+            kona_cfg.read_rollup_config()
         }
     }
 }
@@ -295,43 +296,47 @@ pub async fn zeth_execution_preflight(
     cfg: &KailuaHostCli,
     rollup_config: RollupConfig,
 ) -> anyhow::Result<()> {
+    let HostMode::Single(kona_cfg) = &cfg.kona.mode;
     if let Ok(named_chain) = NamedChain::try_from(rollup_config.l2_chain_id) {
         // Limitation: Only works when disk caching is enabled under a known "NamedChain"
-        if !cfg.kona.is_offline()
-            && cfg.kona.data_dir.is_some()
+        if !kona_cfg.is_offline()
+            && kona_cfg.data_dir.is_some()
             && OpRethCoreDriver::chain_spec(&named_chain).is_some()
         {
-            info!("Performing zeth-optimism preflight.");
-            let kona_cfg = cfg.kona.clone();
-            let (_, _, l2_provider) = kona_cfg.create_providers().await?;
-            let preflight_start = l2_provider
-                .get_block_by_hash(kona_cfg.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
-                .await?
-                .unwrap()
-                .header
-                .number;
-            let block_count = kona_cfg.claimed_l2_block_number - preflight_start;
             // Fetch all the initial data
             let preflight_data: StatelessClientData<
                 <OpRethCoreDriver as CoreDriver>::Block,
                 <OpRethCoreDriver as CoreDriver>::Header,
-            > = tokio::task::spawn_blocking(move || {
-                // Prepare the cache directory
-                let cache_dir = kona_cfg.data_dir.map(|dir| dir.join("optimism"));
-                if let Some(dir) = cache_dir.as_ref() {
-                    std::fs::create_dir_all(dir).expect("Could not create directory");
-                };
-                OpRethPreflightClient::preflight(
-                    Some(rollup_config.l2_chain_id),
-                    cache_dir,
-                    kona_cfg.l2_node_address,
-                    preflight_start,
-                    block_count,
-                )
-            })
-            .await??;
+            > = {
+                info!("Performing zeth-optimism preflight.");
+                let kona_cfg = kona_cfg.clone();
+                let (_, _, l2_provider) = kona_cfg.create_providers().await?;
+                let preflight_start = l2_provider
+                    .get_block_by_hash(kona_cfg.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
+                    .await?
+                    .unwrap()
+                    .header
+                    .number;
+                let block_count = kona_cfg.claimed_l2_block_number - preflight_start;
+
+                tokio::task::spawn_blocking(move || {
+                    // Prepare the cache directory
+                    let cache_dir = kona_cfg.data_dir.map(|dir| dir.join("optimism"));
+                    if let Some(dir) = cache_dir.as_ref() {
+                        std::fs::create_dir_all(dir).expect("Could not create directory");
+                    };
+                    OpRethPreflightClient::preflight(
+                        Some(rollup_config.l2_chain_id),
+                        cache_dir,
+                        kona_cfg.l2_node_address,
+                        preflight_start,
+                        block_count,
+                    )
+                })
+                .await??
+            };
             // Write data to the cached Kona kv-store
-            let mut kv_store = cfg.kona.construct_kv_store();
+            let mut kv_store = kona_cfg.construct_kv_store();
             dump_data_to_kv_store(&mut kv_store, &preflight_data).await;
         }
     }
@@ -376,6 +381,7 @@ pub async fn get_blob_fetch_request(
 pub async fn fetch_precondition_data(
     cfg: &KailuaHostCli,
 ) -> anyhow::Result<Option<PreconditionValidationData>> {
+    let HostMode::Single(kona_cfg) = &cfg.kona.mode;
     // Determine precondition hash
     let hash_arguments = [
         cfg.precondition_params.is_empty(),
@@ -385,7 +391,7 @@ pub async fn fetch_precondition_data(
 
     // fetch necessary data to validate blob equivalence precondition
     if hash_arguments.iter().all(|arg| !arg) {
-        let (l1_provider, _, _) = cfg.kona.create_providers().await?;
+        let (l1_provider, _, _) = kona_cfg.create_providers().await?;
         if cfg.precondition_block_hashes.len() != cfg.precondition_blob_hashes.len() {
             bail!(
                 "Blob reference mismatch. Found {} block hashes and {} blob hashes",
@@ -437,7 +443,7 @@ pub async fn fetch_precondition_data(
             bail!("Too many precondition_params values provided");
         };
 
-        let kv_store = cfg.kona.construct_kv_store();
+        let kv_store = kona_cfg.construct_kv_store();
         let mut store = kv_store.write().await;
         let hash = precondition_validation_data.hash();
         store.set(

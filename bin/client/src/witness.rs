@@ -23,7 +23,7 @@ use kona_preimage::{
     CommsClient, HintWriterClient, PreimageKey, PreimageKeyType, PreimageOracleClient,
 };
 use kona_proof::FlushableCache;
-use op_alloy_protocol::BlockInfo;
+use maili_protocol::BlockInfo;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
