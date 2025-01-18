@@ -19,10 +19,10 @@ use kailua_client::proof::fpvm_proof_file_name;
 use kailua_host::{
     fetch_precondition_data, generate_rollup_config, zeth_execution_preflight, KailuaHostCli,
 };
+use kona_host::cli::HostMode;
 use kona_host::init_tracing_subscriber;
 use std::env::set_var;
 use std::path::Path;
-use kona_host::cli::HostMode;
 use tempfile::tempdir;
 use tracing::info;
 

@@ -879,6 +879,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f64009896348fc5af4222e9cf7d7d82a95a256c634ebcf61c53e4ea461422242"
 
 [[package]]
+name = "crossbeam-deque"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9dd111b7b7f7d55b72c0a6ae361660ee5853c9af73f70c3c2ef6858b950e2e51"
+dependencies = [
+ "crossbeam-epoch",
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-epoch"
+version = "0.9.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b82ac4a3c2ca9c3460964f020e1402edd5753411d7737aa39c3714ad1b5420e"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-utils"
+version = "0.8.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
+
+[[package]]
 name = "crunchy"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1352,6 +1377,7 @@ dependencies = [
  "allocator-api2",
  "equivalent",
  "foldhash",
+ "rayon",
  "serde",
 ]
 
@@ -1611,11 +1637,10 @@ dependencies = [
 name = "kailua-fpvm"
 version = "0.1.0"
 dependencies = [
- "alloy-primitives",
  "c-kzg",
  "kailua-common",
- "kona-proof",
  "risc0-zkvm",
+ "risc0-zkvm-platform",
  "rkyv",
 ]
 
@@ -1631,7 +1656,7 @@ dependencies = [
 [[package]]
 name = "kona-derive"
 version = "0.2.3"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -1650,7 +1675,7 @@ dependencies = [
 [[package]]
 name = "kona-driver"
 version = "0.2.3"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
@@ -1669,7 +1694,7 @@ dependencies = [
 [[package]]
 name = "kona-executor"
 version = "0.2.3"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -1687,7 +1712,7 @@ dependencies = [
 [[package]]
 name = "kona-mpt"
 version = "0.1.2"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -1699,7 +1724,7 @@ dependencies = [
 [[package]]
 name = "kona-preimage"
 version = "0.2.1"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "alloy-primitives",
  "async-trait",
@@ -1712,7 +1737,7 @@ dependencies = [
 [[package]]
 name = "kona-proof"
 version = "0.2.3"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -2486,6 +2511,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d25bf25ec5ae4a3f1b92f929810509a2f53d7dca2f50b794ff57e3face536c8f"
 dependencies = [
  "rand_core",
+]
+
+[[package]]
+name = "rayon"
+version = "1.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b418a60154510ca1a002a752ca9714984e21e4241e804d32555251faf8b78ffa"
+dependencies = [
+ "either",
+ "rayon-core",
+]
+
+[[package]]
+name = "rayon-core"
+version = "1.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1465873a3dfdaa8ae7cb14b4383657caab0b3e8a0aa9ae8e04b044854c8dfce2"
+dependencies = [
+ "crossbeam-deque",
+ "crossbeam-utils",
 ]
 
 [[package]]

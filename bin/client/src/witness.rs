@@ -16,7 +16,7 @@ use alloy::consensus::Blob;
 use alloy::eips::eip4844::IndexedBlobHash;
 use async_trait::async_trait;
 use kailua_common::blobs::BlobWitnessData;
-use kailua_common::oracle::OracleWitnessData;
+use kailua_common::oracle::{validate_preimage, PreloadedOracle};
 use kona_derive::prelude::BlobProvider;
 use kona_preimage::errors::PreimageOracleResult;
 use kona_preimage::{
@@ -26,6 +26,7 @@ use kona_proof::FlushableCache;
 use maili_protocol::BlockInfo;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
+use tracing::error;
 
 #[derive(Clone, Debug)]
 pub struct BlobWitnessProvider<T: BlobProvider> {
@@ -67,7 +68,7 @@ impl<T: BlobProvider + Send> BlobProvider for BlobWitnessProvider<T> {
 #[derive(Clone, Debug)]
 pub struct OracleWitnessProvider<P: CommsClient + FlushableCache + Send + Sync + Debug + Clone> {
     pub oracle: P,
-    pub witness: Arc<Mutex<OracleWitnessData>>,
+    pub witness: Arc<Mutex<PreloadedOracle>>,
 }
 
 impl<P> OracleWitnessProvider<P>
@@ -79,8 +80,8 @@ where
             return;
         }
         let mut witness = self.witness.lock().unwrap();
-        witness.keys.push(key);
-        witness.data.push(value.to_vec());
+        validate_preimage(&key, value).expect("Attempted to save invalid preimage");
+        witness.preimages.insert(key, value.to_vec());
     }
 }
 
@@ -90,13 +91,21 @@ where
     P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
 {
     async fn get(&self, key: PreimageKey) -> PreimageOracleResult<Vec<u8>> {
-        let value = self.oracle.get(key).await?;
+        let res = self.oracle.get(key).await;
+        if res.is_err() {
+            error!("Oracle get failure: {:?}", res);
+        }
+        let value = res?;
         self.save(key, &value);
         Ok(value)
     }
 
     async fn get_exact(&self, key: PreimageKey, buf: &mut [u8]) -> PreimageOracleResult<()> {
-        self.oracle.get_exact(key, buf).await?;
+        let res = self.oracle.get_exact(key, buf).await;
+        if res.is_err() {
+            error!("Oracle exact failure: {:?}", res);
+        }
+        res?;
         let value = buf.to_vec();
         self.save(key, &value);
         Ok(())

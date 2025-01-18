@@ -18,7 +18,7 @@ use anyhow::Context;
 use kona_proof::BootInfo;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Ord, PartialOrd, Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct ProofJournal {
     /// The recipient address for the payout
     pub payout_recipient: Address,

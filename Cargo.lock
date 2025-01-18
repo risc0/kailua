@@ -4691,7 +4691,7 @@ dependencies = [
 [[package]]
 name = "kona-client"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "alloy-consensus 0.9.2",
  "alloy-eips 0.9.2",
@@ -4725,7 +4725,7 @@ dependencies = [
 [[package]]
 name = "kona-derive"
 version = "0.2.3"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "alloy-consensus 0.9.2",
  "alloy-eips 0.9.2",
@@ -4744,7 +4744,7 @@ dependencies = [
 [[package]]
 name = "kona-driver"
 version = "0.2.3"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "alloy-consensus 0.9.2",
  "alloy-primitives",
@@ -4763,7 +4763,7 @@ dependencies = [
 [[package]]
 name = "kona-executor"
 version = "0.2.3"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "alloy-consensus 0.9.2",
  "alloy-eips 0.9.2",
@@ -4781,7 +4781,7 @@ dependencies = [
 [[package]]
 name = "kona-host"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "alloy-consensus 0.9.2",
  "alloy-eips 0.9.2",
@@ -4818,7 +4818,7 @@ dependencies = [
 [[package]]
 name = "kona-interop"
 version = "0.1.1"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "alloy-consensus 0.9.2",
  "alloy-primitives",
@@ -4833,7 +4833,7 @@ dependencies = [
 [[package]]
 name = "kona-mpt"
 version = "0.1.2"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -4845,7 +4845,7 @@ dependencies = [
 [[package]]
 name = "kona-preimage"
 version = "0.2.1"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "alloy-primitives",
  "async-channel",
@@ -4859,7 +4859,7 @@ dependencies = [
 [[package]]
 name = "kona-proof"
 version = "0.2.3"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "alloy-consensus 0.9.2",
  "alloy-eips 0.9.2",
@@ -4888,7 +4888,7 @@ dependencies = [
 [[package]]
 name = "kona-proof-interop"
 version = "0.1.1"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -4905,7 +4905,7 @@ dependencies = [
 [[package]]
 name = "kona-std-fpvm"
 version = "0.1.2"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -4917,7 +4917,7 @@ dependencies = [
 [[package]]
 name = "kona-std-fpvm-proc"
 version = "0.1.2"
-source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Fmultiblock#c3b072ea62c028ddb19edc7df5392a427d0386b9"
+source = "git+https://github.com/hashcashier/kona?branch=rkhalil%2Frkyv-derive#c0934b4a93b903d661a2ff7a3a9bfb76c374ec87"
 dependencies = [
  "anyhow",
  "cfg-if",

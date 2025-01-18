@@ -252,6 +252,7 @@ pub async fn run_boundless_client(
     // Preflight execution to get cycle count
     info!("Preflighting execution.");
     let input_frame = rkyv::to_bytes::<rkyv::rancor::Error>(&witness)?.to_vec();
+    info!("Witness size: {}", input_frame.len());
     let env = ExecutorEnv::builder()
         // Pass in witness data
         .write_frame(&input_frame)

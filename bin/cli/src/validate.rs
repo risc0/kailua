@@ -1157,7 +1157,7 @@ pub async fn handle_proof_requests(
         ]
         .concat();
         let mut proving_args = vec![
-            String::from("--single"), // single chain proving mode
+            String::from("--single"),                   // single chain proving mode
             String::from("--payout-recipient-address"), // wallet address for payouts
             payout_recipient,
             String::from("--l1-head"), // l1 head from on-chain proposal

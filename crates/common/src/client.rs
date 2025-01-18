@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::blobs::hash_to_fe;
+use crate::blobs::{hash_to_fe, PreloadedBlobProvider};
+use crate::journal::ProofJournal;
 use crate::precondition::PreconditionValidationData;
+use crate::witness::Witness;
 use alloy_eips::eip4844::{Blob, FIELD_ELEMENTS_PER_BLOB};
 use alloy_primitives::{Address, Sealed, B256};
 use anyhow::{bail, Context};
@@ -39,9 +41,8 @@ pub fn run_client<
 >(
     precondition_validation_data_hash: B256,
     oracle: Arc<O>,
-    boot: Arc<BootInfo>,
     mut beacon: B,
-) -> anyhow::Result<(B256, Option<B256>)>
+) -> anyhow::Result<(Arc<BootInfo>, B256, Option<B256>)>
 where
     <B as BlobProvider>::Error: Debug,
 {
@@ -49,8 +50,14 @@ where
         ////////////////////////////////////////////////////////////////
         //                          PROLOGUE                          //
         ////////////////////////////////////////////////////////////////
-        log("PROLOGUE");
+        log("BOOT");
+        let boot = Arc::new(
+            BootInfo::load(oracle.as_ref())
+                .await
+                .context("BootInfo::load")?,
+        );
 
+        log("PRECONDITION");
         let precondition_data = load_precondition_data(
             precondition_validation_data_hash,
             oracle.clone(),
@@ -144,13 +151,14 @@ where
 
         if output_roots.len() != expected_output_count {
             // Not enough data to derive output root at claimed height
-            Ok((precondition_hash, None))
+            Ok((boot, precondition_hash, None))
         } else if output_roots.is_empty() {
             // Claimed output height is equal to agreed output height
-            Ok((precondition_hash, Some(boot.agreed_l2_output_root)))
+            let real_output_hash = boot.agreed_l2_output_root;
+            Ok((boot, precondition_hash, Some(real_output_hash)))
         } else {
             // Derived output root at future height
-            Ok((precondition_hash, output_roots.pop()))
+            Ok((boot, precondition_hash, output_roots.pop()))
         }
     })
 }
@@ -335,26 +343,12 @@ where
     let mut blobs = Vec::new();
     // Read the blobs to validate divergence
     for request in precondition_validation_data.blob_fetch_requests() {
-        #[cfg(not(target_os = "zkvm"))]
-        let expected_hash = request.blob_hash.hash;
-
-        let response = beacon
-            .get_blobs(&request.block_ref, &[request.blob_hash.clone()])
-            .await
-            .unwrap();
-        let blob = *response[0];
-        #[cfg(not(target_os = "zkvm"))]
-        {
-            let blob = c_kzg::Blob::new(blob.0);
-            let commitment = c_kzg::KzgCommitment::blob_to_kzg_commitment(
-                &blob,
-                c_kzg::ethereum_kzg_settings(),
-            )?;
-            let hash = alloy_eips::eip4844::kzg_to_versioned_hash(commitment.as_slice());
-            assert_eq!(hash, expected_hash);
-        }
-
-        blobs.push(blob);
+        blobs.push(
+            *beacon
+                .get_blobs(&request.block_ref, &[request.blob_hash.clone()])
+                .await
+                .unwrap()[0],
+        );
     }
 
     Ok(Some((precondition_validation_data, blobs)))
@@ -465,4 +459,80 @@ pub fn validate_precondition(
     }
     // Return the precondition hash
     Ok(precondition_hash)
+}
+
+pub fn run_in_memory_client(witness: Witness) -> ProofJournal {
+    log(&format!(
+        "ORACLE: {} PREIMAGES",
+        witness.oracle_witness.preimages.len()
+    ));
+    witness.oracle_witness.validate().expect("Failed to validate preimages");
+    let oracle = Arc::new(witness.oracle_witness);
+    log(&format!(
+        "BEACON: {} BLOBS",
+        witness.blobs_witness.blobs.len()
+    ));
+    let beacon = PreloadedBlobProvider::from(witness.blobs_witness);
+
+    // Attempt to recompute the output hash at the target block number using kona
+    log("RUN");
+    let (boot, precondition_hash, computed_output_opt) = crate::client::run_client(
+        witness.precondition_validation_data_hash,
+        oracle.clone(),
+        beacon,
+    )
+    .expect("Failed to compute output hash.");
+
+    // Validate the output root
+    if let Some(computed_output) = computed_output_opt {
+        // With sufficient data, the input l2_claim must be true
+        assert_eq!(boot.claimed_l2_output_root, computed_output);
+    } else {
+        // We use the zero claim hash to denote that the data as of l1 head is insufficient
+        assert_eq!(boot.claimed_l2_output_root, B256::ZERO);
+    }
+
+    // Stitch boots together into a journal
+    let mut stitched_journal = ProofJournal::new(
+        witness.fpvm_image_id,
+        witness.payout_recipient_address,
+        precondition_hash,
+        boot.as_ref(),
+    );
+    for stitched_boot in witness.stitched_boot_info {
+        // Require equivalence in reference head
+        assert_eq!(stitched_boot.l1_head, stitched_journal.l1_head);
+        // Require progress in stitched boot
+        assert_ne!(
+            stitched_boot.agreed_l2_output_root,
+            stitched_boot.claimed_l2_output_root
+        );
+        // Require proof assumption
+        #[cfg(target_os = "zkvm")]
+        risc0_zkvm::guest::env::verify(
+            witness.fpvm_image_id.0,
+            &ProofJournal::new_stitched(
+                witness.fpvm_image_id,
+                witness.payout_recipient_address,
+                precondition_hash,
+                stitched_journal.config_hash,
+                &stitched_boot,
+            )
+            .encode_packed(),
+        )
+        .expect("Failed to verify stitched boot assumption");
+        // Require continuity
+        if stitched_boot.claimed_l2_output_root == stitched_journal.agreed_l2_output_root {
+            // Backward stitch
+            stitched_journal.agreed_l2_output_root = stitched_boot.agreed_l2_output_root;
+        } else if stitched_boot.agreed_l2_output_root == stitched_journal.claimed_l2_output_root {
+            // Forward stitch
+            stitched_journal.claimed_l2_output_root = stitched_boot.claimed_l2_output_root;
+            stitched_journal.claimed_l2_block_number = stitched_boot.claimed_l2_block_number;
+        } else {
+            unimplemented!("No support for non-contiguous stitching.");
+        }
+    }
+
+    stitched_journal
 }

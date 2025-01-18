@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::blobs::BlobWitnessData;
-use crate::oracle::OracleWitnessData;
+use crate::oracle::PreloadedOracle;
 use alloy_primitives::{Address, B256};
 use serde::{Deserialize, Serialize};
 
@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
     Clone, Debug, Default, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
 )]
 pub struct Witness {
-    pub oracle_witness: OracleWitnessData,
+    pub oracle_witness: PreloadedOracle,
     pub blobs_witness: BlobWitnessData,
     #[rkyv(with = AddressDef)]
     pub payout_recipient_address: Address,

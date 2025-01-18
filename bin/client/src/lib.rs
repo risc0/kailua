@@ -25,12 +25,13 @@ use anyhow::Context;
 use clap::Parser;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use kailua_common::blobs::BlobWitnessData;
+use kailua_common::client::run_in_memory_client;
 use kailua_common::journal::ProofJournal;
-use kailua_common::oracle::OracleWitnessData;
+use kailua_common::oracle::PreloadedOracle;
 use kailua_common::witness::Witness;
 use kona_preimage::{HintWriterClient, PreimageOracleClient};
 use kona_proof::l1::OracleBlobProvider;
-use kona_proof::{BootInfo, CachingOracle};
+use kona_proof::CachingOracle;
 use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts};
 use std::fmt::Debug;
 use std::ops::DerefMut;
@@ -39,7 +40,7 @@ use std::sync::{Arc, Mutex};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::task::spawn_blocking;
-use tracing::info;
+use tracing::{error, info};
 
 /// The size of the LRU cache in the oracle.
 pub const ORACLE_LRU_SIZE: usize = 1024;
@@ -82,13 +83,19 @@ where
     // preload all data natively
     info!("Running native client.");
     let (journal, witness) = run_native_client(
-        oracle_client.clone(),
-        hint_client.clone(),
+        oracle_client,
+        hint_client,
         payout_recipient,
         precondition_validation_data_hash,
     )
     .await
     .expect("Failed to run native client.");
+    // run from memory
+    info!("Running in-memory client.");
+    let in_memory_journal = run_in_memory_client(witness.clone());
+    if journal != in_memory_journal {
+        error!("In-memory journal {in_memory_journal:?} does not match native journal {journal:?}");
+    }
     // compute the receipt in the zkvm
     let proof = match boundless.market {
         Some(args) => boundless::run_boundless_client(args, boundless.storage, journal, witness)
@@ -134,29 +141,20 @@ where
     P: PreimageOracleClient + Send + Sync + Debug + Clone,
     H: HintWriterClient + Send + Sync + Debug + Clone,
 {
-    let oracle_witness = Arc::new(Mutex::new(OracleWitnessData::default()));
+    let oracle_witness = Arc::new(Mutex::new(PreloadedOracle::default()));
     let blobs_witness = Arc::new(Mutex::new(BlobWitnessData::default()));
     info!("Preamble");
     let oracle = Arc::new(OracleWitnessProvider {
         oracle: CachingOracle::new(ORACLE_LRU_SIZE, oracle_client, hint_client),
         witness: oracle_witness.clone(),
     });
-    let boot = Arc::new(
-        BootInfo::load(oracle.as_ref())
-            .await
-            .context("BootInfo::load")?,
-    );
     let beacon = BlobWitnessProvider {
         provider: OracleBlobProvider::new(oracle.clone()),
         witness: blobs_witness.clone(),
     };
     // Run client
-    let (precondition_hash, real_output_hash) = kailua_common::client::run_client(
-        precondition_validation_data_hash,
-        oracle,
-        boot.clone(),
-        beacon,
-    )?;
+    let (boot, precondition_hash, real_output_hash) =
+        kailua_common::client::run_client(precondition_validation_data_hash, oracle, beacon)?;
     // Check output
     if let Some(computed_output) = real_output_hash {
         // With sufficient data, the input l2_claim must be true
@@ -187,6 +185,7 @@ pub async fn run_zkvm_client(witness: Witness) -> anyhow::Result<Proof> {
     info!("Running zkvm client.");
     let prove_info = spawn_blocking(move || {
         let data = rkyv::to_bytes::<rkyv::rancor::Error>(&witness)?.to_vec();
+        info!("Witness size: {}", data.len());
         // Execution environment
         let env = ExecutorEnv::builder()
             // Pass in witness data
