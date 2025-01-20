@@ -16,17 +16,16 @@ use alloy::consensus::Blob;
 use alloy::eips::eip4844::IndexedBlobHash;
 use async_trait::async_trait;
 use kailua_common::blobs::BlobWitnessData;
-use kailua_common::oracle::{validate_preimage, PreloadedOracle};
+use kailua_common::witness::WitnessOracle;
 use kona_derive::prelude::BlobProvider;
 use kona_preimage::errors::PreimageOracleResult;
-use kona_preimage::{
-    CommsClient, HintWriterClient, PreimageKey, PreimageKeyType, PreimageOracleClient,
-};
+use kona_preimage::{CommsClient, HintWriterClient, PreimageKey, PreimageOracleClient};
 use kona_proof::FlushableCache;
 use maili_protocol::BlockInfo;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
-use tracing::error;
+use tracing::debug;
+use tracing::log::error;
 
 #[derive(Clone, Debug)]
 pub struct BlobWitnessProvider<T: BlobProvider> {
@@ -66,65 +65,87 @@ impl<T: BlobProvider + Send> BlobProvider for BlobWitnessProvider<T> {
 }
 
 #[derive(Clone, Debug)]
-pub struct OracleWitnessProvider<P: CommsClient + FlushableCache + Send + Sync + Debug + Clone> {
-    pub oracle: P,
-    pub witness: Arc<Mutex<PreloadedOracle>>,
+pub struct OracleWitnessProvider<
+    P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
+    O: WitnessOracle,
+> {
+    pub oracle: Arc<P>,
+    pub witness: Arc<Mutex<O>>,
 }
 
-impl<P> OracleWitnessProvider<P>
+impl<P, O> OracleWitnessProvider<P, O>
 where
     P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
+    O: WitnessOracle,
 {
     pub fn save(&self, key: PreimageKey, value: &[u8]) {
-        if matches!(key.key_type(), PreimageKeyType::Blob) {
-            return;
-        }
-        let mut witness = self.witness.lock().unwrap();
-        validate_preimage(&key, value).expect("Attempted to save invalid preimage");
-        witness.preimages.insert(key, value.to_vec());
+        self.witness
+            .lock()
+            .unwrap()
+            .insert_preimage(key, value.to_vec());
     }
 }
 
 #[async_trait]
-impl<P> PreimageOracleClient for OracleWitnessProvider<P>
+impl<P, O> PreimageOracleClient for OracleWitnessProvider<P, O>
 where
     P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
+    O: WitnessOracle,
 {
     async fn get(&self, key: PreimageKey) -> PreimageOracleResult<Vec<u8>> {
-        let res = self.oracle.get(key).await;
-        if res.is_err() {
-            error!("Oracle get failure: {:?}", res);
+        debug!("GET: {:?}/{}", key.key_type(), key.key_value());
+        match self.oracle.get(key).await {
+            Ok(value) => {
+                self.save(key, &value);
+                Ok(value)
+            }
+            Err(e) => {
+                error!(
+                    "OracleWitnessProvider failed to get value for key {:?}/{}: {:?}",
+                    key.key_type(),
+                    key.key_value(),
+                    e
+                );
+                Err(e)
+            }
         }
-        let value = res?;
-        self.save(key, &value);
-        Ok(value)
     }
 
     async fn get_exact(&self, key: PreimageKey, buf: &mut [u8]) -> PreimageOracleResult<()> {
-        let res = self.oracle.get_exact(key, buf).await;
-        if res.is_err() {
-            error!("Oracle exact failure: {:?}", res);
+        debug!("GET EXACT: {:?}/{}", key.key_type(), key.key_value());
+        match self.oracle.get_exact(key, buf).await {
+            Ok(_) => {
+                self.save(key, buf);
+                Ok(())
+            }
+            Err(e) => {
+                error!(
+                    "OracleWitnessProvider failed to get exact value for key {:?}/{}: {:?}",
+                    key.key_type(),
+                    key.key_value(),
+                    e
+                );
+                Err(e)
+            }
         }
-        res?;
-        let value = buf.to_vec();
-        self.save(key, &value);
-        Ok(())
     }
 }
 
 #[async_trait]
-impl<P> HintWriterClient for OracleWitnessProvider<P>
+impl<P, O> HintWriterClient for OracleWitnessProvider<P, O>
 where
     P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
+    O: WitnessOracle,
 {
     async fn write(&self, hint: &str) -> PreimageOracleResult<()> {
         self.oracle.write(hint).await
     }
 }
 
-impl<P> FlushableCache for OracleWitnessProvider<P>
+impl<P, O> FlushableCache for OracleWitnessProvider<P, O>
 where
     P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
+    O: WitnessOracle,
 {
     fn flush(&self) {
         self.oracle.flush();

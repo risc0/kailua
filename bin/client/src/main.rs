@@ -24,7 +24,7 @@ async fn main() -> anyhow::Result<()> {
         args.precondition_validation_data_hash.unwrap_or_default();
     let payout_recipient_address = args.payout_recipient_address.unwrap_or_default();
 
-    kailua_client::run_client(
+    kailua_client::run_proving_client(
         args.boundless,
         ORACLE_READER,
         HINT_WRITER,

@@ -14,6 +14,7 @@
 
 pub mod blobs;
 pub mod client;
+pub mod config;
 pub mod journal;
 pub mod oracle;
 pub mod precondition;

@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use kailua_common::oracle::vec::VecOracle;
 use kailua_common::{
-    client::{log, run_in_memory_client},
+    client::{log, run_witness_client},
     witness::Witness,
 };
 use risc0_zkvm::guest::env;
@@ -23,10 +24,10 @@ fn main() {
     // Read witness data
     let witness_data = env::read_frame();
     log("DESERIALIZE");
-    let witness =
-        rkyv::from_bytes::<Witness, Error>(&witness_data).expect("Failed to deserialize witness");
+    let witness = rkyv::from_bytes::<Witness<VecOracle>, Error>(&witness_data)
+        .expect("Failed to deserialize witness");
     // Run client using witness
-    let proof_journal = run_in_memory_client(witness);
+    let proof_journal = run_witness_client(witness);
     // Write the final stitched journal
     env::commit_slice(&proof_journal.encode_packed());
 }

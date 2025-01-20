@@ -53,7 +53,7 @@ impl ProofJournal {
             agreed_l2_output_root: boot_info.agreed_l2_output_root,
             claimed_l2_output_root: boot_info.claimed_l2_output_root,
             claimed_l2_block_number: boot_info.claimed_l2_block_number,
-            config_hash: B256::from(crate::client::config_hash(&boot_info.rollup_config).unwrap()),
+            config_hash: B256::from(crate::config::config_hash(&boot_info.rollup_config).unwrap()),
         }
     }
 

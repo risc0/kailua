@@ -18,7 +18,7 @@ use alloy::primitives::address;
 use alloy::providers::ProviderBuilder;
 use anyhow::Context;
 use kailua_build::KAILUA_FPVM_ID;
-use kailua_common::client::config_hash;
+use kailua_common::config::config_hash;
 use kailua_contracts::SystemConfig;
 use kailua_host::fetch_rollup_config;
 use risc0_zkvm::sha::Digest;

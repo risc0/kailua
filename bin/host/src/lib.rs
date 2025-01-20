@@ -114,7 +114,7 @@ pub async fn start_server_and_native_client(
     ));
 
     // Start the client program in a separate child process.
-    let program_task = task::spawn(kailua_client::run_client(
+    let program_task = task::spawn(kailua_client::run_proving_client(
         args.boundless,
         OracleReader::new(preimage_chan.client),
         HintWriter::new(hint_chan.client),

@@ -12,30 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::blobs::{hash_to_fe, PreloadedBlobProvider};
+use crate::blobs::PreloadedBlobProvider;
 use crate::journal::ProofJournal;
-use crate::precondition::PreconditionValidationData;
-use crate::witness::Witness;
-use alloy_eips::eip4844::{Blob, FIELD_ELEMENTS_PER_BLOB};
+use crate::precondition;
+use crate::witness::{StitchedBootInfo, Witness, WitnessOracle};
 use alloy_primitives::{Address, Sealed, B256};
 use anyhow::{bail, Context};
 use kona_derive::traits::BlobProvider;
 use kona_driver::Driver;
 use kona_executor::TrieDBProvider;
-use kona_preimage::{CommsClient, PreimageKey, PreimageKeyType};
+use kona_preimage::{CommsClient, PreimageKeyType};
 use kona_proof::errors::OracleProviderError;
 use kona_proof::executor::KonaExecutor;
 use kona_proof::l1::{OracleL1ChainProvider, OraclePipeline};
 use kona_proof::l2::OracleL2ChainProvider;
 use kona_proof::sync::new_pipeline_cursor;
 use kona_proof::{BootInfo, FlushableCache, HintType};
-use maili_genesis::RollupConfig;
-use risc0_zkvm::sha::{Impl as SHA2, Sha256};
-use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::sync::Arc;
+use tracing::log::warn;
 
-pub fn run_client<
+/// Executes the Kona client to compute a list of subsequent outputs. Additionally validates
+/// the Kailua Fault/Validity preconditions on proposals for proof generation.
+pub fn run_kailua_client<
     O: CommsClient + FlushableCache + Send + Sync + Debug,
     B: BlobProvider + Send + Sync + Debug + Clone,
 >(
@@ -46,7 +45,7 @@ pub fn run_client<
 where
     <B as BlobProvider>::Error: Debug,
 {
-    kona_proof::block_on(async move {
+    let (boot, precondition_hash, output_hash) = kona_proof::block_on(async move {
         ////////////////////////////////////////////////////////////////
         //                          PROLOGUE                          //
         ////////////////////////////////////////////////////////////////
@@ -58,7 +57,7 @@ where
         );
 
         log("PRECONDITION");
-        let precondition_data = load_precondition_data(
+        let precondition_data = precondition::load_precondition_data(
             precondition_validation_data_hash,
             oracle.clone(),
             &mut beacon,
@@ -140,7 +139,7 @@ where
 
         let precondition_hash = precondition_data
             .map(|(precondition_validation_data, blobs)| {
-                validate_precondition(
+                precondition::validate_precondition(
                     precondition_validation_data,
                     blobs,
                     safe_head_number,
@@ -160,7 +159,18 @@ where
             // Derived output root at future height
             Ok((boot, precondition_hash, output_roots.pop()))
         }
-    })
+    })?;
+
+    // Check output
+    if let Some(computed_output) = output_hash {
+        // With sufficient data, the input l2_claim must be true
+        assert_eq!(boot.claimed_l2_output_root, computed_output);
+    } else {
+        // We use the zero claim hash to denote that the data as of l1 head is insufficient
+        assert_eq!(boot.claimed_l2_output_root, B256::ZERO);
+    }
+
+    Ok((boot, precondition_hash, output_hash))
 }
 
 /// Fetches the safe head hash of the L2 chain based on the agreed upon L2 output root in the
@@ -194,279 +204,15 @@ pub fn log(msg: &str) {
     tracing::info!("{msg}");
 }
 
-fn safe_default<V: Debug + Eq>(opt: Option<V>, default: V) -> anyhow::Result<V> {
-    if let Some(v) = opt {
-        if v == default {
-            anyhow::bail!(format!("Unsafe value! {v:?}"))
-        }
-        Ok(v)
-    } else {
-        Ok(default)
-    }
-}
-
-pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
-    // todo: check whether we need to include this, or if it is loaded from the config address
-    let system_config_hash: [u8; 32] = rollup_config
-        .genesis
-        .system_config
-        .as_ref()
-        .map(|system_config| {
-            let fields = [
-                system_config.batcher_address.0.as_slice(),
-                system_config.overhead.to_be_bytes::<32>().as_slice(),
-                system_config.scalar.to_be_bytes::<32>().as_slice(),
-                system_config.gas_limit.to_be_bytes().as_slice(),
-                safe_default(system_config.base_fee_scalar, u64::MAX)
-                    .context("base_fee_scalar")?
-                    .to_be_bytes()
-                    .as_slice(),
-                safe_default(system_config.blob_base_fee_scalar, u64::MAX)
-                    .context("blob_base_fee_scalar")?
-                    .to_be_bytes()
-                    .as_slice(),
-            ]
-            .concat();
-            let digest = SHA2::hash_bytes(fields.as_slice());
-
-            Ok::<[u8; 32], anyhow::Error>(digest.as_bytes().try_into()?)
-        })
-        .unwrap_or(Ok([0u8; 32]))?;
-    let rollup_config_bytes = [
-        rollup_config.genesis.l1.hash.0.as_slice(),
-        rollup_config.genesis.l2.hash.0.as_slice(),
-        system_config_hash.as_slice(),
-        rollup_config.block_time.to_be_bytes().as_slice(),
-        rollup_config.max_sequencer_drift.to_be_bytes().as_slice(),
-        rollup_config.seq_window_size.to_be_bytes().as_slice(),
-        rollup_config.channel_timeout.to_be_bytes().as_slice(),
-        rollup_config
-            .granite_channel_timeout
-            .to_be_bytes()
-            .as_slice(),
-        rollup_config.l1_chain_id.to_be_bytes().as_slice(),
-        rollup_config.l2_chain_id.to_be_bytes().as_slice(),
-        rollup_config
-            .base_fee_params
-            .max_change_denominator
-            .to_be_bytes()
-            .as_slice(),
-        rollup_config
-            .base_fee_params
-            .elasticity_multiplier
-            .to_be_bytes()
-            .as_slice(),
-        rollup_config
-            .canyon_base_fee_params
-            .max_change_denominator
-            .to_be_bytes()
-            .as_slice(),
-        rollup_config
-            .canyon_base_fee_params
-            .elasticity_multiplier
-            .to_be_bytes()
-            .as_slice(),
-        safe_default(rollup_config.regolith_time, u64::MAX)
-            .context("regolith_time")?
-            .to_be_bytes()
-            .as_slice(),
-        safe_default(rollup_config.canyon_time, u64::MAX)
-            .context("canyon_time")?
-            .to_be_bytes()
-            .as_slice(),
-        safe_default(rollup_config.delta_time, u64::MAX)
-            .context("delta_time")?
-            .to_be_bytes()
-            .as_slice(),
-        safe_default(rollup_config.ecotone_time, u64::MAX)
-            .context("ecotone_time")?
-            .to_be_bytes()
-            .as_slice(),
-        safe_default(rollup_config.fjord_time, u64::MAX)
-            .context("fjord_time")?
-            .to_be_bytes()
-            .as_slice(),
-        safe_default(rollup_config.granite_time, u64::MAX)
-            .context("granite_time")?
-            .to_be_bytes()
-            .as_slice(),
-        safe_default(rollup_config.holocene_time, u64::MAX)
-            .context("holocene_time")?
-            .to_be_bytes()
-            .as_slice(),
-        safe_default(rollup_config.blobs_enabled_l1_timestamp, u64::MAX)
-            .context("blobs_enabled_timestmap")?
-            .to_be_bytes()
-            .as_slice(),
-        rollup_config.batch_inbox_address.0.as_slice(),
-        rollup_config.deposit_contract_address.0.as_slice(),
-        rollup_config.l1_system_config_address.0.as_slice(),
-        rollup_config.protocol_versions_address.0.as_slice(),
-        safe_default(rollup_config.superchain_config_address, Address::ZERO)
-            .context("superchain_config_address")?
-            .0
-            .as_slice(),
-        safe_default(rollup_config.da_challenge_address, Address::ZERO)
-            .context("da_challenge_address")?
-            .0
-            .as_slice(),
-    ]
-    .concat();
-    let digest = SHA2::hash_bytes(rollup_config_bytes.as_slice());
-    Ok::<[u8; 32], anyhow::Error>(digest.as_bytes().try_into()?)
-}
-
-pub async fn load_precondition_data<
-    O: CommsClient + Send + Sync + Debug,
-    B: BlobProvider + Send + Sync + Debug + Clone,
->(
-    precondition_data_hash: B256,
-    oracle: Arc<O>,
-    beacon: &mut B,
-) -> anyhow::Result<Option<(PreconditionValidationData, Vec<Blob>)>>
-where
-    <B as BlobProvider>::Error: Debug,
-{
-    if precondition_data_hash.is_zero() {
-        return Ok(None);
-    }
-    // Read the blob references to fetch
-    let precondition_validation_data: PreconditionValidationData = pot::from_slice(
-        &oracle
-            .get(PreimageKey::new(
-                *precondition_data_hash,
-                PreimageKeyType::Sha256,
-            ))
-            .await
-            .map_err(OracleProviderError::Preimage)?,
-    )?;
-    let mut blobs = Vec::new();
-    // Read the blobs to validate divergence
-    for request in precondition_validation_data.blob_fetch_requests() {
-        blobs.push(
-            *beacon
-                .get_blobs(&request.block_ref, &[request.blob_hash.clone()])
-                .await
-                .unwrap()[0],
-        );
-    }
-
-    Ok(Some((precondition_validation_data, blobs)))
-}
-
-pub fn validate_precondition(
-    precondition_validation_data: PreconditionValidationData,
-    blobs: Vec<Blob>,
-    local_l2_head_number: u64,
-    output_roots: &[B256],
-) -> anyhow::Result<B256> {
-    let precondition_hash = precondition_validation_data.precondition_hash();
-    match precondition_validation_data {
-        PreconditionValidationData::Fault(divergence_index, _) => {
-            // Check equivalence of two blobs until potential divergence point
-            if divergence_index == 0 {
-                bail!("Unexpected divergence index 0");
-            } else if divergence_index > FIELD_ELEMENTS_PER_BLOB {
-                bail!(
-                    "Divergence index value {divergence_index} exceeds {FIELD_ELEMENTS_PER_BLOB}"
-                );
-            }
-            // Check for equality
-            for i in 0..divergence_index {
-                let index = 32 * i as usize;
-                if blobs[0][index..index + 32] != blobs[1][index..index + 32] {
-                    bail!("Elements at equivalence position {i} in blobs are not equal.");
-                }
-            }
-            // Check for inequality
-            let index = 32 * divergence_index as usize;
-            if blobs[0][index..index + 32] == blobs[1][index..index + 32] {
-                bail!("Elements at divergence position {divergence_index} in blobs are equal.");
-            }
-        }
-        PreconditionValidationData::Validity(
-            global_l2_head_number,
-            proposal_output_count,
-            output_block_span,
-            _,
-        ) => {
-            // Ensure local and global block ranges match
-            if global_l2_head_number > local_l2_head_number {
-                bail!(
-                    "Validity precondition global starting block #{} > local agreed l2 head #{}",
-                    global_l2_head_number,
-                    local_l2_head_number
-                )
-            } else if output_roots.is_empty() {
-                bail!("No output roots to check for validity precondition.")
-            }
-            // Calculate blob index pointer
-            let max_block_number =
-                global_l2_head_number + proposal_output_count * output_block_span;
-            for (i, output_hash) in output_roots.iter().enumerate() {
-                let output_block_number = local_l2_head_number + i as u64 + 1;
-                if output_block_number > max_block_number {
-                    // We should not derive outputs beyond the proposal root claim
-                    bail!("Output block #{output_block_number} > max block #{max_block_number}.");
-                } else if output_block_number % output_block_span != 0 {
-                    // We only check equivalence every output_block_span blocks
-                    continue;
-                }
-                let output_offset =
-                    ((output_block_number - global_l2_head_number) / output_block_span) - 1;
-                let blob_index = (output_offset / FIELD_ELEMENTS_PER_BLOB) as usize;
-                let fe_position = (output_offset % FIELD_ELEMENTS_PER_BLOB) as usize;
-                let blob_fe_index = 32 * fe_position;
-                // Verify fe equivalence to computed outputs for all but last output
-                match output_offset.cmp(&(proposal_output_count - 1)) {
-                    Ordering::Less => {
-                        // verify equivalence to blob
-                        let blob_fe_slice = &blobs[blob_index][blob_fe_index..blob_fe_index + 32];
-                        let output_fe = hash_to_fe(*output_hash);
-                        let output_fe_bytes = output_fe.to_be_bytes::<32>();
-                        if blob_fe_slice != output_fe_bytes.as_slice() {
-                            bail!(
-                                "Bad fe #{} in blob {} for block #{}: Expected {} found {} ",
-                                fe_position,
-                                blob_index,
-                                output_block_number,
-                                B256::try_from(output_fe_bytes.as_slice())?,
-                                B256::try_from(blob_fe_slice)?
-                            );
-                        }
-                    }
-                    Ordering::Equal => {
-                        // verify zeroed trail data
-                        if blob_index != blobs.len() - 1 {
-                            bail!(
-                                "Expected trail data to begin at blob {blob_index}/{}",
-                                blobs.len()
-                            );
-                        } else if blobs[blob_index][blob_fe_index..].iter().any(|b| b != &0u8) {
-                            bail!("Found non-zero trail data in blob {blob_index}");
-                        }
-                    }
-                    Ordering::Greater => {
-                        // (output_block_number <= max_block_number) implies:
-                        // (output_offset <= proposal_output_count)
-                        unreachable!(
-                            "Output offset {output_offset} > output count {proposal_output_count}."
-                        );
-                    }
-                }
-            }
-        }
-    }
-    // Return the precondition hash
-    Ok(precondition_hash)
-}
-
-pub fn run_in_memory_client(witness: Witness) -> ProofJournal {
+pub fn run_witness_client<O: WitnessOracle>(witness: Witness<O>) -> ProofJournal {
     log(&format!(
         "ORACLE: {} PREIMAGES",
-        witness.oracle_witness.preimages.len()
+        witness.oracle_witness.preimage_count()
     ));
-    witness.oracle_witness.validate().expect("Failed to validate preimages");
+    witness
+        .oracle_witness
+        .validate_preimages()
+        .expect("Failed to validate preimages");
     let oracle = Arc::new(witness.oracle_witness);
     log(&format!(
         "BEACON: {} BLOBS",
@@ -474,32 +220,53 @@ pub fn run_in_memory_client(witness: Witness) -> ProofJournal {
     ));
     let beacon = PreloadedBlobProvider::from(witness.blobs_witness);
 
-    // Attempt to recompute the output hash at the target block number using kona
-    log("RUN");
-    let (boot, precondition_hash, computed_output_opt) = crate::client::run_client(
+    let proof_journal = run_stitching_client(
         witness.precondition_validation_data_hash,
         oracle.clone(),
         beacon,
-    )
-    .expect("Failed to compute output hash.");
+        witness.fpvm_image_id,
+        witness.payout_recipient_address,
+        witness.stitched_boot_info,
+    );
 
-    // Validate the output root
-    if let Some(computed_output) = computed_output_opt {
-        // With sufficient data, the input l2_claim must be true
-        assert_eq!(boot.claimed_l2_output_root, computed_output);
-    } else {
-        // We use the zero claim hash to denote that the data as of l1 head is insufficient
-        assert_eq!(boot.claimed_l2_output_root, B256::ZERO);
+    if oracle.preimage_count() > 0 {
+        warn!(
+            "Found {} extra preimages in witness",
+            oracle.preimage_count()
+        );
     }
+
+    proof_journal
+}
+
+pub fn run_stitching_client<
+    O: CommsClient + FlushableCache + Send + Sync + Debug,
+    B: BlobProvider + Send + Sync + Debug + Clone,
+>(
+    precondition_validation_data_hash: B256,
+    oracle: Arc<O>,
+    beacon: B,
+    fpvm_image_id: B256,
+    payout_recipient_address: Address,
+    stitched_boot_info: Vec<StitchedBootInfo>,
+) -> ProofJournal
+where
+    <B as BlobProvider>::Error: Debug,
+{
+    // Attempt to recompute the output hash at the target block number using kona
+    log("RUN");
+    let (boot, precondition_hash, _) =
+        run_kailua_client(precondition_validation_data_hash, oracle.clone(), beacon)
+            .expect("Failed to compute output hash.");
 
     // Stitch boots together into a journal
     let mut stitched_journal = ProofJournal::new(
-        witness.fpvm_image_id,
-        witness.payout_recipient_address,
+        fpvm_image_id,
+        payout_recipient_address,
         precondition_hash,
         boot.as_ref(),
     );
-    for stitched_boot in witness.stitched_boot_info {
+    for stitched_boot in stitched_boot_info {
         // Require equivalence in reference head
         assert_eq!(stitched_boot.l1_head, stitched_journal.l1_head);
         // Require progress in stitched boot
@@ -510,10 +277,10 @@ pub fn run_in_memory_client(witness: Witness) -> ProofJournal {
         // Require proof assumption
         #[cfg(target_os = "zkvm")]
         risc0_zkvm::guest::env::verify(
-            witness.fpvm_image_id.0,
+            fpvm_image_id.0,
             &ProofJournal::new_stitched(
-                witness.fpvm_image_id,
-                witness.payout_recipient_address,
+                fpvm_image_id,
+                payout_recipient_address,
                 precondition_hash,
                 stitched_journal.config_hash,
                 &stitched_boot,

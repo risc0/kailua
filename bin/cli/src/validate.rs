@@ -32,7 +32,7 @@ use kailua_client::parse_address;
 use kailua_client::proof::{fpvm_proof_file_name, Proof};
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::blobs::BlobFetchRequest;
-use kailua_common::client::config_hash;
+use kailua_common::config::config_hash;
 use kailua_common::journal::ProofJournal;
 use kailua_common::precondition::{
     divergence_precondition_hash, equivalence_precondition_hash, PreconditionValidationData,

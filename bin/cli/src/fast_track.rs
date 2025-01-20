@@ -23,7 +23,7 @@ use alloy::sol_types::SolValue;
 use alloy::transports::Transport;
 use anyhow::{bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
-use kailua_common::client::config_hash;
+use kailua_common::config::config_hash;
 use kailua_contracts::*;
 use kailua_host::fetch_rollup_config;
 use std::process::exit;

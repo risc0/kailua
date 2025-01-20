@@ -13,15 +13,17 @@
 // limitations under the License.
 
 use crate::blobs::BlobWitnessData;
-use crate::oracle::PreloadedOracle;
 use alloy_primitives::{Address, B256};
+use kona_preimage::{CommsClient, PreimageKey};
+use kona_proof::FlushableCache;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 
 #[derive(
     Clone, Debug, Default, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
 )]
-pub struct Witness {
-    pub oracle_witness: PreloadedOracle,
+pub struct Witness<O: WitnessOracle> {
+    pub oracle_witness: O,
     pub blobs_witness: BlobWitnessData,
     #[rkyv(with = AddressDef)]
     pub payout_recipient_address: Address,
@@ -30,6 +32,13 @@ pub struct Witness {
     pub stitched_boot_info: Vec<StitchedBootInfo>,
     #[rkyv(with = B256Def)]
     pub fpvm_image_id: B256,
+}
+
+pub trait WitnessOracle: CommsClient + FlushableCache + Send + Sync + Debug {
+    fn preimage_count(&self) -> usize;
+    fn validate_preimages(&self) -> anyhow::Result<()>;
+    fn insert_preimage(&mut self, key: PreimageKey, value: Vec<u8>);
+    fn finalize_preimages(&mut self);
 }
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]

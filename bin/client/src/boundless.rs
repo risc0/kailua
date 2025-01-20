@@ -28,6 +28,7 @@ use boundless_market::storage::{StorageProviderConfig, StorageProviderType};
 use clap::Parser;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use kailua_common::journal::ProofJournal;
+use kailua_common::oracle::vec::VecOracle;
 use kailua_common::witness::Witness;
 use risc0_zkvm::sha::Digestible;
 use risc0_zkvm::{default_executor, is_dev_mode, ExecutorEnv, Journal};
@@ -162,7 +163,7 @@ pub async fn run_boundless_client(
     args: MarketProviderConfig,
     storage: Option<StorageProviderConfig>,
     journal: ProofJournal,
-    witness: Witness,
+    witness: Witness<VecOracle>,
 ) -> anyhow::Result<Proof> {
     info!("Running boundless client.");
     let proof_journal = Journal::new(journal.encode_packed());
