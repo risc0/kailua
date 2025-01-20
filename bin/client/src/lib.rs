@@ -222,6 +222,7 @@ pub async fn run_zkvm_client(witness: Witness<VecOracle>) -> anyhow::Result<Proo
         let env = ExecutorEnv::builder()
             // Pass in witness data
             .write_frame(&data)
+            .segment_limit_po2(21)
             .build()?;
         let prover = default_prover();
         let prove_info = prover

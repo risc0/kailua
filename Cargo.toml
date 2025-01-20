@@ -82,13 +82,13 @@ kona-proof = { git = "https://github.com/op-rs/kona", rev = "f912b89be07c452da1e
 kona-std-fpvm = { git = "https://github.com/op-rs/kona", rev = "f912b89be07c452da1ee251b7e7c1ba4a50c17d6" }
 
 # RISC Zero zkVM
-bonsai-sdk = { version = "1.2.0", features = ["non_blocking"] }
-boundless-market = "0.4.1"
-risc0-aggregation = "0.1.0"
-risc0-build = "1.2.0"
-risc0-ethereum-contracts = "1.2.0"
-risc0-zkvm = { version = "1.2.0", features = ["heap-embedded-alloc", "unstable"] }
-risc0-zkvm-platform = { version = "1.2.0", features = ["heap-embedded-alloc"] }
+bonsai-sdk = { version = "1.2.1", features = ["non_blocking"] }
+boundless-market = "0.5.0"
+risc0-aggregation = "0.1.1"
+risc0-build = { version = "1.2.1", features = ["unstable"] }
+risc0-ethereum-contracts = { version = "1.2.1", features = ["unstable"] }
+risc0-zkvm = { version = "1.2.1", features = ["heap-embedded-alloc", "unstable"] }
+risc0-zkvm-platform = { version = "1.2.1", features = ["heap-embedded-alloc"] }
 
 # RISC Zero Zeth
 zeth-core = { git = "https://github.com/risc0/zeth", rev = "cecf5ec" }
@@ -107,11 +107,6 @@ lto = "fat"
 [profile.release.build-override]
 codegen-units = 1
 opt-level = 3
-
-[patch.crates-io]
-crypto-bigint = { git = "https://github.com/risc0/RustCrypto-crypto-bigint", tag = "v0.5.5-risczero.0" }
-k256 = { git = "https://github.com/risc0/RustCrypto-elliptic-curves", tag = "k256/v0.13.3-risczero.0" }
-sha2 = { git = "https://github.com/risc0/RustCrypto-hashes", tag = "sha2-v0.10.8-risczero.0" }
 
 [patch.'https://github.com/op-rs/kona']
 kona-client = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }

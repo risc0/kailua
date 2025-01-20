@@ -209,7 +209,7 @@ pub async fn run_boundless_client(
     );
 
     // Check if an unexpired request had already been made recently
-    let boundless_wallet_address = boundless_client.signer.address();
+    let boundless_wallet_address = boundless_client.local_signer.as_ref().unwrap().address();
     let boundless_wallet_nonce = boundless_client
         .provider()
         .get_transaction_count(boundless_wallet_address)

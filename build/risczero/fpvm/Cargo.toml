@@ -27,14 +27,15 @@ rkyv = "0.8.9"
 
 kailua-common = { path = "../../../crates/common" }
 
-risc0-zkvm = { version = "1.2.0", features = ["std", "heap-embedded-alloc", "unstable"] }
-risc0-zkvm-platform = { version = "1.2.0", features = ["sys-getenv"] }
+risc0-zkvm = { version = "1.2.1", features = ["std", "heap-embedded-alloc", "unstable"] }
+risc0-zkvm-platform = { version = "1.2.1", features = ["sys-getenv"] }
 
 [patch.crates-io]
 c-kzg = { git = "https://github.com/risc0/c-kzg-4844.git", branch = "p1.0.3" }
 crypto-bigint = { git = "https://github.com/risc0/RustCrypto-crypto-bigint", tag = "v0.5.5-risczero.0" }
-k256 = { git = "https://github.com/risc0/RustCrypto-elliptic-curves", tag = "k256/v0.13.3-risczero.0" }
+k256 = { git = "https://github.com/risc0/RustCrypto-elliptic-curves", tag = "k256/v0.13.3-risczero.1" }
 sha2 = { git = "https://github.com/risc0/RustCrypto-hashes", tag = "sha2-v0.10.8-risczero.0" }
+tiny-keccak = { git = "https://github.com/risc0/tiny-keccak", tag = "tiny-keccak/v2.0.2-risczero.0" }
 
 [patch.'https://github.com/op-rs/kona']
 kona-derive = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }
