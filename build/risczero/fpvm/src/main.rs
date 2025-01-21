@@ -22,8 +22,9 @@ use rkyv::rancor::Error;
 
 fn main() {
     // Read witness data
-    log("WITNESS");
-    let witness = rkyv::from_bytes::<Witness<VecOracle>, Error>(&env::read_frame())
+    let witness_data = env::read_frame();
+    log("DESERIALIZE");
+    let witness = rkyv::from_bytes::<Witness<VecOracle>, Error>(&witness_data)
         .expect("Failed to deserialize witness");
     // Run client using witness
     let proof_journal = run_witness_client(witness);
