@@ -25,7 +25,7 @@ use anyhow::{bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_common::config::config_hash;
 use kailua_contracts::*;
-use kailua_host::fetch_rollup_config;
+use kailua_host::config::fetch_rollup_config;
 use std::process::exit;
 use std::str::FromStr;
 use tracing::{error, info};

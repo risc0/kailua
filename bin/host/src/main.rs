@@ -19,9 +19,9 @@ use alloy_primitives::B256;
 use anyhow::Context;
 use clap::Parser;
 use kailua_client::proof::fpvm_proof_file_name;
-use kailua_host::{
-    fetch_precondition_data, generate_rollup_config, zeth_execution_preflight, KailuaHostCli,
-};
+use kailua_host::args::KailuaHostArgs;
+use kailua_host::config::generate_rollup_config;
+use kailua_host::preflight::{fetch_precondition_data, zeth_execution_preflight};
 use kona_host::cli::HostMode;
 use kona_host::init_tracing_subscriber;
 use std::env::set_var;
@@ -31,7 +31,7 @@ use tracing::info;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let mut args = KailuaHostCli::parse();
+    let mut args = KailuaHostArgs::parse();
     init_tracing_subscriber(args.kona.v)?;
     set_var("KAILUA_VERBOSITY", args.kona.v.to_string());
 
@@ -91,9 +91,12 @@ async fn main() -> anyhow::Result<()> {
         }
 
         // generate a proof using the kailua client and kona server
-        kailua_host::start_server_and_native_client(args, precondition_validation_data_hash)
-            .await
-            .expect("Proving failure");
+        kailua_host::server::start_server_and_native_client(
+            args,
+            precondition_validation_data_hash,
+        )
+        .await
+        .expect("Proving failure");
     }
 
     info!(

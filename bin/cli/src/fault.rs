@@ -27,7 +27,7 @@ use anyhow::Context;
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::config::config_hash;
 use kailua_contracts::*;
-use kailua_host::fetch_rollup_config;
+use kailua_host::config::fetch_rollup_config;
 use std::str::FromStr;
 use tracing::{error, info};
 

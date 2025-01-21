@@ -27,8 +27,8 @@ use alloy::primitives::{Address, Bytes, FixedBytes, B256, U256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy::signers::local::LocalSigner;
 use anyhow::{anyhow, bail, Context};
+use kailua_client::args::parse_address;
 use kailua_client::boundless::BoundlessArgs;
-use kailua_client::parse_address;
 use kailua_client::proof::{fpvm_proof_file_name, Proof};
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::blobs::BlobFetchRequest;
@@ -38,7 +38,7 @@ use kailua_common::precondition::{
     divergence_precondition_hash, equivalence_precondition_hash, PreconditionValidationData,
 };
 use kailua_contracts::*;
-use kailua_host::fetch_rollup_config;
+use kailua_host::config::fetch_rollup_config;
 use maili_protocol::BlockInfo;
 use risc0_zkvm::is_dev_mode;
 use std::path::{Path, PathBuf};

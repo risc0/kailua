@@ -13,18 +13,18 @@
 // limitations under the License.
 
 use clap::Parser;
+use kailua_client::args::KailuaClientArgs;
 use kailua_client::oracle::{HINT_WRITER, ORACLE_READER};
-use kailua_client::KailuaClientCli;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args = KailuaClientCli::parse();
+    let args = KailuaClientArgs::parse();
     kona_host::init_tracing_subscriber(args.kailua_verbosity)?;
     let precondition_validation_data_hash =
         args.precondition_validation_data_hash.unwrap_or_default();
     let payout_recipient_address = args.payout_recipient_address.unwrap_or_default();
 
-    kailua_client::run_proving_client(
+    kailua_client::proving::run_proving_client(
         args.boundless,
         ORACLE_READER,
         HINT_WRITER,
