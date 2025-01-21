@@ -14,6 +14,7 @@
 
 use crate::args::KailuaHostArgs;
 use alloy_primitives::B256;
+use kailua_common::witness::StitchedBootInfo;
 use kona_host::cli::HostMode;
 use kona_host::single::{start_native_preimage_server, SingleChainFetcher};
 use kona_preimage::{BidirectionalChannel, HintWriter, OracleReader};
@@ -34,6 +35,7 @@ use tracing::info;
 pub async fn start_server_and_native_client(
     args: KailuaHostArgs,
     precondition_validation_data_hash: B256,
+    stitched_boot_info: Vec<StitchedBootInfo>,
 ) -> anyhow::Result<i32> {
     // Instantiate data channels
     let hint_chan = BidirectionalChannel::new()?;
@@ -67,6 +69,7 @@ pub async fn start_server_and_native_client(
         HintWriter::new(hint_chan.client),
         args.payout_recipient_address.unwrap_or_default(),
         precondition_validation_data_hash,
+        stitched_boot_info,
     ));
     // Execute both tasks and wait for them to complete.
     info!("Starting preimage server and client program.");

@@ -15,20 +15,16 @@
 use crate::proof::Proof;
 use anyhow::Context;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
-use kailua_common::oracle::vec::VecOracle;
-use kailua_common::witness::Witness;
 use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts};
 use tracing::info;
 
-pub async fn run_zkvm_client(witness: Witness<VecOracle>) -> anyhow::Result<Proof> {
+pub async fn run_zkvm_client(witness_frame: Vec<u8>) -> anyhow::Result<Proof> {
     info!("Running zkvm client.");
     let prove_info = tokio::task::spawn_blocking(move || {
-        let data = rkyv::to_bytes::<rkyv::rancor::Error>(&witness)?.to_vec();
-        info!("Witness size: {}", data.len());
         // Execution environment
         let env = ExecutorEnv::builder()
             // Pass in witness data
-            .write_frame(&data)
+            .write_frame(&witness_frame)
             .segment_limit_po2(21)
             .build()?;
         let prover = default_prover();

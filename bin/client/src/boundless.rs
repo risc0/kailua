@@ -28,8 +28,6 @@ use boundless_market::storage::{StorageProviderConfig, StorageProviderType};
 use clap::Parser;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use kailua_common::journal::ProofJournal;
-use kailua_common::oracle::vec::VecOracle;
-use kailua_common::witness::Witness;
 use risc0_zkvm::sha::Digestible;
 use risc0_zkvm::{default_executor, is_dev_mode, ExecutorEnv, Journal};
 use std::borrow::Borrow;
@@ -163,7 +161,7 @@ pub async fn run_boundless_client(
     args: MarketProviderConfig,
     storage: Option<StorageProviderConfig>,
     journal: ProofJournal,
-    witness: Witness<VecOracle>,
+    witness_frame: Vec<u8>,
 ) -> anyhow::Result<Proof> {
     info!("Running boundless client.");
     let proof_journal = Journal::new(journal.encode_packed());
@@ -252,11 +250,9 @@ pub async fn run_boundless_client(
 
     // Preflight execution to get cycle count
     info!("Preflighting execution.");
-    let input_frame = rkyv::to_bytes::<rkyv::rancor::Error>(&witness)?.to_vec();
-    info!("Witness size: {}", input_frame.len());
     let env = ExecutorEnv::builder()
         // Pass in witness data
-        .write_frame(&input_frame)
+        .write_frame(&witness_frame)
         .build()?;
     let session_info = default_executor().execute(env, KAILUA_FPVM_ELF)?;
     let mcycles_count = session_info
@@ -275,7 +271,7 @@ pub async fn run_boundless_client(
     let image_url = boundless_client.upload_image(KAILUA_FPVM_ELF).await?;
     info!("Uploaded image to {}", image_url);
     // Upload input
-    let input = InputBuilder::new().write_frame(&input_frame).build();
+    let input = InputBuilder::new().write_frame(&witness_frame).build();
     let input_url = boundless_client.upload_input(&input).await?;
     info!("Uploaded input to {input_url}");
     let request_input = Input::url(input_url);

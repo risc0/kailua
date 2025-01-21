@@ -13,9 +13,13 @@
 // limitations under the License.
 
 use alloy_primitives::{keccak256, B256};
+use anyhow::{bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
 use risc0_zkvm::{Journal, Receipt};
 use serde::{Deserialize, Serialize};
+use std::path::Path;
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Proof {
@@ -82,4 +86,24 @@ pub fn fpvm_proof_file_name(
     .concat();
     let file_name = keccak256(data);
     format!("risc0-{version}-{file_name}.{suffix}")
+}
+
+pub async fn read_proof_file(proof_file_name: &str) -> anyhow::Result<Proof> {
+    // Read receipt file
+    if !Path::new(proof_file_name).exists() {
+        bail!("Proof file {proof_file_name} not found.");
+    }
+    let mut proof_file = File::open(proof_file_name)
+        .await
+        .context(format!("Failed to open proof file {proof_file_name}."))?;
+    let mut proof_data = Vec::new();
+    proof_file
+        .read_to_end(&mut proof_data)
+        .await
+        .context(format!(
+            "Failed to read proof file {proof_file_name} data until end."
+        ))?;
+    bincode::deserialize::<Proof>(&proof_data).context(format!(
+        "Failed to deserialize proof file {proof_file_name} data with bincode"
+    ))
 }

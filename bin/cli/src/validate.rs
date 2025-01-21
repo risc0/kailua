@@ -29,7 +29,7 @@ use alloy::signers::local::LocalSigner;
 use anyhow::{anyhow, bail, Context};
 use kailua_client::args::parse_address;
 use kailua_client::boundless::BoundlessArgs;
-use kailua_client::proof::{fpvm_proof_file_name, Proof};
+use kailua_client::proof::{fpvm_proof_file_name, read_proof_file, Proof};
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::config::config_hash;
@@ -41,12 +41,10 @@ use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
 use maili_protocol::BlockInfo;
 use risc0_zkvm::is_dev_mode;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::exit;
 use std::str::FromStr;
 use std::time::Duration;
-use tokio::fs::File;
-use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 use tokio::time::sleep;
 use tokio::{spawn, try_join};
@@ -1253,27 +1251,7 @@ pub async fn handle_proof_requests(
             }
         }
         sleep(Duration::from_secs(1)).await;
-        // Read receipt file
-        if !Path::new(&proof_file_name).exists() {
-            error!("Proof file {proof_file_name} not found.");
-        } else {
-            info!("Found proof file.");
-        }
-        let mut proof_file = match File::open(proof_file_name.clone()).await {
-            Ok(f) => f,
-            Err(e) => {
-                error!("Failed to open proof file {proof_file_name}: {e:?}");
-                continue;
-            }
-        };
-        info!("Opened proof file {proof_file_name}.");
-        let mut proof_data = Vec::new();
-        if let Err(e) = proof_file.read_to_end(&mut proof_data).await {
-            error!("Failed to read proof file {proof_file_name}: {e:?}");
-            continue;
-        }
-        info!("Read entire proof file.");
-        match bincode::deserialize::<Proof>(&proof_data) {
+        match read_proof_file(&proof_file_name).await {
             Ok(proof) => {
                 // Send proof via the channel
                 channel
@@ -1283,7 +1261,7 @@ pub async fn handle_proof_requests(
                 info!("Proof for local index {proposal_index} complete.");
             }
             Err(e) => {
-                error!("Failed to deserialize proof: {e:?}");
+                error!("Failed to read proof file: {e:?}");
             }
         }
     }

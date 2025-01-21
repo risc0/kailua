@@ -21,7 +21,7 @@ use kailua_common::client::run_witness_client;
 use kailua_common::journal::ProofJournal;
 use kailua_common::oracle::map::MapOracle;
 use kailua_common::oracle::vec::VecOracle;
-use kailua_common::witness::Witness;
+use kailua_common::witness::{StitchedBootInfo, Witness};
 use kona_preimage::{HintWriterClient, PreimageOracleClient};
 use kona_proof::l1::OracleBlobProvider;
 use kona_proof::CachingOracle;
@@ -40,6 +40,7 @@ pub async fn run_proving_client<P, H>(
     hint_client: H,
     payout_recipient: Address,
     precondition_validation_data_hash: B256,
+    stitched_boot_info: Vec<StitchedBootInfo>,
 ) -> anyhow::Result<()>
 where
     P: PreimageOracleClient + Send + Sync + Debug + Clone + 'static,
@@ -61,6 +62,7 @@ where
             blob_provider,
             payout_recipient,
             precondition_validation_data_hash,
+            stitched_boot_info.clone(),
         )
         .await
         .expect("Failed to run map witgen client.")
@@ -72,6 +74,7 @@ where
         PreloadedBlobProvider::from(witness_map.blobs_witness.clone()),
         payout_recipient,
         precondition_validation_data_hash,
+        stitched_boot_info.clone(),
     )
     .await
     .expect("Failed to run vec witgen client.");
@@ -91,13 +94,15 @@ where
         error!("Native journal does not match journal backed by vec witness");
     }
     // compute the receipt in the zkvm
+    let witness_frame = rkyv::to_bytes::<rkyv::rancor::Error>(&witness_vec)?.to_vec();
+    info!("Witness size: {}", witness_frame.len());
     let proof = match boundless.market {
         Some(args) => {
-            boundless::run_boundless_client(args, boundless.storage, journal, witness_vec)
+            boundless::run_boundless_client(args, boundless.storage, journal, witness_frame)
                 .await
                 .context("Failed to run boundless client.")?
         }
-        None => zkvm::run_zkvm_client(witness_vec)
+        None => zkvm::run_zkvm_client(witness_frame)
             .await
             .context("Failed to run zkvm client.")?,
     };

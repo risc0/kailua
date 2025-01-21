@@ -17,7 +17,7 @@ use alloy_primitives::{Address, B256};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_common::blobs::BlobWitnessData;
 use kailua_common::journal::ProofJournal;
-use kailua_common::witness::{Witness, WitnessOracle};
+use kailua_common::witness::{StitchedBootInfo, Witness, WitnessOracle};
 use kona_derive::prelude::BlobProvider;
 use kona_preimage::CommsClient;
 use kona_proof::FlushableCache;
@@ -31,6 +31,7 @@ pub async fn run_witgen_client<P, B, O>(
     blob_provider: B,
     payout_recipient: Address,
     precondition_validation_data_hash: B256,
+    stitched_boot_info: Vec<StitchedBootInfo>,
 ) -> anyhow::Result<(ProofJournal, Witness<O>)>
 where
     P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
@@ -62,7 +63,7 @@ where
         blobs_witness: core::mem::take(blobs_witness.lock().unwrap().deref_mut()),
         payout_recipient_address: payout_recipient,
         precondition_validation_data_hash,
-        stitched_boot_info: vec![], // todo: consider combined assumptions
+        stitched_boot_info,
         fpvm_image_id,
     };
     witness.oracle_witness.finalize_preimages();

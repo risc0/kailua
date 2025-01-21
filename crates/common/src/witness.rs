@@ -65,7 +65,15 @@ impl From<AddressDef> for Address {
 }
 
 #[derive(
-    Clone, Debug, Default, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
 )]
 pub struct StitchedBootInfo {
     /// The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.

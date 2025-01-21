@@ -21,7 +21,7 @@ use risc0_zkvm::guest::env;
 use rkyv::rancor::Error;
 
 fn main() {
-    // Read witness data
+    // Read witness data (todo: rkyv access)
     let witness_data = env::read_frame();
     log("DESERIALIZE");
     let witness = rkyv::from_bytes::<Witness<VecOracle>, Error>(&witness_data)
