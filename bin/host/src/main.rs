@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use alloy::network::primitives::BlockTransactionsKind;
+use alloy::providers::Provider;
+use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::B256;
 use anyhow::Context;
 use clap::Parser;
@@ -46,6 +49,27 @@ async fn main() -> anyhow::Result<()> {
             None => (B256::ZERO, B256::ZERO),
         };
     let HostMode::Single(kona_cfg) = &args.kona.mode;
+    // count transactions
+    let (.., l2_provider) = kona_cfg.create_providers().await?;
+    let mut transactions = 0;
+    let starting_block = l2_provider
+        .get_block_by_hash(kona_cfg.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
+        .await?
+        .unwrap()
+        .header
+        .number;
+    let block_count = kona_cfg.claimed_l2_block_number - starting_block;
+    for i in 0..block_count {
+        transactions += l2_provider
+            .get_block_transaction_count_by_number(BlockNumberOrTag::Number(starting_block + i))
+            .await?
+            .expect("Failed to get transaction count for block {i}");
+    }
+    info!(
+        "Proving {} transactions over {} blocks.",
+        transactions, block_count
+    );
+
     let file_name = fpvm_proof_file_name(
         precondition_hash,
         kona_cfg.l1_head,
@@ -72,6 +96,10 @@ async fn main() -> anyhow::Result<()> {
             .expect("Proving failure");
     }
 
+    info!(
+        "Proved {} transactions over {} blocks.",
+        transactions, block_count
+    );
     info!("Exiting host program.");
     Ok(())
 }

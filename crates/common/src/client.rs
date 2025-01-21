@@ -122,11 +122,13 @@ where
             if output_number == starting_block {
                 // A mismatch indicates that there is insufficient L1 data available to produce
                 // an L2 output root at the claimed block number
+                log("HALT");
+                break;
+            } else {
                 log(&format!(
-                    "OUTPUT: {output_number}|{}",
+                    "OUTPUT: {output_number}/{}",
                     boot.claimed_l2_block_number
                 ));
-                break;
             }
             // Append newly computed output root
             output_roots.push(output_root);

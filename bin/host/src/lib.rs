@@ -339,6 +339,11 @@ pub async fn zeth_execution_preflight(
             let mut kv_store = kona_cfg.construct_kv_store();
             dump_data_to_kv_store(&mut kv_store, &preflight_data).await;
         }
+    } else {
+        warn!(
+            "Unknown chain-id {}. Skipping zeth-preflight.",
+            rollup_config.l2_chain_id
+        );
     }
     Ok(())
 }
