@@ -1,4 +1,4 @@
-// Copyright 2024 RISC Zero, Inc.
+// Copyright 2024, 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::blobs::BlobWitnessData;
+use crate::journal::ProofJournal;
 use alloy_primitives::{Address, B256};
 use kona_preimage::{CommsClient, PreimageKey};
 use kona_proof::FlushableCache;
@@ -87,4 +88,15 @@ pub struct StitchedBootInfo {
     pub claimed_l2_output_root: B256,
     /// The L2 claim block number.
     pub claimed_l2_block_number: u64,
+}
+
+impl From<ProofJournal> for StitchedBootInfo {
+    fn from(value: ProofJournal) -> Self {
+        Self {
+            l1_head: value.l1_head,
+            agreed_l2_output_root: value.agreed_l2_output_root,
+            claimed_l2_output_root: value.claimed_l2_output_root,
+            claimed_l2_block_number: value.claimed_l2_block_number,
+        }
+    }
 }

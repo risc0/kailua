@@ -19,8 +19,10 @@ use alloy::network::primitives::BlockTransactionsKind;
 use alloy::providers::Provider;
 use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::B256;
-use anyhow::Context;
-use kailua_client::proof::{fpvm_proof_file_name, read_proof_file, Proof};
+use anyhow::{anyhow, Context};
+use kailua_client::proof::{fpvm_proof_file_name, read_proof_file};
+use kailua_client::proving::ProvingError;
+use kailua_common::proof::Proof;
 use kailua_common::witness::StitchedBootInfo;
 use kona_host::cli::HostMode;
 use std::env::set_var;
@@ -31,10 +33,16 @@ use tracing::info;
 pub async fn compute_fpvm_proof(
     mut args: KailuaHostArgs,
     stitched_boot_info: Vec<StitchedBootInfo>,
-) -> anyhow::Result<Proof> {
+    stitched_proofs: Vec<Proof>,
+    prove_snark: bool,
+    force_attempt: bool,
+) -> Result<Proof, ProvingError> {
     // compute receipt if uncached
     let (precondition_hash, precondition_validation_data_hash) =
-        match fetch_precondition_data(&args).await? {
+        match fetch_precondition_data(&args)
+            .await
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
+        {
             Some(data) => {
                 let precondition_validation_data_hash = data.hash();
                 set_var(
@@ -47,11 +55,15 @@ pub async fn compute_fpvm_proof(
         };
     let HostMode::Single(kona_cfg) = &args.kona.mode;
     // count transactions
-    let (.., l2_provider) = kona_cfg.create_providers().await?;
+    let (.., l2_provider) = kona_cfg
+        .create_providers()
+        .await
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     let mut transactions = 0;
     let starting_block = l2_provider
         .get_block_by_hash(kona_cfg.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
-        .await?
+        .await
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
         .unwrap()
         .header
         .number;
@@ -59,7 +71,8 @@ pub async fn compute_fpvm_proof(
     for i in 0..block_count {
         transactions += l2_provider
             .get_block_transaction_count_by_number(BlockNumberOrTag::Number(starting_block + i))
-            .await?
+            .await
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
             .expect("Failed to get transaction count for block {i}");
     }
     info!(
@@ -78,13 +91,16 @@ pub async fn compute_fpvm_proof(
         info!("Proving skipped. Proof file {proof_file_name} already exists.");
     } else {
         info!("Computing uncached proof.");
-        let tmp_dir = tempdir()?;
+        let tmp_dir = tempdir().map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
         let rollup_config = generate_rollup_config(&mut args, &tmp_dir)
             .await
-            .context("generate_rollup_config")?;
+            .context("generate_rollup_config")
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
         // run zeth preflight to fetch the necessary preimages
         if !args.skip_zeth_preflight {
-            zeth_execution_preflight(&args, rollup_config).await?;
+            zeth_execution_preflight(&args, rollup_config)
+                .await
+                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
         }
 
         // generate a proof using the kailua client and kona server
@@ -92,9 +108,11 @@ pub async fn compute_fpvm_proof(
             args,
             precondition_validation_data_hash,
             stitched_boot_info,
+            stitched_proofs,
+            prove_snark,
+            force_attempt,
         )
-        .await
-        .expect("Proving failure");
+        .await?;
     }
 
     info!(
@@ -102,7 +120,10 @@ pub async fn compute_fpvm_proof(
         transactions, block_count
     );
 
-    read_proof_file(&proof_file_name).await.context(format!(
-        "Failed to read proof file {proof_file_name} contents."
-    ))
+    read_proof_file(&proof_file_name)
+        .await
+        .context(format!(
+            "Failed to read proof file {proof_file_name} contents."
+        ))
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))
 }

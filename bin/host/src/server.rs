@@ -14,6 +14,9 @@
 
 use crate::args::KailuaHostArgs;
 use alloy_primitives::B256;
+use anyhow::anyhow;
+use kailua_client::proving::ProvingError;
+use kailua_common::proof::Proof;
 use kailua_common::witness::StitchedBootInfo;
 use kona_host::cli::HostMode;
 use kona_host::single::{start_native_preimage_server, SingleChainFetcher};
@@ -36,15 +39,23 @@ pub async fn start_server_and_native_client(
     args: KailuaHostArgs,
     precondition_validation_data_hash: B256,
     stitched_boot_info: Vec<StitchedBootInfo>,
-) -> anyhow::Result<i32> {
+    stitched_proofs: Vec<Proof>,
+    prove_snark: bool,
+    force_attempt: bool,
+) -> Result<(), ProvingError> {
     // Instantiate data channels
-    let hint_chan = BidirectionalChannel::new()?;
-    let preimage_chan = BidirectionalChannel::new()?;
+    let hint_chan =
+        BidirectionalChannel::new().map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+    let preimage_chan =
+        BidirectionalChannel::new().map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     // Create chain client
     let HostMode::Single(kona_cfg) = args.kona.mode;
     let kv_store = kona_cfg.construct_kv_store();
     let fetcher = if !kona_cfg.is_offline() {
-        let (l1_provider, blob_provider, l2_provider) = kona_cfg.create_providers().await?;
+        let (l1_provider, blob_provider, l2_provider) = kona_cfg
+            .create_providers()
+            .await
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
         Some(Arc::new(RwLock::new(SingleChainFetcher::new(
             kv_store.clone(),
             l1_provider,
@@ -70,11 +81,15 @@ pub async fn start_server_and_native_client(
         args.payout_recipient_address.unwrap_or_default(),
         precondition_validation_data_hash,
         stitched_boot_info,
+        stitched_proofs,
+        prove_snark,
+        force_attempt,
     ));
     // Execute both tasks and wait for them to complete.
     info!("Starting preimage server and client program.");
-    let (_, client_result) = tokio::try_join!(server_task, program_task,)?;
+    let (_, client_result) = tokio::try_join!(server_task, program_task,)
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     info!(target: "kona_host", "Preimage server and client program have joined.");
     // Return execution result
-    Ok(client_result.is_err() as i32)
+    client_result
 }

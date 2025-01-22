@@ -16,6 +16,7 @@ pub mod args;
 pub mod boundless;
 pub mod oracle;
 pub mod proof;
+pub mod provider;
 pub mod proving;
 pub mod witgen;
 pub mod witness;

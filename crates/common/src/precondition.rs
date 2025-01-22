@@ -204,7 +204,8 @@ pub fn validate_precondition(
                     local_l2_head_number
                 )
             } else if output_roots.is_empty() {
-                bail!("No output roots to check for validity precondition.")
+                // abort early if no validation is to take place
+                return Ok(precondition_hash);
             }
             // Calculate blob index pointer
             let max_block_number =

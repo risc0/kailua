@@ -15,12 +15,13 @@
 use crate::boundless::BoundlessArgs;
 use crate::{boundless, proof, witgen, zkvm};
 use alloy_primitives::{Address, B256};
-use anyhow::Context;
+use anyhow::anyhow;
 use kailua_common::blobs::PreloadedBlobProvider;
 use kailua_common::client::run_witness_client;
 use kailua_common::journal::ProofJournal;
 use kailua_common::oracle::map::MapOracle;
 use kailua_common::oracle::vec::VecOracle;
+use kailua_common::proof::Proof;
 use kailua_common::witness::{StitchedBootInfo, Witness};
 use kona_preimage::{HintWriterClient, PreimageOracleClient};
 use kona_proof::l1::OracleBlobProvider;
@@ -29,11 +30,27 @@ use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// The size of the LRU cache in the oracle.
 pub const ORACLE_LRU_SIZE: usize = 1024;
 
+/// The max size of a witness allowed
+pub const MAX_WITNESS_SIZE: usize = 50 * 1024 * 1024;
+
+#[derive(thiserror::Error, Debug)]
+pub enum ProvingError {
+    #[error("WitnessSizeError error: found {0} expected {0}")]
+    WitnessSizeError(usize, usize),
+
+    #[error("ExecutionError error: ZKVM failed {0:?}")]
+    ExecutionError(anyhow::Error),
+
+    #[error("OtherError error: {0:?}")]
+    OtherError(anyhow::Error),
+}
+
+#[allow(clippy::too_many_arguments)]
 pub async fn run_proving_client<P, H>(
     boundless: BoundlessArgs,
     oracle_client: P,
@@ -41,7 +58,10 @@ pub async fn run_proving_client<P, H>(
     payout_recipient: Address,
     precondition_validation_data_hash: B256,
     stitched_boot_info: Vec<StitchedBootInfo>,
-) -> anyhow::Result<()>
+    stitched_proofs: Vec<Proof>,
+    prove_snark: bool,
+    force_attempt: bool,
+) -> Result<(), ProvingError>
 where
     P: PreimageOracleClient + Send + Sync + Debug + Clone + 'static,
     H: HintWriterClient + Send + Sync + Debug + Clone + 'static,
@@ -94,18 +114,35 @@ where
         error!("Native journal does not match journal backed by vec witness");
     }
     // compute the receipt in the zkvm
-    let witness_frame = rkyv::to_bytes::<rkyv::rancor::Error>(&witness_vec)?.to_vec();
+    let witness_frame = rkyv::to_bytes::<rkyv::rancor::Error>(&witness_vec)
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
+        .to_vec();
     info!("Witness size: {}", witness_frame.len());
+    if witness_frame.len() > MAX_WITNESS_SIZE {
+        warn!("Witness too large.");
+        if !force_attempt {
+            warn!("Aborting.");
+            return Err(ProvingError::WitnessSizeError(
+                witness_frame.len(),
+                MAX_WITNESS_SIZE,
+            ));
+        }
+        warn!("Continuing..");
+    }
     let proof = match boundless.market {
         Some(args) => {
-            boundless::run_boundless_client(args, boundless.storage, journal, witness_frame)
-                .await
-                .context("Failed to run boundless client.")?
+            boundless::run_boundless_client(
+                args,
+                boundless.storage,
+                journal,
+                witness_frame,
+                stitched_proofs,
+            )
+            .await?
         }
-        None => zkvm::run_zkvm_client(witness_frame)
-            .await
-            .context("Failed to run zkvm client.")?,
+        _ => zkvm::run_zkvm_client(witness_frame, stitched_proofs, prove_snark).await?,
     };
+
     // Prepare proof file
     let proof_journal = ProofJournal::decode_packed(proof.journal().as_ref())
         .expect("Failed to decode proof output");

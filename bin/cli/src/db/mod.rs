@@ -17,8 +17,7 @@ pub mod proposal;
 pub mod state;
 pub mod treasury;
 
-use crate::providers::beacon::BlobProvider;
-use crate::providers::optimism::OpNodeProvider;
+use crate::provider::BlobProvider;
 use crate::stall::Stall;
 use crate::KAILUA_GAME_TYPE;
 use alloy::network::Network;
@@ -27,6 +26,7 @@ use alloy::providers::Provider;
 use alloy::transports::Transport;
 use anyhow::{bail, Context};
 use config::Config;
+use kailua_client::provider::OpNodeProvider;
 use kailua_contracts::{
     IDisputeGameFactory::{gameAtIndexReturn, IDisputeGameFactoryInstance},
     *,

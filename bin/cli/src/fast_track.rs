@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::providers::optimism::OpNodeProvider;
 use crate::stall::Stall;
-use crate::{BN254_CONTROL_ID, CONTROL_ROOT, KAILUA_GAME_TYPE, SET_BUILDER_ID};
+use crate::KAILUA_GAME_TYPE;
 use alloy::network::{EthereumWallet, Network, TxSigner};
 use alloy::primitives::{Address, Bytes, Uint, U256};
 use alloy::providers::{Provider, ProviderBuilder};
@@ -23,7 +22,8 @@ use alloy::sol_types::SolValue;
 use alloy::transports::Transport;
 use anyhow::{bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
-use kailua_common::config::config_hash;
+use kailua_client::provider::OpNodeProvider;
+use kailua_common::config::{config_hash, BN254_CONTROL_ID, CONTROL_ROOT, SET_BUILDER_ID};
 use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
 use std::process::exit;

@@ -14,7 +14,6 @@
 
 use crate::db::proposal::Proposal;
 use crate::propose::ProposeArgs;
-use crate::providers::optimism::OpNodeProvider;
 use crate::stall::Stall;
 use crate::KAILUA_GAME_TYPE;
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
@@ -24,6 +23,7 @@ use alloy::providers::ProviderBuilder;
 use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
 use anyhow::Context;
+use kailua_client::provider::OpNodeProvider;
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::config::config_hash;
 use kailua_contracts::*;

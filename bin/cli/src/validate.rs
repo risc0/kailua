@@ -1,4 +1,4 @@
-// Copyright 2024 RISC Zero, Inc.
+// Copyright 2024, 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,9 +16,8 @@ use crate::channel::DuplexChannel;
 use crate::db::config::Config;
 use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
-use crate::providers::beacon::BlobProvider;
-use crate::providers::optimism::OpNodeProvider;
-use crate::{stall::Stall, CoreArgs, KAILUA_GAME_TYPE, SET_BUILDER_ID};
+use crate::provider::BlobProvider;
+use crate::{stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::{IndexedBlobHash, FIELD_ELEMENTS_PER_BLOB};
 use alloy::eips::BlockNumberOrTag;
 use alloy::network::primitives::BlockTransactionsKind;
@@ -29,14 +28,16 @@ use alloy::signers::local::LocalSigner;
 use anyhow::{anyhow, bail, Context};
 use kailua_client::args::parse_address;
 use kailua_client::boundless::BoundlessArgs;
-use kailua_client::proof::{fpvm_proof_file_name, read_proof_file, Proof};
+use kailua_client::proof::{encode_seal, fpvm_proof_file_name, read_proof_file};
+use kailua_client::provider::OpNodeProvider;
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::blobs::BlobFetchRequest;
-use kailua_common::config::config_hash;
+use kailua_common::config::{config_hash, SET_BUILDER_ID};
 use kailua_common::journal::ProofJournal;
 use kailua_common::precondition::{
     divergence_precondition_hash, equivalence_precondition_hash, PreconditionValidationData,
 };
+use kailua_common::proof::Proof;
 use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
 use maili_protocol::BlockInfo;
@@ -331,7 +332,7 @@ pub async fn handle_proposals(
             #[cfg(feature = "devnet")]
             let proof = maybe_patch_proof(proof, expected_fpvm_image_id, SET_BUILDER_ID.0)?;
             // verify that the zkvm receipt is valid
-            if let Some(receipt) = proof.as_receipt() {
+            if let Some(receipt) = proof.as_zkvm_receipt() {
                 if let Err(e) = receipt.verify(expected_fpvm_image_id) {
                     error!("Could not verify receipt against image id in contract: {e:?}");
                 } else {
@@ -342,7 +343,7 @@ pub async fn handle_proposals(
             let proof_journal = ProofJournal::decode_packed(proof.journal().as_ref())?;
             info!("Proof journal: {:?}", proof_journal);
             // encode seal data
-            let encoded_seal = Bytes::from(proof.encoded_seal()?);
+            let encoded_seal = Bytes::from(encode_seal(&proof)?);
 
             let opponent_contract = opponent.tournament_contract_instance(&validator_provider);
             // Check if proof is a viable validity proof
@@ -1328,12 +1329,11 @@ fn maybe_patch_proof(
                             .map(|n| risc0_zkvm::sha::Digest::from(n.0))
                             .collect();
                         // construct set builder root from merkle proof
-                        let set_builder_journal =
-                            kailua_client::boundless::encoded_set_builder_journal(
-                                &fpvm_claim_digest,
-                                set_builder_siblings,
-                                expected_set_builder_image_id,
-                            );
+                        let set_builder_journal = kailua_common::proof::encoded_set_builder_journal(
+                            &fpvm_claim_digest,
+                            set_builder_siblings,
+                            expected_set_builder_image_id,
+                        );
                         // create fake proof for the root
                         let set_builder_seal =
                             risc0_ethereum_contracts::encode_seal(&risc0_zkvm::Receipt::new(
@@ -1362,6 +1362,7 @@ fn maybe_patch_proof(
                 }
             }
         }
+        Proof::SetBuilderReceipt(..) => {}
     }
     Ok(proof)
 }

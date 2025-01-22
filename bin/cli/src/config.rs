@@ -13,12 +13,12 @@
 // limitations under the License.
 
 use crate::stall::Stall;
-use crate::{BN254_CONTROL_ID, CONTROL_ROOT, KAILUA_GAME_TYPE, SET_BUILDER_ID};
+use crate::KAILUA_GAME_TYPE;
 use alloy::primitives::address;
 use alloy::providers::ProviderBuilder;
 use anyhow::Context;
 use kailua_build::KAILUA_FPVM_ID;
-use kailua_common::config::config_hash;
+use kailua_common::config::{config_hash, BN254_CONTROL_ID, CONTROL_ROOT, SET_BUILDER_ID};
 use kailua_contracts::SystemConfig;
 use kailua_host::config::fetch_rollup_config;
 use risc0_zkvm::sha::Digest;

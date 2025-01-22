@@ -1,7 +1,5 @@
 use crate::db::config::Config;
-use crate::providers::beacon::blob_fe_proof;
-use crate::providers::beacon::{blob_sidecar, BlobProvider};
-use crate::providers::optimism::OpNodeProvider;
+use crate::provider::{blob_fe_proof, blob_sidecar, BlobProvider};
 use crate::stall::Stall;
 use alloy::consensus::{Blob, BlobTransactionSidecar, BlockHeader};
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
@@ -13,6 +11,7 @@ use alloy::providers::Provider;
 use alloy::transports::Transport;
 use alloy_rpc_types_beacon::sidecar::BlobData;
 use anyhow::{bail, Context};
+use kailua_client::provider::OpNodeProvider;
 use kailua_common::blobs::{hash_to_fe, intermediate_outputs, trail_data};
 use kailua_common::precondition::blobs_hash;
 use kailua_contracts::{

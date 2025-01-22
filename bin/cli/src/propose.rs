@@ -14,8 +14,7 @@
 
 use crate::db::proposal::{Proposal, ELIMINATIONS_LIMIT};
 use crate::db::KailuaDB;
-use crate::providers::beacon::BlobProvider;
-use crate::providers::optimism::OpNodeProvider;
+use crate::provider::BlobProvider;
 use crate::{stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::consensus::BlockHeader;
 use alloy::eips::{BlockId, BlockNumberOrTag};
@@ -26,6 +25,7 @@ use alloy::providers::{Provider, ProviderBuilder};
 use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
 use anyhow::Context;
+use kailua_client::provider::OpNodeProvider;
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::config::config_hash;
 use kailua_contracts::*;

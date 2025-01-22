@@ -18,6 +18,8 @@ use kailua_client::{
     args::{parse_address, parse_b256},
     boundless::BoundlessArgs,
 };
+use kona_host::cli::HostMode;
+use std::cmp::Ordering;
 
 /// The host binary CLI application arguments.
 #[derive(Parser, Clone, Debug)]
@@ -43,4 +45,32 @@ pub struct KailuaHostArgs {
 
     #[clap(flatten)]
     pub boundless: BoundlessArgs,
+}
+
+impl PartialEq<Self> for KailuaHostArgs {
+    fn eq(&self, other: &Self) -> bool {
+        let HostMode::Single(self_cfg) = &self.kona.mode;
+        let HostMode::Single(other_cfg) = &other.kona.mode;
+        self_cfg
+            .claimed_l2_block_number
+            .eq(&other_cfg.claimed_l2_block_number)
+    }
+}
+
+impl Eq for KailuaHostArgs {}
+
+impl PartialOrd<Self> for KailuaHostArgs {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for KailuaHostArgs {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let HostMode::Single(self_cfg) = &self.kona.mode;
+        let HostMode::Single(other_cfg) = &other.kona.mode;
+        self_cfg
+            .claimed_l2_block_number
+            .cmp(&other_cfg.claimed_l2_block_number)
+    }
 }

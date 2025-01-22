@@ -1,4 +1,4 @@
-// Copyright 2024 RISC Zero, Inc.
+// Copyright 2024, 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,6 +31,11 @@ async fn main() -> anyhow::Result<()> {
         payout_recipient_address,
         precondition_validation_data_hash,
         vec![], // todo: read stitched boot info data
+        vec![],
+        true,
+        true
     )
-    .await
+    .await?;
+
+    Ok(())
 }
