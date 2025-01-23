@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy_primitives::{keccak256, B256};
+use alloy_primitives::keccak256;
 use anyhow::{bail, Context};
-use kailua_build::KAILUA_FPVM_ID;
+use kailua_common::journal::ProofJournal;
 use kailua_common::proof::Proof;
 use std::path::Path;
 use tokio::fs::File;
@@ -58,27 +58,23 @@ pub fn derive_set_builder_receipt(proof: &Proof) -> anyhow::Result<Proof> {
     // .expect("Failed to verify Groth16Receipt for {journal_digest}.");
 }
 
-pub fn fpvm_proof_file_name(
-    precondition_output: B256,
-    l1_head: B256,
-    claimed_l2_output_root: B256,
-    claimed_l2_block_number: u64,
-    agreed_l2_output_root: B256,
-) -> String {
+pub fn proof_file_name(proof_journal: &ProofJournal) -> String {
     let version = risc0_zkvm::get_version().unwrap();
     let suffix = if risc0_zkvm::is_dev_mode() {
         "fake"
     } else {
         "zkp"
     };
-    let claimed_l2_block_number = claimed_l2_block_number.to_be_bytes();
+    let claimed_l2_block_number = proof_journal.claimed_l2_block_number.to_be_bytes();
     let data = [
-        bytemuck::cast::<_, [u8; 32]>(KAILUA_FPVM_ID).as_slice(),
-        precondition_output.as_slice(),
-        l1_head.as_slice(),
-        claimed_l2_output_root.as_slice(),
+        proof_journal.payout_recipient.as_slice(),
+        proof_journal.precondition_hash.as_slice(),
+        proof_journal.l1_head.as_slice(),
+        proof_journal.agreed_l2_output_root.as_slice(),
+        proof_journal.claimed_l2_output_root.as_slice(),
         claimed_l2_block_number.as_slice(),
-        agreed_l2_output_root.as_slice(),
+        proof_journal.config_hash.as_slice(),
+        proof_journal.fpvm_image_id.as_slice(),
     ]
     .concat();
     let file_name = keccak256(data);

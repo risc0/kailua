@@ -22,8 +22,8 @@ use serde::{Deserialize, Serialize};
 pub struct ProofJournal {
     /// The recipient address for the payout
     pub payout_recipient: Address,
-    /// The last finalized L2 output
-    pub precondition_output: B256,
+    /// The hash of the precondition for validating this proof
+    pub precondition_hash: B256,
     /// The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
     pub l1_head: B256,
     /// The latest finalized L2 output root.
@@ -48,7 +48,7 @@ impl ProofJournal {
         Self {
             fpvm_image_id,
             payout_recipient,
-            precondition_output,
+            precondition_hash: precondition_output,
             l1_head: boot_info.l1_head,
             agreed_l2_output_root: boot_info.agreed_l2_output_root,
             claimed_l2_output_root: boot_info.claimed_l2_output_root,
@@ -67,7 +67,7 @@ impl ProofJournal {
         Self {
             fpvm_image_id,
             payout_recipient,
-            precondition_output,
+            precondition_hash: precondition_output,
             l1_head: boot_info.l1_head,
             agreed_l2_output_root: boot_info.agreed_l2_output_root,
             claimed_l2_output_root: boot_info.claimed_l2_output_root,
@@ -81,7 +81,7 @@ impl ProofJournal {
     pub fn encode_packed(&self) -> Vec<u8> {
         [
             self.payout_recipient.as_slice(),
-            self.precondition_output.as_slice(),
+            self.precondition_hash.as_slice(),
             self.l1_head.as_slice(),
             self.agreed_l2_output_root.as_slice(),
             self.claimed_l2_output_root.as_slice(),
@@ -95,7 +95,7 @@ impl ProofJournal {
     pub fn decode_packed(encoded: &[u8]) -> Result<Self, anyhow::Error> {
         Ok(ProofJournal {
             payout_recipient: encoded[..20].try_into().context("payout_recipient")?,
-            precondition_output: encoded[20..52].try_into().context("precondition_output")?,
+            precondition_hash: encoded[20..52].try_into().context("precondition_output")?,
             l1_head: encoded[52..84].try_into().context("l1_head")?,
             agreed_l2_output_root: encoded[84..116]
                 .try_into()

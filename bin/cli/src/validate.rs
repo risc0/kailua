@@ -26,9 +26,10 @@ use alloy::primitives::{Address, Bytes, FixedBytes, B256, U256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
 use alloy::signers::local::LocalSigner;
 use anyhow::{anyhow, bail, Context};
+use kailua_build::KAILUA_FPVM_ID;
 use kailua_client::args::parse_address;
 use kailua_client::boundless::BoundlessArgs;
-use kailua_client::proof::{encode_seal, fpvm_proof_file_name, read_proof_file};
+use kailua_client::proof::{encode_seal, proof_file_name, read_proof_file};
 use kailua_client::provider::OpNodeProvider;
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::blobs::BlobFetchRequest;
@@ -378,10 +379,10 @@ pub async fn handle_proposals(
                         &kailua_db.config.output_block_span,
                         contract_blobs_hash,
                     );
-                    if proof_journal.precondition_output != precondition_hash {
+                    if proof_journal.precondition_hash != precondition_hash {
                         warn!(
                             "Proof precondition hash {} does not match expected value {}",
-                            proof_journal.precondition_output, precondition_hash
+                            proof_journal.precondition_hash, precondition_hash
                         );
                     } else {
                         info!("Precondition hash {precondition_hash} confirmed.")
@@ -760,10 +761,10 @@ pub async fn handle_proposals(
                     )
                 };
 
-                if proof_journal.precondition_output != expected_precondition_hash {
+                if proof_journal.precondition_hash != expected_precondition_hash {
                     warn!(
                         "Possible precondition hash mismatch. Found {}, computed {}",
-                        expected_precondition_hash, proof_journal.precondition_output
+                        expected_precondition_hash, proof_journal.precondition_hash
                     );
                 } else {
                     info!("Proof Precondition hash {expected_precondition_hash} confirmed.")
@@ -1101,10 +1102,11 @@ pub async fn handle_proof_requests(
     data_dir: PathBuf,
 ) -> anyhow::Result<()> {
     // Fetch rollup configuration
-    let l2_chain_id = fetch_rollup_config(&args.core.op_node_url, &args.core.op_geth_url, None)
-        .await?
-        .l2_chain_id
-        .to_string();
+    let rollup_config =
+        fetch_rollup_config(&args.core.op_node_url, &args.core.op_geth_url, None).await?;
+    let l2_chain_id = rollup_config.l2_chain_id.to_string();
+    let config_hash = B256::from(config_hash(&rollup_config)?);
+    let fpvm_image_id = B256::from(bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID));
     // Set payout recipient
     let payout_recipient = args.payout_recipient_address.unwrap_or_else(|| {
         LocalSigner::from_str(&args.validator_key)
@@ -1137,13 +1139,17 @@ pub async fn handle_proof_requests(
             .as_ref()
             .map(|d| d.precondition_hash())
             .unwrap_or_default();
-        let proof_file_name = fpvm_proof_file_name(
+        let proof_journal = ProofJournal {
+            payout_recipient,
             precondition_hash,
             l1_head,
+            agreed_l2_output_root,
             claimed_l2_output_root,
             claimed_l2_block_number,
-            agreed_l2_output_root,
-        );
+            config_hash,
+            fpvm_image_id,
+        };
+        let proof_file_name = proof_file_name(&proof_journal);
         let payout_recipient = payout_recipient.to_string();
         let l1_head = l1_head.to_string();
         let agreed_l2_head_hash = agreed_l2_head_hash.to_string();
@@ -1156,30 +1162,46 @@ pub async fn handle_proof_requests(
         ]
         .concat();
         let mut proving_args = vec![
-            String::from("--single"),                   // single chain proving mode
-            String::from("--payout-recipient-address"), // wallet address for payouts
+            // wallet address for payouts
+            String::from("--payout-recipient-address"),
             payout_recipient,
-            String::from("--l1-head"), // l1 head from on-chain proposal
+            // l2 el node
+            String::from("--op-node-address"),
+            args.core.op_node_url.clone(),
+            // single chain proving mode
+            String::from("--single"),
+            // l1 head from on-chain proposal
+            String::from("--l1-head"),
             l1_head,
-            String::from("--agreed-l2-head-hash"), // l2 starting block hash from on-chain proposal
+            // l2 starting block hash from on-chain proposal
+            String::from("--agreed-l2-head-hash"),
             agreed_l2_head_hash,
-            String::from("--agreed-l2-output-root"), // l2 starting output root
+            // l2 starting output root
+            String::from("--agreed-l2-output-root"),
             agreed_l2_output_root,
-            String::from("--claimed-l2-output-root"), // proposed output root
+            // proposed output root
+            String::from("--claimed-l2-output-root"),
             claimed_l2_output_root,
-            String::from("--claimed-l2-block-number"), // proposed block number
+            // proposed block number
+            String::from("--claimed-l2-block-number"),
             claimed_l2_block_number,
-            String::from("--l2-chain-id"), // rollup chain id
+            // rollup chain id
+            String::from("--l2-chain-id"),
             l2_chain_id.clone(),
-            String::from("--l1-node-address"), // l1 el node
+            // l1 el node
+            String::from("--l1-node-address"),
             args.core.eth_rpc_url.clone(),
-            String::from("--l1-beacon-address"), // l1 cl node
+            // l1 cl node
+            String::from("--l1-beacon-address"),
             args.core.beacon_rpc_url.clone(),
-            String::from("--l2-node-address"), // l2 el node
+            // l2 el node
+            String::from("--l2-node-address"),
             args.core.op_geth_url.clone(),
-            String::from("--data-dir"), // path to cache
+            // path to cache
+            String::from("--data-dir"),
             data_dir.to_str().unwrap().to_string(),
-            String::from("--native"), // run the client natively
+            // run the client natively
+            String::from("--native"),
         ];
         // precondition data
         if let Some(precondition_data) = precondition_validation_data {

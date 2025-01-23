@@ -19,4 +19,5 @@ pub mod journal;
 pub mod oracle;
 pub mod precondition;
 pub mod proof;
+pub mod stitching;
 pub mod witness;

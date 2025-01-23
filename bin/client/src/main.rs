@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
         vec![], // todo: read stitched boot info data
         vec![],
         true,
-        true
+        true,
     )
     .await?;
 

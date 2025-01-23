@@ -47,10 +47,7 @@ pub async fn generate_rollup_config(
             } else {
                 info!("Fetching rollup config from nodes.");
                 fetch_rollup_config(
-                    cfg.op_node_address
-                        .clone()
-                        .expect("Missing op-node-address")
-                        .as_str(),
+                    cfg.op_node_address.as_str(),
                     kona_cfg
                         .l2_node_address
                         .clone()

@@ -146,15 +146,9 @@ where
     // Prepare proof file
     let proof_journal = ProofJournal::decode_packed(proof.journal().as_ref())
         .expect("Failed to decode proof output");
-    let mut output_file = File::create(proof::fpvm_proof_file_name(
-        proof_journal.precondition_output,
-        proof_journal.l1_head,
-        proof_journal.claimed_l2_output_root,
-        proof_journal.claimed_l2_block_number,
-        proof_journal.agreed_l2_output_root,
-    ))
-    .await
-    .expect("Failed to create proof output file");
+    let mut output_file = File::create(proof::proof_file_name(&proof_journal))
+        .await
+        .expect("Failed to create proof output file");
     // Write proof data to file
     let proof_bytes = bincode::serialize(&proof).expect("Could not serialize proof.");
     output_file

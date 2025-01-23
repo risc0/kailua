@@ -20,16 +20,20 @@ use alloy::providers::Provider;
 use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
-use kailua_client::proof::{fpvm_proof_file_name, read_proof_file};
+use kailua_build::KAILUA_FPVM_ID;
+use kailua_client::proof::{proof_file_name, read_proof_file};
 use kailua_client::proving::ProvingError;
 use kailua_common::proof::Proof;
+use kailua_common::stitching::stitch_boot_info;
 use kailua_common::witness::StitchedBootInfo;
 use kona_host::cli::HostMode;
+use kona_proof::BootInfo;
 use std::env::set_var;
 use std::path::Path;
 use tempfile::tempdir;
 use tracing::info;
 
+/// Computes a receipt if it is not cached
 pub async fn compute_fpvm_proof(
     mut args: KailuaHostArgs,
     stitched_boot_info: Vec<StitchedBootInfo>,
@@ -37,7 +41,7 @@ pub async fn compute_fpvm_proof(
     prove_snark: bool,
     force_attempt: bool,
 ) -> Result<Proof, ProvingError> {
-    // compute receipt if uncached
+    // preload precondition data into KV store
     let (precondition_hash, precondition_validation_data_hash) =
         match fetch_precondition_data(&args)
             .await
@@ -53,8 +57,31 @@ pub async fn compute_fpvm_proof(
             }
             None => (B256::ZERO, B256::ZERO),
         };
+    // fetch rollup config
+    let tmp_dir = tempdir().map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+    let rollup_config = generate_rollup_config(&mut args, &tmp_dir)
+        .await
+        .context("generate_rollup_config")
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+    // extract single chain kona config
     let HostMode::Single(kona_cfg) = &args.kona.mode;
+    let boot = BootInfo {
+        l1_head: kona_cfg.l1_head,
+        agreed_l2_output_root: kona_cfg.agreed_l2_output_root,
+        claimed_l2_output_root: kona_cfg.claimed_l2_output_root,
+        claimed_l2_block_number: kona_cfg.claimed_l2_block_number,
+        chain_id: rollup_config.l2_chain_id,
+        rollup_config,
+    };
+    let proof_journal = stitch_boot_info(
+        &boot,
+        bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
+        args.payout_recipient_address.unwrap_or_default(),
+        precondition_hash,
+        stitched_boot_info.clone(),
+    );
     // count transactions
+    let stitched_count = stitched_boot_info.len();
     let (.., l2_provider) = kona_cfg
         .create_providers()
         .await
@@ -79,26 +106,15 @@ pub async fn compute_fpvm_proof(
         "Proving {} transactions over {} blocks.",
         transactions, block_count
     );
-    // generate proofs
-    let proof_file_name = fpvm_proof_file_name(
-        precondition_hash,
-        kona_cfg.l1_head,
-        kona_cfg.claimed_l2_output_root,
-        kona_cfg.claimed_l2_block_number,
-        kona_cfg.agreed_l2_output_root,
-    );
+    // generate proof
+    let proof_file_name = proof_file_name(&proof_journal);
     if let Ok(true) = Path::new(&proof_file_name).try_exists() {
         info!("Proving skipped. Proof file {proof_file_name} already exists.");
     } else {
         info!("Computing uncached proof.");
-        let tmp_dir = tempdir().map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-        let rollup_config = generate_rollup_config(&mut args, &tmp_dir)
-            .await
-            .context("generate_rollup_config")
-            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
         // run zeth preflight to fetch the necessary preimages
         if !args.skip_zeth_preflight {
-            zeth_execution_preflight(&args, rollup_config)
+            zeth_execution_preflight(&args, boot.rollup_config)
                 .await
                 .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
         }
@@ -116,8 +132,8 @@ pub async fn compute_fpvm_proof(
     }
 
     info!(
-        "Proved {} transactions over {} blocks.",
-        transactions, block_count
+        "Proved {} transactions over {} blocks. ({} sub-proofs composed)",
+        transactions, block_count, stitched_count
     );
 
     read_proof_file(&proof_file_name)

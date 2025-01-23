@@ -29,7 +29,7 @@ pub struct KailuaHostArgs {
 
     /// Address of OP-NODE endpoint to use
     #[clap(long, env)]
-    pub op_node_address: Option<String>,
+    pub op_node_address: String,
     /// Whether to skip running the zeth preflight engine
     #[clap(long, default_value_t = false, env)]
     pub skip_zeth_preflight: bool,

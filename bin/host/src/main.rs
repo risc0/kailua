@@ -14,6 +14,7 @@
 
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::providers::{Provider, ProviderBuilder};
+use alloy_eips::BlockNumberOrTag;
 use anyhow::{bail, Context};
 use clap::Parser;
 use kailua_client::provider::OpNodeProvider;
@@ -35,9 +36,8 @@ async fn main() -> anyhow::Result<()> {
     // fetch starting block number
     let HostMode::Single(kona_cfg) = &args.kona.mode;
     let (.., l2_provider) = kona_cfg.create_providers().await?;
-    let op_node_provider = OpNodeProvider(
-        ProviderBuilder::new().on_http(args.op_node_address.clone().unwrap().as_str().try_into()?),
-    );
+    let op_node_provider =
+        OpNodeProvider(ProviderBuilder::new().on_http(args.op_node_address.as_str().try_into()?));
     // compute individual proofs
     let mut job_pq = BinaryHeap::new();
     let mut proofs = Vec::new();
@@ -52,6 +52,10 @@ async fn main() -> anyhow::Result<()> {
             .header
             .number;
         let num_blocks = kona_cfg.claimed_l2_block_number - starting_block;
+        info!(
+            "Processing job with {} blocks from block {}",
+            num_blocks, starting_block
+        );
         // Force the proving attempt regardless of witness size if we prove just one block
         let force_attempt = num_blocks == 1;
 
@@ -91,6 +95,13 @@ async fn main() -> anyhow::Result<()> {
                 have_split = true;
                 let mid_point = starting_block + num_blocks / 2;
                 let mid_output = op_node_provider.output_at_block(mid_point).await?;
+                let mid_block = l2_provider
+                    .get_block_by_number(
+                        BlockNumberOrTag::Number(mid_point),
+                        BlockTransactionsKind::Hashes,
+                    )
+                    .await?
+                    .unwrap_or_else(|| panic!("Block {mid_point} not found"));
                 // Lower half workload ends at midpoint
                 let mut lower_job_args = job_args.clone();
                 let HostMode::Single(lower_kona_cfg) = &mut lower_job_args.kona.mode;
@@ -101,23 +112,35 @@ async fn main() -> anyhow::Result<()> {
                 let mut upper_job_args = job_args;
                 let HostMode::Single(upper_kona_cfg) = &mut upper_job_args.kona.mode;
                 upper_kona_cfg.agreed_l2_output_root = mid_output;
+                upper_kona_cfg.agreed_l2_head_hash = mid_block.header.hash;
                 job_pq.push(upper_job_args);
             }
         }
     }
     // stitch contiguous proofs together
     if proofs.len() > 1 {
+        info!("Composing {} proofs together.", proofs.len());
         // construct a proving instruction with no blocks to derive
-        let mut base_args = args.clone();
+        let mut base_args = args;
         {
             // set last block as starting point
             let HostMode::Single(base_kona_args) = &mut base_args.kona.mode;
             base_kona_args.agreed_l2_output_root = base_kona_args.claimed_l2_output_root;
+            base_kona_args.agreed_l2_head_hash = l2_provider
+                .get_block_by_number(
+                    BlockNumberOrTag::Number(base_kona_args.claimed_l2_block_number),
+                    BlockTransactionsKind::Hashes,
+                )
+                .await?
+                .unwrap_or_else(|| {
+                    panic!("Block {} not found", base_kona_args.claimed_l2_block_number)
+                })
+                .header
+                .hash;
         }
-        // construct a reversed list of boot info to backward stitch
+        // construct a list of boot info to backward stitch
         let stitched_boot_info = proofs
             .iter()
-            .rev()
             .map(StitchedBootInfo::from)
             .collect::<Vec<_>>();
         kailua_host::prove::compute_fpvm_proof(base_args, stitched_boot_info, proofs, true, true)

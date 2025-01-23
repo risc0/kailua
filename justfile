@@ -124,7 +124,9 @@ prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data 
   AGREED_L2_HEAD=$(cast block --rpc-url $L2_NODE_ADDRESS $((L2_BLOCK_NUMBER - 1)) -j | jq -r .hash)
 
   echo "Running host program with zk client program..."
-  ./target/{{target}}/kailua-host {{verbosity}} single \
+  ./target/{{target}}/kailua-host {{verbosity}} \
+    --op-node-address $OP_NODE_ADDRESS \
+    single \
     --l1-head $L1_HEAD \
     --agreed-l2-head-hash $AGREED_L2_HEAD \
     --agreed-l2-output-root $AGREED_L2_OUTPUT_ROOT \
