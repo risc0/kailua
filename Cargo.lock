@@ -4590,6 +4590,7 @@ dependencies = [
  "bytemuck",
  "c-kzg",
  "clap",
+ "hex",
  "kailua-build",
  "kailua-common",
  "kailua-contracts",

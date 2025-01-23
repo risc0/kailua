@@ -17,6 +17,7 @@ bincode.workspace = true
 bytemuck.workspace = true
 c-kzg.workspace = true
 clap.workspace = true
+hex.workspace = true
 rkyv.workspace = true
 serde.workspace = true
 serde_json.workspace = true

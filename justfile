@@ -39,7 +39,7 @@ devnet-upgrade target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l2_rpc
       --proposal-output-count 20 \
       --output-block-span 3 \
       --proposal-time-gap 30 \
-      --challenge-timeout 300 \
+      --challenge-timeout 3600 \
       --collateral-amount 1 \
       --deployer-key {{deployer}} \
       --owner-key {{owner}} \

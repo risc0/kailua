@@ -26,21 +26,7 @@ pub async fn run_zkvm_client(
 ) -> Result<Proof, ProvingError> {
     info!("Running zkvm client.");
     let prove_info = tokio::task::spawn_blocking(move || {
-        // Execution environment
-        let mut builder = ExecutorEnv::builder();
-        // Pass in witness data
-        builder.write_frame(&witness_frame);
-        // Set segment po2
-        builder.segment_limit_po2(21);
-        // Pass in proofs
-        for proof in stitched_proofs {
-            if let Proof::ZKVMReceipt(receipt) = proof {
-                builder.add_assumption(*receipt);
-            } else {
-                builder.write(&proof)?;
-            }
-        }
-        let env = builder.build()?;
+        let env = build_zkvm_env(witness_frame, stitched_proofs)?;
         let prover = default_prover();
         let prover_opts = if prove_snark {
             ProverOpts::groth16()
@@ -67,5 +53,28 @@ pub async fn run_zkvm_client(
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     info!("Receipt verified.");
 
+    // todo: return Groth16Receipt variant if snark
     Ok(Proof::ZKVMReceipt(Box::new(prove_info.receipt)))
+}
+
+pub fn build_zkvm_env<'a>(
+    witness_frame: Vec<u8>,
+    stitched_proofs: Vec<Proof>,
+) -> anyhow::Result<ExecutorEnv<'a>> {
+    // Execution environment
+    let mut builder = ExecutorEnv::builder();
+    // Pass in witness data
+    builder.write_frame(&witness_frame);
+    // Set segment po2
+    builder.segment_limit_po2(21);
+    // Pass in proofs
+    for proof in stitched_proofs {
+        if let Proof::ZKVMReceipt(receipt) = proof {
+            builder.add_assumption(*receipt);
+        } else {
+            // todo: convert boundless seals to groth16 receipts
+            builder.write(&proof)?;
+        }
+    }
+    builder.build()
 }

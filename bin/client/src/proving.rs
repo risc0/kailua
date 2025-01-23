@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::boundless::BoundlessArgs;
-use crate::{boundless, proof, witgen, zkvm};
+use crate::{bonsai, boundless, proof, witgen, zkvm};
 use alloy_primitives::{Address, B256};
 use anyhow::anyhow;
 use kailua_common::blobs::PreloadedBlobProvider;
@@ -140,7 +140,13 @@ where
             )
             .await?
         }
-        _ => zkvm::run_zkvm_client(witness_frame, stitched_proofs, prove_snark).await?,
+        None => {
+            if bonsai::should_use_bonsai() {
+                bonsai::run_bonsai_client(witness_frame, stitched_proofs, prove_snark).await?
+            } else {
+                zkvm::run_zkvm_client(witness_frame, stitched_proofs, prove_snark).await?
+            }
+        }
     };
 
     // Prepare proof file

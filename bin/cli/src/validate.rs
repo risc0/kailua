@@ -206,7 +206,7 @@ pub async fn handle_proposals(
                 proposal_parent.tournament_contract_instance(&validator_provider);
             // Check that a validity proof has not already been posted
             if proposal_parent_contract
-                .proofStatus(U256::ZERO, U256::ZERO)
+                .provenAt(U256::ZERO, U256::ZERO)
                 .stall()
                 .await
                 ._0
@@ -436,11 +436,11 @@ pub async fn handle_proposals(
                         Ok(receipt) => {
                             info!("Validity proof submitted: {receipt:?}");
                             let proof_status = parent_contract
-                                .proofStatus(U256::ZERO, U256::ZERO)
+                                .provenAt(U256::ZERO, U256::ZERO)
                                 .stall()
                                 .await
                                 ._0;
-                            info!("Validity proven: {proof_status}");
+                            info!("Validity proof timestamp: {proof_status}");
                         }
                         Err(e) => {
                             error!("Failed to confirm validity proof txn: {e:?}");
