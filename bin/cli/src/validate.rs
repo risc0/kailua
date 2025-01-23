@@ -1168,40 +1168,6 @@ pub async fn handle_proof_requests(
             // l2 el node
             String::from("--op-node-address"),
             args.core.op_node_url.clone(),
-            // single chain proving mode
-            String::from("--single"),
-            // l1 head from on-chain proposal
-            String::from("--l1-head"),
-            l1_head,
-            // l2 starting block hash from on-chain proposal
-            String::from("--agreed-l2-head-hash"),
-            agreed_l2_head_hash,
-            // l2 starting output root
-            String::from("--agreed-l2-output-root"),
-            agreed_l2_output_root,
-            // proposed output root
-            String::from("--claimed-l2-output-root"),
-            claimed_l2_output_root,
-            // proposed block number
-            String::from("--claimed-l2-block-number"),
-            claimed_l2_block_number,
-            // rollup chain id
-            String::from("--l2-chain-id"),
-            l2_chain_id.clone(),
-            // l1 el node
-            String::from("--l1-node-address"),
-            args.core.eth_rpc_url.clone(),
-            // l1 cl node
-            String::from("--l1-beacon-address"),
-            args.core.beacon_rpc_url.clone(),
-            // l2 el node
-            String::from("--l2-node-address"),
-            args.core.op_geth_url.clone(),
-            // path to cache
-            String::from("--data-dir"),
-            data_dir.to_str().unwrap().to_string(),
-            // run the client natively
-            String::from("--native"),
         ];
         // precondition data
         if let Some(precondition_data) = precondition_validation_data {
@@ -1240,6 +1206,43 @@ pub async fn handle_proof_requests(
         if let Some(market) = &args.boundless.market {
             proving_args.extend(market.to_arg_vec(&args.boundless.storage));
         }
+        // kona args
+        proving_args.extend(vec![
+            // single chain proving mode
+            String::from("single"),
+            // l1 head from on-chain proposal
+            String::from("--l1-head"),
+            l1_head,
+            // l2 starting block hash from on-chain proposal
+            String::from("--agreed-l2-head-hash"),
+            agreed_l2_head_hash,
+            // l2 starting output root
+            String::from("--agreed-l2-output-root"),
+            agreed_l2_output_root,
+            // proposed output root
+            String::from("--claimed-l2-output-root"),
+            claimed_l2_output_root,
+            // proposed block number
+            String::from("--claimed-l2-block-number"),
+            claimed_l2_block_number,
+            // rollup chain id
+            String::from("--l2-chain-id"),
+            l2_chain_id.clone(),
+            // l1 el node
+            String::from("--l1-node-address"),
+            args.core.eth_rpc_url.clone(),
+            // l1 cl node
+            String::from("--l1-beacon-address"),
+            args.core.beacon_rpc_url.clone(),
+            // l2 el node
+            String::from("--l2-node-address"),
+            args.core.op_geth_url.clone(),
+            // path to cache
+            String::from("--data-dir"),
+            data_dir.to_str().unwrap().to_string(),
+            // run the client natively
+            String::from("--native"),
+        ]);
         // verbosity level
         if args.core.v > 0 {
             proving_args.push(verbosity);
