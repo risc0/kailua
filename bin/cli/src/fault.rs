@@ -137,7 +137,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
 
     // Prepare intermediate outputs
     let mut io_field_elements = vec![];
-    let is_output_fault = faulty_block_number > proposal_block_count;
+    let is_output_fault = faulty_block_number <= proposal_block_count;
     let normalized_fault_block_number =
         faulty_block_number - (!is_output_fault as u64) * output_block_span;
     for i in 1..FIELD_ELEMENTS_PER_BLOB {

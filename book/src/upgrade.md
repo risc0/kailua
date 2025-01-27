@@ -22,6 +22,28 @@ If the command does not yet support your configuration, you'll need to follow th
 You might find it useful to rehearse migration using a local devnet first.
 ```
 
+### Estimated Gas Costs
+
+The below table contains rounded-up gas cost estimates of various contract operations
+
+| Contract                | Operation        |    Gas | Notes                     |
+|:------------------------|:-----------------|-------:|---------------------------|
+| RiscZeroVerifierRouter  | deploy           |   600K |                           |
+| RiscZeroVerifierRouter  | addVerifier      |    50K |                           |
+| RiscZeroGroth16Verifier | deploy           | 1,200K |                           |
+| RiscZeroSetVerifier     | deploy           |   950K |                           |
+| RiscZeroMockVerifier    | deploy           |   525K |                           |
+| KailuaTreasury          | deploy           | 4,800K |                           |
+| KailuaTreasury          | propose          |   350K |                           |
+| KailuaGame              | deploy           | 4,900K |                           |
+| KailuaGame              | proveValidity    |   400K | Groth16 proof             |
+| KailuaGame              | resolve          |   115K | Undisputed validity       |
+| KailuaGame              | proveOutputFault |   275K | 4 kzg proofs              |
+| KailuaGame              | proveOutputFault |   625K | Groth16 + 4 kzg proofs    |
+| KailuaTournament        | proveOutputFault |   500K | Groth16 + 2 kzg proofs    |
+| KailuaGame              | resolve          |   210K | 1 output fault            |
+
+
 ## Fast-track Migration
 
 ```admonish info

@@ -445,6 +445,7 @@ pub async fn handle_proposals(
                                 .await
                                 ._0;
                             info!("Validity proof timestamp: {proof_status}");
+                            info!("KailuaTournament::proveValidity: {} gas", receipt.gas_used);
                         }
                         Err(e) => {
                             error!("Failed to confirm validity proof txn: {e:?}");
@@ -839,6 +840,18 @@ pub async fn handle_proposals(
                             "Match between {contender_index} and {} proven: {proof_status}",
                             opponent.index
                         );
+
+                        if is_output_fault_proof {
+                            info!(
+                                "KailuaTournament::proveOutputFault: {} gas",
+                                receipt.gas_used
+                            );
+                        } else {
+                            info!(
+                                "KailuaTournament::proveTrailFault: {} gas",
+                                receipt.gas_used
+                            );
+                        }
                     }
                     Err(e) => {
                         error!("Failed to confirm fault proof txn: {e:?}");
@@ -926,7 +939,7 @@ async fn request_fault_proof(
     // Prepare precondition validation data
     let precondition_validation_data = if opponent.has_precondition_for(divergence_point) {
         // Normalize the challenge_position as the blob field element index
-        let normalized_position = divergence_point - !is_output_fault as u64;
+        let normalized_position = divergence_point - (!is_output_fault as u64);
 
         let (u_blob_hash, u_blob) = contender.io_blob_for(normalized_position);
         let u_blob_block_parent = l1_node_provider

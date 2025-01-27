@@ -14,7 +14,7 @@
 
 use crate::stall::Stall;
 use crate::KAILUA_GAME_TYPE;
-use alloy::network::{EthereumWallet, Network, TxSigner};
+use alloy::network::{EthereumWallet, Network, ReceiptResponse, TxSigner};
 use alloy::primitives::{Address, Bytes, Uint, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::signers::local::LocalSigner;
@@ -149,7 +149,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
 
     // Deploy KailuaTreasury contract
     info!("Deploying KailuaTreasury contract to L1 rpc.");
-    let kailua_treasury_implementation = KailuaTreasury::deploy(
+    let receipt = KailuaTreasury::deploy_builder(
         &deployer_provider,
         verifier_contract_address,
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
@@ -159,8 +159,19 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         KAILUA_GAME_TYPE,
         dgf_address,
     )
+    .send()
     .await
-    .context("KailuaTreasury implementation contract deployment error")?;
+    .context("deploy KailuaTreasury")?
+    .get_receipt()
+    .await
+    .context("get_receipt KailuaTreasury")?;
+    info!("KailuaTreasury::deploy: {} gas", receipt.gas_used);
+    let kailua_treasury_implementation = KailuaTreasury::new(
+        receipt
+            .contract_address
+            .expect("KailuaTreasury not deployed"),
+        &deployer_provider,
+    );
     info!("{:?}", &kailua_treasury_implementation);
 
     // Update dispute factory implementation to KailuaTreasury
@@ -256,7 +267,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
 
     // Deploy KailuaGame contract
     info!("Deploying KailuaGame contract to L1 rpc.");
-    let kailua_game_contract = KailuaGame::deploy(
+    let receipt = KailuaGame::deploy_builder(
         &deployer_provider,
         *kailua_treasury_implementation.address(),
         verifier_contract_address,
@@ -271,8 +282,17 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         U256::from(args.proposal_time_gap),
         args.challenge_timeout,
     )
+    .send()
     .await
-    .context("KailuaGame contract deployment error")?;
+    .context("deploy KailuaGame")?
+    .get_receipt()
+    .await
+    .context("get_receipt KailuaGame")?;
+    info!("KailuaGame::deploy: {} gas", receipt.gas_used);
+    let kailua_game_contract = KailuaGame::new(
+        receipt.contract_address.expect("KailuaGame not deployed"),
+        &deployer_provider,
+    );
     info!("{:?}", &kailua_game_contract);
 
     // Update implementation to KailuaGame
@@ -303,13 +323,17 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         }
 
         info!("Setting respectedGameType in OptimismPortal2.");
-        optimism_portal
+        let receipt = optimism_portal
             .setRespectedGameType(KAILUA_GAME_TYPE)
             .send()
             .await
             .context("setImplementation KailuaGame")?
             .get_receipt()
             .await?;
+        info!(
+            "OptimismPortal2::setRespectedGameType: {} gas",
+            receipt.gas_used
+        );
     }
 
     info!("Kailua upgrade complete.");
@@ -328,22 +352,43 @@ pub async fn deploy_verifier<
 ) -> anyhow::Result<Address> {
     // Deploy verifier router contract
     info!("Deploying RiscZeroVerifierRouter contract to L1 under ownership of {owner_address}.");
-    let verifier_contract = RiscZeroVerifierRouter::deploy(&deployer_provider, owner_address)
+    let receipt = RiscZeroVerifierRouter::deploy_builder(&deployer_provider, owner_address)
+        .send()
         .await
-        .context("RiscZeroVerifierRouter contract deployment error")?;
-    let verifier_contract_address = *verifier_contract.address();
+        .context("deploy RiscZeroVerifierRouter")?
+        .get_receipt()
+        .await
+        .context("get_receipt RiscZeroVerifierRouter")?;
+    info!("RiscZeroVerifierRouter::deploy: {} gas", receipt.gas_used());
+    let verifier_contract_address = receipt
+        .contract_address()
+        .expect("RiscZeroVerifierRouter not deployed");
     let verifier_contract = RiscZeroVerifierRouter::new(verifier_contract_address, &owner_provider);
 
     // Deploy RiscZeroGroth16Verifier contract
     info!("Deploying RiscZeroGroth16Verifier contract to L1.");
-    let groth16_verifier_contract =
-        RiscZeroGroth16Verifier::deploy(&deployer_provider, CONTROL_ROOT, BN254_CONTROL_ID)
+    let receipt =
+        RiscZeroGroth16Verifier::deploy_builder(&deployer_provider, CONTROL_ROOT, BN254_CONTROL_ID)
+            .send()
             .await
-            .context("RiscZeroGroth16Verifier contract deployment error")?;
+            .context("deploy RiscZeroGroth16Verifier")?
+            .get_receipt()
+            .await
+            .context("get_receipt RiscZeroGroth16Verifier")?;
+    info!(
+        "RiscZeroGroth16Verifier::deploy: {} gas",
+        receipt.gas_used()
+    );
+    let groth16_verifier_contract = RiscZeroGroth16Verifier::new(
+        receipt
+            .contract_address()
+            .expect("RiscZeroGroth16Verifier not deployed"),
+        &deployer_provider,
+    );
     info!("{:?}", &groth16_verifier_contract);
     let selector = groth16_verifier_contract.SELECTOR().stall().await._0;
     info!("Adding RiscZeroGroth16Verifier contract to RiscZeroVerifierRouter.");
-    verifier_contract
+    let receipt = verifier_contract
         .addVerifier(selector, *groth16_verifier_contract.address())
         .send()
         .await
@@ -351,21 +396,36 @@ pub async fn deploy_verifier<
         .get_receipt()
         .await
         .context("addVerifier RiscZeroGroth16Verifier (get_receipt)")?;
+    info!(
+        "RiscZeroGroth16Verifier::addVerifier: {} gas",
+        receipt.gas_used()
+    );
 
     // Deploy RiscZeroSetVerifier contract
     info!("Deploying RiscZeroSetVerifier contract to L1.");
-    let set_verifier_contract = RiscZeroSetVerifier::deploy(
+    let receipt = RiscZeroSetVerifier::deploy_builder(
         &deployer_provider,
         verifier_contract_address,
         SET_BUILDER_ID,
         String::default(),
     )
+    .send()
     .await
-    .context("RiscZeroSetVerifier contract deployment error")?;
+    .context("deploy RiscZeroSetVerifier")?
+    .get_receipt()
+    .await
+    .context("get_receipt RiscZeroSetVerifier")?;
+    info!("RiscZeroSetVerifier::deploy: {} gas", receipt.gas_used());
+    let set_verifier_contract = RiscZeroSetVerifier::new(
+        receipt
+            .contract_address()
+            .expect("RiscZeroSetVerifier not deployed"),
+        &deployer_provider,
+    );
     info!("{:?}", &set_verifier_contract);
     let selector = set_verifier_contract.SELECTOR().stall().await._0;
     info!("Adding RiscZeroSetVerifier contract to RiscZeroVerifierRouter.");
-    verifier_contract
+    let receipt = verifier_contract
         .addVerifier(selector, *set_verifier_contract.address())
         .send()
         .await
@@ -373,19 +433,34 @@ pub async fn deploy_verifier<
         .get_receipt()
         .await
         .context("addVerifier RiscZeroSetVerifier (get_receipt)")?;
+    info!(
+        "RiscZeroSetVerifier::addVerifier: {} gas",
+        receipt.gas_used()
+    );
 
     // Deploy mock verifier
     #[cfg(feature = "devnet")]
     if risc0_zkvm::is_dev_mode() {
         // Deploy MockVerifier contract
         tracing::warn!("Deploying RiscZeroMockVerifier contract to L1. This will accept fake proofs which are not cryptographically secure!");
-        let mock_verifier_contract =
-            RiscZeroMockVerifier::deploy(&deployer_provider, [0u8; 4].into())
-                .await
-                .context("RiscZeroMockVerifier contract deployment error")?;
+        let receipt = RiscZeroMockVerifier::deploy_builder(&deployer_provider, [0u8; 4].into())
+            .send()
+            .await
+            .context("deploy RiscZeroMockVerifier")?
+            .get_receipt()
+            .await
+            .context("get_receipt RiscZeroMockVerifier")?;
+        info!("RiscZeroMockVerifier::deploy: {} gas", receipt.gas_used());
+
+        let mock_verifier_contract = RiscZeroMockVerifier::new(
+            receipt
+                .contract_address()
+                .expect("RiscZeroMockVerifier not deployed"),
+            &deployer_provider,
+        );
         tracing::warn!("{:?}", &mock_verifier_contract);
         tracing::warn!("Adding RiscZeroMockVerifier contract to RiscZeroVerifierRouter.");
-        verifier_contract
+        let receipt = verifier_contract
             .addVerifier([0u8; 4].into(), *mock_verifier_contract.address())
             .send()
             .await
@@ -393,6 +468,10 @@ pub async fn deploy_verifier<
             .get_receipt()
             .await
             .context("addVerifier RiscZeroMockVerifier (get_receipt)")?;
+        info!(
+            "RiscZeroMockVerifier::addVerifier: {} gas",
+            receipt.gas_used()
+        );
     }
 
     Ok(verifier_contract_address)

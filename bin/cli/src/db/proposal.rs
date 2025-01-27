@@ -5,7 +5,7 @@ use alloy::consensus::{Blob, BlobTransactionSidecar, BlockHeader};
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::primitives::BlockTransactionsKind;
-use alloy::network::{BlockResponse, Network};
+use alloy::network::{BlockResponse, Network, ReceiptResponse};
 use alloy::primitives::{Address, Bytes, B256, U256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
@@ -401,7 +401,7 @@ impl Proposal {
             }
 
             info!("Eliminating {ELIMINATIONS_LIMIT} opponents before resolution.");
-            parent_tournament_instance
+            let receipt = parent_tournament_instance
                 .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
                 .send()
                 .await
@@ -409,16 +409,23 @@ impl Proposal {
                 .get_receipt()
                 .await
                 .context("KailuaTournament::pruneChildren (get_receipt)")?;
+            info!(
+                "KailuaTournament::pruneChildren: {} gas",
+                receipt.gas_used()
+            );
         }
 
-        contract_instance
+        let receipt = contract_instance
             .resolve()
             .send()
             .await
             .context("KailuaTournament::resolve (send)")?
             .get_receipt()
             .await
-            .context("KailuaTournament::resolve (get_receipt)")
+            .context("KailuaTournament::resolve (get_receipt)")?;
+        info!("KailuaTournament::resolve: {} gas", receipt.gas_used());
+
+        Ok(receipt)
     }
 
     pub fn has_parent(&self) -> bool {

@@ -153,13 +153,24 @@ contract KailuaGame is KailuaTournament {
             proposalBlobHashes.push(Hash.wrap(hash));
         }
 
+        // If a validity proof was submitted, do not allow conflicting proposals to be created
+        KailuaTournament parentGame_ =  parentGame();
+        if (parentGame_.provenAt(0, 0).raw() > 0) {
+            if (
+                rootClaim().raw() != parentGame_.validChildRootClaim()
+                || blobsHash() != parentGame_.validChildBlobsHash()
+            ) {
+                revert ProvenFaulty();
+            }
+        }
+
         // Allow only the treasury to create new games
         if (gameCreator() != address(KAILUA_TREASURY)) {
             revert Blacklisted(gameCreator(), address(KAILUA_TREASURY));
         }
 
         // Register this new game in the parent game's contract
-        parentGame().appendChild();
+        parentGame_.appendChild();
 
         // Do not permit proposals if l2 block is still inside the gap
         if (block.timestamp <= GENESIS_TIME_STAMP + thisL2BlockNumber * L2_BLOCK_TIME + PROPOSAL_TIME_GAP) {

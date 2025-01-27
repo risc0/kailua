@@ -198,7 +198,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
 
                     // Prune next set of children
                     info!("Eliminating {ELIMINATIONS_LIMIT} opponents before resolution.");
-                    parent_contract
+                    let receipt = parent_contract
                         .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
                         .send()
                         .await
@@ -206,6 +206,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                         .get_receipt()
                         .await
                         .context("KailuaTournament::pruneChildren (get_receipt)")?;
+                    info!("KailuaTournament::pruneChildren: {} gas", receipt.gas_used);
                 };
                 // Some disputes are still unresolved
                 if !can_resolve {
@@ -392,7 +393,8 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         {
             Ok(txn) => match txn.get_receipt().await.context("propose (get_receipt)") {
                 Ok(receipt) => {
-                    info!("Proposal submitted: {receipt:?}")
+                    info!("Proposal submitted: {receipt:?}");
+                    info!("KailuaTreasury::propose: {} gas", receipt.gas_used);
                 }
                 Err(e) => {
                     error!("Failed to confirm proposal txn: {e:?}");
