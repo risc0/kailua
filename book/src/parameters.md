@@ -77,6 +77,11 @@ This would cover the worst-case proving cost in case of dispute, and, discountin
 The current implementation of Kailua does not yet have adaptive dispute periods based on congestion.
 Consequently, you should keep your existing challenge timeout period.
 
+```admonish note
+If you wish to practically operate Kailua using only validity proofs, set this value to `31536000000000000` seconds
+(i.e. 1 billion calendar years).
+```
+
 ## Verifier Contract
 RISC Zero maintains a set of pre-deployed verifier contracts for its ZK proving system.
 These contracts are regularly upgraded to support new releases of the prover, and also have a permissionless fail-safe

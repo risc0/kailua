@@ -14,7 +14,7 @@ proposal.
 
 ```admonish note
 While Kailua can be configured to operate using a single published commitment per proposal, this may make the proving
-work required to resolve disputes impractical for chains with very low block times, or a significantly large number
+work required to resolve disputes expensive for chains with very low block times, or a significantly large number
 of blocks per proposal in general.
 ```
 

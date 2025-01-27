@@ -46,7 +46,23 @@ from delaying the finality of honest sequencing proposals.
 ```
 
 ```admonish success
-Running `kailua-cli validate` should monitor your rollup for disputes and generate the required proofs!
+Running `kailua-cli validate` should monitor your rollup for any disputes and generate the required proofs!
+```
+
+## Validity Proof Generation
+Instead of only generating fault proofs, the validator can be instructed to generate a validity proof for every correct
+canonical proposal it encounters to fast-forward finality until a specified block height.
+This is configured using the below parameter:
+*  `fast-forward-target`: The L2 block height until which validity proofs should be computed.
+
+```admonish note
+To indefinitely power a validity-proof only rollup, this value can be specified to the maximum 64-bit value of
+`18446744073709551615`.
+```
+
+```admonish success
+Running `kailua-cli validate` with the above parameter should generate a validity proof as soon as a correct proposal
+is made by an honest proposer!
 ```
 
 ## Delegated Proof Generation
@@ -81,26 +97,26 @@ These parameters can be passed in as CLI arguments or set as environment variabl
 
 #### Proof Requests
 The following first set of parameters determine where/how requests are made:
-* `boundless_rpc_url`: The rpc endpoint of the L1 chain where the Boundless network is deployed.
-* `boundless_wallet_key`: The wallet private key to use to send proof request transactions.
-* `boundless_offchain`: (Optional) Flag instructing whether to submit proofs off-chain.
-* `boundless_order_stream_url`: (Optional) The URL to use for off-chain order submission.
-* `boundless_set_verifier_address`: The address of the RISC Zero verifier supporting aggregated proofs for order validation.
-* `boundless_market_address`: The address of the Boundless market contract.
-* `boundless_lookback`: (Defaults to `5`) The number of previous proof requests to inspect for duplicates before making a new proof request.
+* `boundless-rpc-url`: The rpc endpoint of the L1 chain where the Boundless network is deployed.
+* `boundless-wallet-key`: The wallet private key to use to send proof request transactions.
+* `boundless-offchain`: (Optional) Flag instructing whether to submit proofs off-chain.
+* `boundless-order-stream-url`: (Optional) The URL to use for off-chain order submission.
+* `boundless-set-verifier-address`: The address of the RISC Zero verifier supporting aggregated proofs for order validation.
+* `boundless-market-address`: The address of the Boundless market contract.
+* `boundless-lookback`: (Defaults to `5`) The number of previous proof requests to inspect for duplicates before making a new proof request.
 
 #### Storage Provider
 The below second set of parameters determine where the proven executable and its input are stored:
-* `storage_provider`: One of `s3`, `pinata`, or `file`.
-* `s3_access_key`: The `s3` access key.
-* `s3_secret_key`: The `s3` secret key.
-* `s3_bucket`: The `s3` bucket.
-* `s3_url`: The `s3` url.
-* `aws_region`: The `s3` region.
-* `pinata_jwt`: The private `pinata` jwt.
-* `pinata_api_url`: The `pinata` api URL.
-* `ipfs_gateway_url`: The `pinata` gateway URL.
-* `file_path`: The file storage provider path.
+* `storage-provider`: One of `s3`, `pinata`, or `file`.
+* `s3-access-key`: The `s3` access key.
+* `s3-secret-key`: The `s3` secret key.
+* `s3-bucket`: The `s3` bucket.
+* `s3-url`: The `s3` url.
+* `aws-region`: The `s3` region.
+* `pinata-jwt`: The private `pinata` jwt.
+* `pinata-api-url`: The `pinata` api URL.
+* `ipfs-gateway-url`: The `pinata` gateway URL.
+* `file-path`: The file storage provider path.
 
 ```admonish success
 Running `kailua-cli validate` with the above extra arguments should now delegate all validator proving to the [Boundless proving network](https://docs.beboundless.xyz/)!

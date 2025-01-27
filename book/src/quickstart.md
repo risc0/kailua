@@ -33,7 +33,8 @@ You can deploy a local optimism devnet equipped with Kailua through the followin
 6. `just devnet-validate`
     * Launches the Kailua validator.
     * This monitors `KailuaGame` instances for disputes and creates proofs to resolve them.
-    * Note: Use `RISC0_DEV_MODE=1` to use fake proofs.
+    * (VALIDITY PROVING) Use `just devnet-validate [block-height]` to generate validity proofs to fast-forward finality until the specified L2 block height.
+    * (DEVELOPMENT MODE): Use `RISC0_DEV_MODE=1` to use fake proofs.
 7. `just devnet-fault`
     * Deploys a single `KailuaGame` instance with a faulty sequencing proposal.
     * Tests the validator's fault proving functionality.
