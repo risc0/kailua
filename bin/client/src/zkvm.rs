@@ -16,8 +16,9 @@ use crate::proving::ProvingError;
 use anyhow::{anyhow, Context};
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use kailua_common::proof::Proof;
-use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts};
+use risc0_zkvm::{default_prover, is_dev_mode, ExecutorEnv, ProverOpts};
 use tracing::info;
+use tracing::log::warn;
 
 pub async fn run_zkvm_client(
     witness_frame: Vec<u8>,
@@ -67,8 +68,19 @@ pub fn build_zkvm_env<'a>(
     builder.write_frame(&witness_frame);
     // Set segment po2
     builder.segment_limit_po2(21);
+    // Dev-mode for recursive proofs
+    if is_dev_mode() {
+        builder.env_var("RISC0_DEV_MODE", "1");
+    }
     // Pass in proofs
     for proof in stitched_proofs {
+        // Force in-guest verification (should be used for testing only)
+        if std::env::var("KAILUA_FORCE_RECURSION").is_ok() {
+            warn!("(KAILUA_FORCE_RECURSION) Forcibly loading receipt as guest input.");
+            builder.write(&proof)?;
+            continue;
+        }
+
         if let Proof::ZKVMReceipt(receipt) = proof {
             builder.add_assumption(*receipt);
         } else {

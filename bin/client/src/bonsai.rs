@@ -114,7 +114,7 @@ pub async fn run_bonsai_client(
                 .context("Missing stats object on Bonsai status res")
                 .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
             info!(
-                "Bonsai usage: cycles: {} total_cycles: {}",
+                "Bonsai usage: user_cycles: {} total_cycles: {}",
                 stats.cycles, stats.total_cycles
             );
 

@@ -13,23 +13,30 @@
 // limitations under the License.
 
 fn main() {
-    // Build a reproducible ELF file using docker under the release profile
-    #[cfg(not(any(feature = "debug-guest-build", debug_assertions)))]
     let build_opts = {
-        let cwd = std::env::current_dir().unwrap();
-        let root_dir = cwd.parent().unwrap().parent().map(|d| d.to_path_buf());
+        #[cfg(not(any(feature = "debug-guest-build", debug_assertions)))]
+        let root_dir = {
+            let cwd = std::env::current_dir().unwrap();
+            cwd.parent().unwrap().parent().map(|d| d.to_path_buf())
+        };
         std::collections::HashMap::from([(
             "kailua-fpvm",
             risc0_build::GuestOptions {
+                // Build a reproducible ELF file using docker under the release profile
+                #[cfg(not(any(feature = "debug-guest-build", debug_assertions)))]
                 use_docker: Some(risc0_build::DockerOptions { root_dir }),
+                // Disable dev-mode receipts from being validated inside the guest
+                features: vec![
+                    #[cfg(any(
+                        feature = "disable-dev-mode",
+                        not(any(feature = "debug-guest-build", debug_assertions))
+                    ))]
+                    String::from("disable-dev-mode"),
+                ],
                 ..Default::default()
             },
         )])
     };
-
-    // Build ELFs natively under debug
-    #[cfg(any(feature = "debug-guest-build", debug_assertions))]
-    let build_opts = Default::default();
 
     risc0_build::embed_methods_with_options(build_opts);
     println!("cargo:rerun-if-changed=src");

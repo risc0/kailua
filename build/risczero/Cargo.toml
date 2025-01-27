@@ -18,3 +18,4 @@ methods = ["fpvm"]
 
 [features]
 debug-guest-build = []
+disable-dev-mode = []
