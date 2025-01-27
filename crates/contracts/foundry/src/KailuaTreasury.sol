@@ -149,22 +149,101 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         // Record elimination round
         eliminationRound[eliminated] = child.gameIndex();
 
-        // Transfer bond payment to the game's prover
-        pay(paidBonds[eliminated], prover);
+        // Allocate bond to prover
+        eliminations[prover].push(eliminated);
+    }
+
+    /// @inheritdoc IKailuaTreasury
+    bool public isProposing;
+
+    /// @inheritdoc IKailuaTreasury
+    function releaseProposer() external {
+        address proposer = proposerOf[msg.sender];
+
+        // INVARIANT: Only a known proposal contract may call this function
+        if (proposer == address(0x0)) {
+            revert NotProposed();
+        }
+
+        pendingProposals[proposer]--;
     }
 
     // ------------------------------
     // Treasury
     // ------------------------------
 
+    /// @notice The locked collateral required for proposal submission
     uint256 public participationBond;
 
+    /// @notice The locked collateral still paid by proposers for participation
     mapping(address => uint256) public paidBonds;
+
+    /// @notice The list of players each prover has eliminated
+    mapping(address => address[]) public eliminations;
+
+    /// @notice The number of eliminations paid out to each prover
+    mapping(address => uint256) public eliminationsPaid;
+
+    /// @notice The number of unfinalized proposals made by a proposer
+    mapping(address => uint256) public pendingProposals;
+
+    /// @notice Boolean flag to prevent re-entrant calls
+    bool internal isLocked;
+
+    modifier nonReentrant() {
+        require(!isLocked);
+        isLocked = true;
+        _;
+        isLocked = false;
+    }
 
     modifier onlyFactoryOwner() {
         OwnableUpgradeable factoryContract = OwnableUpgradeable(address(DISPUTE_GAME_FACTORY));
         require(msg.sender == factoryContract.owner(), "Ownable: caller is not the owner");
         _;
+    }
+
+    /// @notice Pays out the prover for the eliminations it has accrued
+    function claimEliminationBonds(uint256 claims) public nonReentrant {
+        // INVARIANT: Must claim a non-zero number of payouts
+        if (claims == 0) {
+            revert NoCreditToClaim();
+        }
+
+        uint256 claimed = 0;
+        for (
+            uint256 i = eliminationsPaid[msg.sender];
+            claimed < claims && i < eliminations[msg.sender].length;
+            (i++, claimed++)
+        ) {
+            address eliminated = eliminations[msg.sender][i];
+            uint256 payout = paidBonds[eliminated];
+            if (payout > 0) {
+                paidBonds[eliminated] = 0;
+                pay(payout, msg.sender);
+            }
+        }
+        // Increase number of bonds claimed
+        if (claimed > 0) {
+            eliminationsPaid[msg.sender] += claimed;
+        }
+    }
+
+    function claimProposerBond() public nonReentrant {
+        // INVARIANT: Can only claim bond back if no pending proposals are left
+        if (pendingProposals[msg.sender] > 0) {
+            revert GameNotResolved();
+        }
+
+        uint256 payout = paidBonds[msg.sender];
+        // INVARIANT: Can only claim bond if it is paid
+        if (payout == 0) {
+            revert NoCreditToClaim();
+        }
+
+        // Pay out and clear bond
+        paidBonds[msg.sender] = 0;
+        pay(payout, msg.sender);
     }
 
     /// @notice Transfers ETH from the contract's balance to the recipient
@@ -178,8 +257,6 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         participationBond = amount;
         emit BondUpdated(amount);
     }
-
-    bool public isProposing;
 
     /// @notice Checks the proposer's bonded amount and creates a new proposal through the factory
     function propose(Claim _rootClaim, bytes calldata _extraData)
@@ -205,5 +282,6 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         isProposing = false;
         // Record proposer
         proposerOf[address(gameContract)] = msg.sender;
+        pendingProposals[msg.sender]++;
     }
 }

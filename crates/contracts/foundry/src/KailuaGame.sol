@@ -213,6 +213,9 @@ contract KailuaGame is KailuaTournament {
 
         // Update the status and emit the resolved event, note that we're performing a storage update here.
         emit Resolved(status = status_ = GameStatus.DEFENDER_WINS);
+
+        // Release the proposer from being bonded by just this proposal
+        KAILUA_TREASURY.releaseProposer();
     }
 
     // ------------------------------

@@ -122,11 +122,14 @@ interface IKailuaTreasury {
     /// @notice Returns the proposer of a game
     function proposerOf(address game) external returns (address);
 
-    /// @notice Eliminates a child's proposer and transfers their bond to the prover
+    /// @notice Eliminates a child's proposer and allocates their bond to the prover
     function eliminate(address child, address prover) external;
 
     /// @notice Returns true iff a proposal is currently being submitted
     function isProposing() external returns (bool);
+
+    /// @notice Releases the proposer from being bonded by the calling proposal
+    function releaseProposer() external;
 }
 
 library KailuaLib {
