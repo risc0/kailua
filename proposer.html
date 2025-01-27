@@ -184,12 +184,14 @@ It also attempts to resolve any finalizeable proposals.</p>
 <p>All the parameters above can be provided as environment variables.</p>
 </div>
 </div>
-### Endpoints
-The first four arguments specify the endpoints that the proposer should use for sequencing:
-* `eth-rpc-url`: The parent chain (ethereum) endpoint for reading/publishing proposals.
-* `beacon-rpc-url`: The DA layer (eth-beacon chain) endpoint for retrieving published proposal data.
-* `op-geth-url`: The rollup `op-geth` endpoint to read configuration data from.
-* `op-node-url`: The rollup `op-node` endpoint to read sequencing proposals from.
+<h3 id="endpoints"><a class="header" href="#endpoints">Endpoints</a></h3>
+<p>The first four arguments specify the endpoints that the proposer should use for sequencing:</p>
+<ul>
+<li><code>eth-rpc-url</code>: The parent chain (ethereum) endpoint for reading/publishing proposals.</li>
+<li><code>beacon-rpc-url</code>: The DA layer (eth-beacon chain) endpoint for retrieving published proposal data.</li>
+<li><code>op-geth-url</code>: The rollup <code>op-geth</code> endpoint to read configuration data from.</li>
+<li><code>op-node-url</code>: The rollup <code>op-node</code> endpoint to read sequencing proposals from.</li>
+</ul>
 <h3 id="cache-directory-optional"><a class="header" href="#cache-directory-optional">Cache Directory (Optional)</a></h3>
 <p>The proposer saves data to disk as it tracks on-chain proposals.
 This allows it to restart quickly without requesting a lot of old on-chain data if terminated.</p>

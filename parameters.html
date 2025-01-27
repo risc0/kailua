@@ -178,22 +178,11 @@ using this finalized state.</p>
 <p>You can postpone enabling withdrawals using Kailua at any later point in time after successful migration.</p>
 </div>
 </div>
-<h2 id="proposal-block-span"><a class="header" href="#proposal-block-span">Proposal Block Span</a></h2>
+<h2 id="proposal-output-count--output-block-span"><a class="header" href="#proposal-output-count--output-block-span">Proposal Output Count / Output Block Span</a></h2>
 <p>Each sequencing proposal in Kailua must cover a fixed number of L2 blocks, which will determine how much data must be
 published per proposal.
-Consequently, this parameter will determine your proposer's DA costs for using Kailua.</p>
-<div id="admonition-note" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-title">
-<div class="admonition-title">
-<div id="admonition-note-title">
-<p>Note</p>
-</div>
-<a class="admonition-anchor-link" href="#admonition-note"></a>
-</div>
-<div>
-<p>The current implementation does not yet support mutli-block fault proofs, which means that proposals will have to
-publish a commitment per covered L2 block in the proposal.</p>
-</div>
-</div>
+Consequently, configuring how many output commitments are published per proposal and how many L2 blocks are covered per
+commitment will determine your proposer's DA costs for using Kailua and your validator's proving costs during dispute.</p>
 <p>These commitments are published as Blobs, which means you should optimize your block span <code>S</code> to be <code>S = B * 4096 + 1</code>,
 where <code>B</code> is the number of blobs required for a single proposal transaction (Ethereum currently limits a single block to
 at most 6 blobs, i.e. <code>B &lt; 7</code>).</p>
@@ -220,12 +209,12 @@ proposals from being made eagerly before the parent chain data supporting that s
 timestamp on the parent chain (ethereum).</p>
 <p>At the time of writing, Ethereum finalizes each block in <a href="https://ethereum.org/en/roadmap/single-slot-finality/#:~:text=It%20takes%20about%2015%20minutes%20for%20an%20Ethereum%20block%20to%20finalize">approximately 15 minutes</a>.
 Consequently, we recommend you set this parameter to <code>15 × 60 = 900</code> seconds to match.</p>
-<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
+<div id="admonition-note" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-title">
 <div class="admonition-title">
-<div id="admonition-note-1-title">
+<div id="admonition-note-title">
 <p>Note</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-note-1"></a>
+<a class="admonition-anchor-link" href="#admonition-note"></a>
 </div>
 <div>
 <p>While the Kailua proposer agent won't publish a sequencing proposal until it is considered safe, the Kailua contracts
@@ -261,6 +250,18 @@ This would cover the worst-case proving cost in case of dispute, and, discountin
 <h2 id="challenge-timeout"><a class="header" href="#challenge-timeout">Challenge Timeout</a></h2>
 <p>The current implementation of Kailua does not yet have adaptive dispute periods based on congestion.
 Consequently, you should keep your existing challenge timeout period.</p>
+<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
+<div class="admonition-title">
+<div id="admonition-note-1-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-note-1"></a>
+</div>
+<div>
+<p>If you wish to practically operate Kailua using only validity proofs, set this value to <code>31536000000000000</code> seconds
+(i.e. 1 billion calendar years).</p>
+</div>
+</div>
 <h2 id="verifier-contract"><a class="header" href="#verifier-contract">Verifier Contract</a></h2>
 <p>RISC Zero maintains a set of pre-deployed verifier contracts for its ZK proving system.
 These contracts are regularly upgraded to support new releases of the prover, and also have a permissionless fail-safe

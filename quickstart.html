@@ -207,7 +207,8 @@ Optimism's Bedrock contracts <code>v1.4.0</code> and above.</p>
 <ul>
 <li>Launches the Kailua validator.</li>
 <li>This monitors <code>KailuaGame</code> instances for disputes and creates proofs to resolve them.</li>
-<li>Note: Use <code>RISC0_DEV_MODE=1</code> to use fake proofs.</li>
+<li>(VALIDITY PROVING) Use <code>just devnet-validate [block-height]</code> to generate validity proofs to fast-forward finality until the specified L2 block height.</li>
+<li>(DEVELOPMENT MODE): Use <code>RISC0_DEV_MODE=1</code> to use fake proofs.</li>
 </ul>
 </li>
 <li><code>just devnet-fault</code>

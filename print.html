@@ -297,7 +297,8 @@ Optimism's Bedrock contracts <code>v1.4.0</code> and above.</p>
 <ul>
 <li>Launches the Kailua validator.</li>
 <li>This monitors <code>KailuaGame</code> instances for disputes and creates proofs to resolve them.</li>
-<li>Note: Use <code>RISC0_DEV_MODE=1</code> to use fake proofs.</li>
+<li>(VALIDITY PROVING) Use <code>just devnet-validate [block-height]</code> to generate validity proofs to fast-forward finality until the specified L2 block height.</li>
+<li>(DEVELOPMENT MODE): Use <code>RISC0_DEV_MODE=1</code> to use fake proofs.</li>
 </ul>
 </li>
 <li><code>just devnet-fault</code>
@@ -335,7 +336,7 @@ proposal.</p>
 </div>
 <div>
 <p>While Kailua can be configured to operate using a single published commitment per proposal, this may make the proving
-work required to resolve disputes impractical for chains with very low block times, or a significantly large number
+work required to resolve disputes expensive for chains with very low block times, or a significantly large number
 of blocks per proposal in general.</p>
 </div>
 </div>
@@ -491,7 +492,7 @@ If you install them in parallel, GitHub may throttle you, leading to a docker bu
 </div>
 </div>
 <h3 id="cli-binary"><a class="header" href="#cli-binary">CLI Binary</a></h3>
-<pre><code class="language-shell">cargo install kailua-cli --path bin/cli
+<pre><code class="language-shell">cargo install kailua-cli --path bin/cli --locked
 </code></pre>
 <h3 id="prover-binary"><a class="header" href="#prover-binary">Prover Binary</a></h3>
 <div id="admonition-info" class="admonition admonish-info" role="note" aria-labelledby="admonition-info-title">
@@ -507,7 +508,7 @@ it utilize your locally installed RISC Zero <code>r0vm</code>.
 To do this, add <code>-F prove</code> to the command below.</p>
 </div>
 </div>
-<pre><code class="language-shell">cargo install kailua-host --path bin/host
+<pre><code class="language-shell">cargo install kailua-host --path bin/host --locked
 </code></pre>
 <h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
 <p>Once your installation is successful, you should be able to run the following command to fetch the Kailua configuration
@@ -515,8 +516,8 @@ parameters for your rollup instance:</p>
 <pre><code class="language-shell">kailua-cli config --op-node-url [YOUR_OP_NODE_URL] --op-geth-url [YOUR_OP_GETH_URL] --eth-rpc-url [YOUR_ETH_RPC_URL]
 </code></pre>
 <p>Running the above command against the respective op-sepolia endpoints should produce the following output:</p>
-<pre><code>RISC0_VERSION: 1.2.0
-FPVM_IMAGE_ID: 0x49D33C8E46E9FBDB4B3BEBC10473FDC47C4D5E8190CBEECB1B3B2A177149EA6F
+<pre><code>RISC0_VERSION: 1.2.1
+FPVM_IMAGE_ID: 0x6882F4878D98ECD7483BC588B766C17DA329B1B1699631C4D0AFC9897A9A8A81
 CONTROL_ROOT: 0x8CDAD9242664BE3112ABA377C5425A4DF735EB1C6966472B561D2855932C0469
 CONTROL_ID: 0x04446E66D300EB7FB45C9726BB53C793DDA407A62E9601618BB43C5C14657AC0
 SET_BUILDER_ID: 0x744CCA56CDE6933DEA72752C78B4A6CA894ED620E8AF6437AB05FAD53BCEC40A
@@ -575,22 +576,11 @@ using this finalized state.</p>
 <p>You can postpone enabling withdrawals using Kailua at any later point in time after successful migration.</p>
 </div>
 </div>
-<h2 id="proposal-block-span"><a class="header" href="#proposal-block-span">Proposal Block Span</a></h2>
+<h2 id="proposal-output-count--output-block-span"><a class="header" href="#proposal-output-count--output-block-span">Proposal Output Count / Output Block Span</a></h2>
 <p>Each sequencing proposal in Kailua must cover a fixed number of L2 blocks, which will determine how much data must be
 published per proposal.
-Consequently, this parameter will determine your proposer's DA costs for using Kailua.</p>
-<div id="admonition-note" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-title">
-<div class="admonition-title">
-<div id="admonition-note-title">
-<p>Note</p>
-</div>
-<a class="admonition-anchor-link" href="parameters.html#admonition-note"></a>
-</div>
-<div>
-<p>The current implementation does not yet support mutli-block fault proofs, which means that proposals will have to
-publish a commitment per covered L2 block in the proposal.</p>
-</div>
-</div>
+Consequently, configuring how many output commitments are published per proposal and how many L2 blocks are covered per
+commitment will determine your proposer's DA costs for using Kailua and your validator's proving costs during dispute.</p>
 <p>These commitments are published as Blobs, which means you should optimize your block span <code>S</code> to be <code>S = B * 4096 + 1</code>,
 where <code>B</code> is the number of blobs required for a single proposal transaction (Ethereum currently limits a single block to
 at most 6 blobs, i.e. <code>B &lt; 7</code>).</p>
@@ -617,12 +607,12 @@ proposals from being made eagerly before the parent chain data supporting that s
 timestamp on the parent chain (ethereum).</p>
 <p>At the time of writing, Ethereum finalizes each block in <a href="https://ethereum.org/en/roadmap/single-slot-finality/#:~:text=It%20takes%20about%2015%20minutes%20for%20an%20Ethereum%20block%20to%20finalize">approximately 15 minutes</a>.
 Consequently, we recommend you set this parameter to <code>15 × 60 = 900</code> seconds to match.</p>
-<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
+<div id="admonition-note" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-title">
 <div class="admonition-title">
-<div id="admonition-note-1-title">
+<div id="admonition-note-title">
 <p>Note</p>
 </div>
-<a class="admonition-anchor-link" href="parameters.html#admonition-note-1"></a>
+<a class="admonition-anchor-link" href="parameters.html#admonition-note"></a>
 </div>
 <div>
 <p>While the Kailua proposer agent won't publish a sequencing proposal until it is considered safe, the Kailua contracts
@@ -658,6 +648,18 @@ This would cover the worst-case proving cost in case of dispute, and, discountin
 <h2 id="challenge-timeout"><a class="header" href="#challenge-timeout">Challenge Timeout</a></h2>
 <p>The current implementation of Kailua does not yet have adaptive dispute periods based on congestion.
 Consequently, you should keep your existing challenge timeout period.</p>
+<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
+<div class="admonition-title">
+<div id="admonition-note-1-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="parameters.html#admonition-note-1"></a>
+</div>
+<div>
+<p>If you wish to practically operate Kailua using only validity proofs, set this value to <code>31536000000000000</code> seconds
+(i.e. 1 billion calendar years).</p>
+</div>
+</div>
 <h2 id="verifier-contract"><a class="header" href="#verifier-contract">Verifier Contract</a></h2>
 <p>RISC Zero maintains a set of pre-deployed verifier contracts for its ZK proving system.
 These contracts are regularly upgraded to support new releases of the prover, and also have a permissionless fail-safe
@@ -768,7 +770,8 @@ You can enable withdrawals manually later using the <code>OptimismPortal2</code>
       --op-node-url [YOUR_OP_NODE_URL] \
 \
       --starting-block-number [YOUR_STARTING_BLOCK_NUMBER] \
-      --proposal-block-span [YOUR_BLOCKS_PER_PROPOSAL] \
+      --proposal-output-count [YOUR_OUTPUTS_PER_PROPOSAL] \
+      --output-block-span [YOUR_BLOCKS_PER_OUTPUT] \
       --proposal-time-gap [YOUR_PROPOSAL_TIME_GAP] \
 \
       --collateral-amount [YOUR_COLLATERAL_AMOUNT] \
@@ -803,7 +806,8 @@ You can enable withdrawals manually later using the <code>OptimismPortal2</code>
 <p>The next three parameters configure sequencing:</p>
 <ul>
 <li><code>starting-block-number</code>: The rollup block number to immediately finalize and start sequencing from.</li>
-<li><code>proposal-block-span</code>: The number of rollup blocks each sequencing proposal must cover.</li>
+<li><code>proposal-output-count</code>: The number of intermediate output commitments published per proposal.</li>
+<li><code>output-block-span</code>: The number of rollup blocks each intermediate output commitment must cover.</li>
 <li><code>proposal-time-gap</code>: The minimum amount of time (in seconds) that must pass before a rollup block can be sequenced.</li>
 </ul>
 <div id="admonition-warning" class="admonition admonish-warning" role="note" aria-labelledby="admonition-warning-title">
@@ -1139,20 +1143,34 @@ For more information, refer to <code>forge create --help</code>, <code>cast call
   IRiscZeroVerifier _verifierContract,
   bytes32 _imageId,
   bytes32 _configHash,
-  uint256 _proposalBlockCount,
+  uint256 _proposalOutputCount,
+  uint256 _outputBlockSpan,
   GameType _gameType,
   IDisputeGameFactory _disputeGameFactory
 )
 </code></pre>
 <p>This contract stores the collateral bonds required for sequencers to publish their proposal, and also stores the first
 sequencing proposal for Kailua as a fault dispute game in your rollup.</p>
+<div id="admonition-note-2" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-2-title">
+<div class="admonition-title">
+<div id="admonition-note-2-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="dispute.html#admonition-note-2"></a>
+</div>
+<div>
+<p>Each published proposal on the L1 will cover <code>proposalOutputCount × outputBlockSpan</code> L2 blocks, and require
+publication of <code>proposalOutputCount</code> 32-byte commitments on the DA layer.</p>
+</div>
+</div>
 <h3 id="deployment-1"><a class="header" href="#deployment-1">Deployment</a></h3>
 <p>Deployment of this contract is via the command below:</p>
 <pre><code class="language-shell">forge create KailuaTreasury --constructor-args \
   [YOUR_RISC_ZERO_VERIFIER] \
   [YOUR_FPVM_IMAGE_ID] \
   [YOUR_ROLLUP_CONFIG_HASH] \
-  [YOUR_PROPOSAL_BLOCK_COUNT] \
+  [YOUR_PROPOSAL_OUTPUT_COUNT] \
+  [YOUR_OUTPUT_BLOCK_SPAN] \
   [YOUR_KAILUA_GAME_TYPE] \
   [YOUR_DISPUTE_GAME_FACTORY]
 </code></pre>
@@ -1199,7 +1217,8 @@ rollup.</p>
   IRiscZeroVerifier _verifierContract,
   bytes32 _imageId,
   bytes32 _configHash,
-  uint256 _proposalBlockCount,
+  uint256 _proposalOutputCount,
+  uint256 _outputBlockSpan,
   GameType _gameType,
   IDisputeGameFactory _disputeGameFactory,
   uint256 _genesisTimeStamp,
@@ -1216,7 +1235,8 @@ Deployment is fairly similar to the treasury via the command below:</p>
   [YOUR_RISC_ZERO_VERIFIER] \
   [YOUR_FPVM_IMAGE_ID] \
   [YOUR_ROLLUP_CONFIG_HASH] \
-  [YOUR_PROPOSAL_BLOCK_COUNT] \
+  [YOUR_PROPOSAL_OUTPUT_COUNT] \
+  [YOUR_OUTPUT_BLOCK_SPAN] \
   [YOUR_KAILUA_GAME_TYPE] \
   [YOUR_DISPUTE_GAME_FACTORY] \
   [YOUR_GENESIS_TIMESTAMP] \
@@ -1224,12 +1244,12 @@ Deployment is fairly similar to the treasury via the command below:</p>
   [YOUR_PROPOSAL_TIME_GAP] \
   [YOUR_MAX_CLOCK_DURATION]
 </code></pre>
-<div id="admonition-note-2" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-2-title">
+<div id="admonition-note-3" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-3-title">
 <div class="admonition-title">
-<div id="admonition-note-2-title">
+<div id="admonition-note-3-title">
 <p>Note</p>
 </div>
-<a class="admonition-anchor-link" href="dispute.html#admonition-note-2"></a>
+<a class="admonition-anchor-link" href="dispute.html#admonition-note-3"></a>
 </div>
 <div>
 <p>The above forge command requires the <code>--evm-version cancun</code> argument.</p>
@@ -1547,12 +1567,14 @@ It also attempts to resolve any finalizeable proposals.</p>
 <p>All the parameters above can be provided as environment variables.</p>
 </div>
 </div>
-### Endpoints
-The first four arguments specify the endpoints that the proposer should use for sequencing:
-* `eth-rpc-url`: The parent chain (ethereum) endpoint for reading/publishing proposals.
-* `beacon-rpc-url`: The DA layer (eth-beacon chain) endpoint for retrieving published proposal data.
-* `op-geth-url`: The rollup `op-geth` endpoint to read configuration data from.
-* `op-node-url`: The rollup `op-node` endpoint to read sequencing proposals from.
+<h3 id="endpoints-1"><a class="header" href="#endpoints-1">Endpoints</a></h3>
+<p>The first four arguments specify the endpoints that the proposer should use for sequencing:</p>
+<ul>
+<li><code>eth-rpc-url</code>: The parent chain (ethereum) endpoint for reading/publishing proposals.</li>
+<li><code>beacon-rpc-url</code>: The DA layer (eth-beacon chain) endpoint for retrieving published proposal data.</li>
+<li><code>op-geth-url</code>: The rollup <code>op-geth</code> endpoint to read configuration data from.</li>
+<li><code>op-node-url</code>: The rollup <code>op-node</code> endpoint to read sequencing proposals from.</li>
+</ul>
 <h3 id="cache-directory-optional"><a class="header" href="#cache-directory-optional">Cache Directory (Optional)</a></h3>
 <p>The proposer saves data to disk as it tracks on-chain proposals.
 This allows it to restart quickly without requesting a lot of old on-chain data if terminated.</p>
@@ -1640,7 +1662,7 @@ Node software other than <code>op-geth</code> is not as reliable for the necessa
 <p>All the parameters in this section can be provided as environment variables.</p>
 </div>
 </div>
-<h3 id="endpoints-1"><a class="header" href="#endpoints-1">Endpoints</a></h3>
+<h3 id="endpoints-2"><a class="header" href="#endpoints-2">Endpoints</a></h3>
 <p>The first four arguments specify the endpoints that the validator should use to generate fault proofs:</p>
 <ul>
 <li><code>eth-rpc-url</code>: The parent chain (ethereum) endpoint for reading proposals and publishing proofs.</li>
@@ -1678,7 +1700,38 @@ from delaying the finality of honest sequencing proposals.</p>
 <a class="admonition-anchor-link" href="validator.html#admonition-success"></a>
 </div>
 <div>
-<p>Running <code>kailua-cli validate</code> should monitor your rollup for disputes and generate the required proofs!</p>
+<p>Running <code>kailua-cli validate</code> should monitor your rollup for any disputes and generate the required proofs!</p>
+</div>
+</div>
+<h2 id="validity-proof-generation"><a class="header" href="#validity-proof-generation">Validity Proof Generation</a></h2>
+<p>Instead of only generating fault proofs, the validator can be instructed to generate a validity proof for every correct
+canonical proposal it encounters to fast-forward finality until a specified block height.
+This is configured using the below parameter:</p>
+<ul>
+<li><code>fast-forward-target</code>: The L2 block height until which validity proofs should be computed.</li>
+</ul>
+<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
+<div class="admonition-title">
+<div id="admonition-note-1-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="validator.html#admonition-note-1"></a>
+</div>
+<div>
+<p>To indefinitely power a validity-proof only rollup, this value can be specified to the maximum 64-bit value of
+<code>18446744073709551615</code>.</p>
+</div>
+</div>
+<div id="admonition-success-1" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-1-title">
+<div class="admonition-title">
+<div id="admonition-success-1-title">
+<p>Success</p>
+</div>
+<a class="admonition-anchor-link" href="validator.html#admonition-success-1"></a>
+</div>
+<div>
+<p>Running <code>kailua-cli validate</code> with the above parameter should generate a validity proof as soon as a correct proposal
+is made by an honest proposer!</p>
 </div>
 </div>
 <h2 id="delegated-proof-generation"><a class="header" href="#delegated-proof-generation">Delegated Proof Generation</a></h2>
@@ -1687,12 +1740,12 @@ generation takes place.
 Running using only the parameters above will generate proofs using the local RISC Zero prover available to the validator.
 Alternatively, proof generation can be delegated to an external service such as <a href="https://risczero.com/bonsai">Bonsai</a>,
 or to the decentralized <a href="https://docs.beboundless.xyz/">Boundless proving network</a>.</p>
-<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
+<div id="admonition-note-2" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-2-title">
 <div class="admonition-title">
-<div id="admonition-note-1-title">
+<div id="admonition-note-2-title">
 <p>Note</p>
 </div>
-<a class="admonition-anchor-link" href="validator.html#admonition-note-1"></a>
+<a class="admonition-anchor-link" href="validator.html#admonition-note-2"></a>
 </div>
 <div>
 <p>All data required to generate the proof can be publicly derived from the public chain data available for your rollup,
@@ -1705,12 +1758,12 @@ making this process safe to delegate.</p>
 <li><code>BONSAI_API_KEY</code>: Your Bonsai API key.</li>
 <li><code>BONSAI_API_URL</code>: Your Bonsai API url.</li>
 </ul>
-<div id="admonition-success-1" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-1-title">
+<div id="admonition-success-2" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-2-title">
 <div class="admonition-title">
-<div id="admonition-success-1-title">
+<div id="admonition-success-2-title">
 <p>Success</p>
 </div>
-<a class="admonition-anchor-link" href="validator.html#admonition-success-1"></a>
+<a class="admonition-anchor-link" href="validator.html#admonition-success-2"></a>
 </div>
 <div>
 <p>Running <code>kailua-cli validate</code> with these two environment variables should now delegate all validator proving to <a href="https://risczero.com/bonsai">Bonsai</a>!</p>
@@ -1726,34 +1779,34 @@ These parameters can be passed in as CLI arguments or set as environment variabl
 <h4 id="proof-requests"><a class="header" href="#proof-requests">Proof Requests</a></h4>
 <p>The following first set of parameters determine where/how requests are made:</p>
 <ul>
-<li><code>boundless_rpc_url</code>: The rpc endpoint of the L1 chain where the Boundless network is deployed.</li>
-<li><code>boundless_wallet_key</code>: The wallet private key to use to send proof request transactions.</li>
-<li><code>boundless_offchain</code>: (Optional) Flag instructing whether to submit proofs off-chain.</li>
-<li><code>boundless_order_stream_url</code>: (Optional) The URL to use for off-chain order submission.</li>
-<li><code>boundless_set_verifier_address</code>: The address of the RISC Zero verifier supporting aggregated proofs for order validation.</li>
-<li><code>boundless_market_address</code>: The address of the Boundless market contract.</li>
-<li><code>boundless_lookback</code>: (Defaults to <code>5</code>) The number of previous proof requests to inspect for duplicates before making a new proof request.</li>
+<li><code>boundless-rpc-url</code>: The rpc endpoint of the L1 chain where the Boundless network is deployed.</li>
+<li><code>boundless-wallet-key</code>: The wallet private key to use to send proof request transactions.</li>
+<li><code>boundless-offchain</code>: (Optional) Flag instructing whether to submit proofs off-chain.</li>
+<li><code>boundless-order-stream-url</code>: (Optional) The URL to use for off-chain order submission.</li>
+<li><code>boundless-set-verifier-address</code>: The address of the RISC Zero verifier supporting aggregated proofs for order validation.</li>
+<li><code>boundless-market-address</code>: The address of the Boundless market contract.</li>
+<li><code>boundless-lookback</code>: (Defaults to <code>5</code>) The number of previous proof requests to inspect for duplicates before making a new proof request.</li>
 </ul>
 <h4 id="storage-provider"><a class="header" href="#storage-provider">Storage Provider</a></h4>
 <p>The below second set of parameters determine where the proven executable and its input are stored:</p>
 <ul>
-<li><code>storage_provider</code>: One of <code>s3</code>, <code>pinata</code>, or <code>file</code>.</li>
-<li><code>s3_access_key</code>: The <code>s3</code> access key.</li>
-<li><code>s3_secret_key</code>: The <code>s3</code> secret key.</li>
-<li><code>s3_bucket</code>: The <code>s3</code> bucket.</li>
-<li><code>s3_url</code>: The <code>s3</code> url.</li>
-<li><code>aws_region</code>: The <code>s3</code> region.</li>
-<li><code>pinata_jwt</code>: The private <code>pinata</code> jwt.</li>
-<li><code>pinata_api_url</code>: The <code>pinata</code> api URL.</li>
-<li><code>ipfs_gateway_url</code>: The <code>pinata</code> gateway URL.</li>
-<li><code>file_path</code>: The file storage provider path.</li>
+<li><code>storage-provider</code>: One of <code>s3</code>, <code>pinata</code>, or <code>file</code>.</li>
+<li><code>s3-access-key</code>: The <code>s3</code> access key.</li>
+<li><code>s3-secret-key</code>: The <code>s3</code> secret key.</li>
+<li><code>s3-bucket</code>: The <code>s3</code> bucket.</li>
+<li><code>s3-url</code>: The <code>s3</code> url.</li>
+<li><code>aws-region</code>: The <code>s3</code> region.</li>
+<li><code>pinata-jwt</code>: The private <code>pinata</code> jwt.</li>
+<li><code>pinata-api-url</code>: The <code>pinata</code> api URL.</li>
+<li><code>ipfs-gateway-url</code>: The <code>pinata</code> gateway URL.</li>
+<li><code>file-path</code>: The file storage provider path.</li>
 </ul>
-<div id="admonition-success-2" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-2-title">
+<div id="admonition-success-3" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-3-title">
 <div class="admonition-title">
-<div id="admonition-success-2-title">
+<div id="admonition-success-3-title">
 <p>Success</p>
 </div>
-<a class="admonition-anchor-link" href="validator.html#admonition-success-2"></a>
+<a class="admonition-anchor-link" href="validator.html#admonition-success-3"></a>
 </div>
 <div>
 <p>Running <code>kailua-cli validate</code> with the above extra arguments should now delegate all validator proving to the <a href="https://docs.beboundless.xyz/">Boundless proving network</a>!</p>
