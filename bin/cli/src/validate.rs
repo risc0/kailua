@@ -33,7 +33,7 @@ use kailua_client::proof::{encode_seal, proof_file_name, read_proof_file};
 use kailua_client::provider::OpNodeProvider;
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::blobs::BlobFetchRequest;
-use kailua_common::config::{config_hash, SET_BUILDER_ID};
+use kailua_common::config::config_hash;
 use kailua_common::journal::ProofJournal;
 use kailua_common::precondition::{
     divergence_precondition_hash, equivalence_precondition_hash, PreconditionValidationData,
@@ -331,7 +331,11 @@ pub async fn handle_proposals(
             let expected_fpvm_image_id = parent_contract.imageId().stall().await.imageId_.0;
             // patch the proof if in dev mode
             #[cfg(feature = "devnet")]
-            let proof = maybe_patch_proof(proof, expected_fpvm_image_id, SET_BUILDER_ID.0)?;
+            let proof = maybe_patch_proof(
+                proof,
+                expected_fpvm_image_id,
+                kailua_common::config::SET_BUILDER_ID.0,
+            )?;
             // verify that the zkvm receipt is valid
             if let Some(receipt) = proof.as_zkvm_receipt() {
                 if let Err(e) = receipt.verify(expected_fpvm_image_id) {
