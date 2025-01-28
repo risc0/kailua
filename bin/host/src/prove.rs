@@ -97,7 +97,7 @@ pub async fn compute_fpvm_proof(
     let block_count = kona_cfg.claimed_l2_block_number - starting_block;
     for i in 0..block_count {
         transactions += l2_provider
-            .get_block_transaction_count_by_number(BlockNumberOrTag::Number(starting_block + i))
+            .get_block_transaction_count_by_number(BlockNumberOrTag::Number(starting_block + i + 1))
             .await
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
             .expect("Failed to get transaction count for block {i}");
