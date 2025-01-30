@@ -83,7 +83,7 @@ devnet-validate fastforward="0" target="debug" verbosity="" l1_rpc="http://127.0
 
 devnet-prove block_number block_count target="debug" verbosity="" data=".localtestdata": (prove block_number block_count "http://localhost:8545" "http://localhost:5052" "http://localhost:9545" "http://localhost:7545" data target verbosity)
 
-bench l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data start range count target="release" verbosity="-v":
+bench l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data start length range count target="release" verbosity="":
     ./target/{{target}}/kailua-cli benchmark \
           --eth-rpc-url {{l1_rpc}} \
           --beacon-rpc-url {{l1_beacon_rpc}} \
@@ -91,6 +91,7 @@ bench l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data start range count target=
           --op-node-url {{rollup_node_rpc}} \
           --data-dir {{data}} \
           --bench-start {{start}} \
+          --bench-length {{length}} \
           --bench-range {{range}} \
           --bench-count {{count}} \
           {{verbosity}}

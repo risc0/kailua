@@ -20,7 +20,7 @@ use alloy::transports::Transport;
 use kailua_contracts::Safe::SafeInstance;
 use std::path::PathBuf;
 
-// pub mod bench;
+pub mod bench;
 pub mod channel;
 pub mod config;
 pub mod db;
@@ -44,7 +44,7 @@ pub enum Cli {
     Propose(propose::ProposeArgs),
     Validate(validate::ValidateArgs),
     TestFault(fault::FaultArgs),
-    // Benchmark(bench::BenchArgs),
+    Benchmark(bench::BenchArgs),
 }
 
 #[derive(clap::Args, Debug, Clone)]
@@ -78,7 +78,7 @@ impl Cli {
             Cli::Propose(args) => args.core.v,
             Cli::Validate(args) => args.core.v,
             Cli::TestFault(args) => args.propose_args.core.v,
-            // Cli::Benchmark(args) => args.v,
+            Cli::Benchmark(args) => args.core.v,
         }
     }
 

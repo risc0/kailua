@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::CoreArgs;
+use alloy::primitives::map::{Entry, HashMap};
 use alloy::providers::{Provider, ProviderBuilder};
-use alloy::rpc::types::Block;
 use risc0_zkvm::is_dev_mode;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -23,27 +24,15 @@ use tracing::{info, warn};
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct BenchArgs {
-    #[arg(long, short, help = "Verbosity level (0-4)", action = clap::ArgAction::Count)]
-    pub v: u8,
-
-    /// Address of OP-NODE endpoint to use
-    #[clap(long, env)]
-    pub op_node_address: String,
-    /// Address of L2 JSON-RPC endpoint to use (eth and debug namespace required).
-    #[clap(long, env)]
-    pub l2_node_address: String,
-    /// Address of L1 JSON-RPC endpoint to use (eth namespace required)
-    #[clap(long, env)]
-    pub l1_node_address: String,
-    /// Address of the L1 Beacon API endpoint to use.
-    #[clap(long, env)]
-    pub l1_beacon_address: String,
-    #[clap(long, env)]
-    pub data_dir: String,
+    #[clap(flatten)]
+    pub core: CoreArgs,
 
     /// The starting L2 block number to scan for blocks from
     #[clap(long, env)]
     pub bench_start: u64,
+    /// The length of the sequence of blocks to benchmark
+    #[clap(long, env)]
+    pub bench_length: u64,
     /// The number of L2 blocks to scan as benchmark candidates
     #[clap(long, env)]
     pub bench_range: u64,
@@ -54,8 +43,8 @@ pub struct BenchArgs {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CandidateBlock {
-    pub txn_count: usize,
-    pub block: Block,
+    pub txn_count: u64,
+    pub block_number: u64,
 }
 
 impl PartialOrd for CandidateBlock {
@@ -72,43 +61,57 @@ impl Ord for CandidateBlock {
 
 pub async fn benchmark(args: BenchArgs) -> anyhow::Result<()> {
     let l2_node_provider =
-        ProviderBuilder::new().on_http(args.l2_node_address.as_str().try_into()?);
+        ProviderBuilder::new().on_http(args.core.op_geth_url.as_str().try_into()?);
+    let mut cache: HashMap<u64, u64> = HashMap::new();
     // Scan L2 blocks for highest transaction counts
     let bench_end = args.bench_start + args.bench_range;
     let mut block_heap = BinaryHeap::new();
     info!("Scanning candidates.");
     for block_number in args.bench_start..bench_end {
-        let Some(block) = l2_node_provider
-            .get_block_by_number(block_number.into(), false)
-            .await?
-        else {
-            warn!("Failed to fetch block #{block_number}");
-            break;
-        };
+        let mut txn_count = 0;
+        for i in 0..args.bench_length {
+            let block_number = block_number + i;
+            txn_count += match cache.entry(block_number) {
+                Entry::Occupied(e) => *e.get(),
+                Entry::Vacant(e) => {
+                    let x = l2_node_provider
+                        .get_block_transaction_count_by_number(block_number.into())
+                        .await?
+                        .unwrap_or_else(|| {
+                            panic!("Failed to fetch transaction count for block {block_number}")
+                        });
+                    *e.insert(x)
+                }
+            }
+        }
         block_heap.push(CandidateBlock {
-            txn_count: block.transactions.len(),
-            block,
+            txn_count,
+            block_number,
         })
     }
     // Benchmark top candidates
     for _ in 0..args.bench_count {
-        let Some(block) = block_heap.pop() else {
+        let Some(CandidateBlock {
+            txn_count,
+            block_number,
+        }) = block_heap.pop()
+        else {
             warn!("Ran out of candidates too early.");
             break;
         };
-        let block_number = block.block.header.number.to_string();
-        let txn_count = block.txn_count;
-        info!("Processing candidate block {block_number} with {txn_count} transactions.");
+        let end = block_number + args.bench_length;
+        info!("Processing blocks {block_number}-{end} with {txn_count} transactions.");
         // Derive output file name
-        let version = risc0_zkvm::get_version().unwrap();
-        let output_file_name = format!("bench-risc0-{version}-{block_number}-{txn_count}.out");
+        let version = risc0_zkvm::get_version()?;
+        let output_file_name =
+            format!("bench-risc0-{version}-{block_number}-{end}-{txn_count}.out");
         let output_file = OpenOptions::new()
             .create(true)
             .append(true)
             .open(&output_file_name)?;
         // Pipe outputs to file
-        let verbosity_level = if args.v > 0 {
-            format!("-{}", "v".repeat(args.v as usize))
+        let verbosity_level = if args.core.v > 0 {
+            format!("-{}", "v".repeat(args.core.v as usize))
         } else {
             String::new()
         };
@@ -116,18 +119,23 @@ pub async fn benchmark(args: BenchArgs) -> anyhow::Result<()> {
         if is_dev_mode() {
             cmd.env("RISC0_DEV_MODE", "1");
         }
+        let block_number = block_number.to_string();
+        let block_count = args.bench_length.to_string();
+        let data_dir = args.core.data_dir.clone().unwrap();
         cmd.args(vec![
-                "prove",
-                &block_number,
-                &args.l1_node_address,
-                &args.l1_beacon_address,
-                &args.l2_node_address,
-                &args.op_node_address,
-                &args.data_dir,
-                &verbosity_level,
-            ])
-            .stdout(output_file)
-            .status()?;
+            "prove",
+            &block_number,
+            &block_count,
+            &args.core.eth_rpc_url,
+            &args.core.beacon_rpc_url,
+            &args.core.op_geth_url,
+            &args.core.op_node_url,
+            data_dir.to_str().unwrap(),
+            "debug",
+            &verbosity_level,
+        ]);
+        println!("Executing: {cmd:?}");
+        cmd.stdout(output_file).status()?;
         info!("Output written to {output_file_name}");
     }
     Ok(())
