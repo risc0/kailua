@@ -86,11 +86,11 @@ kona-std-fpvm = { git = "https://github.com/op-rs/kona", rev = "f912b89be07c452d
 bonsai-sdk = { version = "1.2.1", features = ["non_blocking"] }
 boundless-market = "0.5.0"
 risc0-aggregation = "0.1.1"
-risc0-build = { version = "1.2.1", features = ["unstable"] }
+risc0-build = { version = "1.2.2", features = ["unstable"] }
 risc0-ethereum-contracts = { version = "1.2.1", features = ["unstable"] }
-risc0-groth16 = { version = "1.2.1", default-features = false }
-risc0-zkvm = { version = "1.2.1", features = ["heap-embedded-alloc", "unstable"] }
-risc0-zkvm-platform = { version = "1.2.1", features = ["heap-embedded-alloc"] }
+risc0-groth16 = { version = "1.2.2", default-features = false }
+risc0-zkvm = { version = "1.2.2", features = ["heap-embedded-alloc", "unstable"] }
+risc0-zkvm-platform = { version = "1.2.2", features = ["heap-embedded-alloc"] }
 
 # RISC Zero Zeth
 zeth-core = { git = "https://github.com/risc0/zeth", rev = "cecf5ec" }
