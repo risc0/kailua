@@ -136,6 +136,7 @@ where
                 journal,
                 witness_frame,
                 stitched_proofs,
+                segment_limit,
             )
             .await?
         }

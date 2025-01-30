@@ -168,6 +168,7 @@ pub async fn run_boundless_client(
     journal: ProofJournal,
     witness_frame: Vec<u8>,
     stitched_proofs: Vec<Proof>,
+    segment_limit: u32,
 ) -> Result<Proof, ProvingError> {
     info!("Running boundless client.");
     let proof_journal = Journal::new(journal.encode_packed());
@@ -265,10 +266,13 @@ pub async fn run_boundless_client(
     let preflight_stitched_proofs = stitched_proofs.clone();
     let session_info = tokio::task::spawn_blocking(move || {
         let mut builder = ExecutorEnv::builder();
+        // Set segment po2
+        builder.segment_limit_po2(segment_limit);
         // Pass in witness data
         builder.write_frame(&preflight_witness_frame);
         // Pass in proofs
         for proof in &preflight_stitched_proofs {
+            // todo: convert boundless seals to groth16 receipts
             builder.write(proof)?;
         }
         let env = builder.build()?;

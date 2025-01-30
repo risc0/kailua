@@ -66,10 +66,10 @@ pub fn build_zkvm_env<'a>(
 ) -> anyhow::Result<ExecutorEnv<'a>> {
     // Execution environment
     let mut builder = ExecutorEnv::builder();
-    // Pass in witness data
-    builder.write_frame(&witness_frame);
     // Set segment po2
     builder.segment_limit_po2(segment_limit);
+    // Pass in witness data
+    builder.write_frame(&witness_frame);
     // Dev-mode for recursive proofs
     if is_dev_mode() {
         builder.env_var("RISC0_DEV_MODE", "1");
@@ -79,6 +79,7 @@ pub fn build_zkvm_env<'a>(
         // Force in-guest verification (should be used for testing only)
         if std::env::var("KAILUA_FORCE_RECURSION").is_ok() {
             warn!("(KAILUA_FORCE_RECURSION) Forcibly loading receipt as guest input.");
+            // todo: convert boundless seals to groth16 receipts
             builder.write(&proof)?;
             continue;
         }
