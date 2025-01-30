@@ -56,7 +56,12 @@ pub struct MarketProviderConfig {
     #[arg(required = false)]
     pub boundless_wallet_key: PrivateKeySigner,
     /// Submit the request offchain via the provided order stream service url.
-    #[clap(long, requires = "boundless_order_stream_url", default_value_t = false)]
+    #[clap(
+        long,
+        env,
+        requires = "boundless_order_stream_url",
+        default_value_t = false
+    )]
     pub boundless_offchain: bool,
     /// Offchain order stream service URL to submit offchain requests to.
     #[clap(long, env)]

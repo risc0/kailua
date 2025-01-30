@@ -20,14 +20,20 @@ use std::str::FromStr;
 /// The client binary CLI application arguments.
 #[derive(Parser, Clone, Debug)]
 pub struct KailuaClientArgs {
-    #[arg(long, action = clap::ArgAction::Count, env)]
+    #[arg(long, env, action = clap::ArgAction::Count)]
     pub kailua_verbosity: u8,
 
-    #[clap(long, value_parser = parse_address, env)]
+    #[clap(long, env, value_parser = parse_address)]
     pub payout_recipient_address: Option<Address>,
 
-    #[clap(long, value_parser = parse_b256, env)]
+    #[clap(long, env, value_parser = parse_b256)]
     pub precondition_validation_data_hash: Option<B256>,
+
+    #[clap(long, env, required = false, default_value_t = 21)]
+    pub segment_limit: u32,
+
+    #[clap(long, env, required = false, default_value_t = 52_428_800)]
+    pub max_witness_size: usize,
 
     #[clap(flatten)]
     pub boundless: BoundlessArgs,

@@ -27,28 +27,28 @@ pub struct BenchArgs {
     pub v: u8,
 
     /// Address of OP-NODE endpoint to use
-    #[clap(long)]
+    #[clap(long, env)]
     pub op_node_address: String,
     /// Address of L2 JSON-RPC endpoint to use (eth and debug namespace required).
-    #[clap(long)]
+    #[clap(long, env)]
     pub l2_node_address: String,
     /// Address of L1 JSON-RPC endpoint to use (eth namespace required)
-    #[clap(long)]
+    #[clap(long, env)]
     pub l1_node_address: String,
     /// Address of the L1 Beacon API endpoint to use.
-    #[clap(long)]
+    #[clap(long, env)]
     pub l1_beacon_address: String,
-    #[clap(long)]
+    #[clap(long, env)]
     pub data_dir: String,
 
     /// The starting L2 block number to scan for blocks from
-    #[clap(long)]
+    #[clap(long, env)]
     pub bench_start: u64,
     /// The number of L2 blocks to scan as benchmark candidates
-    #[clap(long)]
+    #[clap(long, env)]
     pub bench_range: u64,
     /// The number of top candidate L2 blocks to benchmark
-    #[clap(long)]
+    #[clap(long, env)]
     pub bench_count: u64,
 }
 

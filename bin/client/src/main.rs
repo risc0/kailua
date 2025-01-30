@@ -34,6 +34,8 @@ async fn main() -> anyhow::Result<()> {
         vec![],
         true,
         true,
+        args.segment_limit,
+        args.max_witness_size,
     )
     .await?;
 

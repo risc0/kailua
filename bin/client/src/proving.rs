@@ -35,9 +35,6 @@ use tracing::{error, info, warn};
 /// The size of the LRU cache in the oracle.
 pub const ORACLE_LRU_SIZE: usize = 1024;
 
-/// The max size of a witness allowed
-pub const MAX_WITNESS_SIZE: usize = 50 * 1024 * 1024;
-
 #[derive(thiserror::Error, Debug)]
 pub enum ProvingError {
     #[error("WitnessSizeError error: found {0} expected {0}")]
@@ -61,6 +58,8 @@ pub async fn run_proving_client<P, H>(
     stitched_proofs: Vec<Proof>,
     prove_snark: bool,
     force_attempt: bool,
+    segment_limit: u32,
+    max_witness_size: usize,
 ) -> Result<(), ProvingError>
 where
     P: PreimageOracleClient + Send + Sync + Debug + Clone + 'static,
@@ -118,13 +117,13 @@ where
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
         .to_vec();
     info!("Witness size: {}", witness_frame.len());
-    if witness_frame.len() > MAX_WITNESS_SIZE {
+    if witness_frame.len() > max_witness_size {
         warn!("Witness too large.");
         if !force_attempt {
             warn!("Aborting.");
             return Err(ProvingError::WitnessSizeError(
                 witness_frame.len(),
-                MAX_WITNESS_SIZE,
+                max_witness_size,
             ));
         }
         warn!("Continuing..");
@@ -144,7 +143,8 @@ where
             if bonsai::should_use_bonsai() {
                 bonsai::run_bonsai_client(witness_frame, stitched_proofs, prove_snark).await?
             } else {
-                zkvm::run_zkvm_client(witness_frame, stitched_proofs, prove_snark).await?
+                zkvm::run_zkvm_client(witness_frame, stitched_proofs, prove_snark, segment_limit)
+                    .await?
             }
         }
     };

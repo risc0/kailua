@@ -186,11 +186,3 @@ test-offline target="release" verbosity="": (prove-offline "16491249" "0x82da720
 cleanup:
     echo "Cleanup: Removing any .fake receipt files in directory."
     rm ./*.fake
-
-kurtosis-up:
-  kurtosis run github.com/ethpandaops/optimism-package --args-file kurtosis.yaml > kurtosis.log
-
-kurtosis-down:
-  kurtosis clean -a
-
-kurtosis-prove block_number data verbosity="" target="release": (prove block_number "http://127.0.0.1:63638" "http://127.0.0.1:63650" "http://127.0.0.1:49320" "http://127.0.0.1:49383" data target verbosity)

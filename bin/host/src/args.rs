@@ -31,16 +31,20 @@ pub struct KailuaHostArgs {
     #[clap(long, env)]
     pub op_node_address: String,
     /// Whether to skip running the zeth preflight engine
-    #[clap(long, default_value_t = false, env)]
+    #[clap(long, env, default_value_t = false)]
     pub skip_zeth_preflight: bool,
-    #[clap(long, value_parser = parse_address, env)]
+    #[clap(long, env, value_parser = parse_address)]
     pub payout_recipient_address: Option<Address>,
+    #[clap(long, env, required = false, default_value_t = 21)]
+    pub segment_limit: u32,
+    #[clap(long, env, required = false, default_value_t = 52_428_800)]
+    pub max_witness_size: usize,
 
-    #[clap(long, value_delimiter = ',', env)]
+    #[clap(long, env, value_delimiter = ',')]
     pub precondition_params: Vec<u64>,
-    #[clap(long, value_parser = parse_b256, value_delimiter = ',', env)]
+    #[clap(long, env, value_parser = parse_b256, value_delimiter = ',')]
     pub precondition_block_hashes: Vec<B256>,
-    #[clap(long, value_parser = parse_b256, value_delimiter = ',', env)]
+    #[clap(long, env, value_parser = parse_b256, value_delimiter = ',')]
     pub precondition_blob_hashes: Vec<B256>,
 
     #[clap(flatten)]

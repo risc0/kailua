@@ -37,11 +37,11 @@ pub struct FaultArgs {
     pub propose_args: ProposeArgs,
 
     /// Offset of the faulty block within the proposal
-    #[clap(long)]
+    #[clap(long, env)]
     pub fault_offset: u64,
 
     /// Index of the parent of the faulty proposal
-    #[clap(long)]
+    #[clap(long, env)]
     pub fault_parent: u64,
 }
 

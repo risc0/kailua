@@ -67,7 +67,7 @@ pub struct ValidateArgs {
     /// Secret key of L1 wallet to use for challenging and proving outputs
     #[clap(long, env)]
     pub validator_key: String,
-    #[clap(long, value_parser = parse_address, env)]
+    #[clap(long, env, value_parser = parse_address)]
     pub payout_recipient_address: Option<Address>,
 
     #[clap(flatten)]
