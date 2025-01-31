@@ -307,6 +307,10 @@ impl KailuaDB {
             if contender.divergence_point(opponent).is_none() {
                 return Ok(false);
             }
+            // Skip proposals arriving after the timeout period
+            if opponent.created_at - contender.created_at >= self.config.timeout {
+                return Ok(false);
+            }
         }
         // Participate in tournament only if this is a correct or first bad proposal
         if self.was_proposer_eliminated_before(opponent) {
