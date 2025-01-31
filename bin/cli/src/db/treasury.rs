@@ -24,7 +24,6 @@ use std::collections::HashMap;
 #[derive(Clone, Debug, Default)]
 pub struct Treasury {
     pub address: Address,
-    pub elimination_round: HashMap<Address, u64>,
     pub claim_proposer: HashMap<Address, Address>,
     pub participation_bond: U256,
     pub paid_bond: HashMap<Address, U256>,
@@ -38,7 +37,6 @@ impl Treasury {
         let participation_bond = treasury_implementation.participationBond().stall().await._0;
         Ok(Self {
             address: *treasury_implementation.address(),
-            elimination_round: Default::default(),
             claim_proposer: Default::default(),
             participation_bond,
             paid_bond: Default::default(),
@@ -94,21 +92,5 @@ impl Treasury {
             Entry::Occupied(entry) => *entry.get(),
         };
         Ok(proposer)
-    }
-
-    pub async fn fetch_elimination_round<T: Transport + Clone, P: Provider<T, N>, N: Network>(
-        &mut self,
-        provider: P,
-        address: Address,
-    ) -> anyhow::Result<u64> {
-        let instance = self.treasury_contract_instance(provider);
-        let round = match self.elimination_round.entry(address) {
-            Entry::Vacant(entry) => {
-                let round = instance.eliminationRound(address).stall().await._0.to();
-                *entry.insert(round)
-            }
-            Entry::Occupied(entry) => *entry.get(),
-        };
-        Ok(round)
     }
 }
