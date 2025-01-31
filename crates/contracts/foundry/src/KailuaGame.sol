@@ -154,11 +154,11 @@ contract KailuaGame is KailuaTournament {
         }
 
         // If a validity proof was submitted, do not allow conflicting proposals to be created
-        KailuaTournament parentGame_ =  parentGame();
+        KailuaTournament parentGame_ = parentGame();
         if (parentGame_.provenAt(0, 0).raw() > 0) {
             if (
                 rootClaim().raw() != parentGame_.validChildRootClaim()
-                || blobsHash() != parentGame_.validChildBlobsHash()
+                    || blobsHash() != parentGame_.validChildBlobsHash()
             ) {
                 revert ProvenFaulty();
             }
@@ -224,9 +224,6 @@ contract KailuaGame is KailuaTournament {
 
         // Update the status and emit the resolved event, note that we're performing a storage update here.
         emit Resolved(status = status_ = GameStatus.DEFENDER_WINS);
-
-        // Release the proposer from being bonded by just this proposal
-        KAILUA_TREASURY.releaseProposer();
     }
 
     // ------------------------------

@@ -127,9 +127,6 @@ interface IKailuaTreasury {
 
     /// @notice Returns true iff a proposal is currently being submitted
     function isProposing() external returns (bool);
-
-    /// @notice Releases the proposer from being bonded by the calling proposal
-    function releaseProposer() external;
 }
 
 library KailuaLib {
