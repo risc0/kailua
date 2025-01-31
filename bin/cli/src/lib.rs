@@ -28,6 +28,7 @@ pub mod fast_track;
 pub mod fault;
 pub mod propose;
 pub mod provider;
+pub mod signer;
 pub mod stall;
 pub mod validate;
 

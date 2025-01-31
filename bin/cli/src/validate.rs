@@ -17,14 +17,13 @@ use crate::db::config::Config;
 use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
 use crate::provider::BlobProvider;
+use crate::signer::ValidatorSignerArgs;
 use crate::{stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::{IndexedBlobHash, FIELD_ELEMENTS_PER_BLOB};
 use alloy::eips::BlockNumberOrTag;
 use alloy::network::primitives::BlockTransactionsKind;
-use alloy::network::EthereumWallet;
 use alloy::primitives::{Address, Bytes, FixedBytes, B256, U256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
-use alloy::signers::local::LocalSigner;
 use anyhow::{anyhow, bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_client::args::parse_address;
@@ -45,7 +44,6 @@ use maili_protocol::BlockInfo;
 use risc0_zkvm::is_dev_mode;
 use std::path::PathBuf;
 use std::process::exit;
-use std::str::FromStr;
 use std::time::Duration;
 use tokio::process::Command;
 use tokio::time::sleep;
@@ -65,8 +63,9 @@ pub struct ValidateArgs {
     pub fast_forward_target: u64,
 
     /// Secret key of L1 wallet to use for challenging and proving outputs
-    #[clap(long, env)]
-    pub validator_key: String,
+    #[clap(flatten)]
+    pub validator_signer: ValidatorSignerArgs,
+    /// Address of the recipient account to use for bond payouts
     #[clap(long, env, value_parser = parse_address)]
     pub payout_recipient_address: Option<Address>,
 
@@ -138,9 +137,11 @@ pub async fn handle_proposals(
 
     // initialize validator wallet
     info!("Initializing validator wallet.");
-    let validator_signer = LocalSigner::from_str(&args.validator_key)?;
-    let validator_address = validator_signer.address();
-    let validator_wallet = EthereumWallet::from(validator_signer);
+    let validator_wallet = args
+        .validator_signer
+        .wallet(Some(config.l1_chain_id))
+        .await?;
+    let validator_address = validator_wallet.default_signer().address();
     let validator_provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .wallet(validator_wallet)
@@ -1125,11 +1126,13 @@ pub async fn handle_proof_requests(
     let config_hash = B256::from(config_hash(&rollup_config)?);
     let fpvm_image_id = B256::from(bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID));
     // Set payout recipient
-    let payout_recipient = args.payout_recipient_address.unwrap_or_else(|| {
-        LocalSigner::from_str(&args.validator_key)
-            .unwrap()
-            .address()
-    });
+    let validator_wallet = args
+        .validator_signer
+        .wallet(Some(rollup_config.l1_chain_id))
+        .await?;
+    let payout_recipient = args
+        .payout_recipient_address
+        .unwrap_or_else(|| validator_wallet.default_signer().address());
     info!("Proof payout recipient: {payout_recipient}");
     // Run proof generator loop
     loop {

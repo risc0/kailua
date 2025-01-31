@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::signer::{DeployerSignerArgs, GuardianSignerArgs, OwnerSignerArgs};
 use crate::stall::Stall;
 use crate::KAILUA_GAME_TYPE;
-use alloy::network::{EthereumWallet, Network, ReceiptResponse, TxSigner};
+use alloy::network::{Network, ReceiptResponse, TxSigner};
 use alloy::primitives::{Address, Bytes, Uint, U256};
 use alloy::providers::{Provider, ProviderBuilder};
-use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
 use alloy::transports::Transport;
 use anyhow::{bail, Context};
@@ -69,14 +69,14 @@ pub struct FastTrackArgs {
     pub challenge_timeout: u64,
 
     /// Secret key of L1 wallet to use for deploying contracts
-    #[clap(long, env)]
-    pub deployer_key: String,
+    #[clap(flatten)]
+    pub deployer_signer: DeployerSignerArgs,
     /// Secret key of L1 wallet that (indirectly) owns `DisputeGameFactory`
-    #[clap(long, env)]
-    pub owner_key: String,
+    #[clap(flatten)]
+    pub owner_signer: OwnerSignerArgs,
     /// Secret key of L1 guardian wallet
-    #[clap(long, env, required_if_eq("respect_kailua_proposals", "true"))]
-    pub guardian_key: Option<String>,
+    #[clap(flatten)]
+    pub guardian_signer: Option<GuardianSignerArgs>,
 
     /// Whether to set Kailua as the OptimismPortal's respected game type
     #[clap(long, env)]
@@ -103,8 +103,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
 
     // initialize owner wallet
     info!("Initializing owner wallet.");
-    let owner_signer = LocalSigner::from_str(&args.owner_key)?;
-    let owner_wallet = EthereumWallet::from(owner_signer);
+    let owner_wallet = args.owner_signer.wallet(Some(config.l1_chain_id)).await?;
     let owner_provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .wallet(&owner_wallet)
@@ -132,8 +131,10 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
 
     // initialize deployment wallet
     info!("Initializing deployer wallet.");
-    let deployer_signer = LocalSigner::from_str(&args.deployer_key)?;
-    let deployer_wallet = EthereumWallet::from(deployer_signer);
+    let deployer_wallet = args
+        .deployer_signer
+        .wallet(Some(config.l1_chain_id))
+        .await?;
     let deployer_provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .wallet(&deployer_wallet)
@@ -309,9 +310,12 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     if args.respect_kailua_proposals {
         // initialize guardian wallet
         info!("Initializing guardian wallet.");
-        let guardian_signer = LocalSigner::from_str(&args.guardian_key.unwrap())?;
-        let guardian_address = guardian_signer.address();
-        let guardian_wallet = EthereumWallet::from(guardian_signer);
+        let guardian_wallet = args
+            .guardian_signer
+            .unwrap()
+            .wallet(Some(config.l1_chain_id))
+            .await?;
+        let guardian_address = guardian_wallet.default_signer().address();
         let guardian_provider = ProviderBuilder::new()
             .with_recommended_fillers()
             .wallet(&guardian_wallet)

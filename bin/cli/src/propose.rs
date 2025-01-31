@@ -15,14 +15,14 @@
 use crate::db::proposal::{Proposal, ELIMINATIONS_LIMIT};
 use crate::db::KailuaDB;
 use crate::provider::BlobProvider;
+use crate::signer::ProposerSignerArgs;
 use crate::{stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::consensus::BlockHeader;
 use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::primitives::BlockTransactionsKind;
-use alloy::network::{BlockResponse, EthereumWallet};
+use alloy::network::{BlockResponse, TxSigner};
 use alloy::primitives::{Bytes, U256};
 use alloy::providers::{Provider, ProviderBuilder};
-use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
 use anyhow::Context;
 use kailua_client::provider::OpNodeProvider;
@@ -32,7 +32,6 @@ use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
 use std::path::PathBuf;
 use std::process::exit;
-use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
@@ -42,9 +41,9 @@ pub struct ProposeArgs {
     #[clap(flatten)]
     pub core: CoreArgs,
 
-    /// Secret key of L1 wallet to use for proposing outputs
-    #[clap(long, env)]
-    pub proposer_key: String,
+    /// L1 wallet to use for proposing outputs
+    #[clap(flatten)]
+    pub proposer_signer: ProposerSignerArgs,
 }
 
 pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()> {
@@ -69,9 +68,11 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
 
     // initialize proposer wallet
     info!("Initializing proposer wallet.");
-    let proposer_signer = LocalSigner::from_str(&args.proposer_key)?;
-    let proposer_address = proposer_signer.address();
-    let proposer_wallet = EthereumWallet::from(proposer_signer);
+    let proposer_wallet = args
+        .proposer_signer
+        .wallet(Some(config.l1_chain_id))
+        .await?;
+    let proposer_address = proposer_wallet.default_signer().address();
     let proposer_provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .wallet(&proposer_wallet)

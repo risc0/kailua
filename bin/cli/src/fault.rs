@@ -17,10 +17,8 @@ use crate::propose::ProposeArgs;
 use crate::stall::Stall;
 use crate::KAILUA_GAME_TYPE;
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
-use alloy::network::EthereumWallet;
 use alloy::primitives::{Bytes, B256, U256};
 use alloy::providers::ProviderBuilder;
-use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
 use anyhow::Context;
 use kailua_client::provider::OpNodeProvider;
@@ -28,7 +26,6 @@ use kailua_common::blobs::hash_to_fe;
 use kailua_common::config::config_hash;
 use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
-use std::str::FromStr;
 use tracing::{error, info};
 
 #[derive(clap::Args, Debug, Clone)]
@@ -69,9 +66,12 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let dgf_address = system_config.disputeGameFactory().stall().await.addr_;
 
     // init l1 stuff
-    let tester_signer = LocalSigner::from_str(&args.propose_args.proposer_key)?;
-    let tester_address = tester_signer.address();
-    let tester_wallet = EthereumWallet::from(tester_signer);
+    let tester_wallet = args
+        .propose_args
+        .proposer_signer
+        .wallet(Some(config.l1_chain_id))
+        .await?;
+    let tester_address = tester_wallet.default_signer().address();
     let tester_provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .wallet(tester_wallet)
