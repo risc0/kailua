@@ -245,9 +245,12 @@ impl KailuaDB {
         info!("Assessing proposal correctness..");
         let is_parent_correct = self
             .get_local_proposal(&proposal.parent)
-            .expect("Attempted to process child before registering parent.")
-            .is_correct()
-            .expect("Attempted to process child before deciding parent correctness");
+            .map(|parent| {
+                parent
+                    .is_correct()
+                    .expect("Attempted to process child before deciding parent correctness")
+            })
+            .unwrap_or_default(); // missing parent means it's not part of the tournament
         let is_correct_proposal = match proposal
             .assess_correctness(&self.config, op_node_provider, is_parent_correct)
             .await?
@@ -293,7 +296,15 @@ impl KailuaDB {
             return Ok(true);
         }
 
-        let mut parent = self.get_local_proposal(&opponent.parent).unwrap().clone();
+        let mut parent = self.get_local_proposal(&opponent.parent).unwrap();
+        // Append child to parent tournament children list
+        if !parent.append_child(opponent.index) {
+            warn!(
+                "Attempted out of order child {} insertion into parent {} ",
+                opponent.index, parent.index
+            );
+        }
+        self.set_local_proposal(opponent.parent, &parent)?;
         // Ignore skipped proposals
         let contender = parent
             .survivor
@@ -322,13 +333,6 @@ impl KailuaDB {
         }
         // Update the contender
         opponent.contender = parent.survivor;
-        // Append child to parent
-        if !parent.append_child(opponent.index) {
-            warn!(
-                "Attempted out of order child {} insertion into parent {} ",
-                opponent.index, parent.index
-            );
-        }
         // Determine if opponent is the next survivor
         if contender
             .as_ref()
@@ -338,9 +342,8 @@ impl KailuaDB {
             // If the old survivor (if any) is defeated,
             // set this proposal as the new survivor
             parent.survivor = Some(opponent.index);
+            self.set_local_proposal(opponent.parent, &parent)?;
         }
-        // Commit updated parent data
-        self.set_local_proposal(opponent.parent, &parent)?;
         Ok(true)
     }
 

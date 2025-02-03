@@ -377,7 +377,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         let balance = proposer_provider.get_balance(proposer_address).await?;
         let owed_collateral = bond_value.saturating_sub(paid_in);
         if balance < owed_collateral {
-            error!("INSUFFICIENT BALANCE! Need to lock in at least {owed_collateral}.");
+            error!("INSUFFICIENT BALANCE! Need to lock in at least {owed_collateral} more.");
             continue;
         }
         // Submit proposal
