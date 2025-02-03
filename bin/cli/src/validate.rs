@@ -42,6 +42,7 @@ use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
 use maili_protocol::BlockInfo;
 use risc0_zkvm::is_dev_mode;
+use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
@@ -180,6 +181,8 @@ pub async fn handle_proposals(
         "Starting from proposal at factory index {}",
         kailua_db.state.next_factory_index
     );
+    // init channel buffer
+    let mut channel_buf = VecDeque::new();
     loop {
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
@@ -305,15 +308,21 @@ pub async fn handle_proposals(
             .await?;
         }
 
-        // publish computed fault proofs and resolve proven challenges
+        // load newly received messages into buffer
         while !channel.receiver.is_empty() {
-            let Message::Proof(proposal_index, proof) = channel
-                .receiver
-                .recv()
-                .await
-                .ok_or(anyhow!("proposals receiver channel closed"))?
-            else {
-                bail!("Unexpected message type.");
+            let Some(message) = channel.receiver.recv().await else {
+                error!("Proofs receiver channel closed");
+                break;
+            };
+            channel_buf.push_back(message);
+        }
+
+        // publish computed fault proofs and resolve proven challenges
+        let messages = channel_buf.len();
+        for _ in 0..messages {
+            let Message::Proof(proposal_index, proof) = channel_buf.pop_front().unwrap() else {
+                error!("Validator loop received an unexpected message type.");
+                continue;
             };
             let opponent = kailua_db.get_local_proposal(&proposal_index).unwrap();
             let parent = kailua_db.get_local_proposal(&opponent.parent).unwrap();
@@ -450,10 +459,12 @@ pub async fn handle_proposals(
                         }
                         Err(e) => {
                             error!("Failed to confirm validity proof txn: {e:?}");
+                            channel_buf.push_back(Message::Proof(proposal_index, proof));
                         }
                     },
                     Err(e) => {
                         error!("Failed to send validity proof txn: {e:?}");
+                        channel_buf.push_back(Message::Proof(proposal_index, proof));
                     }
                 }
                 // Skip fault proof submission logic
@@ -856,10 +867,12 @@ pub async fn handle_proposals(
                     }
                     Err(e) => {
                         error!("Failed to confirm fault proof txn: {e:?}");
+                        channel_buf.push_back(Message::Proof(proposal_index, proof));
                     }
                 },
                 Err(e) => {
                     error!("Failed to send fault proof txn: {e:?}");
+                    channel_buf.push_back(Message::Proof(proposal_index, proof));
                 }
             }
         }
