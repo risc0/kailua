@@ -23,6 +23,8 @@ tokio.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
 
+opentelemetry.workspace = true
+
 # Alloy
 alloy = { workspace = true, features = ["rlp", "reqwest"] }
 alloy-primitives = { workspace = true, features = ["map-hashbrown"] }

@@ -44,9 +44,19 @@ spin = { version = "0.9.8", features = ["mutex"] }
 tempfile = "3.10.1"
 thiserror = "2.0.11"
 tokio = { version = "1.39.1", features = ["full"] }
-tracing = "0.1.40"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.5.4"
+
+# Telemetry
+opentelemetry = "0.27.1"
+opentelemetry_sdk = { version = "0.27.1", features = ["rt-tokio"] }
+opentelemetry-semantic-conventions = "0.27.0"
+opentelemetry-otlp = { version = "0.27.0", features = ["tonic"] }
+opentelemetry-prometheus = "0.27.0"
+opentelemetry-zipkin = "0.27.0"
+tracing = "0.1.40"
+tracing-opentelemetry = "0.28.0"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
 
 # Alloy
 alloy = { version = "0.9.2", default-features = false, features = ["json"] }
