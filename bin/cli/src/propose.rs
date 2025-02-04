@@ -26,6 +26,7 @@ use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::SolValue;
 use anyhow::Context;
 use kailua_client::provider::OpNodeProvider;
+use kailua_client::telemetry::TelemetryArgs;
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::config::config_hash;
 use kailua_contracts::*;
@@ -44,6 +45,9 @@ pub struct ProposeArgs {
     /// L1 wallet to use for proposing outputs
     #[clap(flatten)]
     pub proposer_signer: ProposerSignerArgs,
+
+    #[clap(flatten)]
+    pub telemetry: TelemetryArgs,
 }
 
 pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()> {

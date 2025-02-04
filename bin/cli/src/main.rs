@@ -16,13 +16,14 @@ use clap::Parser;
 use kailua_cli::Cli;
 use kailua_client::telemetry::init_tracer_provider;
 use kona_host::init_tracing_subscriber;
+use opentelemetry::global::shutdown_tracer_provider;
 use tempfile::tempdir;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     init_tracing_subscriber(cli.verbosity())?;
-    let tracer_provider = init_tracer_provider()?;
+    init_tracer_provider(cli.otlp_endpoint())?;
 
     let tmp_dir = tempdir()?;
     let data_dir = cli.data_dir().unwrap_or(tmp_dir.path().to_path_buf());
@@ -40,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
         Cli::Benchmark(bench_args) => kailua_cli::bench::benchmark(bench_args).await?,
     }
 
-    tracer_provider.shutdown()?;
+    shutdown_tracer_provider();
 
     Ok(())
 }

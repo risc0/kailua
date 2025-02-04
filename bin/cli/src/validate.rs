@@ -30,6 +30,7 @@ use kailua_client::args::parse_address;
 use kailua_client::boundless::BoundlessArgs;
 use kailua_client::proof::{encode_seal, proof_file_name, read_proof_file};
 use kailua_client::provider::OpNodeProvider;
+use kailua_client::telemetry::TelemetryArgs;
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::config::config_hash;
@@ -72,6 +73,9 @@ pub struct ValidateArgs {
 
     #[clap(flatten)]
     pub boundless: BoundlessArgs,
+
+    #[clap(flatten)]
+    pub telemetry: TelemetryArgs,
 }
 
 pub async fn validate(args: ValidateArgs, data_dir: PathBuf) -> anyhow::Result<()> {

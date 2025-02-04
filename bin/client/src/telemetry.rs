@@ -15,19 +15,33 @@
 use opentelemetry::global::set_tracer_provider;
 use opentelemetry::trace::TraceError;
 use opentelemetry::KeyValue;
-use opentelemetry_otlp::SpanExporter;
+use opentelemetry_otlp::{SpanExporter, WithExportConfig};
 use opentelemetry_sdk::{runtime::Tokio, trace::TracerProvider, Resource};
 
-pub fn init_tracer_provider() -> Result<TracerProvider, TraceError> {
-    // Instantiate OTLP exporter
-    let exporter = SpanExporter::builder().with_tonic().build()?;
-    // Build tracer provider with exporter
-    let provider = TracerProvider::builder()
-        .with_batch_exporter(exporter, Tokio)
-        .with_resource(Resource::new(vec![KeyValue::new("service.name", "kailua")]))
-        .build();
-    // Set as default global provider
-    set_tracer_provider(provider.clone());
-    // Return provider
-    Ok(provider)
+#[derive(clap::Args, Debug, Clone)]
+pub struct TelemetryArgs {
+    /// OTLP Collector endpoint address
+    #[clap(long, env, num_args = 0..=1, default_missing_value = "http://localhost:4317")]
+    pub otlp_collector: Option<String>,
+}
+
+pub fn init_tracer_provider<T: Into<String>>(endpoint: Option<T>) -> Result<(), TraceError> {
+    if let Some(endpoint) = endpoint {
+        let endpoint: String = endpoint.into();
+        println!("telemetry export endpoint: {endpoint}");
+        // Build and set default global provider
+        set_tracer_provider(
+            TracerProvider::builder()
+                .with_batch_exporter(
+                    SpanExporter::builder()
+                        .with_tonic()
+                        .with_endpoint(endpoint)
+                        .build()?,
+                    Tokio,
+                )
+                .with_resource(Resource::new(vec![KeyValue::new("service.name", "kailua")]))
+                .build(),
+        );
+    }
+    Ok(())
 }

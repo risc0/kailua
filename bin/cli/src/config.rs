@@ -17,6 +17,7 @@ use crate::KAILUA_GAME_TYPE;
 use alloy::primitives::address;
 use alloy::providers::ProviderBuilder;
 use kailua_build::KAILUA_FPVM_ID;
+use kailua_client::telemetry::TelemetryArgs;
 use kailua_common::config::{config_hash, BN254_CONTROL_ID, CONTROL_ROOT, SET_BUILDER_ID};
 use kailua_contracts::SystemConfig;
 use kailua_host::config::fetch_rollup_config;
@@ -39,6 +40,9 @@ pub struct ConfigArgs {
     /// Address of the ethereum rpc endpoint to use (eth namespace required)
     #[clap(long, env)]
     pub eth_rpc_url: String,
+
+    #[clap(flatten)]
+    pub telemetry: TelemetryArgs,
 }
 
 pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {

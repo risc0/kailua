@@ -23,6 +23,7 @@ use alloy::transports::Transport;
 use anyhow::{bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_client::provider::OpNodeProvider;
+use kailua_client::telemetry::TelemetryArgs;
 use kailua_common::config::{config_hash, BN254_CONTROL_ID, CONTROL_ROOT, SET_BUILDER_ID};
 use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
@@ -81,6 +82,9 @@ pub struct FastTrackArgs {
     /// Whether to set Kailua as the OptimismPortal's respected game type
     #[clap(long, env)]
     pub respect_kailua_proposals: bool,
+
+    #[clap(flatten)]
+    pub telemetry: TelemetryArgs,
 }
 
 pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {

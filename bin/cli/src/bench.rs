@@ -15,6 +15,7 @@
 use crate::CoreArgs;
 use alloy::primitives::map::{Entry, HashMap};
 use alloy::providers::{Provider, ProviderBuilder};
+use kailua_client::telemetry::TelemetryArgs;
 use risc0_zkvm::is_dev_mode;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -39,6 +40,9 @@ pub struct BenchArgs {
     /// The number of top candidate L2 blocks to benchmark
     #[clap(long, env)]
     pub bench_count: u64,
+
+    #[clap(flatten)]
+    pub telemetry: TelemetryArgs,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

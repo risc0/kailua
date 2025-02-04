@@ -90,6 +90,17 @@ impl Cli {
             _ => None,
         }
     }
+
+    pub fn otlp_endpoint(&self) -> Option<String> {
+        match self {
+            Cli::Config(args) => args.telemetry.otlp_collector.clone(),
+            Cli::FastTrack(args) => args.telemetry.otlp_collector.clone(),
+            Cli::Propose(args) => args.telemetry.otlp_collector.clone(),
+            Cli::Validate(args) => args.telemetry.otlp_collector.clone(),
+            Cli::TestFault(args) => args.telemetry.otlp_collector.clone(),
+            Cli::Benchmark(args) => args.telemetry.otlp_collector.clone(),
+        }
+    }
 }
 
 pub async fn exec_safe_txn<

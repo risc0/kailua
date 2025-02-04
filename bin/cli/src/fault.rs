@@ -22,6 +22,7 @@ use alloy::providers::ProviderBuilder;
 use alloy::sol_types::SolValue;
 use anyhow::Context;
 use kailua_client::provider::OpNodeProvider;
+use kailua_client::telemetry::TelemetryArgs;
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::config::config_hash;
 use kailua_contracts::*;
@@ -40,6 +41,9 @@ pub struct FaultArgs {
     /// Index of the parent of the faulty proposal
     #[clap(long, env)]
     pub fault_parent: u64,
+
+    #[clap(flatten)]
+    pub telemetry: TelemetryArgs,
 }
 
 pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
