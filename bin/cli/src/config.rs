@@ -16,6 +16,7 @@ use crate::stall::Stall;
 use crate::KAILUA_GAME_TYPE;
 use alloy::primitives::address;
 use alloy::providers::ProviderBuilder;
+use anyhow::Context;
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_client::telemetry::TelemetryArgs;
 use kailua_common::config::{config_hash, BN254_CONTROL_ID, CONTROL_ROOT, SET_BUILDER_ID};
@@ -23,7 +24,6 @@ use kailua_contracts::SystemConfig;
 use kailua_host::config::fetch_rollup_config;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, Status, TraceContextExt, Tracer};
-use opentelemetry::Context;
 use risc0_zkvm::sha::Digest;
 
 #[derive(clap::Args, Debug, Clone)]
@@ -47,11 +47,12 @@ pub struct ConfigArgs {
 
 pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
-    let context = Context::current_with_span(tracer.start("config"));
+    let context = opentelemetry::Context::current_with_span(tracer.start("config"));
 
     let config = fetch_rollup_config(&args.op_node_url, &args.op_geth_url, None)
         .with_context(context.clone())
-        .await?;
+        .await
+        .context("fetch_rollup_config")?;
 
     let eth_rpc_provider = ProviderBuilder::new().on_http(args.eth_rpc_url.as_str().try_into()?);
     // load system config
