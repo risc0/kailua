@@ -153,17 +153,6 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             let proposal = kailua_db.get_local_proposal(&proposal_index).unwrap();
             let parent = kailua_db.get_local_proposal(&proposal.parent).unwrap();
             let parent_contract = parent.tournament_contract_instance(&proposer_provider);
-            info!("Parent Tournament Children:");
-            for i in 0..u64::MAX {
-                match parent_contract.children(U256::from(i)).call().await {
-                    Ok(res) => {
-                        info!("{}", res._0);
-                    }
-                    Err(err) => {
-                        error!("Child {i} lookup failure: {err:?}")
-                    }
-                }
-            }
 
             // Skip resolved games
             match proposal.fetch_finality(&proposer_provider).await {
