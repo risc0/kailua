@@ -14,6 +14,7 @@
 
 use alloy_primitives::{Address, B256};
 use clap::Parser;
+use kailua_client::telemetry::TelemetryArgs;
 use kailua_client::{
     args::{parse_address, parse_b256},
     boundless::BoundlessArgs,
@@ -29,7 +30,7 @@ pub struct KailuaHostArgs {
 
     /// Address of OP-NODE endpoint to use
     #[clap(long, env)]
-    pub op_node_address: String,
+    pub op_node_address: Option<String>,
     /// Whether to skip running the zeth preflight engine
     #[clap(long, env, default_value_t = false)]
     pub skip_zeth_preflight: bool,
@@ -49,6 +50,8 @@ pub struct KailuaHostArgs {
 
     #[clap(flatten)]
     pub boundless: BoundlessArgs,
+    #[clap(flatten)]
+    pub telemetry: TelemetryArgs,
 }
 
 impl PartialEq<Self> for KailuaHostArgs {

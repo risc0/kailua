@@ -35,9 +35,20 @@ async fn main() -> anyhow::Result<()> {
 
     // fetch starting block number
     let HostMode::Single(kona_cfg) = &args.kona.mode;
-    let (.., l2_provider) = kona_cfg.create_providers().await?;
-    let op_node_provider =
-        OpNodeProvider(ProviderBuilder::new().on_http(args.op_node_address.as_str().try_into()?));
+    let l2_provider = if kona_cfg.is_offline() {
+        None
+    } else {
+        Some(kona_cfg.create_providers().await?.2)
+    };
+    let op_node_provider = args.op_node_address.as_ref().map(|addr| {
+        OpNodeProvider(
+            ProviderBuilder::new().on_http(
+                addr.as_str()
+                    .try_into()
+                    .expect("Failed to parse op_node_address"),
+            ),
+        )
+    });
     // compute individual proofs
     let mut job_pq = BinaryHeap::new();
     let mut proofs = Vec::new();
@@ -45,19 +56,27 @@ async fn main() -> anyhow::Result<()> {
     let mut have_split = false;
     while let Some(job_args) = job_pq.pop() {
         let HostMode::Single(kona_cfg) = &job_args.kona.mode;
-        let starting_block = l2_provider
-            .get_block_by_hash(kona_cfg.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
-            .await?
-            .unwrap()
-            .header
-            .number;
+
+        let starting_block = if let Some(l2_provider) = l2_provider.as_ref() {
+            l2_provider
+                .get_block_by_hash(kona_cfg.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
+                .await?
+                .unwrap()
+                .header
+                .number
+        } else {
+            0
+        };
+
         let num_blocks = kona_cfg.claimed_l2_block_number - starting_block;
-        info!(
-            "Processing job with {} blocks from block {}",
-            num_blocks, starting_block
-        );
+        if starting_block > 0 {
+            info!(
+                "Processing job with {} blocks from block {}",
+                num_blocks, starting_block
+            );
+        }
         // Force the proving attempt regardless of witness size if we prove just one block
-        let force_attempt = num_blocks == 1;
+        let force_attempt = num_blocks == 1 || kona_cfg.is_offline();
 
         match kailua_host::prove::compute_fpvm_proof(
             job_args.clone(),
@@ -94,8 +113,14 @@ async fn main() -> anyhow::Result<()> {
                 // Split workload at midpoint (num_blocks > 1)
                 have_split = true;
                 let mid_point = starting_block + num_blocks / 2;
-                let mid_output = op_node_provider.output_at_block(mid_point).await?;
+                let mid_output = op_node_provider
+                    .as_ref()
+                    .expect("Missing op_node_provider")
+                    .output_at_block(mid_point)
+                    .await?;
                 let mid_block = l2_provider
+                    .as_ref()
+                    .expect("Missing l2_provider")
                     .get_block_by_number(
                         BlockNumberOrTag::Number(mid_point),
                         BlockTransactionsKind::Hashes,
@@ -127,6 +152,8 @@ async fn main() -> anyhow::Result<()> {
             let HostMode::Single(base_kona_args) = &mut base_args.kona.mode;
             base_kona_args.agreed_l2_output_root = base_kona_args.claimed_l2_output_root;
             base_kona_args.agreed_l2_head_hash = l2_provider
+                .as_ref()
+                .unwrap()
                 .get_block_by_number(
                     BlockNumberOrTag::Number(base_kona_args.claimed_l2_block_number),
                     BlockTransactionsKind::Hashes,

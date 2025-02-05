@@ -82,30 +82,34 @@ pub async fn compute_fpvm_proof(
     );
     // count transactions
     let stitched_count = stitched_boot_info.len();
-    let (.., l2_provider) = kona_cfg
-        .create_providers()
-        .await
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-    let mut transactions = 0;
-    let starting_block = l2_provider
-        .get_block_by_hash(kona_cfg.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
-        .await
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
-        .unwrap()
-        .header
-        .number;
-    let block_count = kona_cfg.claimed_l2_block_number - starting_block;
-    for i in 0..block_count {
-        transactions += l2_provider
-            .get_block_transaction_count_by_number(BlockNumberOrTag::Number(starting_block + i + 1))
+    if !kona_cfg.is_offline() {
+        let (.., l2_provider) = kona_cfg
+            .create_providers()
+            .await
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+        let mut transactions = 0;
+        let starting_block = l2_provider
+            .get_block_by_hash(kona_cfg.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
             .await
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
-            .expect("Failed to get transaction count for block {i}");
+            .unwrap()
+            .header
+            .number;
+        let block_count = kona_cfg.claimed_l2_block_number - starting_block;
+        for i in 0..block_count {
+            transactions += l2_provider
+                .get_block_transaction_count_by_number(BlockNumberOrTag::Number(
+                    starting_block + i + 1,
+                ))
+                .await
+                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
+                .expect("Failed to get transaction count for block {i}");
+        }
+        info!(
+            "Proving {} transactions over {} blocks.",
+            transactions, block_count
+        );
     }
-    info!(
-        "Proving {} transactions over {} blocks.",
-        transactions, block_count
-    );
     // generate proof
     let proof_file_name = proof_file_name(&proof_journal);
     if let Ok(true) = Path::new(&proof_file_name).try_exists() {
@@ -131,10 +135,7 @@ pub async fn compute_fpvm_proof(
         .await?;
     }
 
-    info!(
-        "Proved {} transactions over {} blocks. ({} sub-proofs composed)",
-        transactions, block_count, stitched_count
-    );
+    info!("{} sub-proofs composed", stitched_count);
 
     read_proof_file(&proof_file_name)
         .await

@@ -21,7 +21,7 @@ use crate::provider::BlobProvider;
 use crate::stall::Stall;
 use crate::KAILUA_GAME_TYPE;
 use alloy::network::Network;
-use alloy::primitives::{Address, U256};
+use alloy::primitives::U256;
 use alloy::providers::Provider;
 use alloy::transports::Transport;
 use anyhow::{bail, Context};
@@ -37,15 +37,6 @@ use std::collections::hash_map::Entry;
 use std::path::PathBuf;
 use tracing::{error, info, warn};
 use treasury::Treasury;
-
-#[derive(Clone, Debug, Default)]
-pub enum ProofStatus {
-    #[default]
-    NONE,
-    ULoseVLose,
-    ULoseVWin,
-    UWinVLose,
-}
 
 #[derive(Debug)]
 pub struct KailuaDB {
@@ -358,10 +349,6 @@ impl KailuaDB {
         Ok(self
             .db
             .put(index.to_be_bytes(), bincode::serialize(proposal)?)?)
-    }
-
-    pub fn is_proposer_eliminated(&self, proposer: Address) -> bool {
-        self.state.eliminations.contains_key(&proposer)
     }
 
     pub fn was_proposer_eliminated_before(&self, proposal: &Proposal) -> bool {

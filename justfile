@@ -175,7 +175,6 @@ query block_number l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc:
 prove-offline block_number l2_claim l2_output_root l2_head l1_head l2_chain_id data target="release" verbosity="":
   echo "Running host program with zk client program..."
   ./target/{{target}}/kailua-host {{verbosity}} \
-    --otlp-collector \
     single \
     --l1-head {{l1_head}} \
     --agreed-l2-head-hash {{l2_head}} \

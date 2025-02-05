@@ -251,11 +251,19 @@ pub async fn run_boundless_client(
         }
 
         info!("Waiting for 0x{request_id:x} to be fulfilled");
-        let (_journal, seal) = boundless_client
+        let (fulfilled_journal, seal) = boundless_client
             .wait_for_request_fulfillment(request_id, Duration::from_secs(5), request.expires_at())
             .await
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
         info!("Request 0x{request_id:x} fulfilled");
+
+        if proof_journal.as_ref() != fulfilled_journal.0.as_ref() {
+            warn!(
+                "Fulfilled journal {} does not match expected journal {}.",
+                hex::encode(&fulfilled_journal.0),
+                hex::encode(proof_journal.as_ref())
+            );
+        }
 
         return Ok(Proof::BoundlessSeal(seal.to_vec(), proof_journal));
     }
@@ -353,10 +361,19 @@ pub async fn run_boundless_client(
 
     // Wait for the request to be fulfilled by the market, returning the journal and seal.
     info!("Waiting for 0x{request_id:x} to be fulfilled");
-    let (_journal, seal) = boundless_client
+    let (fulfilled_journal, seal) = boundless_client
         .wait_for_request_fulfillment(request_id, Duration::from_secs(5), expires_at)
         .await
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+
+    if proof_journal.as_ref() != fulfilled_journal.0.as_ref() {
+        warn!(
+            "Fulfilled journal {} does not match expected journal {}.",
+            hex::encode(&fulfilled_journal.0),
+            hex::encode(proof_journal.as_ref())
+        );
+    }
+
     info!("Request 0x{request_id:x} fulfilled");
 
     Ok(Proof::BoundlessSeal(seal.to_vec(), proof_journal))

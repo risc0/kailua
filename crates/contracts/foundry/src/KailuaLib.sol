@@ -47,21 +47,9 @@ error AlreadyEliminated();
 /// @notice Thrown when a proof is submitted for an already proven game
 error AlreadyProven();
 
-// 0xa37b6ee4
-/// @notice Thrown when a challenge is submitted after the clock has expired
-error ClockExpired();
-
 // 0xa506d334
 /// @notice Thrown when a resolution is attempted for an unproven claim
 error NotProven();
-
-// 0x87ec6473
-/// @notice Thrown when a proving fault for an unchallenged game
-error UnchallengedGame();
-
-// 0x84b45441
-/// @notice Thrown when a proving fault for an unchallenged output
-error UnchallengedOutput();
 
 // 0x5e22e582
 /// @notice Thrown when resolving a faulty proposal
@@ -90,10 +78,6 @@ error BlobHashMismatch(bytes32 found, bytes32 expected);
 // 0x1434391f
 /// @notice Thrown when a blob hash is missing
 error BlobHashMissing(uint256 index, uint256 count);
-
-// 0x1be40a37
-/// @notice Occurs when the anchored game is not finalized
-error InvalidAnchoredGame();
 
 // 0x19e3a1dc
 /// @notice Occurs when the duplication counter is wrong

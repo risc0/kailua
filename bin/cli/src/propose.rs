@@ -162,7 +162,6 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                 }
             }
 
-            let proposal = kailua_db.get_local_proposal(&proposal_index).unwrap();
             // Skip resolved games
             if proposal
                 .fetch_finality(&proposer_provider)
