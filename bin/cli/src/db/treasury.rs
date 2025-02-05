@@ -53,21 +53,21 @@ impl Treasury {
     pub async fn fetch_bond<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         &mut self,
         provider: P,
-    ) -> anyhow::Result<U256> {
+    ) -> U256 {
         self.participation_bond = self
             .treasury_contract_instance(provider)
             .participationBond()
             .stall()
             .await
             ._0;
-        Ok(self.participation_bond)
+        self.participation_bond
     }
 
     pub async fn fetch_balance<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         &mut self,
         provider: P,
         address: Address,
-    ) -> anyhow::Result<U256> {
+    ) -> U256 {
         let paid_bond = self
             .treasury_contract_instance(provider)
             .paidBonds(address)
@@ -75,7 +75,7 @@ impl Treasury {
             .await
             ._0;
         self.paid_bond.insert(address, paid_bond);
-        Ok(paid_bond)
+        paid_bond
     }
 
     pub async fn fetch_proposer<T: Transport + Clone, P: Provider<T, N>, N: Network>(

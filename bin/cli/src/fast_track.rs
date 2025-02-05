@@ -14,6 +14,7 @@
 
 use crate::signer::{DeployerSignerArgs, GuardianSignerArgs, OwnerSignerArgs};
 use crate::stall::Stall;
+use crate::transact::Transact;
 use crate::KAILUA_GAME_TYPE;
 use alloy::network::{Network, ReceiptResponse, TxSigner};
 use alloy::primitives::{Address, Bytes, Uint, U256};
@@ -202,18 +203,10 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         KAILUA_GAME_TYPE,
         dgf_address,
     )
-    .send()
-    .with_context(
-        context.with_span(tracer.start_with_context("KailuaTreasury::deploy (send)", &context)),
-    )
+    .transact()
+    .with_context(context.with_span(tracer.start_with_context("KailuaTreasury::deploy", &context)))
     .await
-    .context("deploy KailuaTreasury")?
-    .get_receipt()
-    .with_context(
-        context.with_span(tracer.start_with_context("KailuaTreasury::deploy (receipt)", &context)),
-    )
-    .await
-    .context("get_receipt KailuaTreasury")?;
+    .context("KailuaTreasury::deploy")?;
     info!("KailuaTreasury::deploy: {} gas", receipt.gas_used);
     let kailua_treasury_implementation = KailuaTreasury::new(
         receipt
@@ -350,18 +343,10 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         U256::from(args.proposal_time_gap),
         args.challenge_timeout,
     )
-    .send()
-    .with_context(
-        context.with_span(tracer.start_with_context("KailuaTreasury::deploy (send)", &context)),
-    )
+    .transact()
+    .with_context(context.with_span(tracer.start_with_context("KailuaGame::deploy", &context)))
     .await
-    .context("deploy KailuaGame")?
-    .get_receipt()
-    .with_context(
-        context.with_span(tracer.start_with_context("KailuaTreasury::deploy (receipt)", &context)),
-    )
-    .await
-    .context("get_receipt KailuaGame")?;
+    .context("KailuaGame::deploy")?;
     info!("KailuaGame::deploy: {} gas", receipt.gas_used);
     let kailua_game_contract = KailuaGame::new(
         receipt
@@ -415,20 +400,12 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         info!("Setting respectedGameType in OptimismPortal2.");
         let receipt = optimism_portal
             .setRespectedGameType(KAILUA_GAME_TYPE)
-            .send()
+            .transact()
             .with_context(
-                context
-                    .with_span(tracer.start_with_context("setRespectedGameType (send)", &context)),
+                context.with_span(tracer.start_with_context("setRespectedGameType", &context)),
             )
             .await
-            .context("setImplementation KailuaGame")?
-            .get_receipt()
-            .with_context(
-                context.with_span(
-                    tracer.start_with_context("setRespectedGameType (receipt)", &context),
-                ),
-            )
-            .await?;
+            .context("OptimismPortal2::setRespectedGameType")?;
         info!(
             "OptimismPortal2::setRespectedGameType: {} gas",
             receipt.gas_used
@@ -455,18 +432,13 @@ pub async fn deploy_verifier<
     // Deploy verifier router contract
     info!("Deploying RiscZeroVerifierRouter contract to L1 under ownership of {owner_address}.");
     let receipt = RiscZeroVerifierRouter::deploy_builder(&deployer_provider, owner_address)
-        .send()
-        .with_context(context.with_span(
-            tracer.start_with_context("RiscZeroVerifierRouter::deploy (send)", &context),
-        ))
+        .transact()
+        .with_context(
+            context
+                .with_span(tracer.start_with_context("RiscZeroVerifierRouter::deploy", &context)),
+        )
         .await
-        .context("deploy RiscZeroVerifierRouter")?
-        .get_receipt()
-        .with_context(context.with_span(
-            tracer.start_with_context("RiscZeroVerifierRouter::deploy (receipt)", &context),
-        ))
-        .await
-        .context("get_receipt RiscZeroVerifierRouter")?;
+        .context("RiscZeroVerifierRouter::deploy")?;
     info!("RiscZeroVerifierRouter::deploy: {} gas", receipt.gas_used());
     let verifier_contract_address = receipt
         .contract_address()
@@ -477,18 +449,14 @@ pub async fn deploy_verifier<
     info!("Deploying RiscZeroGroth16Verifier contract to L1.");
     let receipt =
         RiscZeroGroth16Verifier::deploy_builder(&deployer_provider, CONTROL_ROOT, BN254_CONTROL_ID)
-            .send()
-            .with_context(context.with_span(
-                tracer.start_with_context("RiscZeroGroth16Verifier::deploy (send)", &context),
-            ))
+            .transact()
+            .with_context(
+                context.with_span(
+                    tracer.start_with_context("RiscZeroGroth16Verifier::deploy", &context),
+                ),
+            )
             .await
-            .context("deploy RiscZeroGroth16Verifier")?
-            .get_receipt()
-            .with_context(context.with_span(
-                tracer.start_with_context("RiscZeroGroth16Verifier::deploy (receipt)", &context),
-            ))
-            .await
-            .context("get_receipt RiscZeroGroth16Verifier")?;
+            .context("RiscZeroGroth16Verifier::deploy")?;
     info!(
         "RiscZeroGroth16Verifier::deploy: {} gas",
         receipt.gas_used()
@@ -500,22 +468,26 @@ pub async fn deploy_verifier<
         &deployer_provider,
     );
     info!("{:?}", &groth16_verifier_contract);
-    let selector = groth16_verifier_contract.SELECTOR().stall().await._0;
-    info!("Adding RiscZeroGroth16Verifier contract to RiscZeroVerifierRouter.");
-    let receipt = verifier_contract
-        .addVerifier(selector, *groth16_verifier_contract.address())
-        .send()
-        .with_context(context.with_span(tracer.start_with_context("addVerifier (send)", &context)))
-        .await
-        .context("addVerifier RiscZeroGroth16Verifier (send)")?
-        .get_receipt()
+    let selector = groth16_verifier_contract
+        .SELECTOR()
+        .stall()
         .with_context(
-            context.with_span(tracer.start_with_context("addVerifier (receipt)", &context)),
+            context.with_span(tracer.start_with_context("selector(groth16Verifier)", &context)),
         )
         .await
-        .context("addVerifier RiscZeroGroth16Verifier (get_receipt)")?;
+        ._0;
+    info!("Adding RiscZeroGroth16Verifier contract to RiscZeroVerifierRouter.");
+    let receipt =
+        verifier_contract
+            .addVerifier(selector, *groth16_verifier_contract.address())
+            .transact()
+            .with_context(context.with_span(
+                tracer.start_with_context("addVerifier(RiscZeroGroth16Verifier)", &context),
+            ))
+            .await
+            .context("RiscZeroVerifierRouter::addVerifier(RiscZeroGroth16Verifier)")?;
     info!(
-        "RiscZeroGroth16Verifier::addVerifier: {} gas",
+        "RiscZeroVerifierRouter::addVerifier(RiscZeroGroth16Verifier): {} gas",
         receipt.gas_used()
     );
 
@@ -527,21 +499,12 @@ pub async fn deploy_verifier<
         SET_BUILDER_ID,
         String::default(),
     )
-    .send()
+    .transact()
     .with_context(
-        context
-            .with_span(tracer.start_with_context("RiscZeroSetVerifier::deploy (send)", &context)),
+        context.with_span(tracer.start_with_context("RiscZeroSetVerifier::deploy", &context)),
     )
     .await
-    .context("deploy RiscZeroSetVerifier")?
-    .get_receipt()
-    .with_context(
-        context.with_span(
-            tracer.start_with_context("RiscZeroSetVerifier::deploy (receipt)", &context),
-        ),
-    )
-    .await
-    .context("get_receipt RiscZeroSetVerifier")?;
+    .context("RiscZeroSetVerifier::deploy")?;
     info!("RiscZeroSetVerifier::deploy: {} gas", receipt.gas_used());
     let set_verifier_contract = RiscZeroSetVerifier::new(
         receipt
@@ -550,22 +513,26 @@ pub async fn deploy_verifier<
         &deployer_provider,
     );
     info!("{:?}", &set_verifier_contract);
-    let selector = set_verifier_contract.SELECTOR().stall().await._0;
+    let selector = set_verifier_contract
+        .SELECTOR()
+        .stall()
+        .with_context(
+            context.with_span(tracer.start_with_context("selector(setVerifier)", &context)),
+        )
+        .await
+        ._0;
     info!("Adding RiscZeroSetVerifier contract to RiscZeroVerifierRouter.");
     let receipt = verifier_contract
         .addVerifier(selector, *set_verifier_contract.address())
-        .send()
-        .with_context(context.with_span(tracer.start_with_context("addVerifier (send)", &context)))
-        .await
-        .context("addVerifier RiscZeroSetVerifier (send)")?
-        .get_receipt()
+        .transact()
         .with_context(
-            context.with_span(tracer.start_with_context("addVerifier (receipt)", &context)),
+            context
+                .with_span(tracer.start_with_context("addVerifier(RiscZeroSetVerifier)", &context)),
         )
         .await
-        .context("addVerifier RiscZeroSetVerifier (get_receipt)")?;
+        .context("RiscZeroVerifierRouter::addVerifier(RiscZeroSetVerifier)")?;
     info!(
-        "RiscZeroSetVerifier::addVerifier: {} gas",
+        "RiscZeroVerifierRouter::addVerifier(RiscZeroSetVerifier): {} gas",
         receipt.gas_used()
     );
 
@@ -575,18 +542,13 @@ pub async fn deploy_verifier<
         // Deploy MockVerifier contract
         tracing::warn!("Deploying RiscZeroMockVerifier contract to L1. This will accept fake proofs which are not cryptographically secure!");
         let receipt = RiscZeroMockVerifier::deploy_builder(&deployer_provider, [0u8; 4].into())
-            .send()
-            .with_context(context.with_span(
-                tracer.start_with_context("RiscZeroMockVerifier::deploy (send)", &context),
-            ))
+            .transact()
+            .with_context(
+                context
+                    .with_span(tracer.start_with_context("RiscZeroMockVerifier::deploy", &context)),
+            )
             .await
-            .context("deploy RiscZeroMockVerifier")?
-            .get_receipt()
-            .with_context(context.with_span(
-                tracer.start_with_context("RiscZeroMockVerifier::deploy (receipt)", &context),
-            ))
-            .await
-            .context("get_receipt RiscZeroMockVerifier")?;
+            .context("RiscZeroMockVerifier::deploy")?;
         info!("RiscZeroMockVerifier::deploy: {} gas", receipt.gas_used());
 
         let mock_verifier_contract = RiscZeroMockVerifier::new(
@@ -599,20 +561,14 @@ pub async fn deploy_verifier<
         tracing::warn!("Adding RiscZeroMockVerifier contract to RiscZeroVerifierRouter.");
         let receipt = verifier_contract
             .addVerifier([0u8; 4].into(), *mock_verifier_contract.address())
-            .send()
-            .with_context(
-                context.with_span(tracer.start_with_context("addVerifier (send)", &context)),
-            )
+            .transact()
+            .with_context(context.with_span(
+                tracer.start_with_context("addVerifier(RiscZeroMockVerifier)", &context),
+            ))
             .await
-            .context("addVerifier RiscZeroMockVerifier (send)")?
-            .get_receipt()
-            .with_context(
-                context.with_span(tracer.start_with_context("addVerifier (receipt)", &context)),
-            )
-            .await
-            .context("addVerifier RiscZeroMockVerifier (get_receipt)")?;
+            .context("RiscZeroVerifierRouter::addVerifier(RiscZeroMockVerifier)")?;
         info!(
-            "RiscZeroMockVerifier::addVerifier: {} gas",
+            "RiscZeroVerifierRouter::addVerifier(RiscZeroMockVerifier): {} gas",
             receipt.gas_used()
         );
     }

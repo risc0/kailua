@@ -1,6 +1,8 @@
 use crate::db::config::Config;
 use crate::provider::{blob_fe_proof, blob_sidecar, BlobProvider};
+use crate::retry;
 use crate::stall::Stall;
+use crate::transact::Transact;
 use alloy::consensus::{Blob, BlobTransactionSidecar, BlockHeader};
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy::eips::{BlockId, BlockNumberOrTag};
@@ -10,7 +12,7 @@ use alloy::primitives::{Address, Bytes, B256, U256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
 use alloy_rpc_types_beacon::sidecar::BlobData;
-use anyhow::{bail, Context};
+use anyhow::{anyhow, bail, Context};
 use kailua_client::provider::OpNodeProvider;
 use kailua_common::blobs::{hash_to_fe, intermediate_outputs, trail_data};
 use kailua_common::precondition::blobs_hash;
@@ -209,7 +211,7 @@ impl Proposal {
             .await
             .parentGame_;
         let parent_tournament_instance = KailuaTournament::new(parent_tournament, &provider);
-        let children = parent_tournament_instance.childCount().call().await?.count_;
+        let children = parent_tournament_instance.childCount().stall().await.count_;
         let survivor = parent_tournament_instance
             .pruneChildren(children)
             .call()
@@ -281,16 +283,17 @@ impl Proposal {
         &self,
         provider: P,
     ) -> anyhow::Result<u64> {
-        let chain_time = provider
+        let chain_time = retry!(provider
             .get_block(
                 BlockId::Number(BlockNumberOrTag::Latest),
                 BlockTransactionsKind::Hashes,
             )
             .await
             .context("get_block")?
-            .expect("Could not fetch latest L1 block")
-            .header()
-            .timestamp();
+            .ok_or_else(|| anyhow!("Failed to fetch block")))
+        .await?
+        .header()
+        .timestamp();
         Ok(self
             .tournament_contract_instance(provider)
             .getChallengerDuration(U256::from(chain_time))
@@ -403,12 +406,9 @@ impl Proposal {
             info!("Eliminating {ELIMINATIONS_LIMIT} opponents before resolution.");
             let receipt = parent_tournament_instance
                 .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
-                .send()
+                .transact()
                 .await
-                .context("KailuaTournament::pruneChildren (send)")?
-                .get_receipt()
-                .await
-                .context("KailuaTournament::pruneChildren (get_receipt)")?;
+                .context("KailuaTournament::pruneChildren")?;
             info!(
                 "KailuaTournament::pruneChildren: {} gas",
                 receipt.gas_used()
@@ -417,12 +417,9 @@ impl Proposal {
 
         let receipt = contract_instance
             .resolve()
-            .send()
+            .transact()
             .await
-            .context("KailuaTournament::resolve (send)")?
-            .get_receipt()
-            .await
-            .context("KailuaTournament::resolve (get_receipt)")?;
+            .context("KailuaTournament::resolve")?;
         info!("KailuaTournament::resolve: {} gas", receipt.gas_used());
 
         Ok(receipt)

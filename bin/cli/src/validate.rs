@@ -18,6 +18,7 @@ use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
 use crate::provider::BlobProvider;
 use crate::signer::ValidatorSignerArgs;
+use crate::transact::Transact;
 use crate::{stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::{IndexedBlobHash, FIELD_ELEMENTS_PER_BLOB};
 use alloy::eips::BlockNumberOrTag;
@@ -498,32 +499,22 @@ pub async fn handle_proposals(
                         v_index,
                         encoded_seal.clone(),
                     )
-                    .send()
+                    .transact()
                     .await
-                    .context("proveValidity (send)")
+                    .context("KailuaTournament::proveValidity")
                 {
-                    Ok(txn) => match txn
-                        .get_receipt()
-                        .await
-                        .context("proveValidity (get_receipt)")
-                    {
-                        Ok(receipt) => {
-                            info!("Validity proof submitted: {receipt:?}");
-                            let proof_status = parent_contract
-                                .provenAt(U256::ZERO, U256::ZERO)
-                                .stall()
-                                .await
-                                ._0;
-                            info!("Validity proof timestamp: {proof_status}");
-                            info!("KailuaTournament::proveValidity: {} gas", receipt.gas_used);
-                        }
-                        Err(e) => {
-                            error!("Failed to confirm validity proof txn: {e:?}");
-                            proof_buffer.push_back(Message::Proof(proposal_index, proof));
-                        }
-                    },
+                    Ok(receipt) => {
+                        info!("Validity proof submitted: {:?}", receipt.transaction_hash);
+                        let proof_status = parent_contract
+                            .provenAt(U256::ZERO, U256::ZERO)
+                            .stall()
+                            .await
+                            ._0;
+                        info!("Validity proof timestamp: {proof_status}");
+                        info!("KailuaTournament::proveValidity: {} gas", receipt.gas_used);
+                    }
                     Err(e) => {
-                        error!("Failed to send validity proof txn: {e:?}");
+                        error!("Failed to confirm validity proof txn: {e:?}");
                         proof_buffer.push_back(Message::Proof(proposal_index, proof));
                     }
                 }
@@ -881,9 +872,9 @@ pub async fn handle_proposals(
                         commitments,
                         proofs,
                     )
-                    .send()
+                    .transact()
                     .await
-                    .context("proveOutputFault (send)")
+                    .context("KailuaTournament::proveOutputFault")
             } else {
                 parent_contract
                     .proveTrailFault(
@@ -894,44 +885,38 @@ pub async fn handle_proposals(
                         commitments,
                         proofs,
                     )
-                    .send()
+                    .transact()
                     .await
-                    .context("proveTrailFault (send)")
+                    .context("KailuaTournament::proveTrailFault")
             };
 
             match transaction_dispatch {
-                Ok(txn) => match txn.get_receipt().await.context("prove (get_receipt)") {
-                    Ok(receipt) => {
-                        info!("Fault proof submitted: {receipt:?}");
-                        let proof_status = parent_contract
-                            .proofStatus(U256::from(u_index), U256::from(v_index))
-                            .stall()
-                            .await
-                            ._0;
-                        info!(
-                            "Match between {contender_index} and {} proven: {proof_status}",
-                            opponent.index
-                        );
+                Ok(receipt) => {
+                    info!("Fault proof submitted: {receipt:?}");
+                    let proof_status = parent_contract
+                        .proofStatus(U256::from(u_index), U256::from(v_index))
+                        .stall()
+                        .await
+                        ._0;
+                    info!(
+                        "Match between {contender_index} and {} proven: {proof_status}",
+                        opponent.index
+                    );
 
-                        if is_output_fault_proof {
-                            info!(
-                                "KailuaTournament::proveOutputFault: {} gas",
-                                receipt.gas_used
-                            );
-                        } else {
-                            info!(
-                                "KailuaTournament::proveTrailFault: {} gas",
-                                receipt.gas_used
-                            );
-                        }
+                    if is_output_fault_proof {
+                        info!(
+                            "KailuaTournament::proveOutputFault: {} gas",
+                            receipt.gas_used
+                        );
+                    } else {
+                        info!(
+                            "KailuaTournament::proveTrailFault: {} gas",
+                            receipt.gas_used
+                        );
                     }
-                    Err(e) => {
-                        error!("Failed to confirm fault proof txn: {e:?}");
-                        proof_buffer.push_back(Message::Proof(proposal_index, proof));
-                    }
-                },
+                }
                 Err(e) => {
-                    error!("Failed to send fault proof txn: {e:?}");
+                    error!("Failed to confirm fault proof txn: {e:?}");
                     proof_buffer.push_back(Message::Proof(proposal_index, proof));
                 }
             }

@@ -16,7 +16,8 @@ use crate::db::proposal::{Proposal, ELIMINATIONS_LIMIT};
 use crate::db::KailuaDB;
 use crate::provider::BlobProvider;
 use crate::signer::ProposerSignerArgs;
-use crate::{stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
+use crate::transact::Transact;
+use crate::{retry, stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::consensus::BlockHeader;
 use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::primitives::BlockTransactionsKind;
@@ -24,7 +25,7 @@ use alloy::network::{BlockResponse, TxSigner};
 use alloy::primitives::{Bytes, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::SolValue;
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use kailua_client::provider::OpNodeProvider;
 use kailua_client::telemetry::TelemetryArgs;
 use kailua_common::blobs::hash_to_fe;
@@ -84,8 +85,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
     info!("Proposer address: {proposer_address}");
 
     // Init registry and factory contracts
-    let dispute_game_factory =
-        kailua_contracts::IDisputeGameFactory::new(dgf_address, &proposer_provider);
+    let dispute_game_factory = IDisputeGameFactory::new(dgf_address, &proposer_provider);
     info!("DisputeGameFactory({:?})", dispute_game_factory.address());
     let game_count: u64 = dispute_game_factory
         .gameCount()
@@ -94,7 +94,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         .gameCount_
         .to();
     info!("There have been {game_count} games created using DisputeGameFactory");
-    let kailua_game_implementation = kailua_contracts::KailuaGame::new(
+    let kailua_game_implementation = KailuaGame::new(
         dispute_game_factory
             .gameImpls(KAILUA_GAME_TYPE)
             .stall()
@@ -155,20 +155,13 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             let parent_contract = parent.tournament_contract_instance(&proposer_provider);
 
             // Skip resolved games
-            match proposal.fetch_finality(&proposer_provider).await {
-                Ok(res) => {
-                    if res.unwrap_or_default() {
-                        info!("Reached resolved ancestor proposal.");
-                        continue;
-                    }
-                }
-                Err(err) => {
-                    error!(
-                        "Failed to fetch finality of proposal {}: {err:?}",
-                        proposal.index
-                    );
-                    break;
-                }
+            if proposal
+                .fetch_finality(&proposer_provider)
+                .await?
+                .unwrap_or_default()
+            {
+                info!("Reached resolved ancestor proposal.");
+                continue;
             }
 
             // Check for timeout and fast-forward status
@@ -201,19 +194,24 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
 
                     // Prune next set of children
                     info!("Eliminating {ELIMINATIONS_LIMIT} opponents before resolution.");
-                    let receipt = parent_contract
+                    match parent_contract
                         .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
-                        .send()
+                        .transact()
                         .await
-                        .context("KailuaTournament::pruneChildren (send)")?
-                        .get_receipt()
-                        .await
-                        .context("KailuaTournament::pruneChildren (get_receipt)")?;
-                    info!("KailuaTournament::pruneChildren: {} gas", receipt.gas_used);
+                        .context("KailuaTournament::pruneChildren transact")
+                    {
+                        Ok(receipt) => {
+                            info!("KailuaTournament::pruneChildren: {} gas", receipt.gas_used);
+                        }
+                        Err(err) => {
+                            error!("KailuaTournament::pruneChildren: {err:?}");
+                            break false;
+                        }
+                    }
                 };
                 // Some disputes are still unresolved
                 if !can_resolve {
-                    info!("Waiting for more proofs to resolve proposer as survivor");
+                    info!("Waiting for more proofs to resolve proposer as survivor.");
                     break;
                 }
             }
@@ -246,7 +244,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             continue;
         };
         // Query op-node to get latest safe l2 head
-        let sync_status = op_node_provider.sync_status().await?;
+        let sync_status = retry!(op_node_provider.sync_status().await).await?;
         debug!("sync_status[safe_l2] {:?}", &sync_status["safe_l2"]);
         let output_block_number = sync_status["safe_l2"]["number"].as_u64().unwrap();
         if output_block_number < canonical_tip.output_block_number {
@@ -272,16 +270,17 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         // Wait for L1 timestamp to advance beyond the safety gap for proposals
         let proposed_block_number =
             canonical_tip.output_block_number + kailua_db.config.blocks_per_proposal();
-        let chain_time = proposer_provider
+        let chain_time = retry!(proposer_provider
             .get_block(
                 BlockId::Number(BlockNumberOrTag::Latest),
                 BlockTransactionsKind::Hashes,
             )
             .await
             .context("get_block")?
-            .expect("Could not fetch latest L1 block")
-            .header()
-            .timestamp();
+            .ok_or_else(|| anyhow!("Failed to fetch block")))
+        .await?
+        .header()
+        .timestamp();
         if !kailua_db
             .config
             .allows_proposal(proposed_block_number, chain_time)
@@ -293,25 +292,32 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         }
 
         // Prepare proposal
-        let proposed_output_root = op_node_provider
-            .output_at_block(proposed_block_number)
-            .await?;
+        let proposed_output_root = retry!(
+            op_node_provider
+                .output_at_block(proposed_block_number)
+                .await
+        )
+        .await?;
         // Prepare intermediate outputs
         let mut io_field_elements = vec![];
         for i in 1..kailua_db.config.proposal_output_count {
             let io_block_number =
                 canonical_tip.output_block_number + i * kailua_db.config.output_block_span;
-            let Ok(output_hash) = op_node_provider.output_at_block(io_block_number).await else {
-                error!("Could not retrieve intermediate output at block #{io_block_number}.");
-                break;
-            };
+            let output_hash =
+                retry!(op_node_provider.output_at_block(io_block_number).await).await?;
             io_field_elements.push(hash_to_fe(output_hash));
         }
         if io_field_elements.len() as u64 != kailua_db.config.proposal_output_count - 1 {
             error!("Could not gather all necessary intermediate outputs.");
             continue;
         }
-        let sidecar = Proposal::create_sidecar(&io_field_elements)?;
+        let sidecar = match Proposal::create_sidecar(&io_field_elements) {
+            Ok(res) => res,
+            Err(err) => {
+                error!("Failed to create blob sidecar: {err:?}");
+                continue;
+            }
+        };
 
         info!("Candidate proposal prepared");
         // Calculate required duplication counter
@@ -371,12 +377,12 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             continue;
         };
         // Check collateral requirements
-        let bond_value = kailua_db.treasury.fetch_bond(&proposer_provider).await?;
+        let bond_value = kailua_db.treasury.fetch_bond(&proposer_provider).await;
         let paid_in = kailua_db
             .treasury
             .fetch_balance(&proposer_provider, proposer_address)
-            .await?;
-        let balance = proposer_provider.get_balance(proposer_address).await?;
+            .await;
+        let balance = retry!(proposer_provider.get_balance(proposer_address).await).await?;
         let owed_collateral = bond_value.saturating_sub(paid_in);
         if balance < owed_collateral {
             error!("INSUFFICIENT BALANCE! Need to lock in at least {owed_collateral} more.");
@@ -390,21 +396,16 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             .propose(proposed_output_root, Bytes::from(extra_data))
             .value(owed_collateral)
             .sidecar(sidecar)
-            .send()
+            .transact()
             .await
-            .context("propose (send)")
+            .context("KailuaTreasury::propose")
         {
-            Ok(txn) => match txn.get_receipt().await.context("propose (get_receipt)") {
-                Ok(receipt) => {
-                    info!("Proposal submitted: {receipt:?}");
-                    info!("KailuaTreasury::propose: {} gas", receipt.gas_used);
-                }
-                Err(e) => {
-                    error!("Failed to confirm proposal txn: {e:?}");
-                }
-            },
+            Ok(receipt) => {
+                info!("Proposal submitted: {:?}", receipt.transaction_hash);
+                info!("KailuaTreasury::propose: {} gas", receipt.gas_used);
+            }
             Err(e) => {
-                error!("Failed to send proposal txn: {e:?}");
+                error!("Failed to confirm proposal txn: {e:?}");
             }
         }
     }

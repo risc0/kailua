@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::transact::Transact;
 use alloy::contract::SolCallBuilder;
 use alloy::network::{Network, TransactionBuilder};
 use alloy::primitives::{Address, Uint, U256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
+use anyhow::Context;
 use kailua_contracts::Safe::SafeInstance;
 use std::path::PathBuf;
 
@@ -28,8 +30,10 @@ pub mod fast_track;
 pub mod fault;
 pub mod propose;
 pub mod provider;
+pub mod retry;
 pub mod signer;
 pub mod stall;
+pub mod transact;
 pub mod validate;
 
 pub const KAILUA_GAME_TYPE: u32 = 1337;
@@ -134,9 +138,8 @@ pub async fn exec_safe_txn<
         .concat()
         .into(),
     )
-    .send()
-    .await?
-    .get_receipt()
-    .await?;
+    .transact()
+    .await
+    .context("Safe::execTransaction")?;
     Ok(())
 }

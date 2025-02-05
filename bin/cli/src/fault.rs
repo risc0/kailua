@@ -15,6 +15,7 @@
 use crate::db::proposal::Proposal;
 use crate::propose::ProposeArgs;
 use crate::stall::Stall;
+use crate::transact::Transact;
 use crate::KAILUA_GAME_TYPE;
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy::primitives::{Bytes, B256, U256};
@@ -198,20 +199,15 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .propose(proposed_output_root, Bytes::from(extra_data))
         .value(owed_collateral)
         .sidecar(sidecar)
-        .send()
+        .transact()
         .await
         .context("propose (send)")
     {
-        Ok(txn) => match txn.get_receipt().await.context("propose (get_receipt)") {
-            Ok(receipt) => {
-                info!("Faulty proposal submitted at index {games_count}: {receipt:?}")
-            }
-            Err(e) => {
-                error!("Failed to confirm faulty proposal txn: {e:?}");
-            }
-        },
+        Ok(receipt) => {
+            info!("Faulty proposal submitted at index {games_count}: {receipt:?}")
+        }
         Err(e) => {
-            error!("Failed to send faulty proposal txn: {e:?}");
+            error!("Failed to confirm faulty proposal txn: {e:?}");
         }
     }
     Ok(())

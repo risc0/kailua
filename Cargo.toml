@@ -44,6 +44,7 @@ spin = { version = "0.9.8", features = ["mutex"] }
 tempfile = "3.10.1"
 thiserror = "2.0.11"
 tokio = { version = "1.39.1", features = ["full"] }
+tokio-retry = "0.3.0"
 url = "2.5.4"
 
 # Telemetry
