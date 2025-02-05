@@ -155,21 +155,31 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             let parent_contract = parent.tournament_contract_instance(&proposer_provider);
             info!("Parent Tournament Children:");
             for i in 0..u64::MAX {
-                if let Ok(res) = parent_contract.children(U256::from(i)).call().await {
-                    info!("{}", res._0);
-                } else {
-                    break;
+                match parent_contract.children(U256::from(i)).call().await {
+                    Ok(res) => {
+                        info!("{}", res._0);
+                    }
+                    Err(err) => {
+                        error!("Child {i} lookup failure: {err:?}")
+                    }
                 }
             }
 
             // Skip resolved games
-            if proposal
-                .fetch_finality(&proposer_provider)
-                .await?
-                .unwrap_or_default()
-            {
-                info!("Reached resolved ancestor proposal.");
-                continue;
+            match proposal.fetch_finality(&proposer_provider).await {
+                Ok(res) => {
+                    if res.unwrap_or_default() {
+                        info!("Reached resolved ancestor proposal.");
+                        continue;
+                    }
+                }
+                Err(err) => {
+                    error!(
+                        "Failed to fetch finality of proposal {}: {err:?}",
+                        proposal.index
+                    );
+                    break;
+                }
             }
 
             // Check for timeout and fast-forward status

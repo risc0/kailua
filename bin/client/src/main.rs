@@ -30,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
         HINT_WRITER,
         payout_recipient_address,
         precondition_validation_data_hash,
-        vec![], // todo: read stitched boot info data
+        vec![],
         vec![],
         true,
         true,

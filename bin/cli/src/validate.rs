@@ -185,8 +185,10 @@ pub async fn handle_proposals(
         "Starting from proposal at factory index {}",
         kailua_db.state.next_factory_index
     );
-    // init channel buffer
-    let mut channel_buf = VecDeque::new();
+    // init channel buffers
+    let mut proof_buffer = VecDeque::new();
+    let mut fault_buffer = VecDeque::new();
+    let mut valid_buffer = VecDeque::new();
     loop {
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
@@ -237,15 +239,7 @@ pub async fn handle_proposals(
                 && opponent.output_block_number <= args.fast_forward_target
             {
                 // Prove full validity
-                request_validity_proof(
-                    &mut channel,
-                    &kailua_db.config,
-                    &proposal_parent,
-                    &opponent,
-                    &eth_rpc_provider,
-                    &op_geth_provider,
-                )
-                .await?;
+                valid_buffer.push_back(opponent_index);
                 continue;
             }
             // skip fault proving this proposal if it has no contender
@@ -298,11 +292,37 @@ pub async fn handle_proposals(
                 );
                 continue;
             }
-            // Prove fault
-            request_fault_proof(
+            // Queue fault proof request
+            fault_buffer.push_back((contender_index, opponent_index));
+        }
+        // dispatch buffered fault proof requests
+        let fault_proof_requests = fault_buffer.len();
+        for _ in 0..fault_proof_requests {
+            let request = fault_buffer.pop_front().unwrap();
+            let (contender_index, opponent_index) = request;
+            let Some(opponent) = kailua_db.get_local_proposal(&opponent_index) else {
+                error!("Proposal {opponent_index} missing from database.");
+                fault_buffer.push_back(request);
+                continue;
+            };
+            // Look up parent proposal
+            let Some(parent) = kailua_db.get_local_proposal(&opponent.parent) else {
+                error!(
+                    "Proposal {} parent {} missing from database.",
+                    opponent.index, opponent.parent
+                );
+                fault_buffer.push_back(request);
+                continue;
+            };
+            let Some(contender) = kailua_db.get_local_proposal(&contender_index) else {
+                error!("Contender {contender_index} missing from database.");
+                fault_buffer.push_back(request);
+                continue;
+            };
+            if let Err(err) = request_fault_proof(
                 &mut channel,
                 &kailua_db.config,
-                &proposal_parent,
+                &parent,
                 &contender,
                 &opponent,
                 &eth_rpc_provider,
@@ -310,22 +330,57 @@ pub async fn handle_proposals(
                 &op_node_provider,
             )
             .await
-            .context("request_fault_proof")?;
+            {
+                error!("Could not request fault proof for {contender_index} vs {opponent_index}: {err:?}");
+                fault_buffer.push_back(request);
+            }
+        }
+        // dispatch buffered validity proof requests
+        let validity_proof_requests = valid_buffer.len();
+        for _ in 0..validity_proof_requests {
+            let proposal_index = valid_buffer.pop_front().unwrap();
+            let Some(proposal) = kailua_db.get_local_proposal(&proposal_index) else {
+                error!("Proposal {proposal_index} missing from database.");
+                valid_buffer.push_front(proposal_index);
+                continue;
+            };
+            // Look up parent proposal
+            let Some(parent) = kailua_db.get_local_proposal(&proposal.parent) else {
+                error!(
+                    "Proposal {} parent {} missing from database.",
+                    proposal.index, proposal.parent
+                );
+                valid_buffer.push_front(proposal_index);
+                continue;
+            };
+            if let Err(err) = request_validity_proof(
+                &mut channel,
+                &kailua_db.config,
+                &parent,
+                &proposal,
+                &eth_rpc_provider,
+                &op_geth_provider,
+            )
+            .await
+            {
+                error!("Could not request validity proof for {proposal_index}: {err:?}");
+                valid_buffer.push_front(proposal_index);
+            }
         }
 
-        // load newly received messages into buffer
+        // load newly received proofs into buffer
         while !channel.receiver.is_empty() {
             let Some(message) = channel.receiver.recv().await else {
                 error!("Proofs receiver channel closed");
                 break;
             };
-            channel_buf.push_back(message);
+            proof_buffer.push_back(message);
         }
 
-        // publish computed fault proofs and resolve proven challenges
-        let messages = channel_buf.len();
-        for _ in 0..messages {
-            let Message::Proof(proposal_index, proof) = channel_buf.pop_front().unwrap() else {
+        // publish computed proofs and resolve proven challenges
+        let computed_proofs = proof_buffer.len();
+        for _ in 0..computed_proofs {
+            let Message::Proof(proposal_index, proof) = proof_buffer.pop_front().unwrap() else {
                 error!("Validator loop received an unexpected message type.");
                 continue;
             };
@@ -464,12 +519,12 @@ pub async fn handle_proposals(
                         }
                         Err(e) => {
                             error!("Failed to confirm validity proof txn: {e:?}");
-                            channel_buf.push_back(Message::Proof(proposal_index, proof));
+                            proof_buffer.push_back(Message::Proof(proposal_index, proof));
                         }
                     },
                     Err(e) => {
                         error!("Failed to send validity proof txn: {e:?}");
-                        channel_buf.push_back(Message::Proof(proposal_index, proof));
+                        proof_buffer.push_back(Message::Proof(proposal_index, proof));
                     }
                 }
                 // Skip fault proof submission logic
@@ -872,12 +927,12 @@ pub async fn handle_proposals(
                     }
                     Err(e) => {
                         error!("Failed to confirm fault proof txn: {e:?}");
-                        channel_buf.push_back(Message::Proof(proposal_index, proof));
+                        proof_buffer.push_back(Message::Proof(proposal_index, proof));
                     }
                 },
                 Err(e) => {
                     error!("Failed to send fault proof txn: {e:?}");
-                    channel_buf.push_back(Message::Proof(proposal_index, proof));
+                    proof_buffer.push_back(Message::Proof(proposal_index, proof));
                 }
             }
         }
