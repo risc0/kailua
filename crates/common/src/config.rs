@@ -125,6 +125,14 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
             .context("holocene_time")?
             .to_be_bytes()
             .as_slice(),
+        safe_default(rollup_config.isthmus_time, u64::MAX)
+            .context("isthmus_time")?
+            .to_be_bytes()
+            .as_slice(),
+        safe_default(rollup_config.interop_time, u64::MAX)
+            .context("interop_time")?
+            .to_be_bytes()
+            .as_slice(),
         safe_default(rollup_config.blobs_enabled_l1_timestamp, u64::MAX)
             .context("blobs_enabled_timestmap")?
             .to_be_bytes()

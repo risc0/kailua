@@ -97,7 +97,7 @@ impl Cli {
             Cli::FastTrack(args) => args.telemetry.otlp_collector.clone(),
             Cli::Propose(args) => args.telemetry.otlp_collector.clone(),
             Cli::Validate(args) => args.telemetry.otlp_collector.clone(),
-            Cli::TestFault(args) => args.telemetry.otlp_collector.clone(),
+            Cli::TestFault(args) => args.propose_args.telemetry.otlp_collector.clone(),
             Cli::Benchmark(args) => args.telemetry.otlp_collector.clone(),
         }
     }

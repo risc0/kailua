@@ -101,10 +101,10 @@ event BondUpdated(uint256 amount);
 
 interface IKailuaTreasury {
     /// @notice Returns the game index at which proposer was proven faulty
-    function eliminationRound(address proposer) external returns (uint256);
+    function eliminationRound(address proposer) external view returns (uint256);
 
     /// @notice Returns the proposer of a game
-    function proposerOf(address game) external returns (address);
+    function proposerOf(address game) external view returns (address);
 
     /// @notice Eliminates a child's proposer and allocates their bond to the prover
     function eliminate(address child, address prover) external;
@@ -168,13 +168,19 @@ library KailuaLib {
         // [144:192]	proof	        Proof associated with the commitment.
         bytes memory kzgCallData = abi.encodePacked(versionedBlobHash, rootOfUnity, value, blobCommitment, proof);
         // The precompile will reject non-canonical field elements (i.e. value must be less than BLS_MODULUS).
-        (success,) = KZG.call(kzgCallData);
+        (bool _success, bytes memory kzgResult) = KZG.call(kzgCallData);
+        // Validate the precompile response
+        require(
+            keccak256(kzgResult) == keccak256(abi.encodePacked(uint256(1 << FIELD_ELEMENTS_PER_BLOB_PO2), BLS_MODULUS))
+        );
+        success = _success;
     }
 
-    function modExp(uint256 base) internal returns (uint256 result) {
+    function modExp(uint256 exponent) internal returns (uint256 result) {
         bytes memory modExpData =
-            abi.encodePacked(uint256(32), uint256(32), uint256(32), ROOT_OF_UNITY, base, BLS_MODULUS);
-        (, bytes memory rootOfUnity) = MOD_EXP.call(modExpData);
+            abi.encodePacked(uint256(32), uint256(32), uint256(32), ROOT_OF_UNITY, exponent, BLS_MODULUS);
+        (bool success, bytes memory rootOfUnity) = MOD_EXP.call(modExpData);
+        require(success);
         result = uint256(bytes32(rootOfUnity));
     }
 

@@ -309,7 +309,8 @@ pub async fn handle_proposals(
                 &op_geth_provider,
                 &op_node_provider,
             )
-            .await?;
+            .await
+            .context("request_fault_proof")?;
         }
 
         // load newly received messages into buffer

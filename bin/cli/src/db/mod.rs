@@ -24,7 +24,7 @@ use alloy::network::Network;
 use alloy::primitives::U256;
 use alloy::providers::Provider;
 use alloy::transports::Transport;
-use anyhow::{bail, Context};
+use anyhow::{anyhow, bail, Context};
 use config::Config;
 use kailua_client::provider::OpNodeProvider;
 use kailua_contracts::{
@@ -119,7 +119,9 @@ impl KailuaDB {
                                 proposals.push(self.state.next_factory_index);
                                 Some(
                                     self.get_local_proposal(&self.state.next_factory_index)
-                                        .expect("Failed to load immediately processed proposal"),
+                                        .ok_or_else(|| {
+                                            anyhow!("Failed to load immediately processed proposal")
+                                        })?,
                                 )
                             } else {
                                 None

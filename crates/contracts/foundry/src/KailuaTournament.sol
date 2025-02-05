@@ -301,7 +301,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                 u = v;
                 contender = opponent;
             } else {
-                // assume u survives (todo eliminate u on lose-lose)
+                // assume u survives
                 // eliminate the opponent
                 KAILUA_TREASURY.eliminate(address(opponent), prover[u][v]);
                 // proceed with the same contender
@@ -320,7 +320,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     }
 
     /// @notice Returns true iff the child proposal was eliminated
-    function isChildEliminated(KailuaTournament child) internal returns (bool) {
+    function isChildEliminated(KailuaTournament child) internal view returns (bool) {
         address _proposer = KAILUA_TREASURY.proposerOf(address(child));
         uint256 eliminationRound = KAILUA_TREASURY.eliminationRound(_proposer);
         if (eliminationRound == 0 || eliminationRound > child.gameIndex()) {
@@ -331,7 +331,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     }
 
     /// @notice Returns true if the opposing proposal can be ignored by the contender
-    function canIgnoreOpponent(KailuaTournament contender, KailuaTournament opponent) internal returns (bool) {
+    function canIgnoreOpponent(KailuaTournament contender, KailuaTournament opponent) internal view returns (bool) {
         // If the opponent proposal is an identical twin, skip it
         if (contender.rootClaim().raw() == opponent.rootClaim().raw()) {
             // The equivalence of intermediate output commitments matters because one proposal
@@ -361,7 +361,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     function parentGame() public view virtual returns (KailuaTournament parentGame_);
 
     /// @notice Returns the proposer address
-    function proposer() public returns (address proposer_) {
+    function proposer() public view returns (address proposer_) {
         proposer_ = KAILUA_TREASURY.proposerOf(address(this));
     }
 
