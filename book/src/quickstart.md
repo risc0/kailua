@@ -12,6 +12,7 @@ Optimism's Bedrock contracts `v1.4.0` and above.
 3. [docker](https://www.docker.com/)
 4. [solc](https://docs.soliditylang.org/en/latest/installing-solidity.html)
 5. [foundry](https://book.getfoundry.sh/getting-started/installation)
+6. [go](https://go.dev/dl/)
 
 ## Local Devnet
 
