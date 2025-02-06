@@ -106,8 +106,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         ROLLUP_CONFIG_HASH = _configHash;
         PROPOSAL_OUTPUT_COUNT = _proposalOutputCount;
         OUTPUT_BLOCK_SPAN = _outputBlockSpan;
-        PROPOSAL_BLOBS = (_proposalOutputCount / (1 << KailuaLib.FIELD_ELEMENTS_PER_BLOB_PO2))
-            + ((_proposalOutputCount % (1 << KailuaLib.FIELD_ELEMENTS_PER_BLOB_PO2)) == 0 ? 0 : 1);
+        PROPOSAL_BLOBS = (_proposalOutputCount / KailuaLib.FIELD_ELEMENTS_PER_BLOB)
+            + ((_proposalOutputCount % KailuaLib.FIELD_ELEMENTS_PER_BLOB) == 0 ? 0 : 1);
         GAME_TYPE = _gameType;
         DISPUTE_GAME_FACTORY = _disputeGameFactory;
     }

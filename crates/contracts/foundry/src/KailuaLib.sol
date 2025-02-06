@@ -135,12 +135,15 @@ library KailuaLib {
     /// @notice The po2 for the number of field elements in a single blob
     uint256 internal constant FIELD_ELEMENTS_PER_BLOB_PO2 = 12;
 
+    /// @notice The number of field elements in a single blob
+    uint256 internal constant FIELD_ELEMENTS_PER_BLOB = (1 << FIELD_ELEMENTS_PER_BLOB_PO2);
+
     function blobIndex(uint256 outputOffset) internal pure returns (uint256 index) {
-        index = outputOffset / (1 << FIELD_ELEMENTS_PER_BLOB_PO2);
+        index = outputOffset / FIELD_ELEMENTS_PER_BLOB;
     }
 
-    function fieldElementIndex(uint256 outputOffset) internal pure returns (uint256 position) {
-        position = outputOffset % (1 << FIELD_ELEMENTS_PER_BLOB_PO2);
+    function fieldElementIndex(uint256 outputOffset) internal pure returns (uint32 position) {
+        position = uint32(outputOffset % FIELD_ELEMENTS_PER_BLOB);
     }
 
     function versionedKZGHash(bytes calldata blobCommitment) internal pure returns (bytes32 hash) {
@@ -170,9 +173,7 @@ library KailuaLib {
         // The precompile will reject non-canonical field elements (i.e. value must be less than BLS_MODULUS).
         (bool _success, bytes memory kzgResult) = KZG.call(kzgCallData);
         // Validate the precompile response
-        require(
-            keccak256(kzgResult) == keccak256(abi.encodePacked(uint256(1 << FIELD_ELEMENTS_PER_BLOB_PO2), BLS_MODULUS))
-        );
+        require(keccak256(kzgResult) == keccak256(abi.encodePacked(FIELD_ELEMENTS_PER_BLOB, BLS_MODULUS)));
         success = _success;
     }
 

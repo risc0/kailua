@@ -223,14 +223,20 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         &factory_owner_safe,
         owner_address,
     )
-    .with_context(context.with_span(tracer.start_with_context("setInitBond(ZERO)", &context)))
+    .with_context(
+        context.with_span(tracer.start_with_context("DisputeGameFactory::setInitBond", &context)),
+    )
     .await
-    .context("setInitBond 0 wei")?;
+    .context("DisputeGameFactory::setInitBond")?;
     assert_eq!(
         dispute_game_factory
             .initBonds(KAILUA_GAME_TYPE)
             .stall()
-            .with_context(context.with_span(tracer.start_with_context("initBonds", &context)))
+            .with_context(
+                context.with_span(
+                    tracer.start_with_context("DisputeGameFactory::initBonds", &context)
+                )
+            )
             .await
             .bond_,
         U256::ZERO
@@ -242,16 +248,19 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         &factory_owner_safe,
         owner_address,
     )
-    .with_context(context.with_span(tracer.start_with_context("setParticipationBond", &context)))
+    .with_context(
+        context
+            .with_span(tracer.start_with_context("KailuaTreasury::setParticipationBond", &context)),
+    )
     .await
-    .context("setParticipationBond 1 wei")?;
+    .context("KailuaTreasury::setParticipationBond(1)")?;
     assert_eq!(
         kailua_treasury_implementation
             .participationBond()
             .stall()
-            .with_context(
-                context.with_span(tracer.start_with_context("participationBond", &context))
-            )
+            .with_context(context.with_span(
+                tracer.start_with_context("KailuaTreasury::participationBond", &context)
+            ))
             .await
             ._0,
         bond_value
@@ -265,15 +274,21 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         owner_address,
     )
     .with_context(
-        context.with_span(tracer.start_with_context("setImplementation (treasury)", &context)),
+        context.with_span(
+            tracer.start_with_context("DisputeGameFactory::setImplementation", &context),
+        ),
     )
     .await
-    .context("setImplementation KailuaTreasury")?;
+    .context("DisputeGameFactory::setImplementation(KailuaTreasury)")?;
     assert_eq!(
         dispute_game_factory
             .gameImpls(KAILUA_GAME_TYPE)
             .stall()
-            .with_context(context.with_span(tracer.start_with_context("gameImpls", &context)))
+            .with_context(
+                context.with_span(
+                    tracer.start_with_context("DisputeGameFactory::gameImpls", &context)
+                )
+            )
             .await
             .impl_,
         *kailua_treasury_implementation.address()
@@ -294,13 +309,17 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         &factory_owner_safe,
         owner_address,
     )
-    .with_context(context.with_span(tracer.start_with_context("dgfCreate", &context)))
+    .with_context(context.with_span(
+        tracer.start_with_context("DisputeGameFactory::create(KailuaTreasury)", &context),
+    ))
     .await
-    .context("create KailuaTreasury")?;
+    .context("DisputeGameFactory::create(KailuaTreasury)")?;
     let kailua_treasury_instance_address = dispute_game_factory
         .games(KAILUA_GAME_TYPE, root_claim, extra_data)
         .stall()
-        .with_context(context.with_span(tracer.start_with_context("dgfGames", &context)))
+        .with_context(
+            context.with_span(tracer.start_with_context("DisputeGameFactory::games", &context)),
+        )
         .await
         .proxy_;
     let kailua_treasury_instance =
@@ -309,7 +328,9 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     let status = kailua_treasury_instance
         .status()
         .stall()
-        .with_context(context.with_span(tracer.start_with_context("status", &context)))
+        .with_context(
+            context.with_span(tracer.start_with_context("KailuaTreasury::status", &context)),
+        )
         .await
         ._0;
     if status == 0 {
@@ -319,7 +340,9 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
             &factory_owner_safe,
             owner_address,
         )
-        .with_context(context.with_span(tracer.start_with_context("resolve", &context)))
+        .with_context(
+            context.with_span(tracer.start_with_context("KailuaTreasury::resolve", &context)),
+        )
         .await
         .context("resolve KailuaTreasury")?;
     } else {
@@ -364,10 +387,12 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         owner_address,
     )
     .with_context(
-        context.with_span(tracer.start_with_context("setImplementation (game)", &context)),
+        context.with_span(
+            tracer.start_with_context("DisputeGameFactory::setImplementation", &context),
+        ),
     )
     .await
-    .context("setImplementation KailuaGame")?;
+    .context("DisputeGameFactory::setImplementation(KailuaGame)")?;
 
     // Update the respectedGameType as the guardian
     if args.respect_kailua_proposals {
@@ -389,7 +414,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
             .guardian()
             .stall()
             .with_context(
-                context.with_span(tracer.start_with_context("portal_guardian_address", &context)),
+                context.with_span(tracer.start_with_context("OptimismPortal2::guardian", &context)),
             )
             .await
             ._0;
@@ -401,9 +426,9 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         let receipt = optimism_portal
             .setRespectedGameType(KAILUA_GAME_TYPE)
             .transact()
-            .with_context(
-                context.with_span(tracer.start_with_context("setRespectedGameType", &context)),
-            )
+            .with_context(context.with_span(
+                tracer.start_with_context("OptimismPortal2::setRespectedGameType", &context),
+            ))
             .await
             .context("OptimismPortal2::setRespectedGameType")?;
         info!(

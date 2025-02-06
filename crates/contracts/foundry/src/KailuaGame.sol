@@ -263,12 +263,11 @@ contract KailuaGame is KailuaTournament {
         bytes calldata kzgProof
     ) external override returns (bool success) {
         uint256 blobIndex = KailuaLib.blobIndex(outputNumber);
-        uint256 blobPosition = KailuaLib.fieldElementIndex(outputNumber);
+        uint32 blobPosition = KailuaLib.fieldElementIndex(outputNumber);
         bytes32 proposalBlobHash = KailuaLib.versionedKZGHash(blobCommitment);
         // Note: The below check also implies that we can validate only against known blobs
         require(proposalBlobHash == proposalBlobHashes[blobIndex].raw(), "bad proposalBlobHash");
-        success =
-            KailuaLib.verifyKZGBlobProof(proposalBlobHash, uint32(blobPosition), outputFe, blobCommitment, kzgProof);
+        success = KailuaLib.verifyKZGBlobProof(proposalBlobHash, blobPosition, outputFe, blobCommitment, kzgProof);
     }
 
     /// @inheritdoc KailuaTournament
