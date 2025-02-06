@@ -156,18 +156,6 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     /// @inheritdoc IKailuaTreasury
     bool public isProposing;
 
-    /// @inheritdoc IKailuaTreasury
-    function releaseProposer() external {
-        address proposer = proposerOf[msg.sender];
-
-        // INVARIANT: Only a known proposal contract may call this function
-        if (proposer == address(0x0)) {
-            revert NotProposed();
-        }
-
-        pendingProposals[proposer]--;
-    }
-
     // ------------------------------
     // Treasury
     // ------------------------------
@@ -184,8 +172,8 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     /// @notice The number of eliminations paid out to each prover
     mapping(address => uint256) public eliminationsPaid;
 
-    /// @notice The number of unfinalized proposals made by a proposer
-    mapping(address => uint256) public pendingProposals;
+    /// @notice The last proposal made by each proposer
+    mapping(address => KailuaTournament) public lastProposal;
 
     /// @notice Boolean flag to prevent re-entrant calls
     bool internal isLocked;
@@ -231,8 +219,11 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
 
     function claimProposerBond() public nonReentrant {
         // INVARIANT: Can only claim bond back if no pending proposals are left
-        if (pendingProposals[msg.sender] > 0) {
-            revert GameNotResolved();
+        KailuaTournament previousGame = lastProposal[msg.sender];
+        if (address(previousGame) != address(0x0)) {
+            if (previousGame.status() != GameStatus.DEFENDER_WINS) {
+                revert GameNotResolved();
+            }
         }
 
         uint256 payout = paidBonds[msg.sender];
@@ -280,8 +271,17 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         isProposing = true;
         gameContract = KailuaTournament(address(DISPUTE_GAME_FACTORY.create(GAME_TYPE, _rootClaim, _extraData)));
         isProposing = false;
+        // Check proposal progression
+        KailuaTournament previousGame = lastProposal[msg.sender];
+        if (address(previousGame) != address(0x0)) {
+            // INVARIANT: Proposers may only extend the proposal set monotonically
+            if (previousGame.l2BlockNumber() >= gameContract.l2BlockNumber()) {
+                revert BlockNumberMismatch(previousGame.l2BlockNumber(), gameContract.l2BlockNumber());
+            }
+        }
         // Record proposer
         proposerOf[address(gameContract)] = msg.sender;
-        pendingProposals[msg.sender]++;
+        // Record proposal
+        lastProposal[msg.sender] = gameContract;
     }
 }

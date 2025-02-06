@@ -17,6 +17,9 @@ use alloy::providers::{Provider, ProviderBuilder};
 use kona_host::cli::HostMode;
 use maili_genesis::RollupConfig;
 use maili_registry::Registry;
+use opentelemetry::global::tracer;
+use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
+use opentelemetry::Context;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -47,7 +50,7 @@ pub async fn generate_rollup_config(
             } else {
                 info!("Fetching rollup config from nodes.");
                 fetch_rollup_config(
-                    cfg.op_node_address.as_str(),
+                    cfg.op_node_address.as_ref().unwrap().as_str(),
                     kona_cfg
                         .l2_node_address
                         .clone()
@@ -68,12 +71,18 @@ pub async fn fetch_rollup_config(
     l2_node_address: &str,
     json_file_path: Option<&PathBuf>,
 ) -> anyhow::Result<RollupConfig> {
+    let tracer = tracer("kailua");
+    let context = Context::current_with_span(tracer.start("fetch_rollup_config"));
+
     let op_node_provider = ProviderBuilder::new().on_http(op_node_address.try_into()?);
     let l2_node_provider = ProviderBuilder::new().on_http(l2_node_address.try_into()?);
 
     let mut rollup_config: Value = op_node_provider
         .client()
         .request_noparams("optimism_rollupConfig")
+        .with_context(
+            context.with_span(tracer.start_with_context("optimism_rollupConfig", &context)),
+        )
         .await?;
 
     debug!("Rollup config: {:?}", rollup_config);
@@ -81,6 +90,7 @@ pub async fn fetch_rollup_config(
     let chain_config: Value = l2_node_provider
         .client()
         .request_noparams("debug_chainConfig")
+        .with_context(context.with_span(tracer.start_with_context("debug_chainConfig", &context)))
         .await?;
 
     debug!("ChainConfig: {:?}", chain_config);

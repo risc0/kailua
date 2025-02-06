@@ -47,21 +47,9 @@ error AlreadyEliminated();
 /// @notice Thrown when a proof is submitted for an already proven game
 error AlreadyProven();
 
-// 0xa37b6ee4
-/// @notice Thrown when a challenge is submitted after the clock has expired
-error ClockExpired();
-
 // 0xa506d334
 /// @notice Thrown when a resolution is attempted for an unproven claim
 error NotProven();
-
-// 0x87ec6473
-/// @notice Thrown when a proving fault for an unchallenged game
-error UnchallengedGame();
-
-// 0x84b45441
-/// @notice Thrown when a proving fault for an unchallenged output
-error UnchallengedOutput();
 
 // 0x5e22e582
 /// @notice Thrown when resolving a faulty proposal
@@ -91,10 +79,6 @@ error BlobHashMismatch(bytes32 found, bytes32 expected);
 /// @notice Thrown when a blob hash is missing
 error BlobHashMissing(uint256 index, uint256 count);
 
-// 0x1be40a37
-/// @notice Occurs when the anchored game is not finalized
-error InvalidAnchoredGame();
-
 // 0x19e3a1dc
 /// @notice Occurs when the duplication counter is wrong
 error InvalidDuplicationCounter();
@@ -117,19 +101,16 @@ event BondUpdated(uint256 amount);
 
 interface IKailuaTreasury {
     /// @notice Returns the game index at which proposer was proven faulty
-    function eliminationRound(address proposer) external returns (uint256);
+    function eliminationRound(address proposer) external view returns (uint256);
 
     /// @notice Returns the proposer of a game
-    function proposerOf(address game) external returns (address);
+    function proposerOf(address game) external view returns (address);
 
     /// @notice Eliminates a child's proposer and allocates their bond to the prover
     function eliminate(address child, address prover) external;
 
     /// @notice Returns true iff a proposal is currently being submitted
     function isProposing() external returns (bool);
-
-    /// @notice Releases the proposer from being bonded by the calling proposal
-    function releaseProposer() external;
 }
 
 library KailuaLib {
@@ -154,12 +135,15 @@ library KailuaLib {
     /// @notice The po2 for the number of field elements in a single blob
     uint256 internal constant FIELD_ELEMENTS_PER_BLOB_PO2 = 12;
 
+    /// @notice The number of field elements in a single blob
+    uint256 internal constant FIELD_ELEMENTS_PER_BLOB = (1 << FIELD_ELEMENTS_PER_BLOB_PO2);
+
     function blobIndex(uint256 outputOffset) internal pure returns (uint256 index) {
-        index = outputOffset / (1 << FIELD_ELEMENTS_PER_BLOB_PO2);
+        index = outputOffset / FIELD_ELEMENTS_PER_BLOB;
     }
 
-    function fieldElementIndex(uint256 outputOffset) internal pure returns (uint256 position) {
-        position = outputOffset % (1 << FIELD_ELEMENTS_PER_BLOB_PO2);
+    function fieldElementIndex(uint256 outputOffset) internal pure returns (uint32 position) {
+        position = uint32(outputOffset % FIELD_ELEMENTS_PER_BLOB);
     }
 
     function versionedKZGHash(bytes calldata blobCommitment) internal pure returns (bytes32 hash) {
@@ -187,13 +171,17 @@ library KailuaLib {
         // [144:192]	proof	        Proof associated with the commitment.
         bytes memory kzgCallData = abi.encodePacked(versionedBlobHash, rootOfUnity, value, blobCommitment, proof);
         // The precompile will reject non-canonical field elements (i.e. value must be less than BLS_MODULUS).
-        (success,) = KZG.call(kzgCallData);
+        (bool _success, bytes memory kzgResult) = KZG.call(kzgCallData);
+        // Validate the precompile response
+        require(keccak256(kzgResult) == keccak256(abi.encodePacked(FIELD_ELEMENTS_PER_BLOB, BLS_MODULUS)));
+        success = _success;
     }
 
-    function modExp(uint256 base) internal returns (uint256 result) {
+    function modExp(uint256 exponent) internal returns (uint256 result) {
         bytes memory modExpData =
-            abi.encodePacked(uint256(32), uint256(32), uint256(32), ROOT_OF_UNITY, base, BLS_MODULUS);
-        (, bytes memory rootOfUnity) = MOD_EXP.call(modExpData);
+            abi.encodePacked(uint256(32), uint256(32), uint256(32), ROOT_OF_UNITY, exponent, BLS_MODULUS);
+        (bool success, bytes memory rootOfUnity) = MOD_EXP.call(modExpData);
+        require(success);
         result = uint256(bytes32(rootOfUnity));
     }
 

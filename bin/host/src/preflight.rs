@@ -158,15 +158,21 @@ pub async fn get_blob_fetch_request(
         .await?
         .expect("Failed to fetch block {block_hash}.");
     let mut blob_index = 0;
+    let mut blob_found = false;
     for blob in block.transactions.into_transactions().flat_map(|tx| {
         tx.blob_versioned_hashes()
             .map(|h| h.to_vec())
             .unwrap_or_default()
     }) {
         if blob == blob_hash {
+            blob_found = true;
             break;
         }
         blob_index += 1;
+    }
+
+    if !blob_found {
+        bail!("Could not find blob with hash {blob_hash} in block {block_hash}");
     }
 
     Ok(BlobFetchRequest {

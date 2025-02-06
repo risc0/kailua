@@ -1,4 +1,4 @@
-// Copyright 2024 RISC Zero, Inc.
+// Copyright 2024, 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,15 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::transact::Transact;
 use alloy::contract::SolCallBuilder;
 use alloy::network::{Network, TransactionBuilder};
 use alloy::primitives::{Address, Uint, U256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
+use anyhow::Context;
 use kailua_contracts::Safe::SafeInstance;
 use std::path::PathBuf;
 
-// pub mod bench;
+pub mod bench;
 pub mod channel;
 pub mod config;
 pub mod db;
@@ -28,7 +30,10 @@ pub mod fast_track;
 pub mod fault;
 pub mod propose;
 pub mod provider;
+pub mod retry;
+pub mod signer;
 pub mod stall;
+pub mod transact;
 pub mod validate;
 
 pub const KAILUA_GAME_TYPE: u32 = 1337;
@@ -44,7 +49,7 @@ pub enum Cli {
     Propose(propose::ProposeArgs),
     Validate(validate::ValidateArgs),
     TestFault(fault::FaultArgs),
-    // Benchmark(bench::BenchArgs),
+    Benchmark(bench::BenchArgs),
 }
 
 #[derive(clap::Args, Debug, Clone)]
@@ -78,7 +83,7 @@ impl Cli {
             Cli::Propose(args) => args.core.v,
             Cli::Validate(args) => args.core.v,
             Cli::TestFault(args) => args.propose_args.core.v,
-            // Cli::Benchmark(args) => args.v,
+            Cli::Benchmark(args) => args.core.v,
         }
     }
 
@@ -87,6 +92,17 @@ impl Cli {
             Cli::Propose(args) => args.core.data_dir.clone(),
             Cli::Validate(args) => args.core.data_dir.clone(),
             _ => None,
+        }
+    }
+
+    pub fn otlp_endpoint(&self) -> Option<String> {
+        match self {
+            Cli::Config(args) => args.telemetry.otlp_collector.clone(),
+            Cli::FastTrack(args) => args.telemetry.otlp_collector.clone(),
+            Cli::Propose(args) => args.telemetry.otlp_collector.clone(),
+            Cli::Validate(args) => args.telemetry.otlp_collector.clone(),
+            Cli::TestFault(args) => args.propose_args.telemetry.otlp_collector.clone(),
+            Cli::Benchmark(args) => args.telemetry.otlp_collector.clone(),
         }
     }
 }
@@ -122,9 +138,8 @@ pub async fn exec_safe_txn<
         .concat()
         .into(),
     )
-    .send()
-    .await?
-    .get_receipt()
-    .await?;
+    .transact()
+    .await
+    .context("Safe::execTransaction")?;
     Ok(())
 }

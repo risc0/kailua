@@ -24,10 +24,11 @@ pub async fn run_zkvm_client(
     witness_frame: Vec<u8>,
     stitched_proofs: Vec<Proof>,
     prove_snark: bool,
+    segment_limit: u32,
 ) -> Result<Proof, ProvingError> {
     info!("Running zkvm client.");
     let prove_info = tokio::task::spawn_blocking(move || {
-        let env = build_zkvm_env(witness_frame, stitched_proofs)?;
+        let env = build_zkvm_env(witness_frame, stitched_proofs, segment_limit)?;
         let prover = default_prover();
         let prover_opts = if prove_snark {
             ProverOpts::groth16()
@@ -61,13 +62,14 @@ pub async fn run_zkvm_client(
 pub fn build_zkvm_env<'a>(
     witness_frame: Vec<u8>,
     stitched_proofs: Vec<Proof>,
+    segment_limit: u32,
 ) -> anyhow::Result<ExecutorEnv<'a>> {
     // Execution environment
     let mut builder = ExecutorEnv::builder();
+    // Set segment po2
+    builder.segment_limit_po2(segment_limit);
     // Pass in witness data
     builder.write_frame(&witness_frame);
-    // Set segment po2
-    builder.segment_limit_po2(21);
     // Dev-mode for recursive proofs
     if is_dev_mode() {
         builder.env_var("RISC0_DEV_MODE", "1");
@@ -77,6 +79,7 @@ pub fn build_zkvm_env<'a>(
         // Force in-guest verification (should be used for testing only)
         if std::env::var("KAILUA_FORCE_RECURSION").is_ok() {
             warn!("(KAILUA_FORCE_RECURSION) Forcibly loading receipt as guest input.");
+            // todo: convert boundless seals to groth16 receipts
             builder.write(&proof)?;
             continue;
         }

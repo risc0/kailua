@@ -15,12 +15,11 @@
 use crate::db::proposal::Proposal;
 use crate::propose::ProposeArgs;
 use crate::stall::Stall;
+use crate::transact::Transact;
 use crate::KAILUA_GAME_TYPE;
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
-use alloy::network::EthereumWallet;
 use alloy::primitives::{Bytes, B256, U256};
 use alloy::providers::ProviderBuilder;
-use alloy::signers::local::LocalSigner;
 use alloy::sol_types::SolValue;
 use anyhow::Context;
 use kailua_client::provider::OpNodeProvider;
@@ -28,7 +27,6 @@ use kailua_common::blobs::hash_to_fe;
 use kailua_common::config::config_hash;
 use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
-use std::str::FromStr;
 use tracing::{error, info};
 
 #[derive(clap::Args, Debug, Clone)]
@@ -37,11 +35,11 @@ pub struct FaultArgs {
     pub propose_args: ProposeArgs,
 
     /// Offset of the faulty block within the proposal
-    #[clap(long)]
+    #[clap(long, env)]
     pub fault_offset: u64,
 
     /// Index of the parent of the faulty proposal
-    #[clap(long)]
+    #[clap(long, env)]
     pub fault_parent: u64,
 }
 
@@ -69,9 +67,12 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let dgf_address = system_config.disputeGameFactory().stall().await.addr_;
 
     // init l1 stuff
-    let tester_signer = LocalSigner::from_str(&args.propose_args.proposer_key)?;
-    let tester_address = tester_signer.address();
-    let tester_wallet = EthereumWallet::from(tester_signer);
+    let tester_wallet = args
+        .propose_args
+        .proposer_signer
+        .wallet(Some(config.l1_chain_id))
+        .await?;
+    let tester_address = tester_wallet.default_signer().address();
     let tester_provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .wallet(tester_wallet)
@@ -137,7 +138,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
 
     // Prepare intermediate outputs
     let mut io_field_elements = vec![];
-    let is_output_fault = faulty_block_number > proposal_block_count;
+    let is_output_fault = faulty_block_number <= proposal_block_count;
     let normalized_fault_block_number =
         faulty_block_number - (!is_output_fault as u64) * output_block_span;
     for i in 1..FIELD_ELEMENTS_PER_BLOB {
@@ -198,20 +199,15 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .propose(proposed_output_root, Bytes::from(extra_data))
         .value(owed_collateral)
         .sidecar(sidecar)
-        .send()
+        .transact()
         .await
         .context("propose (send)")
     {
-        Ok(txn) => match txn.get_receipt().await.context("propose (get_receipt)") {
-            Ok(receipt) => {
-                info!("Faulty proposal submitted at index {games_count}: {receipt:?}")
-            }
-            Err(e) => {
-                error!("Failed to confirm faulty proposal txn: {e:?}");
-            }
-        },
+        Ok(receipt) => {
+            info!("Faulty proposal submitted at index {games_count}: {receipt:?}")
+        }
         Err(e) => {
-            error!("Failed to send faulty proposal txn: {e:?}");
+            error!("Failed to confirm faulty proposal txn: {e:?}");
         }
     }
     Ok(())

@@ -84,6 +84,8 @@ pub async fn start_server_and_native_client(
         stitched_proofs,
         prove_snark,
         force_attempt,
+        args.segment_limit,
+        args.max_witness_size,
     ));
     // Execute both tasks and wait for them to complete.
     info!("Starting preimage server and client program.");

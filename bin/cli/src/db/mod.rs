@@ -21,10 +21,10 @@ use crate::provider::BlobProvider;
 use crate::stall::Stall;
 use crate::KAILUA_GAME_TYPE;
 use alloy::network::Network;
-use alloy::primitives::{Address, U256};
+use alloy::primitives::U256;
 use alloy::providers::Provider;
 use alloy::transports::Transport;
-use anyhow::{bail, Context};
+use anyhow::{anyhow, bail, Context};
 use config::Config;
 use kailua_client::provider::OpNodeProvider;
 use kailua_contracts::{
@@ -37,15 +37,6 @@ use std::collections::hash_map::Entry;
 use std::path::PathBuf;
 use tracing::{error, info, warn};
 use treasury::Treasury;
-
-#[derive(Clone, Debug, Default)]
-pub enum ProofStatus {
-    #[default]
-    NONE,
-    ULoseVLose,
-    ULoseVWin,
-    UWinVLose,
-}
 
 #[derive(Debug)]
 pub struct KailuaDB {
@@ -128,7 +119,9 @@ impl KailuaDB {
                                 proposals.push(self.state.next_factory_index);
                                 Some(
                                     self.get_local_proposal(&self.state.next_factory_index)
-                                        .expect("Failed to load immediately processed proposal"),
+                                        .ok_or_else(|| {
+                                            anyhow!("Failed to load immediately processed proposal")
+                                        })?,
                                 )
                             } else {
                                 None
@@ -245,9 +238,12 @@ impl KailuaDB {
         info!("Assessing proposal correctness..");
         let is_parent_correct = self
             .get_local_proposal(&proposal.parent)
-            .expect("Attempted to process child before registering parent.")
-            .is_correct()
-            .expect("Attempted to process child before deciding parent correctness");
+            .map(|parent| {
+                parent
+                    .is_correct()
+                    .expect("Attempted to process child before deciding parent correctness")
+            })
+            .unwrap_or_default(); // missing parent means it's not part of the tournament
         let is_correct_proposal = match proposal
             .assess_correctness(&self.config, op_node_provider, is_parent_correct)
             .await?
@@ -293,7 +289,18 @@ impl KailuaDB {
             return Ok(true);
         }
 
-        let mut parent = self.get_local_proposal(&opponent.parent).unwrap().clone();
+        // Skipped parents imply skipped children
+        let Some(mut parent) = self.get_local_proposal(&opponent.parent) else {
+            return Ok(false);
+        };
+        // Append child to parent tournament children list
+        if !parent.append_child(opponent.index) {
+            warn!(
+                "Attempted out of order child {} insertion into parent {} ",
+                opponent.index, parent.index
+            );
+        }
+        self.set_local_proposal(opponent.parent, &parent)?;
         // Ignore skipped proposals
         let contender = parent
             .survivor
@@ -307,6 +314,10 @@ impl KailuaDB {
             if contender.divergence_point(opponent).is_none() {
                 return Ok(false);
             }
+            // Skip proposals arriving after the timeout period
+            if opponent.created_at - contender.created_at >= self.config.timeout {
+                return Ok(false);
+            }
         }
         // Participate in tournament only if this is a correct or first bad proposal
         if self.was_proposer_eliminated_before(opponent) {
@@ -318,13 +329,6 @@ impl KailuaDB {
         }
         // Update the contender
         opponent.contender = parent.survivor;
-        // Append child to parent
-        if !parent.append_child(opponent.index) {
-            warn!(
-                "Attempted out of order child {} insertion into parent {} ",
-                opponent.index, parent.index
-            );
-        }
         // Determine if opponent is the next survivor
         if contender
             .as_ref()
@@ -334,9 +338,8 @@ impl KailuaDB {
             // If the old survivor (if any) is defeated,
             // set this proposal as the new survivor
             parent.survivor = Some(opponent.index);
+            self.set_local_proposal(opponent.parent, &parent)?;
         }
-        // Commit updated parent data
-        self.set_local_proposal(opponent.parent, &parent)?;
         Ok(true)
     }
 
@@ -351,10 +354,6 @@ impl KailuaDB {
         Ok(self
             .db
             .put(index.to_be_bytes(), bincode::serialize(proposal)?)?)
-    }
-
-    pub fn is_proposer_eliminated(&self, proposer: Address) -> bool {
-        self.state.eliminations.contains_key(&proposer)
     }
 
     pub fn was_proposer_eliminated_before(&self, proposal: &Proposal) -> bool {

@@ -13,21 +13,33 @@ categories.workspace = true
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
+aws-config.workspace = true
+aws-sdk-kms.workspace = true
 bincode.workspace = true
 bytemuck.workspace = true
 c-kzg.workspace = true
 clap.workspace = true
+gcloud-sdk.workspace = true
 hex.workspace = true
+paste.workspace = true
 rocksdb.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
+tokio-retry.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
 
-alloy = { workspace = true, features = ["full", "kzg"] }
+opentelemetry.workspace = true
+opentelemetry_sdk.workspace = true
+opentelemetry-semantic-conventions.workspace = true
+opentelemetry-otlp.workspace = true
+opentelemetry-prometheus.workspace = true
+opentelemetry-zipkin.workspace = true
+
+alloy = { workspace = true, features = ["full", "kzg", "signer-aws", "signer-gcp"] }
 alloy-rpc-types-beacon.workspace = true
 
 maili-protocol.workspace = true

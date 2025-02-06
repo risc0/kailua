@@ -14,6 +14,7 @@
 
 use alloy_primitives::{Address, B256};
 use clap::Parser;
+use kailua_client::telemetry::TelemetryArgs;
 use kailua_client::{
     args::{parse_address, parse_b256},
     boundless::BoundlessArgs,
@@ -29,22 +30,28 @@ pub struct KailuaHostArgs {
 
     /// Address of OP-NODE endpoint to use
     #[clap(long, env)]
-    pub op_node_address: String,
+    pub op_node_address: Option<String>,
     /// Whether to skip running the zeth preflight engine
-    #[clap(long, default_value_t = false, env)]
+    #[clap(long, env, default_value_t = false)]
     pub skip_zeth_preflight: bool,
-    #[clap(long, value_parser = parse_address, env)]
+    #[clap(long, env, value_parser = parse_address)]
     pub payout_recipient_address: Option<Address>,
+    #[clap(long, env, required = false, default_value_t = 21)]
+    pub segment_limit: u32,
+    #[clap(long, env, required = false, default_value_t = 52_428_800)]
+    pub max_witness_size: usize,
 
-    #[clap(long, value_delimiter = ',', env)]
+    #[clap(long, env, value_delimiter = ',')]
     pub precondition_params: Vec<u64>,
-    #[clap(long, value_parser = parse_b256, value_delimiter = ',', env)]
+    #[clap(long, env, value_parser = parse_b256, value_delimiter = ',')]
     pub precondition_block_hashes: Vec<B256>,
-    #[clap(long, value_parser = parse_b256, value_delimiter = ',', env)]
+    #[clap(long, env, value_parser = parse_b256, value_delimiter = ',')]
     pub precondition_blob_hashes: Vec<B256>,
 
     #[clap(flatten)]
     pub boundless: BoundlessArgs,
+    #[clap(flatten)]
+    pub telemetry: TelemetryArgs,
 }
 
 impl PartialEq<Self> for KailuaHostArgs {

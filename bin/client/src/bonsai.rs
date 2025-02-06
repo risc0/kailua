@@ -22,6 +22,7 @@ use risc0_zkvm::sha::Digest;
 use risc0_zkvm::{is_dev_mode, ProveInfo, Receipt, SessionStats};
 use std::time::Duration;
 use tracing::info;
+use tracing::log::warn;
 
 pub async fn run_bonsai_client(
     witness_frame: Vec<u8>,
@@ -41,6 +42,15 @@ pub async fn run_bonsai_client(
     // Load recursive proofs and upload succinct receipts
     let mut assumption_receipt_ids = vec![];
     for proof in stitched_proofs {
+        if std::env::var("KAILUA_FORCE_RECURSION").is_ok() {
+            warn!("(KAILUA_FORCE_RECURSION) Forcibly loading receipt as guest input.");
+            // todo: convert boundless seals to groth16 receipts
+            input.extend_from_slice(bytemuck::cast_slice(
+                &to_vec(&proof).map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
+            ));
+            continue;
+        }
+
         if let Proof::ZKVMReceipt(receipt) = proof {
             let inner_receipt = *receipt;
             let serialized_receipt = bincode::serialize(&inner_receipt)

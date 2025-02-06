@@ -70,8 +70,7 @@ where
         let mut l2_provider =
             OracleL2ChainProvider::new(safe_head_hash, boot.rollup_config.clone(), oracle.clone());
 
-        // If the claimed L2 block number is less than or equal to the safe head of the L2 chain,
-        // the claim is invalid.
+        // The claimed L2 block number must be greater than or equal to the L2 safe head.
         // Fetch the safe head's block header.
         let safe_head = l2_provider
             .header_by_hash(safe_head_hash)

@@ -1,4 +1,4 @@
-// Copyright 2024, 2025 RISC Zero, Inc.
+// Copyright 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod args;
-pub mod bonsai;
-pub mod boundless;
-pub mod oracle;
-pub mod proof;
-pub mod provider;
-pub mod proving;
-pub mod telemetry;
-pub mod witgen;
-pub mod witness;
-pub mod zkvm;
+#[macro_export]
+macro_rules! retry {
+    ($e:expr) => {
+        retry!(2, 1024, $e)
+    };
+    ($m:literal, $e:expr) => {
+        retry!(2, $m, $e)
+    };
+    ($b:literal, $m:literal, $e:expr) => {
+        tokio_retry::Retry::spawn(
+            tokio_retry::strategy::ExponentialBackoff::from_millis($b)
+                .max_delay(std::time::Duration::from_millis($m)),
+            || async { $e },
+        )
+    };
+}

@@ -17,20 +17,21 @@ use crate::db::config::Config;
 use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
 use crate::provider::BlobProvider;
+use crate::signer::ValidatorSignerArgs;
+use crate::transact::Transact;
 use crate::{stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::{IndexedBlobHash, FIELD_ELEMENTS_PER_BLOB};
 use alloy::eips::BlockNumberOrTag;
 use alloy::network::primitives::BlockTransactionsKind;
-use alloy::network::EthereumWallet;
 use alloy::primitives::{Address, Bytes, FixedBytes, B256, U256};
 use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
-use alloy::signers::local::LocalSigner;
 use anyhow::{anyhow, bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_client::args::parse_address;
 use kailua_client::boundless::BoundlessArgs;
 use kailua_client::proof::{encode_seal, proof_file_name, read_proof_file};
 use kailua_client::provider::OpNodeProvider;
+use kailua_client::telemetry::TelemetryArgs;
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::config::config_hash;
@@ -43,9 +44,9 @@ use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
 use maili_protocol::BlockInfo;
 use risc0_zkvm::is_dev_mode;
+use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::process::exit;
-use std::str::FromStr;
 use std::time::Duration;
 use tokio::process::Command;
 use tokio::time::sleep;
@@ -65,13 +66,17 @@ pub struct ValidateArgs {
     pub fast_forward_target: u64,
 
     /// Secret key of L1 wallet to use for challenging and proving outputs
-    #[clap(long, env)]
-    pub validator_key: String,
-    #[clap(long, value_parser = parse_address, env)]
+    #[clap(flatten)]
+    pub validator_signer: ValidatorSignerArgs,
+    /// Address of the recipient account to use for bond payouts
+    #[clap(long, env, value_parser = parse_address)]
     pub payout_recipient_address: Option<Address>,
 
     #[clap(flatten)]
     pub boundless: BoundlessArgs,
+
+    #[clap(flatten)]
+    pub telemetry: TelemetryArgs,
 }
 
 pub async fn validate(args: ValidateArgs, data_dir: PathBuf) -> anyhow::Result<()> {
@@ -138,9 +143,11 @@ pub async fn handle_proposals(
 
     // initialize validator wallet
     info!("Initializing validator wallet.");
-    let validator_signer = LocalSigner::from_str(&args.validator_key)?;
-    let validator_address = validator_signer.address();
-    let validator_wallet = EthereumWallet::from(validator_signer);
+    let validator_wallet = args
+        .validator_signer
+        .wallet(Some(config.l1_chain_id))
+        .await?;
+    let validator_address = validator_wallet.default_signer().address();
     let validator_provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .wallet(validator_wallet)
@@ -179,6 +186,10 @@ pub async fn handle_proposals(
         "Starting from proposal at factory index {}",
         kailua_db.state.next_factory_index
     );
+    // init channel buffers
+    let mut proof_buffer = VecDeque::new();
+    let mut fault_buffer = VecDeque::new();
+    let mut valid_buffer = VecDeque::new();
     loop {
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
@@ -229,15 +240,7 @@ pub async fn handle_proposals(
                 && opponent.output_block_number <= args.fast_forward_target
             {
                 // Prove full validity
-                request_validity_proof(
-                    &mut channel,
-                    &kailua_db.config,
-                    &proposal_parent,
-                    &opponent,
-                    &eth_rpc_provider,
-                    &op_geth_provider,
-                )
-                .await?;
+                valid_buffer.push_back(opponent_index);
                 continue;
             }
             // skip fault proving this proposal if it has no contender
@@ -290,29 +293,97 @@ pub async fn handle_proposals(
                 );
                 continue;
             }
-            // Prove fault
-            request_fault_proof(
+            // Queue fault proof request
+            fault_buffer.push_back((contender_index, opponent_index));
+        }
+        // dispatch buffered fault proof requests
+        let fault_proof_requests = fault_buffer.len();
+        for _ in 0..fault_proof_requests {
+            let request = fault_buffer.pop_front().unwrap();
+            let (contender_index, opponent_index) = request;
+            let Some(opponent) = kailua_db.get_local_proposal(&opponent_index) else {
+                error!("Proposal {opponent_index} missing from database.");
+                fault_buffer.push_back(request);
+                continue;
+            };
+            // Look up parent proposal
+            let Some(parent) = kailua_db.get_local_proposal(&opponent.parent) else {
+                error!(
+                    "Proposal {} parent {} missing from database.",
+                    opponent.index, opponent.parent
+                );
+                fault_buffer.push_back(request);
+                continue;
+            };
+            let Some(contender) = kailua_db.get_local_proposal(&contender_index) else {
+                error!("Contender {contender_index} missing from database.");
+                fault_buffer.push_back(request);
+                continue;
+            };
+            if let Err(err) = request_fault_proof(
                 &mut channel,
                 &kailua_db.config,
-                &proposal_parent,
+                &parent,
                 &contender,
                 &opponent,
                 &eth_rpc_provider,
                 &op_geth_provider,
                 &op_node_provider,
             )
-            .await?;
+            .await
+            {
+                error!("Could not request fault proof for {contender_index} vs {opponent_index}: {err:?}");
+                fault_buffer.push_back(request);
+            }
+        }
+        // dispatch buffered validity proof requests
+        let validity_proof_requests = valid_buffer.len();
+        for _ in 0..validity_proof_requests {
+            let proposal_index = valid_buffer.pop_front().unwrap();
+            let Some(proposal) = kailua_db.get_local_proposal(&proposal_index) else {
+                error!("Proposal {proposal_index} missing from database.");
+                valid_buffer.push_front(proposal_index);
+                continue;
+            };
+            // Look up parent proposal
+            let Some(parent) = kailua_db.get_local_proposal(&proposal.parent) else {
+                error!(
+                    "Proposal {} parent {} missing from database.",
+                    proposal.index, proposal.parent
+                );
+                valid_buffer.push_front(proposal_index);
+                continue;
+            };
+            if let Err(err) = request_validity_proof(
+                &mut channel,
+                &kailua_db.config,
+                &parent,
+                &proposal,
+                &eth_rpc_provider,
+                &op_geth_provider,
+            )
+            .await
+            {
+                error!("Could not request validity proof for {proposal_index}: {err:?}");
+                valid_buffer.push_front(proposal_index);
+            }
         }
 
-        // publish computed fault proofs and resolve proven challenges
+        // load newly received proofs into buffer
         while !channel.receiver.is_empty() {
-            let Message::Proof(proposal_index, proof) = channel
-                .receiver
-                .recv()
-                .await
-                .ok_or(anyhow!("proposals receiver channel closed"))?
-            else {
-                bail!("Unexpected message type.");
+            let Some(message) = channel.receiver.recv().await else {
+                error!("Proofs receiver channel closed");
+                break;
+            };
+            proof_buffer.push_back(message);
+        }
+
+        // publish computed proofs and resolve proven challenges
+        let computed_proofs = proof_buffer.len();
+        for _ in 0..computed_proofs {
+            let Message::Proof(proposal_index, proof) = proof_buffer.pop_front().unwrap() else {
+                error!("Validator loop received an unexpected message type.");
+                continue;
             };
             let opponent = kailua_db.get_local_proposal(&proposal_index).unwrap();
             let parent = kailua_db.get_local_proposal(&opponent.parent).unwrap();
@@ -428,30 +499,23 @@ pub async fn handle_proposals(
                         v_index,
                         encoded_seal.clone(),
                     )
-                    .send()
+                    .transact()
                     .await
-                    .context("proveValidity (send)")
+                    .context("KailuaTournament::proveValidity")
                 {
-                    Ok(txn) => match txn
-                        .get_receipt()
-                        .await
-                        .context("proveValidity (get_receipt)")
-                    {
-                        Ok(receipt) => {
-                            info!("Validity proof submitted: {receipt:?}");
-                            let proof_status = parent_contract
-                                .provenAt(U256::ZERO, U256::ZERO)
-                                .stall()
-                                .await
-                                ._0;
-                            info!("Validity proof timestamp: {proof_status}");
-                        }
-                        Err(e) => {
-                            error!("Failed to confirm validity proof txn: {e:?}");
-                        }
-                    },
+                    Ok(receipt) => {
+                        info!("Validity proof submitted: {:?}", receipt.transaction_hash);
+                        let proof_status = parent_contract
+                            .provenAt(U256::ZERO, U256::ZERO)
+                            .stall()
+                            .await
+                            ._0;
+                        info!("Validity proof timestamp: {proof_status}");
+                        info!("KailuaTournament::proveValidity: {} gas", receipt.gas_used);
+                    }
                     Err(e) => {
-                        error!("Failed to send validity proof txn: {e:?}");
+                        error!("Failed to confirm validity proof txn: {e:?}");
+                        proof_buffer.push_back(Message::Proof(proposal_index, proof));
                     }
                 }
                 // Skip fault proof submission logic
@@ -808,9 +872,9 @@ pub async fn handle_proposals(
                         commitments,
                         proofs,
                     )
-                    .send()
+                    .transact()
                     .await
-                    .context("proveOutputFault (send)")
+                    .context("KailuaTournament::proveOutputFault")
             } else {
                 parent_contract
                     .proveTrailFault(
@@ -821,31 +885,39 @@ pub async fn handle_proposals(
                         commitments,
                         proofs,
                     )
-                    .send()
+                    .transact()
                     .await
-                    .context("proveTrailFault (send)")
+                    .context("KailuaTournament::proveTrailFault")
             };
 
             match transaction_dispatch {
-                Ok(txn) => match txn.get_receipt().await.context("prove (get_receipt)") {
-                    Ok(receipt) => {
-                        info!("Fault proof submitted: {receipt:?}");
-                        let proof_status = parent_contract
-                            .proofStatus(U256::from(u_index), U256::from(v_index))
-                            .stall()
-                            .await
-                            ._0;
+                Ok(receipt) => {
+                    info!("Fault proof submitted: {receipt:?}");
+                    let proof_status = parent_contract
+                        .proofStatus(U256::from(u_index), U256::from(v_index))
+                        .stall()
+                        .await
+                        ._0;
+                    info!(
+                        "Match between {contender_index} and {} proven: {proof_status}",
+                        opponent.index
+                    );
+
+                    if is_output_fault_proof {
                         info!(
-                            "Match between {contender_index} and {} proven: {proof_status}",
-                            opponent.index
+                            "KailuaTournament::proveOutputFault: {} gas",
+                            receipt.gas_used
+                        );
+                    } else {
+                        info!(
+                            "KailuaTournament::proveTrailFault: {} gas",
+                            receipt.gas_used
                         );
                     }
-                    Err(e) => {
-                        error!("Failed to confirm fault proof txn: {e:?}");
-                    }
-                },
+                }
                 Err(e) => {
-                    error!("Failed to send fault proof txn: {e:?}");
+                    error!("Failed to confirm fault proof txn: {e:?}");
+                    proof_buffer.push_back(Message::Proof(proposal_index, proof));
                 }
             }
         }
@@ -926,7 +998,7 @@ async fn request_fault_proof(
     // Prepare precondition validation data
     let precondition_validation_data = if opponent.has_precondition_for(divergence_point) {
         // Normalize the challenge_position as the blob field element index
-        let normalized_position = divergence_point - !is_output_fault as u64;
+        let normalized_position = divergence_point - (!is_output_fault as u64);
 
         let (u_blob_hash, u_blob) = contender.io_blob_for(normalized_position);
         let u_blob_block_parent = l1_node_provider
@@ -1112,11 +1184,13 @@ pub async fn handle_proof_requests(
     let config_hash = B256::from(config_hash(&rollup_config)?);
     let fpvm_image_id = B256::from(bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID));
     // Set payout recipient
-    let payout_recipient = args.payout_recipient_address.unwrap_or_else(|| {
-        LocalSigner::from_str(&args.validator_key)
-            .unwrap()
-            .address()
-    });
+    let validator_wallet = args
+        .validator_signer
+        .wallet(Some(rollup_config.l1_chain_id))
+        .await?;
+    let payout_recipient = args
+        .payout_recipient_address
+        .unwrap_or_else(|| validator_wallet.default_signer().address());
     info!("Proof payout recipient: {payout_recipient}");
     // Run proof generator loop
     loop {

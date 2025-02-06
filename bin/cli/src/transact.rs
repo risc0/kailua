@@ -1,4 +1,4 @@
-// Copyright 2024 RISC Zero, Inc.
+// Copyright 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,23 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy::contract::{EthCall, SolCallBuilder};
+use alloy::contract::{CallBuilder, CallDecoder, EthCall};
 use alloy::network::Network;
 use alloy::providers::Provider;
-use alloy::sol_types::SolCall;
 use alloy::transports::Transport;
+use anyhow::Context;
 use async_trait::async_trait;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use std::future::IntoFuture;
-use std::marker::PhantomData;
-use std::time::Duration;
-use tokio::time::sleep;
-use tracing::error;
 
 #[async_trait]
-pub trait Stall<R> {
-    async fn stall(&self) -> R;
+pub trait Transact<N: Network> {
+    async fn transact(&self) -> anyhow::Result<N::ReceiptResponse>;
 }
 
 #[async_trait]
@@ -37,32 +33,22 @@ impl<
         'coder,
         T: Transport + Clone,
         P: Provider<T, N>,
-        C: SolCall + 'static + Sync,
+        D: CallDecoder + Send + Sync + 'static,
         N: Network,
-    > Stall<C::Return> for SolCallBuilder<T, P, C, N>
+    > Transact<N> for CallBuilder<T, P, D, N>
 where
-    EthCall<'req, 'coder, PhantomData<C>, T, N>: IntoFuture,
-    C::Return: Send,
+    EthCall<'req, 'coder, D, T, N>: IntoFuture,
 {
-    async fn stall(&self) -> C::Return {
+    async fn transact(&self) -> anyhow::Result<N::ReceiptResponse> {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current();
-
-        loop {
-            match self
-                .call_raw()
-                .into_future()
-                .with_context(context.with_span(tracer.start_with_context("call_raw", &context)))
-                .await
-                .and_then(|raw_result| self.decode_output(raw_result, true))
-            {
-                Ok(res) => break res,
-                Err(error) => {
-                    error!("Stall Error: {:?}", error);
-                    // Wait before retrying
-                    sleep(Duration::from_millis(250)).await;
-                }
-            }
-        }
+        self.send()
+            .with_context(context.with_span(tracer.start_with_context("send", &context)))
+            .await
+            .context("send")?
+            .get_receipt()
+            .with_context(context.with_span(tracer.start_with_context("get_receipt", &context)))
+            .await
+            .context("get_receipt")
     }
 }
