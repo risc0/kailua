@@ -56,6 +56,14 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
                     .context("blob_base_fee_scalar")?
                     .to_be_bytes()
                     .as_slice(),
+                safe_default(system_config.eip1559_denominator, u32::MAX)
+                    .context("eip1559_denominator")?
+                    .to_be_bytes()
+                    .as_slice(),
+                safe_default(system_config.eip1559_elasticity, u32::MAX)
+                    .context("eip1559_elasticity")?
+                    .to_be_bytes()
+                    .as_slice(),
             ]
             .concat();
             let digest = SHA2::hash_bytes(fields.as_slice());
@@ -65,7 +73,10 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
         .unwrap_or(Ok([0u8; 32]))?;
     let rollup_config_bytes = [
         rollup_config.genesis.l1.hash.0.as_slice(),
+        rollup_config.genesis.l1.number.to_be_bytes().as_slice(),
         rollup_config.genesis.l2.hash.0.as_slice(),
+        rollup_config.genesis.l2.number.to_be_bytes().as_slice(),
+        rollup_config.genesis.l2_time.to_be_bytes().as_slice(),
         system_config_hash.as_slice(),
         rollup_config.block_time.to_be_bytes().as_slice(),
         rollup_config.max_sequencer_drift.to_be_bytes().as_slice(),
@@ -133,10 +144,6 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
             .context("interop_time")?
             .to_be_bytes()
             .as_slice(),
-        safe_default(rollup_config.blobs_enabled_l1_timestamp, u64::MAX)
-            .context("blobs_enabled_timestmap")?
-            .to_be_bytes()
-            .as_slice(),
         rollup_config.batch_inbox_address.0.as_slice(),
         rollup_config.deposit_contract_address.0.as_slice(),
         rollup_config.l1_system_config_address.0.as_slice(),
@@ -144,6 +151,10 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
         safe_default(rollup_config.superchain_config_address, Address::ZERO)
             .context("superchain_config_address")?
             .0
+            .as_slice(),
+        safe_default(rollup_config.blobs_enabled_l1_timestamp, u64::MAX)
+            .context("blobs_enabled_timestmap")?
+            .to_be_bytes()
             .as_slice(),
         safe_default(rollup_config.da_challenge_address, Address::ZERO)
             .context("da_challenge_address")?
