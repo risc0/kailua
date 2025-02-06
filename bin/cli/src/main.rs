@@ -53,12 +53,13 @@ async fn main() -> anyhow::Result<()> {
                 .with_context(context.clone())
                 .await
         }
-        Cli::TestFault(_args) => Ok({
+        Cli::TestFault(_args) =>
+        {
             #[cfg(feature = "devnet")]
             kailua_cli::fault::fault(_args)
                 .with_context(context.clone())
                 .await
-        }),
+        }
         Cli::Benchmark(bench_args) => {
             kailua_cli::bench::benchmark(bench_args)
                 .with_context(context.clone())
