@@ -289,7 +289,10 @@ impl KailuaDB {
             return Ok(true);
         }
 
-        let mut parent = self.get_local_proposal(&opponent.parent).unwrap();
+        // Skipped parents imply skipped children
+        let Some(mut parent) = self.get_local_proposal(&opponent.parent) else {
+            return Ok(false);
+        };
         // Append child to parent tournament children list
         if !parent.append_child(opponent.index) {
             warn!(
