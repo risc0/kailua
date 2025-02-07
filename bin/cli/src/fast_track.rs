@@ -15,7 +15,7 @@
 use crate::signer::{DeployerSignerArgs, GuardianSignerArgs, OwnerSignerArgs};
 use crate::stall::Stall;
 use crate::transact::Transact;
-use crate::KAILUA_GAME_TYPE;
+use crate::{retry_with_context, KAILUA_GAME_TYPE};
 use alloy::network::{Network, ReceiptResponse, TxSigner};
 use alloy::primitives::{Address, Bytes, Uint, U256};
 use alloy::providers::{Provider, ProviderBuilder};
@@ -25,11 +25,12 @@ use anyhow::{anyhow, bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_client::provider::OpNodeProvider;
 use kailua_client::telemetry::TelemetryArgs;
+use kailua_client::{await_tel, await_tel_res};
 use kailua_common::config::{config_hash, BN254_CONTROL_ID, CONTROL_ROOT, SET_BUILDER_ID};
 use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
 use opentelemetry::global::tracer;
-use opentelemetry::trace::{FutureExt, Span, Status, TraceContextExt, Tracer};
+use opentelemetry::trace::{FutureExt, Status, TraceContextExt, Tracer};
 use std::str::FromStr;
 use tracing::info;
 
@@ -91,9 +92,7 @@ pub struct FastTrackArgs {
 
 pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
-    let mut span = tracer.start("fast_track");
-    span.add_event("start", vec![]);
-    let context = opentelemetry::Context::current_with_span(span);
+    let context = opentelemetry::Context::current_with_span(tracer.start("fast_track"));
 
     let op_node_provider =
         OpNodeProvider(ProviderBuilder::new().on_http(args.op_node_url.as_str().try_into()?));
@@ -101,10 +100,11 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
 
     info!("Fetching rollup configuration from rpc endpoints.");
     // fetch rollup config
-    let config = fetch_rollup_config(&args.op_node_url, &args.op_geth_url, None)
-        .with_context(context.clone())
-        .await
-        .context("fetch_rollup_config")?;
+    let config = await_tel!(
+        context,
+        fetch_rollup_config(&args.op_node_url, &args.op_geth_url, None)
+    )
+    .context("fetch_rollup_config")?;
     let rollup_config_hash = config_hash(&config).context("config_hash")?;
     info!("RollupConfigHash({})", hex::encode(rollup_config_hash));
 
@@ -112,24 +112,23 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     let system_config = SystemConfig::new(config.l1_system_config_address, &eth_rpc_provider);
     let portal_address = system_config
         .optimismPortal()
-        .stall()
-        .with_context(context.with_span(tracer.start_with_context("optimismPortal", &context)))
+        .stall_with_context(context.clone(), "SystemConfig::optimismPortal")
         .await
         .addr_;
     let dgf_address = system_config
         .disputeGameFactory()
-        .stall()
-        .with_context(context.with_span(tracer.start_with_context("disputeGameFactory", &context)))
+        .stall_with_context(context.clone(), "SystemConfig::disputeGameFactory")
         .await
         .addr_;
 
     // initialize owner wallet
     info!("Initializing owner wallet.");
-    let owner_wallet = args
-        .owner_signer
-        .wallet(Some(config.l1_chain_id))
-        .with_context(context.with_span(tracer.start_with_context("owner_wallet", &context)))
-        .await?;
+    let owner_wallet = await_tel_res!(
+        context,
+        tracer,
+        "OwnerSignerArgs::wallet",
+        args.owner_signer.wallet(Some(config.l1_chain_id))
+    )?;
     let owner_provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .wallet(&owner_wallet)
@@ -140,26 +139,21 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     info!("DisputeGameFactory({:?})", dispute_game_factory.address());
     let game_count = dispute_game_factory
         .gameCount()
-        .stall()
-        .with_context(context.with_span(tracer.start_with_context("gameCount", &context)))
+        .stall_with_context(context.clone(), "DisputeGameFactory::gameCount")
         .await
         .gameCount_;
     info!("There have been {game_count} games created using DisputeGameFactory");
     let dispute_game_factory_ownable = OwnableUpgradeable::new(dgf_address, &owner_provider);
     let factory_owner_address = dispute_game_factory_ownable
         .owner()
-        .stall()
-        .with_context(
-            context.with_span(tracer.start_with_context("factory_owner_address", &context)),
-        )
+        .stall_with_context(context.clone(), "DisputeGameFactory::owner")
         .await
         ._0;
     let factory_owner_safe = Safe::new(factory_owner_address, &owner_provider);
     info!("Safe({:?})", factory_owner_safe.address());
     let safe_owners = factory_owner_safe
         .getOwners()
-        .stall()
-        .with_context(context.with_span(tracer.start_with_context("safe_owners", &context)))
+        .stall_with_context(context.clone(), "Safe::getOwners")
         .await
         ._0;
     info!("Safe::owners({:?})", &safe_owners);
@@ -172,11 +166,12 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
 
     // initialize deployment wallet
     info!("Initializing deployer wallet.");
-    let deployer_wallet = args
-        .deployer_signer
-        .wallet(Some(config.l1_chain_id))
-        .with_context(context.with_span(tracer.start_with_context("deployer_wallet", &context)))
-        .await?;
+    let deployer_wallet = await_tel_res!(
+        context,
+        tracer,
+        "DeployerSignerArgs::wallet",
+        args.deployer_signer.wallet(Some(config.l1_chain_id))
+    )?;
     let deployer_provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .wallet(&deployer_wallet)
@@ -184,10 +179,11 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
 
     // Deploy or reuse existing RISCZeroVerifier contracts
     let verifier_contract_address = match &args.verifier_contract {
-        None => deploy_verifier(&deployer_provider, &owner_provider, owner_address)
-            .with_context(context.with_span(tracer.start_with_context("deploy_verifier", &context)))
-            .await
-            .context("deploy_verifier")?,
+        None => await_tel!(
+            context,
+            deploy_verifier(&deployer_provider, &owner_provider, owner_address)
+        )
+        .context("deploy_verifier")?,
         Some(address) => Address::from_str(address)?,
     };
 
@@ -203,8 +199,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         KAILUA_GAME_TYPE,
         dgf_address,
     )
-    .transact()
-    .with_context(context.with_span(tracer.start_with_context("KailuaTreasury::deploy", &context)))
+    .transact_with_context(context.clone(), "KailuaTreasury::deploy")
     .await
     .context("KailuaTreasury::deploy")?;
     info!("KailuaTreasury::deploy: {} gas", receipt.gas_used);
@@ -218,108 +213,91 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
 
     // Update dispute factory implementation to KailuaTreasury
     info!("Setting KailuaTreasury initialization bond value in DisputeGameFactory to zero.");
-    crate::exec_safe_txn(
-        dispute_game_factory.setInitBond(KAILUA_GAME_TYPE, U256::ZERO),
-        &factory_owner_safe,
-        owner_address,
-    )
-    .with_context(
-        context.with_span(tracer.start_with_context("DisputeGameFactory::setInitBond", &context)),
-    )
-    .await
-    .context("DisputeGameFactory::setInitBond")?;
+    await_tel_res!(
+        context,
+        tracer,
+        "DisputeGameFactory::setInitBond",
+        crate::exec_safe_txn(
+            dispute_game_factory.setInitBond(KAILUA_GAME_TYPE, U256::ZERO),
+            &factory_owner_safe,
+            owner_address,
+        )
+    )?;
     assert_eq!(
         dispute_game_factory
             .initBonds(KAILUA_GAME_TYPE)
-            .stall()
-            .with_context(
-                context.with_span(
-                    tracer.start_with_context("DisputeGameFactory::initBonds", &context)
-                )
-            )
+            .stall_with_context(context.clone(), "DisputeGameFactory::initBonds")
             .await
             .bond_,
         U256::ZERO
     );
     info!("Setting KailuaTreasury participation bond value to 1 wei.");
     let bond_value = U256::from(1);
-    crate::exec_safe_txn(
-        kailua_treasury_implementation.setParticipationBond(bond_value),
-        &factory_owner_safe,
-        owner_address,
-    )
-    .with_context(
-        context
-            .with_span(tracer.start_with_context("KailuaTreasury::setParticipationBond", &context)),
-    )
-    .await
-    .context("KailuaTreasury::setParticipationBond(1)")?;
+    await_tel_res!(
+        context,
+        tracer,
+        "KailuaTreasury::setParticipationBond",
+        crate::exec_safe_txn(
+            kailua_treasury_implementation.setParticipationBond(bond_value),
+            &factory_owner_safe,
+            owner_address,
+        )
+    )?;
     assert_eq!(
         kailua_treasury_implementation
             .participationBond()
-            .stall()
-            .with_context(context.with_span(
-                tracer.start_with_context("KailuaTreasury::participationBond", &context)
-            ))
+            .stall_with_context(context.clone(), "KailuaTreasury::participationBond")
             .await
             ._0,
         bond_value
     );
 
     info!("Setting KailuaTreasury implementation address in DisputeGameFactory.");
-    crate::exec_safe_txn(
-        dispute_game_factory
-            .setImplementation(KAILUA_GAME_TYPE, *kailua_treasury_implementation.address()),
-        &factory_owner_safe,
-        owner_address,
-    )
-    .with_context(
-        context.with_span(
-            tracer.start_with_context("DisputeGameFactory::setImplementation", &context),
-        ),
-    )
-    .await
-    .context("DisputeGameFactory::setImplementation(KailuaTreasury)")?;
+    await_tel_res!(
+        context,
+        tracer,
+        "DisputeGameFactory::setImplementation",
+        crate::exec_safe_txn(
+            dispute_game_factory
+                .setImplementation(KAILUA_GAME_TYPE, *kailua_treasury_implementation.address()),
+            &factory_owner_safe,
+            owner_address,
+        )
+    )?;
     assert_eq!(
         dispute_game_factory
             .gameImpls(KAILUA_GAME_TYPE)
-            .stall()
-            .with_context(
-                context.with_span(
-                    tracer.start_with_context("DisputeGameFactory::gameImpls", &context)
-                )
-            )
+            .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
             .await
             .impl_,
         *kailua_treasury_implementation.address()
     );
 
     // Create new treasury instance from target block number
-    let root_claim = op_node_provider
-        .output_at_block(args.starting_block_number)
-        .with_context(context.with_span(tracer.start_with_context("output_at_block", &context)))
-        .await?;
+    let root_claim = await_tel_res!(
+        context,
+        tracer,
+        "root_claim",
+        retry_with_context!(op_node_provider.output_at_block(args.starting_block_number))
+    )?;
     let extra_data = Bytes::from(args.starting_block_number.abi_encode_packed());
     info!(
         "Creating new KailuaTreasury game instance from {} ({}).",
         args.starting_block_number, root_claim
     );
-    crate::exec_safe_txn(
-        dispute_game_factory.create(KAILUA_GAME_TYPE, root_claim, extra_data.clone()),
-        &factory_owner_safe,
-        owner_address,
-    )
-    .with_context(context.with_span(
-        tracer.start_with_context("DisputeGameFactory::create(KailuaTreasury)", &context),
-    ))
-    .await
-    .context("DisputeGameFactory::create(KailuaTreasury)")?;
+    await_tel_res!(
+        context,
+        tracer,
+        "DisputeGameFactory::create(KailuaTreasury)",
+        crate::exec_safe_txn(
+            dispute_game_factory.create(KAILUA_GAME_TYPE, root_claim, extra_data.clone()),
+            &factory_owner_safe,
+            owner_address,
+        )
+    )?;
     let kailua_treasury_instance_address = dispute_game_factory
         .games(KAILUA_GAME_TYPE, root_claim, extra_data)
-        .stall()
-        .with_context(
-            context.with_span(tracer.start_with_context("DisputeGameFactory::games", &context)),
-        )
+        .stall_with_context(context.clone(), "DisputeGameFactory::games")
         .await
         .proxy_;
     let kailua_treasury_instance =
@@ -327,24 +305,21 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     info!("{:?}", &kailua_treasury_instance);
     let status = kailua_treasury_instance
         .status()
-        .stall()
-        .with_context(
-            context.with_span(tracer.start_with_context("KailuaTreasury::status", &context)),
-        )
+        .stall_with_context(context.clone(), "KailuaTreasury::status")
         .await
         ._0;
     if status == 0 {
         info!("Resolving KailuaTreasury instance");
-        crate::exec_safe_txn(
-            kailua_treasury_instance.resolve(),
-            &factory_owner_safe,
-            owner_address,
-        )
-        .with_context(
-            context.with_span(tracer.start_with_context("KailuaTreasury::resolve", &context)),
-        )
-        .await
-        .context("resolve KailuaTreasury")?;
+        await_tel_res!(
+            context,
+            tracer,
+            "KailuaTreasury::resolve",
+            crate::exec_safe_txn(
+                kailua_treasury_instance.resolve(),
+                &factory_owner_safe,
+                owner_address,
+            )
+        )?;
     } else {
         info!("Game instance is not ongoing ({status})");
     }
@@ -366,8 +341,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         U256::from(args.proposal_time_gap),
         args.challenge_timeout,
     )
-    .transact()
-    .with_context(context.with_span(tracer.start_with_context("KailuaGame::deploy", &context)))
+    .transact_with_context(context.clone(), "KailuaGame::deploy")
     .await
     .context("KailuaGame::deploy")?;
     info!("KailuaGame::deploy: {} gas", receipt.gas_used);
@@ -381,29 +355,30 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
 
     // Update implementation to KailuaGame
     info!("Setting KailuaGame implementation address in DisputeGameFactory.");
-    crate::exec_safe_txn(
-        dispute_game_factory.setImplementation(KAILUA_GAME_TYPE, *kailua_game_contract.address()),
-        &factory_owner_safe,
-        owner_address,
-    )
-    .with_context(
-        context.with_span(
-            tracer.start_with_context("DisputeGameFactory::setImplementation", &context),
-        ),
-    )
-    .await
-    .context("DisputeGameFactory::setImplementation(KailuaGame)")?;
+    await_tel_res!(
+        context,
+        tracer,
+        "DisputeGameFactory::setImplementation",
+        crate::exec_safe_txn(
+            dispute_game_factory
+                .setImplementation(KAILUA_GAME_TYPE, *kailua_game_contract.address()),
+            &factory_owner_safe,
+            owner_address,
+        )
+    )?;
 
     // Update the respectedGameType as the guardian
     if args.respect_kailua_proposals {
         // initialize guardian wallet
         info!("Initializing guardian wallet.");
-        let guardian_wallet = args
-            .guardian_signer
-            .ok_or_else(|| anyhow!("Guardian signer not provided"))?
-            .wallet(Some(config.l1_chain_id))
-            .with_context(context.with_span(tracer.start_with_context("guardian_wallet", &context)))
-            .await?;
+        let guardian_wallet = await_tel_res!(
+            context,
+            tracer,
+            "GuardianSignerArgs::wallet",
+            args.guardian_signer
+                .ok_or_else(|| anyhow!("Guardian signer not provided"))?
+                .wallet(Some(config.l1_chain_id))
+        )?;
         let guardian_address = guardian_wallet.default_signer().address();
         let guardian_provider = ProviderBuilder::new()
             .with_recommended_fillers()
@@ -412,10 +387,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         let optimism_portal = OptimismPortal2::new(portal_address, &guardian_provider);
         let portal_guardian_address = optimism_portal
             .guardian()
-            .stall()
-            .with_context(
-                context.with_span(tracer.start_with_context("OptimismPortal2::guardian", &context)),
-            )
+            .stall_with_context(context.clone(), "OptimismPortal2::guardian")
             .await
             ._0;
         if portal_guardian_address != guardian_address {
@@ -425,10 +397,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         info!("Setting respectedGameType in OptimismPortal2.");
         let receipt = optimism_portal
             .setRespectedGameType(KAILUA_GAME_TYPE)
-            .transact()
-            .with_context(context.with_span(
-                tracer.start_with_context("OptimismPortal2::setRespectedGameType", &context),
-            ))
+            .transact_with_context(context.clone(), "OptimismPortal2::setRespectedGameType")
             .await
             .context("OptimismPortal2::setRespectedGameType")?;
         info!(
@@ -453,15 +422,11 @@ pub async fn deploy_verifier<
     owner_address: Address,
 ) -> anyhow::Result<Address> {
     let tracer = tracer("kailua");
-    let context = opentelemetry::Context::current();
+    let context = opentelemetry::Context::current_with_span(tracer.start("deploy_verifier"));
     // Deploy verifier router contract
     info!("Deploying RiscZeroVerifierRouter contract to L1 under ownership of {owner_address}.");
     let receipt = RiscZeroVerifierRouter::deploy_builder(&deployer_provider, owner_address)
-        .transact()
-        .with_context(
-            context
-                .with_span(tracer.start_with_context("RiscZeroVerifierRouter::deploy", &context)),
-        )
+        .transact_with_context(context.clone(), "RiscZeroVerifierRouter::deploy")
         .await
         .context("RiscZeroVerifierRouter::deploy")?;
     info!("RiscZeroVerifierRouter::deploy: {} gas", receipt.gas_used());
@@ -474,12 +439,7 @@ pub async fn deploy_verifier<
     info!("Deploying RiscZeroGroth16Verifier contract to L1.");
     let receipt =
         RiscZeroGroth16Verifier::deploy_builder(&deployer_provider, CONTROL_ROOT, BN254_CONTROL_ID)
-            .transact()
-            .with_context(
-                context.with_span(
-                    tracer.start_with_context("RiscZeroGroth16Verifier::deploy", &context),
-                ),
-            )
+            .transact_with_context(context.clone(), "RiscZeroGroth16Verifier::deploy")
             .await
             .context("RiscZeroGroth16Verifier::deploy")?;
     info!(
@@ -495,22 +455,18 @@ pub async fn deploy_verifier<
     info!("{:?}", &groth16_verifier_contract);
     let selector = groth16_verifier_contract
         .SELECTOR()
-        .stall()
-        .with_context(
-            context.with_span(tracer.start_with_context("selector(groth16Verifier)", &context)),
-        )
+        .stall_with_context(context.clone(), "RiscZeroGroth16Verifier::SELECTOR")
         .await
         ._0;
     info!("Adding RiscZeroGroth16Verifier contract to RiscZeroVerifierRouter.");
-    let receipt =
-        verifier_contract
-            .addVerifier(selector, *groth16_verifier_contract.address())
-            .transact()
-            .with_context(context.with_span(
-                tracer.start_with_context("addVerifier(RiscZeroGroth16Verifier)", &context),
-            ))
-            .await
-            .context("RiscZeroVerifierRouter::addVerifier(RiscZeroGroth16Verifier)")?;
+    let receipt = verifier_contract
+        .addVerifier(selector, *groth16_verifier_contract.address())
+        .transact_with_context(
+            context.clone(),
+            "RiscZeroVerifierRouter::addVerifier(RiscZeroGroth16Verifier)",
+        )
+        .await
+        .context("RiscZeroVerifierRouter::addVerifier(RiscZeroGroth16Verifier)")?;
     info!(
         "RiscZeroVerifierRouter::addVerifier(RiscZeroGroth16Verifier): {} gas",
         receipt.gas_used()
@@ -524,10 +480,7 @@ pub async fn deploy_verifier<
         SET_BUILDER_ID,
         String::default(),
     )
-    .transact()
-    .with_context(
-        context.with_span(tracer.start_with_context("RiscZeroSetVerifier::deploy", &context)),
-    )
+    .transact_with_context(context.clone(), "RiscZeroSetVerifier::deploy")
     .await
     .context("RiscZeroSetVerifier::deploy")?;
     info!("RiscZeroSetVerifier::deploy: {} gas", receipt.gas_used());
@@ -540,19 +493,15 @@ pub async fn deploy_verifier<
     info!("{:?}", &set_verifier_contract);
     let selector = set_verifier_contract
         .SELECTOR()
-        .stall()
-        .with_context(
-            context.with_span(tracer.start_with_context("selector(setVerifier)", &context)),
-        )
+        .stall_with_context(context.clone(), "RiscZeroSetVerifier::selector")
         .await
         ._0;
     info!("Adding RiscZeroSetVerifier contract to RiscZeroVerifierRouter.");
     let receipt = verifier_contract
         .addVerifier(selector, *set_verifier_contract.address())
-        .transact()
-        .with_context(
-            context
-                .with_span(tracer.start_with_context("addVerifier(RiscZeroSetVerifier)", &context)),
+        .transact_with_context(
+            context.clone(),
+            "RiscZeroVerifierRouter::addVerifier(RiscZeroSetVerifier)",
         )
         .await
         .context("RiscZeroVerifierRouter::addVerifier(RiscZeroSetVerifier)")?;
@@ -567,11 +516,7 @@ pub async fn deploy_verifier<
         // Deploy MockVerifier contract
         tracing::warn!("Deploying RiscZeroMockVerifier contract to L1. This will accept fake proofs which are not cryptographically secure!");
         let receipt = RiscZeroMockVerifier::deploy_builder(&deployer_provider, [0u8; 4].into())
-            .transact()
-            .with_context(
-                context
-                    .with_span(tracer.start_with_context("RiscZeroMockVerifier::deploy", &context)),
-            )
+            .transact_with_context(context.clone(), "RiscZeroMockVerifier::deploy")
             .await
             .context("RiscZeroMockVerifier::deploy")?;
         info!("RiscZeroMockVerifier::deploy: {} gas", receipt.gas_used());
@@ -586,10 +531,10 @@ pub async fn deploy_verifier<
         tracing::warn!("Adding RiscZeroMockVerifier contract to RiscZeroVerifierRouter.");
         let receipt = verifier_contract
             .addVerifier([0u8; 4].into(), *mock_verifier_contract.address())
-            .transact()
-            .with_context(context.with_span(
-                tracer.start_with_context("addVerifier(RiscZeroMockVerifier)", &context),
-            ))
+            .transact_with_context(
+                context.clone(),
+                "RiscZeroVerifierRouter::addVerifier(RiscZeroMockVerifier)",
+            )
             .await
             .context("RiscZeroVerifierRouter::addVerifier(RiscZeroMockVerifier)")?;
         info!(

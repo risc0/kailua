@@ -16,15 +16,15 @@ use crate::channel::DuplexChannel;
 use crate::db::config::Config;
 use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
-use crate::provider::BlobProvider;
+use crate::provider::{get_block_by_number, get_next_block, BlobProvider};
 use crate::signer::ValidatorSignerArgs;
 use crate::transact::Transact;
-use crate::{stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
+use crate::{retry_with_context, stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::{IndexedBlobHash, FIELD_ELEMENTS_PER_BLOB};
-use alloy::eips::BlockNumberOrTag;
-use alloy::network::primitives::BlockTransactionsKind;
+use alloy::network::primitives::HeaderResponse;
+use alloy::network::BlockResponse;
 use alloy::primitives::{Address, Bytes, FixedBytes, B256, U256};
-use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
+use alloy::providers::{ProviderBuilder, ReqwestProvider};
 use anyhow::{anyhow, bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_client::args::parse_address;
@@ -32,6 +32,7 @@ use kailua_client::boundless::BoundlessArgs;
 use kailua_client::proof::{encode_seal, proof_file_name, read_proof_file};
 use kailua_client::provider::OpNodeProvider;
 use kailua_client::telemetry::TelemetryArgs;
+use kailua_client::{await_tel, await_tel_res};
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::config::config_hash;
@@ -43,6 +44,8 @@ use kailua_common::proof::Proof;
 use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
 use maili_protocol::BlockInfo;
+use opentelemetry::global::tracer;
+use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use risc0_zkvm::is_dev_mode;
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -80,16 +83,19 @@ pub struct ValidateArgs {
 }
 
 pub async fn validate(args: ValidateArgs, data_dir: PathBuf) -> anyhow::Result<()> {
+    let tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(tracer.start("validate"));
+
     // We run two concurrent tasks, one for the chain, and one for the prover.
     // Both tasks communicate using the duplex channel
     let channel_pair = DuplexChannel::new_pair(4096);
 
-    let handle_proposals = spawn(handle_proposals(
-        channel_pair.0,
-        args.clone(),
-        data_dir.clone(),
-    ));
-    let handle_proof_requests = spawn(handle_proof_requests(channel_pair.1, args, data_dir));
+    let handle_proposals = spawn(
+        handle_proposals(channel_pair.0, args.clone(), data_dir.clone())
+            .with_context(context.clone()),
+    );
+    let handle_proof_requests =
+        spawn(handle_proof_requests(channel_pair.1, args, data_dir).with_context(context.clone()));
 
     let (proposals_task, proofs_task) = try_join!(handle_proposals, handle_proof_requests)?;
     proposals_task.context("handle_proposals")?;
@@ -119,6 +125,9 @@ pub async fn handle_proposals(
     args: ValidateArgs,
     data_dir: PathBuf,
 ) -> anyhow::Result<()> {
+    let tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(tracer.start("handle_proposals"));
+
     // initialize blockchain connections
     info!("Initializing rpc connections.");
     let op_node_provider =
@@ -127,26 +136,38 @@ pub async fn handle_proposals(
         ProviderBuilder::new().on_http(args.core.eth_rpc_url.as_str().try_into()?);
     let op_geth_provider =
         ProviderBuilder::new().on_http(args.core.op_geth_url.as_str().try_into()?);
-    let cl_node_provider = BlobProvider::new(args.core.beacon_rpc_url.as_str()).await?;
+    let cl_node_provider = await_tel!(
+        context,
+        BlobProvider::new(args.core.beacon_rpc_url.as_str())
+    )
+    .context("BlobProvier::new")?;
 
     info!("Fetching rollup configuration from rpc endpoints.");
     // fetch rollup config
-    let config = fetch_rollup_config(&args.core.op_node_url, &args.core.op_geth_url, None)
-        .await
-        .context("fetch_rollup_config")?;
+    let config = await_tel!(
+        context,
+        fetch_rollup_config(&args.core.op_node_url, &args.core.op_geth_url, None)
+    )
+    .context("fetch_rollup_config")?;
     let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
     info!("RollupConfigHash({})", hex::encode(rollup_config_hash));
 
     // load system config
     let system_config = SystemConfig::new(config.l1_system_config_address, &eth_rpc_provider);
-    let dgf_address = system_config.disputeGameFactory().stall().await.addr_;
+    let dgf_address = system_config
+        .disputeGameFactory()
+        .stall_with_context(context.clone(), "SystemConfig::disputeGameFactory")
+        .await
+        .addr_;
 
     // initialize validator wallet
     info!("Initializing validator wallet.");
-    let validator_wallet = args
-        .validator_signer
-        .wallet(Some(config.l1_chain_id))
-        .await?;
+    let validator_wallet = await_tel_res!(
+        context,
+        tracer,
+        "ValidatorSigner::walet",
+        args.validator_signer.wallet(Some(config.l1_chain_id))
+    )?;
     let validator_address = validator_wallet.default_signer().address();
     let validator_provider = ProviderBuilder::new()
         .with_recommended_fillers()
@@ -159,7 +180,7 @@ pub async fn handle_proposals(
     info!("DisputeGameFactory({:?})", dispute_game_factory.address());
     let game_count: u64 = dispute_game_factory
         .gameCount()
-        .stall()
+        .stall_with_context(context.clone(), "DisputeGameFactory::gameCount")
         .await
         .gameCount_
         .to();
@@ -167,7 +188,7 @@ pub async fn handle_proposals(
     let kailua_game_implementation = KailuaGame::new(
         dispute_game_factory
             .gameImpls(KAILUA_GAME_TYPE)
-            .stall()
+            .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
             .await
             .impl_,
         &validator_provider,
@@ -179,7 +200,8 @@ pub async fn handle_proposals(
     }
     // Initialize empty DB
     info!("Initializing..");
-    let mut kailua_db = KailuaDB::init(data_dir, &dispute_game_factory).await?;
+    let mut kailua_db = await_tel!(context, KailuaDB::init(data_dir, &dispute_game_factory))
+        .context("KailuaDB::init")?;
     info!("KailuaTreasury({:?})", kailua_db.treasury.address);
     // Run the validator loop
     info!(
@@ -194,10 +216,11 @@ pub async fn handle_proposals(
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
         // fetch latest games
-        let loaded_proposals = kailua_db
-            .load_proposals(&dispute_game_factory, &op_node_provider, &cl_node_provider)
-            .await
-            .context("load_proposals")?;
+        let loaded_proposals = await_tel!(
+            context,
+            kailua_db.load_proposals(&dispute_game_factory, &op_node_provider, &cl_node_provider)
+        )
+        .context("load_proposals")?;
 
         // check new proposals for fault and queue potential responses
         for opponent_index in loaded_proposals {
@@ -218,7 +241,7 @@ pub async fn handle_proposals(
             // Check that a validity proof has not already been posted
             if proposal_parent_contract
                 .provenAt(U256::ZERO, U256::ZERO)
-                .stall()
+                .stall_with_context(context.clone(), "KailuaTournament::provenAt")
                 .await
                 ._0
                 != 0
@@ -284,7 +307,7 @@ pub async fn handle_proposals(
             // Check that a fault proof had not already been posted
             let proof_status = proposal_parent_contract
                 .proofStatus(U256::from(u_index), U256::from(v_index))
-                .stall()
+                .stall_with_context(context.clone(), "KailuaTournament::proofStatus")
                 .await
                 ._0;
             if proof_status != 0 {
@@ -320,18 +343,19 @@ pub async fn handle_proposals(
                 fault_buffer.push_back(request);
                 continue;
             };
-            if let Err(err) = request_fault_proof(
-                &mut channel,
-                &kailua_db.config,
-                &parent,
-                &contender,
-                &opponent,
-                &eth_rpc_provider,
-                &op_geth_provider,
-                &op_node_provider,
-            )
-            .await
-            {
+            if let Err(err) = await_tel!(
+                context,
+                request_fault_proof(
+                    &mut channel,
+                    &kailua_db.config,
+                    &parent,
+                    &contender,
+                    &opponent,
+                    &eth_rpc_provider,
+                    &op_geth_provider,
+                    &op_node_provider,
+                )
+            ) {
                 error!("Could not request fault proof for {contender_index} vs {opponent_index}: {err:?}");
                 fault_buffer.push_back(request);
             }
@@ -354,16 +378,17 @@ pub async fn handle_proposals(
                 valid_buffer.push_front(proposal_index);
                 continue;
             };
-            if let Err(err) = request_validity_proof(
-                &mut channel,
-                &kailua_db.config,
-                &parent,
-                &proposal,
-                &eth_rpc_provider,
-                &op_geth_provider,
-            )
-            .await
-            {
+            if let Err(err) = await_tel!(
+                context,
+                request_validity_proof(
+                    &mut channel,
+                    &kailua_db.config,
+                    &parent,
+                    &proposal,
+                    &eth_rpc_provider,
+                    &op_geth_provider,
+                )
+            ) {
                 error!("Could not request validity proof for {proposal_index}: {err:?}");
                 valid_buffer.push_front(proposal_index);
             }
@@ -388,10 +413,10 @@ pub async fn handle_proposals(
             let opponent = kailua_db.get_local_proposal(&proposal_index).unwrap();
             let parent = kailua_db.get_local_proposal(&opponent.parent).unwrap();
             // Abort early if a validity proof is already submitted in this tournament
-            if parent
-                .fetch_is_successor_validity_proven(&validator_provider)
-                .await?
-            {
+            if await_tel!(
+                context,
+                parent.fetch_is_successor_validity_proven(&validator_provider)
+            )? {
                 info!(
                     "Skipping proof submission in tournament {} with validity proof.",
                     parent.index
@@ -399,7 +424,12 @@ pub async fn handle_proposals(
                 continue;
             }
             let parent_contract = parent.tournament_contract_instance(&validator_provider);
-            let expected_fpvm_image_id = parent_contract.imageId().stall().await.imageId_.0;
+            let expected_fpvm_image_id = parent_contract
+                .imageId()
+                .stall_with_context(context.clone(), "KailuaTournament::imageId")
+                .await
+                .imageId_
+                .0;
             // patch the proof if in dev mode
             #[cfg(feature = "devnet")]
             let proof = maybe_patch_proof(
@@ -437,8 +467,11 @@ pub async fn handle_proposals(
 
                 // sanity check proof journal fields
                 {
-                    let contract_blobs_hash =
-                        opponent_contract.blobsHash().stall().await.blobsHash_;
+                    let contract_blobs_hash = opponent_contract
+                        .blobsHash()
+                        .stall_with_context(context.clone(), "KailuaGame::blobsHash")
+                        .await
+                        .blobsHash_;
                     if opponent.blobs_hash() != contract_blobs_hash {
                         warn!(
                             "Local proposal blobs hash {} doesn't match contract blobs hash {}",
@@ -462,7 +495,11 @@ pub async fn handle_proposals(
                     } else {
                         info!("Precondition hash {precondition_hash} confirmed.")
                     }
-                    let config_hash = opponent_contract.configHash().stall().await.configHash_;
+                    let config_hash = opponent_contract
+                        .configHash()
+                        .stall_with_context(context.clone(), "KailuaGame::configHash")
+                        .await
+                        .configHash_;
                     if proof_journal.config_hash != config_hash {
                         warn!(
                             "Proof config hash {} does not match contract hash {config_hash}",
@@ -499,7 +536,7 @@ pub async fn handle_proposals(
                         v_index,
                         encoded_seal.clone(),
                     )
-                    .transact()
+                    .transact_with_context(context.clone(), "KailuaTournament::proveValidity")
                     .await
                     .context("KailuaTournament::proveValidity")
                 {
@@ -507,7 +544,7 @@ pub async fn handle_proposals(
                         info!("Validity proof submitted: {:?}", receipt.transaction_hash);
                         let proof_status = parent_contract
                             .provenAt(U256::ZERO, U256::ZERO)
-                            .stall()
+                            .stall_with_context(context.clone(), "KailuaTournament::provenAt")
                             .await
                             ._0;
                         info!("Validity proof timestamp: {proof_status}");
@@ -558,9 +595,14 @@ pub async fn handle_proposals(
                             "Proposal output fe {opponent_output_fe} doesn't match proof fe {proof_output_root_fe}",
                         );
                     }
-                    let op_node_output = op_node_provider
-                        .output_at_block(proof_journal.claimed_l2_block_number)
-                        .await?;
+                    let op_node_output = await_tel_res!(
+                        context,
+                        tracer,
+                        "op_node_output",
+                        retry_with_context!(
+                            op_node_provider.output_at_block(proof_journal.claimed_l2_block_number)
+                        )
+                    )?;
                     if proof_journal.claimed_l2_output_root != op_node_output {
                         error!(
                             "Local op node output {op_node_output} doesn't match proof {}",
@@ -631,7 +673,7 @@ pub async fn handle_proposals(
             // Skip proof submission if already proven
             let fault_proof_status = parent_contract
                 .proofStatus(U256::from(u_index), U256::from(v_index))
-                .stall()
+                .stall_with_context(context.clone(), "KailuaTournament::proofStatus")
                 .await
                 ._0;
             if fault_proof_status != 0 {
@@ -698,7 +740,10 @@ pub async fn handle_proposals(
                                 commitments[0].last().unwrap().clone(),
                                 proofs[0].last().unwrap().clone(),
                             )
-                            .stall()
+                            .stall_with_context(
+                                context.clone(),
+                                "KailuaGame::verifyIntermediateOutput",
+                            )
                             .await
                             .success;
                         if !contender_has_output {
@@ -713,7 +758,10 @@ pub async fn handle_proposals(
                                 commitments[1].last().unwrap().clone(),
                                 proofs[1].last().unwrap().clone(),
                             )
-                            .stall()
+                            .stall_with_context(
+                                context.clone(),
+                                "KailuaGame::verifyIntermediateOutput",
+                            )
                             .await
                             .success;
                         if !opponent_has_output {
@@ -748,7 +796,10 @@ pub async fn handle_proposals(
                                 commitments[0].first().unwrap().clone(),
                                 proofs[0].first().unwrap().clone(),
                             )
-                            .stall()
+                            .stall_with_context(
+                                context.clone(),
+                                "KailuaGame::verifyIntermediateOutput",
+                            )
                             .await
                             .success;
                         if !contender_has_output {
@@ -763,7 +814,10 @@ pub async fn handle_proposals(
                                 commitments[1].first().unwrap().clone(),
                                 proofs[1].first().unwrap().clone(),
                             )
-                            .stall()
+                            .stall_with_context(
+                                context.clone(),
+                                "KailuaGame::verifyIntermediateOutput",
+                            )
                             .await
                             .success;
                         if !proposal_has_output {
@@ -788,7 +842,7 @@ pub async fn handle_proposals(
                             commitments[0].first().unwrap().clone(),
                             proofs[0].first().unwrap().clone(),
                         )
-                        .stall()
+                        .stall_with_context(context.clone(), "KailuaGame::verifyIntermediateOutput")
                         .await
                         .success
                     {
@@ -803,7 +857,7 @@ pub async fn handle_proposals(
                             commitments[1].first().unwrap().clone(),
                             proofs[1].first().unwrap().clone(),
                         )
-                        .stall()
+                        .stall_with_context(context.clone(), "KailuaGame::verifyIntermediateOutput")
                         .await
                         .success
                     {
@@ -841,7 +895,11 @@ pub async fn handle_proposals(
 
             // sanity check config hash
             {
-                let config_hash = parent_contract.configHash().stall().await.configHash_;
+                let config_hash = parent_contract
+                    .configHash()
+                    .stall_with_context(context.clone(), "KailuaTournament::configHash")
+                    .await
+                    .configHash_;
                 if proof_journal.config_hash != config_hash {
                     warn!(
                         "Config hash mismatch. Found {}, expected {config_hash}.",
@@ -872,7 +930,7 @@ pub async fn handle_proposals(
                         commitments,
                         proofs,
                     )
-                    .transact()
+                    .transact_with_context(context.clone(), "KailuaTournament::proveOutputFault")
                     .await
                     .context("KailuaTournament::proveOutputFault")
             } else {
@@ -885,7 +943,7 @@ pub async fn handle_proposals(
                         commitments,
                         proofs,
                     )
-                    .transact()
+                    .transact_with_context(context.clone(), "KailuaTournament::proveTrailFault")
                     .await
                     .context("KailuaTournament::proveTrailFault")
             };
@@ -895,7 +953,7 @@ pub async fn handle_proposals(
                     info!("Fault proof submitted: {receipt:?}");
                     let proof_status = parent_contract
                         .proofStatus(U256::from(u_index), U256::from(v_index))
-                        .stall()
+                        .stall_with_context(context.clone(), "KailuaTournament::proofStatus")
                         .await
                         ._0;
                     info!(
@@ -935,6 +993,9 @@ async fn request_fault_proof(
     l2_node_provider: &ReqwestProvider,
     op_node_provider: &OpNodeProvider,
 ) -> anyhow::Result<()> {
+    let tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(tracer.start("request_fault_proof"));
+
     let Some(divergence_point) = contender.divergence_point(opponent) else {
         error!(
             "Contender {} does not diverge from opponent {}.",
@@ -964,23 +1025,21 @@ async fn request_fault_proof(
     debug!("l2_head_number {:?}", &agreed_l2_head_number);
 
     // Get L2 head hash
-    let agreed_l2_head_hash = l2_node_provider
-        .get_block_by_number(
-            BlockNumberOrTag::Number(agreed_l2_head_number),
-            BlockTransactionsKind::Hashes,
-        )
-        .await
-        .context("agreed_l2_head_hash")?
-        .expect("Agreed l2 head not found")
-        .header
-        .hash;
+    let agreed_l2_head_hash = await_tel!(
+        context,
+        get_block_by_number(&l2_node_provider, agreed_l2_head_number,)
+    )?
+    .header()
+    .hash();
     debug!("l2_head {:?}", &agreed_l2_head_hash);
 
     // Get L2 head output root
-    let agreed_l2_output_root = op_node_provider
-        .output_at_block(agreed_l2_head_number)
-        .await
-        .context("output_at_block")?;
+    let agreed_l2_output_root = await_tel_res!(
+        context,
+        tracer,
+        "output_at_block",
+        retry_with_context!(op_node_provider.output_at_block(agreed_l2_head_number))
+    )?;
 
     // Prepare expected output commitment
     let claimed_l2_block_number = if is_output_fault {
@@ -990,10 +1049,12 @@ async fn request_fault_proof(
         // trail data challenges do not derive any l2 blocks
         agreed_l2_head_number
     };
-    let claimed_l2_output_root = op_node_provider
-        .output_at_block(claimed_l2_block_number)
-        .await
-        .context("output_at_block")?;
+    let claimed_l2_output_root = await_tel_res!(
+        context,
+        tracer,
+        "claimed_l2_output_root",
+        retry_with_context!(op_node_provider.output_at_block(claimed_l2_block_number))
+    )?;
 
     // Prepare precondition validation data
     let precondition_validation_data = if opponent.has_precondition_for(divergence_point) {
@@ -1001,34 +1062,15 @@ async fn request_fault_proof(
         let normalized_position = divergence_point - (!is_output_fault as u64);
 
         let (u_blob_hash, u_blob) = contender.io_blob_for(normalized_position);
-        let u_blob_block_parent = l1_node_provider
-            .get_block_by_hash(contender.l1_head, BlockTransactionsKind::Hashes)
-            .await
-            .context("u_blob_block_parent get_block_by_hash")?
-            .expect("u_blob_block_parent not found");
-        let u_blob_block = l1_node_provider
-            .get_block_by_number(
-                BlockNumberOrTag::Number(u_blob_block_parent.header.number + 1),
-                BlockTransactionsKind::Hashes,
-            )
-            .await
-            .context("u_blob_block get_block_by_number")?
-            .expect("u_blob_block not found");
+        let u_blob_block = await_tel!(
+            context,
+            get_next_block(&l1_node_provider, contender.l1_head)
+        )
+        .context("u_blob_block")?;
 
         let (v_blob_hash, v_blob) = opponent.io_blob_for(normalized_position);
-        let v_blob_block_parent = l1_node_provider
-            .get_block_by_hash(opponent.l1_head, BlockTransactionsKind::Hashes)
-            .await
-            .context("v_blob_block_parent get_block_by_hash")?
-            .expect("v_blob_block_parent not found");
-        let v_blob_block = l1_node_provider
-            .get_block_by_number(
-                BlockNumberOrTag::Number(v_blob_block_parent.header.number + 1),
-                BlockTransactionsKind::Hashes,
-            )
-            .await
-            .context("v_blob_block get_block_by_number")?
-            .expect("v_blob_block not found");
+        let v_blob_block = await_tel!(context, get_next_block(&l1_node_provider, opponent.l1_head))
+            .context("v_blob_block")?;
 
         info!(
             "Fetched blobs {}:{u_blob_hash} and {}:{v_blob_hash} for challenge point {normalized_position}/{is_output_fault}",
@@ -1104,23 +1146,16 @@ async fn request_validity_proof(
     l1_node_provider: &ReqwestProvider,
     l2_node_provider: &ReqwestProvider,
 ) -> anyhow::Result<()> {
+    let tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(tracer.start("request_validity_proof"));
+
     let precondition_validation_data = if config.proposal_output_count > 1 {
         let mut validated_blobs = Vec::with_capacity(proposal.io_blobs.len());
         debug_assert!(!proposal.io_blobs.is_empty());
         for (blob_hash, blob) in &proposal.io_blobs {
-            let block_parent = l1_node_provider
-                .get_block_by_hash(proposal.l1_head, BlockTransactionsKind::Hashes)
-                .await
-                .context("block_parent get_block_by_hash")?
-                .expect("block_parent not found");
-            let block = l1_node_provider
-                .get_block_by_number(
-                    BlockNumberOrTag::Number(block_parent.header.number + 1),
-                    BlockTransactionsKind::Hashes,
-                )
-                .await
-                .context("block get_block_by_number")?
-                .expect("block not found");
+            let block = await_tel!(context, get_next_block(&l1_node_provider, proposal.l1_head))
+                .context("block")?;
+
             validated_blobs.push(BlobFetchRequest {
                 block_ref: BlockInfo {
                     hash: block.header.hash,
@@ -1145,16 +1180,12 @@ async fn request_validity_proof(
         None
     };
     // Get L2 head hash
-    let agreed_l2_head_hash = l2_node_provider
-        .get_block_by_number(
-            BlockNumberOrTag::Number(parent.output_block_number),
-            BlockTransactionsKind::Hashes,
-        )
-        .await
-        .context("agreed_l2_head_hash")?
-        .expect("Agreed l2 head not found")
-        .header
-        .hash;
+    let agreed_l2_head_hash = await_tel!(
+        context,
+        get_block_by_number(&l2_node_provider, parent.output_block_number)
+    )?
+    .header
+    .hash;
     debug!("l2_head {:?}", &agreed_l2_head_hash);
     // Message proving task
     channel
@@ -1177,17 +1208,26 @@ pub async fn handle_proof_requests(
     args: ValidateArgs,
     data_dir: PathBuf,
 ) -> anyhow::Result<()> {
+    let tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(tracer.start("handle_proof_requests"));
+
     // Fetch rollup configuration
-    let rollup_config =
-        fetch_rollup_config(&args.core.op_node_url, &args.core.op_geth_url, None).await?;
+    let rollup_config = await_tel!(
+        context,
+        fetch_rollup_config(&args.core.op_node_url, &args.core.op_geth_url, None)
+    )
+    .context("fetch_rollup_config")?;
     let l2_chain_id = rollup_config.l2_chain_id.to_string();
     let config_hash = B256::from(config_hash(&rollup_config)?);
     let fpvm_image_id = B256::from(bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID));
     // Set payout recipient
-    let validator_wallet = args
-        .validator_signer
-        .wallet(Some(rollup_config.l1_chain_id))
-        .await?;
+    let validator_wallet = await_tel_res!(
+        context,
+        tracer,
+        "ValidatorSigner::wallet",
+        args.validator_signer
+            .wallet(Some(rollup_config.l1_chain_id))
+    )?;
     let payout_recipient = args
         .payout_recipient_address
         .unwrap_or_else(|| validator_wallet.default_signer().address());
@@ -1335,13 +1375,16 @@ pub async fn handle_proof_requests(
         kailua_host_command.args(proving_args);
         debug!("kailua_host_command {:?}", &kailua_host_command);
         {
-            match kailua_host_command
-                .kill_on_drop(true)
-                .spawn()
-                .context("Invoking kailua-host")?
-                .wait()
-                .await
-            {
+            match await_tel_res!(
+                context,
+                tracer,
+                "KailuaHost",
+                kailua_host_command
+                    .kill_on_drop(true)
+                    .spawn()
+                    .context("Invoking kailua-host")?
+                    .wait()
+            ) {
                 Ok(proving_task) => {
                     if !proving_task.success() {
                         error!("Proving task failure.");

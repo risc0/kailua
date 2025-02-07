@@ -18,6 +18,8 @@ use alloy::primitives::{Address, B256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
 use kailua_contracts::KailuaGame::KailuaGameInstance;
+use opentelemetry::global::tracer;
+use opentelemetry::trace::{TraceContextExt, Tracer};
 
 #[derive(Clone, Debug, Default)]
 pub struct Config {
@@ -41,71 +43,78 @@ impl Config {
     pub async fn load<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         kailua_game_implementation: &KailuaGameInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(tracer.start("Config::load"));
+
         let treasury = kailua_game_implementation
             .treasury()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaGame::treasury")
             .await
             .treasury_;
         let game = *kailua_game_implementation.address();
         let verifier = kailua_game_implementation
             .verifier()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaGame::verifier")
             .await
             .verifier_;
-        let image_id = kailua_game_implementation.imageId().stall().await.imageId_;
+        let image_id = kailua_game_implementation
+            .imageId()
+            .stall_with_context(context.clone(), "")
+            .await
+            .imageId_;
         let cfg_hash = kailua_game_implementation
             .configHash()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaGame::configHash")
             .await
             .configHash_;
         let proposal_output_count = kailua_game_implementation
             .proposalOutputCount()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaGame::proposalOutputCount")
             .await
             .proposalOutputCount_
             .to();
         let output_block_span = kailua_game_implementation
             .outputBlockSpan()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaGame::outputBlockSpan")
             .await
             .outputBlockSpan_
             .to();
         let proposal_blobs = kailua_game_implementation
             .proposalBlobs()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaGame::proposalBlobs")
             .await
             .proposalBlobs_
             .to();
         let game_type = kailua_game_implementation
             .gameType()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaGame::gameType")
             .await
             .gameType_ as u8;
         let factory = kailua_game_implementation
             .disputeGameFactory()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaGame::disputeGameFactory")
             .await
             .factory_;
         let timeout = kailua_game_implementation
             .maxClockDuration()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaGame::maxClockDuration")
             .await
             .maxClockDuration_;
         let genesis_time = kailua_game_implementation
             .genesisTimeStamp()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaGame::genesisTimeStamp")
             .await
             .genesisTimeStamp_
             .to();
         let block_time = kailua_game_implementation
             .l2BlockTime()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaGame::l2BlockTime")
             .await
             .l2BlockTime_
             .to();
         let proposal_gap = kailua_game_implementation
             .proposalTimeGap()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaGame::proposalTimeGap")
             .await
             .proposalTimeGap_
             .to();

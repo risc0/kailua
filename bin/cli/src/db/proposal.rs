@@ -1,27 +1,30 @@
 use crate::db::config::Config;
-use crate::provider::{blob_fe_proof, blob_sidecar, BlobProvider};
-use crate::retry;
+use crate::provider::{blob_fe_proof, blob_sidecar, get_block, BlobProvider};
+use crate::retry_with_context;
 use crate::stall::Stall;
 use crate::transact::Transact;
 use alloy::consensus::{Blob, BlobTransactionSidecar, BlockHeader};
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
-use alloy::eips::{BlockId, BlockNumberOrTag};
-use alloy::network::primitives::BlockTransactionsKind;
+use alloy::eips::BlockNumberOrTag;
 use alloy::network::{BlockResponse, Network, ReceiptResponse};
 use alloy::primitives::{Address, Bytes, B256, U256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
 use alloy_rpc_types_beacon::sidecar::BlobData;
-use anyhow::{anyhow, bail, Context};
+use anyhow::{bail, Context};
 use kailua_client::provider::OpNodeProvider;
+use kailua_client::{await_tel, await_tel_res};
 use kailua_common::blobs::{hash_to_fe, intermediate_outputs, trail_data};
 use kailua_common::precondition::blobs_hash;
 use kailua_contracts::{
     KailuaGame::KailuaGameInstance, KailuaTournament::KailuaTournamentInstance,
     KailuaTreasury::KailuaTreasuryInstance, *,
 };
+use opentelemetry::global::tracer;
+use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::future::IntoFuture;
 use std::iter::repeat;
 use tracing::{error, info};
 
@@ -61,46 +64,76 @@ impl Proposal {
         blob_provider: &BlobProvider,
         tournament_instance: &KailuaTournamentInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(tracer.start("Proposal::load"));
+
         let instance_address = *tournament_instance.address();
-        let parent_address = tournament_instance.parentGame().stall().await.parentGame_;
+        let parent_address = tournament_instance
+            .parentGame()
+            .stall_with_context(context.clone(), "KailuaTournament::parentGame")
+            .await
+            .parentGame_;
         if parent_address == instance_address {
             info!("Loading KailuaTreasury instance");
-            Self::load_treasury(&KailuaTreasury::new(
-                instance_address,
-                tournament_instance.provider(),
-            ))
-            .await
+            await_tel!(
+                context,
+                Self::load_treasury(&KailuaTreasury::new(
+                    instance_address,
+                    tournament_instance.provider(),
+                ))
+            )
         } else {
             info!("Loading KailuaGame with parent {parent_address}");
-            Self::load_game(
-                config,
-                blob_provider,
-                &KailuaGame::new(instance_address, tournament_instance.provider()),
+            await_tel!(
+                context,
+                Self::load_game(
+                    config,
+                    blob_provider,
+                    &KailuaGame::new(instance_address, tournament_instance.provider()),
+                )
             )
-            .await
         }
     }
 
     async fn load_treasury<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         treasury_instance: &KailuaTreasuryInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
-        let index = treasury_instance.gameIndex().stall().await._0.to();
-        let created_at = treasury_instance.createdAt().stall().await._0;
+        let tracer = tracer("kailua");
+        let context =
+            opentelemetry::Context::current_with_span(tracer.start("Proposal::load_treasury"));
+
+        let index = treasury_instance
+            .gameIndex()
+            .stall_with_context(context.clone(), "KailuaTreasury::gameIndex")
+            .await
+            ._0
+            .to();
+        let created_at = treasury_instance
+            .createdAt()
+            .stall_with_context(context.clone(), "KailuaTreasury::createdAt")
+            .await
+            ._0;
         // claim data
         let output_root = treasury_instance
             .rootClaim()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaTreasury::rootClaim")
             .await
             .rootClaim_
             .0
             .into();
         let output_block_number = treasury_instance
             .l2BlockNumber()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaTreasury::l2BlockNumber")
             .await
             .l2BlockNumber_
             .to();
-        let l1_head = treasury_instance.l1Head().stall().await.l1Head_.0.into();
+        let l1_head = treasury_instance
+            .l1Head()
+            .stall_with_context(context.clone(), "KailuaTreasury::l1Head")
+            .await
+            .l1Head_
+            .0
+            .into();
         Ok(Self {
             contract: *treasury_instance.address(),
             index,
@@ -129,14 +162,31 @@ impl Proposal {
         blob_provider: &BlobProvider,
         game_instance: &KailuaGameInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
-        let index = game_instance.gameIndex().stall().await._0.to();
+        let tracer = tracer("kailua");
+        let context =
+            opentelemetry::Context::current_with_span(tracer.start("Proposal::load_game"));
+
+        let index = game_instance
+            .gameIndex()
+            .stall_with_context(context.clone(), "KailuaGame::gameIndex")
+            .await
+            ._0
+            .to();
         let parent = game_instance
             .parentGameIndex()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaGame::parentGameIndex")
             .await
             .parentGameIndex_;
-        let proposer = game_instance.proposer().stall().await.proposer_;
-        let created_at = game_instance.createdAt().stall().await._0;
+        let proposer = game_instance
+            .proposer()
+            .stall_with_context(context.clone(), "KailuaGame::proposer")
+            .await
+            .proposer_;
+        let created_at = game_instance
+            .createdAt()
+            .stall_with_context(context.clone(), "KailuaGame::createdAt")
+            .await
+            ._0;
         // fetch blob data
         let mut io_blobs = Vec::new();
         let mut io_field_elements = Vec::new();
@@ -144,12 +194,10 @@ impl Proposal {
         for _ in 0..config.proposal_blobs {
             let blob_kzg_hash = game_instance
                 .proposalBlobHashes(U256::from(io_blobs.len()))
-                .stall()
+                .stall_with_context(context.clone(), "KailuaGame::proposalBlobHashes")
                 .await
                 ._0;
-            let blob_data = blob_provider
-                .get_blob(created_at, blob_kzg_hash)
-                .await
+            let blob_data = await_tel!(context, blob_provider.get_blob(created_at, blob_kzg_hash))
                 .context("get_blob")?;
             // save data
             let io_remaining = config.proposal_output_count - (io_field_elements.len() as u64) - 1;
@@ -159,14 +207,26 @@ impl Proposal {
             io_blobs.push((blob_kzg_hash, blob_data));
         }
         // claim data
-        let output_root = game_instance.rootClaim().stall().await.rootClaim_.0.into();
+        let output_root = game_instance
+            .rootClaim()
+            .stall_with_context(context.clone(), "KailuaGame::rootClaim")
+            .await
+            .rootClaim_
+            .0
+            .into();
         let output_block_number: u64 = game_instance
             .l2BlockNumber()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaGame::l2BlockNumber")
             .await
             .l2BlockNumber_
             .to();
-        let l1_head = game_instance.l1Head().stall().await.l1Head_.0.into();
+        let l1_head = game_instance
+            .l1Head()
+            .stall_with_context(context.clone(), "KailuaGame::l1Head")
+            .await
+            .l1Head_
+            .0
+            .into();
         let trail_len = trail_field_elements.len();
         Ok(Self {
             contract: *game_instance.address(),
@@ -201,22 +261,36 @@ impl Proposal {
         &self,
         provider: P,
     ) -> anyhow::Result<Option<Address>> {
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(
+            tracer.start("Proposal::fetch_parent_tournament_survivor"),
+        );
+
         if !self.has_parent() {
             return Ok(Some(self.contract));
         }
         let parent_tournament: Address = self
             .tournament_contract_instance(&provider)
             .parentGame()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaTournament::parentGame")
             .await
             .parentGame_;
         let parent_tournament_instance = KailuaTournament::new(parent_tournament, &provider);
-        let children = parent_tournament_instance.childCount().stall().await.count_;
-        let survivor = parent_tournament_instance
-            .pruneChildren(children)
-            .call()
-            .await?
-            .survivor;
+        let children = parent_tournament_instance
+            .childCount()
+            .stall_with_context(context.clone(), "KailuaTournament::childCount")
+            .await
+            .count_;
+        let survivor = await_tel_res!(
+            context,
+            tracer,
+            "KailuaTournament::pruneChildren",
+            parent_tournament_instance
+                .pruneChildren(children)
+                .call()
+                .into_future()
+        )?
+        .survivor;
         if survivor.is_zero() {
             Ok(None)
         } else {
@@ -232,7 +306,13 @@ impl Proposal {
         &self,
         provider: P,
     ) -> anyhow::Result<Option<bool>> {
-        let survivor = self.fetch_parent_tournament_survivor(provider).await?;
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(
+            tracer.start("Proposal::fetch_parent_tournament_survivor_status"),
+        );
+
+        let survivor = await_tel!(context, self.fetch_parent_tournament_survivor(provider))
+            .context("Proposal::fetch_parent_tournament_survivor")?;
         let is_survivor_expected = survivor.map(|survivor| survivor == self.contract);
         if !is_survivor_expected.unwrap_or_default() {
             error!(
@@ -249,10 +329,14 @@ impl Proposal {
         &self,
         provider: P,
     ) -> anyhow::Result<Option<bool>> {
+        let tracer = tracer("kailua");
+        let context =
+            opentelemetry::Context::current_with_span(tracer.start("Proposal::fetch_finality"));
+
         Self::parse_finality(
             self.tournament_contract_instance(provider)
                 .status()
-                .stall()
+                .stall_with_context(context.clone(), "KailuaTournament::status")
                 .await
                 ._0,
         )
@@ -266,10 +350,14 @@ impl Proposal {
         &self,
         provider: P,
     ) -> anyhow::Result<bool> {
+        let tracer = tracer("kailua");
+        let context =
+            opentelemetry::Context::current_with_span(tracer.start("Proposal::fetch_finality"));
+
         Ok(self
             .tournament_contract_instance(provider)
             .provenAt(U256::ZERO, U256::ZERO)
-            .stall()
+            .stall_with_context(context.clone(), "KailuaTournament::provenAt")
             .await
             ._0
             > 0)
@@ -283,21 +371,19 @@ impl Proposal {
         &self,
         provider: P,
     ) -> anyhow::Result<u64> {
-        let chain_time = retry!(provider
-            .get_block(
-                BlockId::Number(BlockNumberOrTag::Latest),
-                BlockTransactionsKind::Hashes,
-            )
-            .await
-            .context("get_block")?
-            .ok_or_else(|| anyhow!("Failed to fetch block")))
-        .await?
-        .header()
-        .timestamp();
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(
+            tracer.start("Proposal::fetch_current_challenger_duration"),
+        );
+
+        let chain_time = await_tel!(context, get_block(&provider, BlockNumberOrTag::Latest))?
+            .header()
+            .timestamp();
+
         Ok(self
             .tournament_contract_instance(provider)
             .getChallengerDuration(U256::from(chain_time))
-            .stall()
+            .stall_with_context(context.clone(), "KailuaTournament::getChallengerDuration")
             .await
             .duration_)
     }
@@ -317,13 +403,20 @@ impl Proposal {
         op_node_provider: &OpNodeProvider,
         is_correct_parent: bool,
     ) -> anyhow::Result<Option<bool>> {
+        let tracer = tracer("kailua");
+        let context =
+            opentelemetry::Context::current_with_span(tracer.start("Proposal::assess_correctness"));
+
         // Update parent status
         self.correct_parent = Some(is_correct_parent);
         // Check root claim correctness
-        let local_claim = op_node_provider
-            .output_at_block(self.output_block_number)
-            .await
-            .context("output_at_block")?;
+        let local_claim = await_tel_res!(
+            context,
+            tracer,
+            "local_claim",
+            retry_with_context!(op_node_provider.output_at_block(self.output_block_number))
+        )?;
+
         self.correct_claim = Some(local_claim == self.output_root);
         // Check intermediate output correctness for KailuaGame instances
         if self.has_parent() {
@@ -337,11 +430,13 @@ impl Proposal {
             // output commitments
             for (i, output_fe) in self.io_field_elements.iter().enumerate() {
                 let io_number = starting_block_number + (i as u64 + 1) * config.output_block_span;
-                if let Ok(output_hash) = op_node_provider.output_at_block(io_number).await {
-                    self.correct_io[i] = Some(&hash_to_fe(output_hash) == output_fe);
-                } else {
-                    error!("Could not get output hash {io_number} from op node");
-                }
+                let output_hash = await_tel_res!(
+                    context,
+                    tracer,
+                    "output_hash",
+                    retry_with_context!(op_node_provider.output_at_block(io_number))
+                )?;
+                self.correct_io[i] = Some(&hash_to_fe(output_hash) == output_fe);
             }
             // trail data
             for (i, output_fe) in self.trail_field_elements.iter().enumerate() {
@@ -389,16 +484,29 @@ impl Proposal {
         &self,
         provider: P,
     ) -> anyhow::Result<N::ReceiptResponse> {
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(tracer.start("Proposal::resolve"));
+
         let contract_instance = self.tournament_contract_instance(&provider);
-        let parent_tournament: Address = contract_instance.parentGame().stall().await.parentGame_;
+        let parent_tournament: Address = contract_instance
+            .parentGame()
+            .stall_with_context(context.clone(), "KailuaTournament::parentGame")
+            .await
+            .parentGame_;
         let parent_tournament_instance = KailuaTournament::new(parent_tournament, &provider);
 
         loop {
-            let survivor = parent_tournament_instance
-                .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
-                .call()
-                .await?
-                .survivor;
+            let survivor = await_tel_res!(
+                context,
+                tracer,
+                "KailuaTournament::pruneChildren",
+                parent_tournament_instance
+                    .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
+                    .call()
+                    .into_future()
+            )?
+            .survivor;
+
             if !survivor.is_zero() {
                 break;
             }
@@ -406,7 +514,7 @@ impl Proposal {
             info!("Eliminating {ELIMINATIONS_LIMIT} opponents before resolution.");
             let receipt = parent_tournament_instance
                 .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
-                .transact()
+                .transact_with_context(context.clone(), "KailuaTournament::pruneChildren")
                 .await
                 .context("KailuaTournament::pruneChildren")?;
             info!(
@@ -417,7 +525,7 @@ impl Proposal {
 
         let receipt = contract_instance
             .resolve()
-            .transact()
+            .transact_with_context(context.clone(), "KailuaTournament::resolve")
             .await
             .context("KailuaTournament::resolve")?;
         info!("KailuaTournament::resolve: {} gas", receipt.gas_used());

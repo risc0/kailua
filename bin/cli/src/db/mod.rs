@@ -31,6 +31,8 @@ use kailua_contracts::{
     IDisputeGameFactory::{gameAtIndexReturn, IDisputeGameFactoryInstance},
     *,
 };
+use opentelemetry::global::tracer;
+use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use proposal::Proposal;
 use state::State;
 use std::collections::hash_map::Entry;
@@ -63,21 +65,30 @@ impl KailuaDB {
         mut data_dir: PathBuf,
         dispute_game_factory: &IDisputeGameFactoryInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(tracer.start("KailuaDB::init"));
+
         let game_implementation = KailuaGame::new(
             dispute_game_factory
                 .gameImpls(KAILUA_GAME_TYPE)
-                .stall()
+                .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
                 .await
                 .impl_,
             dispute_game_factory.provider(),
         );
-        let config = Config::load(&game_implementation).await?;
+        let config = Config::load(&game_implementation)
+            .with_context(context.clone())
+            .await
+            .context("Config::load")?;
         let treasury_implementation =
             KailuaTreasury::new(config.treasury, dispute_game_factory.provider());
-        let treasury = Treasury::init(&treasury_implementation).await?;
+        let treasury = Treasury::init(&treasury_implementation)
+            .with_context(context.clone())
+            .await
+            .context("Treasury::init")?;
 
         data_dir.push(config.cfg_hash.to_string());
-        let db = rocksdb::DB::open(&Self::options(), &data_dir)?;
+        let db = rocksdb::DB::open(&Self::options(), &data_dir).context("rocksdb::DB::open")?;
         Ok(Self {
             config,
             treasury,
@@ -92,10 +103,14 @@ impl KailuaDB {
         op_node_provider: &OpNodeProvider,
         blob_provider: &BlobProvider,
     ) -> anyhow::Result<Vec<u64>> {
+        let tracer = tracer("kailua");
+        let context =
+            opentelemetry::Context::current_with_span(tracer.start("KailuaDB::load_proposals"));
+
         let canonical_start = self.state.canonical_tip_index;
         let game_count: u64 = dispute_game_factory
             .gameCount()
-            .stall()
+            .stall_with_context(context.clone(), "DisputeGameFactory::gameCount")
             .await
             .gameCount_
             .to();
@@ -112,6 +127,7 @@ impl KailuaDB {
                             blob_provider,
                             self.state.next_factory_index,
                         )
+                        .with_context(context.clone())
                         .await
                     {
                         Ok(processed) => {
@@ -172,6 +188,10 @@ impl KailuaDB {
         blob_provider: &BlobProvider,
         index: u64,
     ) -> anyhow::Result<bool> {
+        let tracer = tracer("kailua");
+        let context =
+            opentelemetry::Context::current_with_span(tracer.start("KailuaDB::load_game_at_index"));
+
         // process game
         let gameAtIndexReturn {
             gameType_: game_type,
@@ -179,7 +199,7 @@ impl KailuaDB {
             ..
         } = dispute_game_factory
             .gameAtIndex(U256::from(index))
-            .stall()
+            .stall_with_context(context.clone(), "DisputeGameFactory::gameAtIndex")
             .await;
         // skip entries for other game types
         if game_type != KAILUA_GAME_TYPE {
@@ -189,11 +209,13 @@ impl KailuaDB {
         info!("Processing tournament {index} at {game_address}");
         let tournament_instance =
             KailuaTournament::new(game_address, dispute_game_factory.provider());
-        let mut proposal =
-            Proposal::load(&self.config, blob_provider, &tournament_instance).await?;
+        let mut proposal = Proposal::load(&self.config, blob_provider, &tournament_instance)
+            .with_context(context.clone())
+            .await?;
 
         // Determine inherited correctness
         self.determine_correctness(&mut proposal, op_node_provider)
+            .with_context(context.clone())
             .await
             .context("Failed to determine proposal correctness")?;
 
@@ -228,6 +250,11 @@ impl KailuaDB {
         proposal: &mut Proposal,
         op_node_provider: &OpNodeProvider,
     ) -> anyhow::Result<bool> {
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(
+            tracer.start("KailuaDB::determine_correctness"),
+        );
+
         // Accept correctness of treasury instance data
         if !proposal.has_parent() {
             info!("Accepting initial treasury proposal as true.");
@@ -246,7 +273,9 @@ impl KailuaDB {
             .unwrap_or_default(); // missing parent means it's not part of the tournament
         let is_correct_proposal = match proposal
             .assess_correctness(&self.config, op_node_provider, is_parent_correct)
-            .await?
+            .with_context(context.clone())
+            .await
+            .context("Proposal::assess_correctness")?
         {
             None => {
                 bail!("Failed to assess correctness. Is op-node synced far enough?");
@@ -384,6 +413,11 @@ impl KailuaDB {
         &self,
         l1_node_provider: &P,
     ) -> anyhow::Result<Vec<u64>> {
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(
+            tracer.start("KailuaDB::determine_correctness"),
+        );
+
         // Nothing to do without a canonical tip
         if self.state.canonical_tip_index.is_none() {
             return Ok(Vec::new());
@@ -394,7 +428,13 @@ impl KailuaDB {
             let proposal_index = *unresolved_proposal_indices.last().unwrap();
             let proposal = self.get_local_proposal(&proposal_index).unwrap();
             // break if we reach a resolved game or a setup game
-            if proposal.fetch_finality(l1_node_provider).await?.is_some() {
+            if proposal
+                .fetch_finality(l1_node_provider)
+                .with_context(context.clone())
+                .await
+                .context("Proposal::fetch_finality")?
+                .is_some()
+            {
                 unresolved_proposal_indices.pop();
                 break;
             } else if proposal.parent == proposal_index {

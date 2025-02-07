@@ -28,3 +28,24 @@ macro_rules! retry {
         )
     };
 }
+
+#[macro_export]
+macro_rules! retry_with_context {
+    ($e:expr) => {
+        retry_with_context!(2, 1024, $e)
+    };
+    ($m:literal, $e:expr) => {
+        retry_with_context!(2, $m, $e)
+    };
+    ($b:literal, $m:literal, $e:expr) => {
+        $crate::retry!(
+            $b,
+            $m,
+            $e.with_context(opentelemetry::Context::current_with_span(
+                opentelemetry::global::tracer("kailua")
+                    .start_with_context("retry_attempt", &opentelemetry::Context::current()),
+            ))
+            .await
+        )
+    };
+}

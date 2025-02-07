@@ -15,15 +15,18 @@
 use alloy::primitives::B256;
 use alloy::providers::{Provider, ReqwestProvider};
 use anyhow::Context;
+use opentelemetry::global::tracer;
+use opentelemetry::trace::Tracer;
 use serde_json::Value;
 use std::str::FromStr;
-use tracing::debug;
 
 pub struct OpNodeProvider(pub ReqwestProvider);
 
 impl OpNodeProvider {
     pub async fn output_at_block(&self, output_block_number: u64) -> anyhow::Result<B256> {
-        let output_at_block: serde_json::Value = self
+        tracer("kailua").start("OpNodeProvider::output_at_block");
+
+        let output_at_block: Value = self
             .0
             .client()
             .request(
@@ -32,13 +35,14 @@ impl OpNodeProvider {
             )
             .await
             .context(format!("optimism_outputAtBlock {output_block_number}"))?;
-        debug!("optimism_outputAtBlock {:?}", &output_at_block);
         Ok(B256::from_str(
             output_at_block["outputRoot"].as_str().unwrap(),
         )?)
     }
 
     pub async fn sync_status(&self) -> anyhow::Result<Value> {
+        tracer("kailua").start("OpNodeProvider::sync_status");
+
         Ok(self
             .0
             .client()
@@ -47,6 +51,8 @@ impl OpNodeProvider {
     }
 
     pub async fn rollup_config(&self) -> anyhow::Result<Value> {
+        tracer("kailua").start("OpNodeProvider::rollup_config");
+
         Ok(self
             .0
             .client()

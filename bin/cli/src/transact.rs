@@ -24,7 +24,15 @@ use std::future::IntoFuture;
 
 #[async_trait]
 pub trait Transact<N: Network> {
-    async fn transact(&self) -> anyhow::Result<N::ReceiptResponse>;
+    async fn transact(&self, span: &'static str) -> anyhow::Result<N::ReceiptResponse>;
+
+    async fn transact_with_context(
+        &self,
+        context: opentelemetry::Context,
+        span: &'static str,
+    ) -> anyhow::Result<N::ReceiptResponse> {
+        self.transact(span).with_context(context).await
+    }
 }
 
 #[async_trait]
@@ -39,9 +47,10 @@ impl<
 where
     EthCall<'req, 'coder, D, T, N>: IntoFuture,
 {
-    async fn transact(&self) -> anyhow::Result<N::ReceiptResponse> {
+    async fn transact(&self, span: &'static str) -> anyhow::Result<N::ReceiptResponse> {
         let tracer = tracer("kailua");
-        let context = opentelemetry::Context::current();
+        let context = opentelemetry::Context::current_with_span(tracer.start(span));
+
         self.send()
             .with_context(context.with_span(tracer.start_with_context("send", &context)))
             .await

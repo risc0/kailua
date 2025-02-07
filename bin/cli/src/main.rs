@@ -14,6 +14,7 @@
 
 use clap::Parser;
 use kailua_cli::Cli;
+use kailua_client::await_tel;
 use kailua_client::telemetry::init_tracer_provider;
 use kona_host::init_tracing_subscriber;
 use opentelemetry::global::{shutdown_tracer_provider, tracer};
@@ -34,36 +35,23 @@ async fn main() -> anyhow::Result<()> {
 
     let command_res = match cli {
         Cli::Config(args) => {
-            kailua_cli::config::config(args)
-                .with_context(context.clone())
-                .await
+            await_tel!(context, kailua_cli::config::config(args))
         }
         Cli::FastTrack(args) => {
-            kailua_cli::fast_track::fast_track(args)
-                .with_context(context.clone())
-                .await
+            await_tel!(context, kailua_cli::fast_track::fast_track(args))
         }
         Cli::Propose(args) => {
-            kailua_cli::propose::propose(args, data_dir)
-                .with_context(context.clone())
-                .await
+            await_tel!(context, kailua_cli::propose::propose(args, data_dir))
         }
         Cli::Validate(args) => {
-            kailua_cli::validate::validate(args, data_dir)
-                .with_context(context.clone())
-                .await
+            await_tel!(context, kailua_cli::validate::validate(args, data_dir))
         }
-        Cli::TestFault(_args) =>
-        {
+        Cli::TestFault(_args) => {
             #[cfg(feature = "devnet")]
-            kailua_cli::fault::fault(_args)
-                .with_context(context.clone())
-                .await
+            await_tel!(context, kailua_cli::fault::fault(_args))
         }
         Cli::Benchmark(bench_args) => {
-            kailua_cli::bench::benchmark(bench_args)
-                .with_context(context.clone())
-                .await
+            await_tel!(context, kailua_cli::bench::benchmark(bench_args))
         }
     };
 

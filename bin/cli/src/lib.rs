@@ -138,7 +138,7 @@ pub async fn exec_safe_txn<
         .concat()
         .into(),
     )
-    .transact()
+    .transact("Safe::execTransaction")
     .await
     .context("Safe::execTransaction")?;
     Ok(())

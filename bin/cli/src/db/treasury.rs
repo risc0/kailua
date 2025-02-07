@@ -18,6 +18,8 @@ use alloy::primitives::{Address, U256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
 use kailua_contracts::{KailuaTreasury::KailuaTreasuryInstance, *};
+use opentelemetry::global::tracer;
+use opentelemetry::trace::{TraceContextExt, Tracer};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
@@ -33,8 +35,15 @@ impl Treasury {
     pub async fn init<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         treasury_implementation: &KailuaTreasuryInstance<T, P, N>,
     ) -> anyhow::Result<Self> {
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(tracer.start("Treasury::init"));
+
         // Load participation bond
-        let participation_bond = treasury_implementation.participationBond().stall().await._0;
+        let participation_bond = treasury_implementation
+            .participationBond()
+            .stall_with_context(context.clone(), "KailuaTreasury::participationBond")
+            .await
+            ._0;
         Ok(Self {
             address: *treasury_implementation.address(),
             claim_proposer: Default::default(),
@@ -54,10 +63,12 @@ impl Treasury {
         &mut self,
         provider: P,
     ) -> U256 {
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(tracer.start("Treasury::init"));
         self.participation_bond = self
             .treasury_contract_instance(provider)
             .participationBond()
-            .stall()
+            .stall_with_context(context.clone(), "KailuaTreasury::participationBond")
             .await
             ._0;
         self.participation_bond
@@ -68,10 +79,12 @@ impl Treasury {
         provider: P,
         address: Address,
     ) -> U256 {
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(tracer.start("Treasury::init"));
         let paid_bond = self
             .treasury_contract_instance(provider)
             .paidBonds(address)
-            .stall()
+            .stall_with_context(context.clone(), "KailuaTreasury::paidBonds")
             .await
             ._0;
         self.paid_bond.insert(address, paid_bond);
@@ -83,10 +96,16 @@ impl Treasury {
         provider: P,
         address: Address,
     ) -> anyhow::Result<Address> {
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(tracer.start("Treasury::init"));
         let instance = self.treasury_contract_instance(provider);
         let proposer = match self.claim_proposer.entry(address) {
             Entry::Vacant(entry) => {
-                let proposer = instance.proposerOf(address).stall().await._0;
+                let proposer = instance
+                    .proposerOf(address)
+                    .stall_with_context(context.clone(), "KailuaTreasury::proposerOf")
+                    .await
+                    ._0;
                 *entry.insert(proposer)
             }
             Entry::Occupied(entry) => *entry.get(),

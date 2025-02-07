@@ -16,17 +16,20 @@ use crate::db::proposal::Proposal;
 use crate::propose::ProposeArgs;
 use crate::stall::Stall;
 use crate::transact::Transact;
-use crate::KAILUA_GAME_TYPE;
+use crate::{retry_with_context, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy::primitives::{Bytes, B256, U256};
 use alloy::providers::ProviderBuilder;
 use alloy::sol_types::SolValue;
 use anyhow::Context;
 use kailua_client::provider::OpNodeProvider;
+use kailua_client::{await_tel, await_tel_res};
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::config::config_hash;
 use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
+use opentelemetry::global::tracer;
+use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use tracing::{error, info};
 
 #[derive(clap::Args, Debug, Clone)]
@@ -44,6 +47,9 @@ pub struct FaultArgs {
 }
 
 pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
+    let tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(tracer.start("fault"));
+
     let op_node_provider = OpNodeProvider(
         ProviderBuilder::new().on_http(args.propose_args.core.op_node_url.as_str().try_into()?),
     );
@@ -52,26 +58,35 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
 
     info!("Fetching rollup configuration from rpc endpoints.");
     // fetch rollup config
-    let config = fetch_rollup_config(
-        &args.propose_args.core.op_node_url,
-        &args.propose_args.core.op_geth_url,
-        None,
+    let config = await_tel!(
+        context,
+        fetch_rollup_config(
+            &args.propose_args.core.op_node_url,
+            &args.propose_args.core.op_geth_url,
+            None,
+        )
     )
-    .await
     .context("fetch_rollup_config")?;
     let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
     info!("RollupConfigHash({})", hex::encode(rollup_config_hash));
 
     // load system config
     let system_config = SystemConfig::new(config.l1_system_config_address, &eth_rpc_provider);
-    let dgf_address = system_config.disputeGameFactory().stall().await.addr_;
+    let dgf_address = system_config
+        .disputeGameFactory()
+        .stall_with_context(context.clone(), "SystemConfig::disputeGameFactory")
+        .await
+        .addr_;
 
     // init l1 stuff
-    let tester_wallet = args
-        .propose_args
-        .proposer_signer
-        .wallet(Some(config.l1_chain_id))
-        .await?;
+    let tester_wallet = await_tel_res!(
+        context,
+        tracer,
+        "ProposerSignerArgs::wallet",
+        args.propose_args
+            .proposer_signer
+            .wallet(Some(config.l1_chain_id))
+    )?;
     let tester_address = tester_wallet.default_signer().address();
     let tester_provider = ProviderBuilder::new()
         .with_recommended_fillers()
@@ -79,17 +94,17 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .on_http(args.propose_args.core.eth_rpc_url.as_str().try_into()?);
 
     let dispute_game_factory = IDisputeGameFactory::new(dgf_address, &tester_provider);
-    let kailua_game_implementation = kailua_contracts::KailuaGame::new(
+    let kailua_game_implementation = KailuaGame::new(
         dispute_game_factory
             .gameImpls(KAILUA_GAME_TYPE)
-            .stall()
+            .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
             .await
             .impl_,
         &tester_provider,
     );
     let kailua_treasury_address = kailua_game_implementation
         .treasury()
-        .stall()
+        .stall_with_context(context.clone(), "KailuaGame::treasury")
         .await
         .treasury_;
     let kailua_treasury_instance = KailuaTreasury::new(kailua_treasury_address, &tester_provider);
@@ -97,29 +112,33 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     // load constants
     let proposal_output_count: u64 = kailua_game_implementation
         .proposalOutputCount()
-        .stall()
+        .stall_with_context(context.clone(), "KailuaGame::proposalOutputCount")
         .await
         .proposalOutputCount_
         .to();
     let output_block_span: u64 = kailua_game_implementation
         .outputBlockSpan()
-        .stall()
+        .stall_with_context(context.clone(), "KailuaGame::outputBlockSpan")
         .await
         .outputBlockSpan_
         .to();
     let proposal_block_count = proposal_output_count * output_block_span;
 
     // get proposal parent
-    let games_count = dispute_game_factory.gameCount().stall().await.gameCount_;
+    let games_count = dispute_game_factory
+        .gameCount()
+        .stall_with_context(context.clone(), "DisputeGameFactory::gameCount")
+        .await
+        .gameCount_;
     let parent_game_address = dispute_game_factory
         .gameAtIndex(U256::from(args.fault_parent))
-        .stall()
+        .stall_with_context(context.clone(), "DisputeGameFactory::gameAtIndex")
         .await
         .proxy_;
     let parent_game_contract = KailuaGame::new(parent_game_address, &tester_provider);
     let parent_block_number: u64 = parent_game_contract
         .l2BlockNumber()
-        .stall()
+        .stall_with_context(context.clone(), "KailuaTournament::l2BlockNumber")
         .await
         .l2BlockNumber_
         .to();
@@ -131,9 +150,12 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let proposed_output_root = if proposed_block_number == faulty_block_number {
         faulty_root_claim
     } else {
-        op_node_provider
-            .output_at_block(proposed_block_number)
-            .await?
+        await_tel_res!(
+            context,
+            tracer,
+            "proposed_output_root",
+            retry_with_context!(op_node_provider.output_at_block(proposed_block_number))
+        )?
     };
 
     // Prepare intermediate outputs
@@ -147,7 +169,12 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         let output_hash = if io_block_number == normalized_fault_block_number {
             faulty_root_claim
         } else if io_block_number < proposal_block_count {
-            op_node_provider.output_at_block(io_block_number).await?
+            await_tel_res!(
+                context,
+                tracer,
+                "output_hash",
+                retry_with_context!(op_node_provider.output_at_block(io_block_number))
+            )?
         } else {
             B256::ZERO
         };
@@ -172,7 +199,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
                 proposed_output_root,
                 Bytes::from(extra_data.clone()),
             )
-            .stall()
+            .stall_with_context(context.clone(), "DisputeGameFactory::games")
             .await
             .proxy_;
         if dupe_game_address.is_zero() {
@@ -185,12 +212,12 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
 
     let bond_value = kailua_treasury_instance
         .participationBond()
-        .stall()
+        .stall_with_context(context.clone(), "KailuaTreasury::participationBond")
         .await
         ._0;
     let paid_in = kailua_treasury_instance
         .paidBonds(tester_address)
-        .stall()
+        .stall_with_context(context.clone(), "KailuaTreasury::paidBonds")
         .await
         ._0;
     let owed_collateral = bond_value.saturating_sub(paid_in);
@@ -199,9 +226,9 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .propose(proposed_output_root, Bytes::from(extra_data))
         .value(owed_collateral)
         .sidecar(sidecar)
-        .transact()
+        .transact_with_context(context.clone(), "KailuaTreasury::propose")
         .await
-        .context("propose (send)")
+        .context("KailuaTreasury::propose")
     {
         Ok(receipt) => {
             info!("Faulty proposal submitted at index {games_count}: {receipt:?}")

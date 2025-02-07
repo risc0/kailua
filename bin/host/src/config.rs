@@ -14,12 +14,13 @@
 
 use crate::args::KailuaHostArgs;
 use alloy::providers::{Provider, ProviderBuilder};
+use anyhow::Context;
+use kailua_client::provider::OpNodeProvider;
 use kona_host::cli::HostMode;
 use maili_genesis::RollupConfig;
 use maili_registry::Registry;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
-use opentelemetry::Context;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -72,26 +73,29 @@ pub async fn fetch_rollup_config(
     json_file_path: Option<&PathBuf>,
 ) -> anyhow::Result<RollupConfig> {
     let tracer = tracer("kailua");
-    let context = Context::current_with_span(tracer.start("fetch_rollup_config"));
+    let context = opentelemetry::Context::current_with_span(tracer.start("fetch_rollup_config"));
 
-    let op_node_provider = ProviderBuilder::new().on_http(op_node_address.try_into()?);
+    let op_node_provider =
+        OpNodeProvider(ProviderBuilder::new().on_http(op_node_address.try_into()?));
     let l2_node_provider = ProviderBuilder::new().on_http(l2_node_address.try_into()?);
 
     let mut rollup_config: Value = op_node_provider
-        .client()
-        .request_noparams("optimism_rollupConfig")
-        .with_context(
-            context.with_span(tracer.start_with_context("optimism_rollupConfig", &context)),
-        )
-        .await?;
+        .rollup_config()
+        .with_context(context.clone())
+        .await
+        .context("rollup_config")?;
 
     debug!("Rollup config: {:?}", rollup_config);
 
-    let chain_config: Value = l2_node_provider
-        .client()
-        .request_noparams("debug_chainConfig")
-        .with_context(context.with_span(tracer.start_with_context("debug_chainConfig", &context)))
-        .await?;
+    let chain_config: Value =
+        l2_node_provider
+            .client()
+            .request_noparams("debug_chainConfig")
+            .with_context(context.with_span(
+                tracer.start_with_context("ReqwestProvider::debug_chainConfig", &context),
+            ))
+            .await
+            .context("debug_chainConfig")?;
 
     debug!("ChainConfig: {:?}", chain_config);
 

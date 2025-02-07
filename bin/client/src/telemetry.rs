@@ -45,3 +45,21 @@ pub fn init_tracer_provider<T: Into<String>>(endpoint: Option<T>) -> Result<(), 
     }
     Ok(())
 }
+
+#[macro_export]
+macro_rules! await_tel {
+    ($c:ident, $e:expr) => {
+        $e.with_context($c.clone()).await
+    };
+    ($c:ident, $t:ident, $l:literal, $e:expr) => {
+        $e.with_context($c.with_span($t.start_with_context($l, &$c)))
+            .await
+    };
+}
+
+#[macro_export]
+macro_rules! await_tel_res {
+    ($c:ident, $t:ident, $l:literal, $e:expr) => {
+        $crate::await_tel!($c, $t, $l, $e).context($l)
+    };
+}

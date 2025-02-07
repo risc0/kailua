@@ -16,6 +16,8 @@ use crate::CoreArgs;
 use alloy::primitives::map::{Entry, HashMap};
 use alloy::providers::{Provider, ProviderBuilder};
 use kailua_client::telemetry::TelemetryArgs;
+use opentelemetry::global::tracer;
+use opentelemetry::trace::{FutureExt, Span, Status, TraceContextExt, Tracer};
 use risc0_zkvm::is_dev_mode;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -64,6 +66,9 @@ impl Ord for CandidateBlock {
 }
 
 pub async fn benchmark(args: BenchArgs) -> anyhow::Result<()> {
+    let tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(tracer.start("benchmark"));
+
     let l2_node_provider =
         ProviderBuilder::new().on_http(args.core.op_geth_url.as_str().try_into()?);
     let mut cache: HashMap<u64, u64> = HashMap::new();
@@ -80,6 +85,10 @@ pub async fn benchmark(args: BenchArgs) -> anyhow::Result<()> {
                 Entry::Vacant(e) => {
                     let x = l2_node_provider
                         .get_block_transaction_count_by_number(block_number.into())
+                        .with_context(context.with_span(tracer.start_with_context(
+                            "ReqwestProvider::get_block_transaction_count_by_number",
+                            &context,
+                        )))
                         .await?
                         .unwrap_or_else(|| {
                             panic!("Failed to fetch transaction count for block {block_number}")
@@ -139,7 +148,20 @@ pub async fn benchmark(args: BenchArgs) -> anyhow::Result<()> {
             &verbosity_level,
         ]);
         println!("Executing: {cmd:?}");
-        cmd.stdout(output_file).status()?;
+
+        let mut sub_span = tracer.start_with_context("prove", &context);
+        let res = cmd.stdout(output_file).status();
+        if let Err(err) = &res {
+            sub_span.record_error(err);
+            Span::set_status(
+                &mut sub_span,
+                Status::error(format!("Fatal error: {err:?}")),
+            );
+        } else {
+            Span::set_status(&mut sub_span, Status::Ok);
+        }
+        res?;
+
         info!("Output written to {output_file_name}");
     }
     Ok(())
