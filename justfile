@@ -31,7 +31,7 @@ devnet-config target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l2_rpc=
       --op-node-url {{rollup_node_rpc}} \
       --otlp-collector
 
-devnet-upgrade timeout="3600" target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" deployer="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba" owner="0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6" guardian="0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6":
+devnet-upgrade timeout="3600" advantage="60" target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" vanguard="0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc" deployer="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba" owner="0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6" guardian="0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6":
   RISC0_DEV_MODE=1 ./target/{{target}}/kailua-cli fast-track \
       --eth-rpc-url {{l1_rpc}} \
       --op-geth-url {{l2_rpc}} \
@@ -45,33 +45,32 @@ devnet-upgrade timeout="3600" target="debug" verbosity="" l1_rpc="http://127.0.0
       --deployer-key {{deployer}} \
       --owner-key {{owner}} \
       --guardian-key {{guardian}} \
+      --vanguard-address {{vanguard}} \
+      --vanguard-advantage {{advantage}} \
       --respect-kailua-proposals \
-      --otlp-collector \
       {{verbosity}}
 
 devnet-reset: devnet-down devnet-clean devnet-up
 
-devnet-propose target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" data_dir=".localtestdata/propose" deployer="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba":
+devnet-propose target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" data_dir=".localtestdata/propose" proposer="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba":
   ./target/{{target}}/kailua-cli propose \
       --eth-rpc-url {{l1_rpc}} \
       --beacon-rpc-url {{l1_beacon_rpc}} \
       --op-geth-url {{l2_rpc}} \
       --op-node-url {{rollup_node_rpc}} \
       --data-dir {{data_dir}} \
-      --proposer-key {{deployer}} \
-      --otlp-collector \
+      --proposer-key {{proposer}} \
       {{verbosity}}
 
-devnet-fault offset parent target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" deployer="0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a":
+devnet-fault offset parent target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" proposer="0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a":
   ./target/{{target}}/kailua-cli test-fault \
       --eth-rpc-url {{l1_rpc}} \
       --beacon-rpc-url {{l1_beacon_rpc}} \
       --op-geth-url {{l2_rpc}} \
       --op-node-url {{rollup_node_rpc}} \
-      --proposer-key {{deployer}} \
+      --proposer-key {{proposer}} \
       --fault-offset {{offset}} \
       --fault-parent {{parent}} \
-      --otlp-collector \
       {{verbosity}}
 
 devnet-validate fastforward="0" target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" data_dir=".localtestdata/validate" validator="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba":
@@ -83,7 +82,6 @@ devnet-validate fastforward="0" target="debug" verbosity="" l1_rpc="http://127.0
       --op-node-url {{rollup_node_rpc}} \
       --kailua-host ./target/{{target}}/kailua-host \
       --validator-key {{validator}} \
-      --otlp-collector \
       {{verbosity}}
 
 devnet-prove block_number block_count target="debug" verbosity="" data=".localtestdata": (prove block_number block_count "http://localhost:8545" "http://localhost:5052" "http://localhost:9545" "http://localhost:7545" data target verbosity)
@@ -99,7 +97,6 @@ bench l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data start length range count 
           --bench-length {{length}} \
           --bench-range {{range}} \
           --bench-count {{count}} \
-          --otlp-collector \
           {{verbosity}}
 
 # Run the client program natively with the host program attached.
@@ -132,7 +129,6 @@ prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data 
 
   echo "Running host program with zk client program..."
   ./target/{{target}}/kailua-host {{verbosity}} \
-    --otlp-collector \
     --op-node-address $OP_NODE_ADDRESS \
     single \
     --l1-head $L1_HEAD \

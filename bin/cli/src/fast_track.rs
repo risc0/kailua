@@ -86,6 +86,13 @@ pub struct FastTrackArgs {
     #[clap(long, env)]
     pub respect_kailua_proposals: bool,
 
+    /// Address of the vanguard to set
+    #[clap(long, env)]
+    pub vanguard_address: Option<String>,
+    /// Duration of the advantage given to the vanguard
+    #[clap(long, env, requires = "vanguard_address")]
+    pub vanguard_advantage: Option<u64>,
+
     #[clap(flatten)]
     pub telemetry: TelemetryArgs,
 }
@@ -366,6 +373,24 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
             owner_address,
         )
     )?;
+
+    // Set the vanguard parameters if provided
+    if let Some(vanguard_address_string) = args.vanguard_address {
+        let vanguard_address = Address::from_str(&vanguard_address_string)?;
+        let vanguard_advantage = args.vanguard_advantage.unwrap_or(u64::MAX);
+        info!("Assigning proposal advantage to vanguard in KailuaTreasury.");
+
+        await_tel_res!(
+            context,
+            tracer,
+            "KailuaTreasury::assignVanguard",
+            crate::exec_safe_txn(
+                kailua_treasury_implementation.assignVanguard(vanguard_address, vanguard_advantage),
+                &factory_owner_safe,
+                owner_address,
+            )
+        )?;
+    }
 
     // Update the respectedGameType as the guardian
     if args.respect_kailua_proposals {

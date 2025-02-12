@@ -64,7 +64,8 @@ impl Treasury {
         provider: P,
     ) -> U256 {
         let tracer = tracer("kailua");
-        let context = opentelemetry::Context::current_with_span(tracer.start("Treasury::init"));
+        let context =
+            opentelemetry::Context::current_with_span(tracer.start("Treasury::fetch_bond"));
         self.participation_bond = self
             .treasury_contract_instance(provider)
             .participationBond()
@@ -74,13 +75,43 @@ impl Treasury {
         self.participation_bond
     }
 
+    pub async fn fetch_vanguard<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+        &mut self,
+        provider: P,
+    ) -> Address {
+        let tracer = tracer("kailua");
+        let context =
+            opentelemetry::Context::current_with_span(tracer.start("Treasury::fetch_vanguard"));
+        self.treasury_contract_instance(provider)
+            .vanguard()
+            .stall_with_context(context.clone(), "KailuaTreasury::vanguard")
+            .await
+            ._0
+    }
+
+    pub async fn fetch_vanguard_advantage<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+        &mut self,
+        provider: P,
+    ) -> u64 {
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(
+            tracer.start("Treasury::fetch_vanguard_advantage"),
+        );
+        self.treasury_contract_instance(provider)
+            .vanguardAdvantage()
+            .stall_with_context(context.clone(), "KailuaTreasury::vanguardAdvantage")
+            .await
+            ._0
+    }
+
     pub async fn fetch_balance<T: Transport + Clone, P: Provider<T, N>, N: Network>(
         &mut self,
         provider: P,
         address: Address,
     ) -> U256 {
         let tracer = tracer("kailua");
-        let context = opentelemetry::Context::current_with_span(tracer.start("Treasury::init"));
+        let context =
+            opentelemetry::Context::current_with_span(tracer.start("Treasury::fetch_balance"));
         let paid_bond = self
             .treasury_contract_instance(provider)
             .paidBonds(address)
@@ -95,11 +126,12 @@ impl Treasury {
         &mut self,
         provider: P,
         address: Address,
-    ) -> anyhow::Result<Address> {
+    ) -> Address {
         let tracer = tracer("kailua");
-        let context = opentelemetry::Context::current_with_span(tracer.start("Treasury::init"));
+        let context =
+            opentelemetry::Context::current_with_span(tracer.start("Treasury::fetch_proposer"));
         let instance = self.treasury_contract_instance(provider);
-        let proposer = match self.claim_proposer.entry(address) {
+        match self.claim_proposer.entry(address) {
             Entry::Vacant(entry) => {
                 let proposer = instance
                     .proposerOf(address)
@@ -109,7 +141,6 @@ impl Treasury {
                 *entry.insert(proposer)
             }
             Entry::Occupied(entry) => *entry.get(),
-        };
-        Ok(proposer)
+        }
     }
 }

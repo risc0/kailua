@@ -274,6 +274,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             warn!("No canonical proposal chain to extend!");
             continue;
         };
+
         // Query op-node to get latest safe l2 head
         let sync_status = await_tel_res!(
             context,
@@ -313,13 +314,33 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         .header()
         .timestamp();
 
-        if !kailua_db
-            .config
-            .allows_proposal(proposed_block_number, chain_time)
-        {
-            let min_proposal_time = kailua_db.config.min_proposal_time(proposed_block_number);
+        let min_proposal_time = kailua_db.config.min_proposal_time(proposed_block_number);
+        if chain_time < min_proposal_time {
             let time_to_wait = min_proposal_time.saturating_sub(chain_time);
             info!("Waiting for {time_to_wait} more seconds of chain time for proposal gap.");
+            continue;
+        }
+
+        // Wait for vanguard to make submission
+        let vanguard = await_tel!(
+            context,
+            kailua_db.treasury.fetch_vanguard(&proposer_provider)
+        );
+        let vanguard_advantage_timeout =
+            if canonical_tip.requires_vanguard_advantage(proposer_address, vanguard) {
+                let vanguard_advantage = await_tel!(
+                    context,
+                    kailua_db
+                        .treasury
+                        .fetch_vanguard_advantage(&proposer_provider)
+                );
+                min_proposal_time + vanguard_advantage
+            } else {
+                min_proposal_time
+            };
+        if chain_time < vanguard_advantage_timeout {
+            let time_to_wait = vanguard_advantage_timeout.saturating_sub(chain_time);
+            warn!("Waiting for at most {time_to_wait} more seconds of chain time for vanguard.");
             continue;
         }
 
@@ -413,16 +434,13 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             continue;
         };
         // Check collateral requirements
-        let bond_value = kailua_db
-            .treasury
-            .fetch_bond(&proposer_provider)
-            .with_context(context.clone())
-            .await;
-        let paid_in = kailua_db
-            .treasury
-            .fetch_balance(&proposer_provider, proposer_address)
-            .with_context(context.clone())
-            .await;
+        let bond_value = await_tel!(context, kailua_db.treasury.fetch_bond(&proposer_provider));
+        let paid_in = await_tel!(
+            context,
+            kailua_db
+                .treasury
+                .fetch_balance(&proposer_provider, proposer_address)
+        );
         let balance = await_tel_res!(
             context,
             tracer,

@@ -604,6 +604,13 @@ impl Proposal {
         }
     }
 
+    pub fn requires_vanguard_advantage(&self, proposer: Address, vanguard: Address) -> bool {
+        if vanguard.is_zero() || vanguard == proposer {
+            return false;
+        }
+        self.children.is_empty()
+    }
+
     pub fn io_blob_for(&self, position: u64) -> (B256, BlobData) {
         let index = position / FIELD_ELEMENTS_PER_BLOB;
         self.io_blobs[index as usize].clone()
