@@ -17,7 +17,7 @@ Optimism's Bedrock contracts `v1.4.0` and above.
 
 You can deploy a local optimism devnet equipped with Kailua through the following commands:
 
-1. `just devnet-install`
+1. `just devnet-fetch`
     * Fetches `v1.9.1` of the `optimism` monorepo.
 2. `just devnet-build`
     * Builds the local cargo and foundry projects.

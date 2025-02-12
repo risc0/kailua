@@ -11,6 +11,7 @@ The steps required to upgrade your on-chain rollup contracts to support Kailua a
 2. Deploy a `KailuaTreasury` and a `KailuaGame` contract with your configuration.
 3. Initialize the `KailuaTreasury` contract to mark the start of sequencing under Kailua.
 4. Update the rollup's `DisputeGameFactory` contract to use `KailuaGame` for sequencing proposals.
+   * (Optional) Designate a Vanguard proposer.
    * (Optional) Enable withdrawals using finalized Kailua proposals.
 
 ```admonish tip
@@ -86,6 +87,9 @@ kailua-cli fast-track \
       --owner-key [YOUR_OWNER_KEY] \
       --guardian-key [YOUR_GUARDIAN_KEY] \
 \
+      --vanguard-address [YOUR_VANGUARD_ADDRESS] \
+      --vanguard-advantage [YOUR_VANGUARD_ADVANTAGE] \
+\
       --respect-kailua-proposals
 ```
 ```admonish tip
@@ -123,9 +127,23 @@ The next three parameters are the private keys for the respective parent chain w
 * `owner-key`: Private key for the sole EOA controlling the Owner "Safe" contract.
 * `guardian-key`: Private key for the EOA used as the "Guardian" of the optimism portal.
 
+##### KMS Support
+Instead of raw private keys, you can also use either AWS or GCP for obtaining transaction signatures from a KMS.
+* AWS: Specify a corresponding `[EOA]-aws-key-id` parameter. (todo: remaining params)
+  * Example: `deployer-aws-key-id`.
+* GCP: Specify the corresponding `[EOA]-google-project-id`, `[EOA]-google-location`, `[EOA]-google-keyring` and `[EOA]-google-key-name` parameters.
+  * Example: `owner-google-project-id`, `owner-google-location`, `owner-google-keyring` and `owner-google-key-name`.
+
+
+#### Vanguard Proposer
+The next two (optional) parameters define the Vanguard proposer advantage:
+* `vanguard-address`: The address of the designated Vanguard.
+* `vanguard-advantage`: The amount of time (in seconds) to grant proposal exclusivity to the Vanguard.
+  * If unspecified, this defaults to `1152921504606846975` (a practically indefinite advantage of 36 Billion years).
+
 #### Withdrawals
 ```admonish bug
-Changing the respected game type to Kailua may crash the `op-proposer` provided by optimism.
+Changing the respected game type to Kailua may crash the `op-proposer` provided by optimism depending on its version.
 This should be inconsequential because you'll need to run the Kailua proposer for further sequencing to take place anyway.
 ```
 

@@ -25,17 +25,16 @@ pub struct TelemetryArgs {
     pub otlp_collector: Option<String>,
 }
 
-pub fn init_tracer_provider<T: Into<String>>(endpoint: Option<T>) -> Result<(), TraceError> {
-    if let Some(endpoint) = endpoint {
-        let endpoint: String = endpoint.into();
-        println!("telemetry export endpoint: {endpoint}");
+pub fn init_tracer_provider(args: &TelemetryArgs) -> Result<(), TraceError> {
+    if let Some(otlp_collector) = &args.otlp_collector {
+        println!("OTLP Collector endpoint: {otlp_collector}");
         // Build and set default global provider
         set_tracer_provider(
             TracerProvider::builder()
                 .with_batch_exporter(
                     SpanExporter::builder()
                         .with_tonic()
-                        .with_endpoint(endpoint)
+                        .with_endpoint(otlp_collector)
                         .build()?,
                     Tokio,
                 )

@@ -19,6 +19,7 @@ use alloy::primitives::{Address, Uint, U256};
 use alloy::providers::Provider;
 use alloy::transports::Transport;
 use anyhow::Context;
+use kailua_client::telemetry::TelemetryArgs;
 use kailua_contracts::Safe::SafeInstance;
 use std::path::PathBuf;
 
@@ -103,6 +104,17 @@ impl Cli {
             Cli::Validate(args) => args.telemetry.otlp_collector.clone(),
             Cli::TestFault(args) => args.propose_args.telemetry.otlp_collector.clone(),
             Cli::Benchmark(args) => args.telemetry.otlp_collector.clone(),
+        }
+    }
+
+    pub fn telemetry_args(&self) -> &TelemetryArgs {
+        match self {
+            Cli::Config(args) => &args.telemetry,
+            Cli::FastTrack(args) => &args.telemetry,
+            Cli::Propose(args) => &args.telemetry,
+            Cli::Validate(args) => &args.telemetry,
+            Cli::TestFault(args) => &args.propose_args.telemetry,
+            Cli::Benchmark(args) => &args.telemetry,
         }
     }
 }

@@ -38,6 +38,10 @@ This allows it to restart quickly without requesting a lot of old on-chain data 
 The proposer requires a funded wallet to be able to publish new sequencing proposals on-chain.
 * `proposer-key`: The private key for the proposer wallet.
 
+```admonish tip
+`proposer-key` can be replaced with the corresponding AWS/GCP parameters as described [here](upgrade.md#kms-support).
+```
+
 ```admonish danger
 The Kailua proposer wallet is critical for security.
 You must keep your proposer's wallet well funded to guarantee the safety and liveness of your rollup.

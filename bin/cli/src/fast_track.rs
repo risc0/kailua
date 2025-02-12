@@ -82,16 +82,16 @@ pub struct FastTrackArgs {
     #[clap(flatten)]
     pub guardian_signer: Option<GuardianSignerArgs>,
 
-    /// Whether to set Kailua as the OptimismPortal's respected game type
-    #[clap(long, env)]
-    pub respect_kailua_proposals: bool,
-
     /// Address of the vanguard to set
     #[clap(long, env)]
     pub vanguard_address: Option<String>,
     /// Duration of the advantage given to the vanguard
     #[clap(long, env, requires = "vanguard_address")]
     pub vanguard_advantage: Option<u64>,
+
+    /// Whether to set Kailua as the OptimismPortal's respected game type
+    #[clap(long, env)]
+    pub respect_kailua_proposals: bool,
 
     #[clap(flatten)]
     pub telemetry: TelemetryArgs,
@@ -377,7 +377,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     // Set the vanguard parameters if provided
     if let Some(vanguard_address_string) = args.vanguard_address {
         let vanguard_address = Address::from_str(&vanguard_address_string)?;
-        let vanguard_advantage = args.vanguard_advantage.unwrap_or(u64::MAX);
+        let vanguard_advantage = args.vanguard_advantage.unwrap_or(u64::MAX >> 4);
         info!("Assigning proposal advantage to vanguard in KailuaTreasury.");
 
         await_tel_res!(

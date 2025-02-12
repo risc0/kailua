@@ -40,6 +40,10 @@ To create a fault proof, the validator invokes the `kailua-host` binary.
 The validator requires a funded wallet to be able to publish fault proofs on chain.
 * `validator-key`: The private key for the validator wallet.
 
+```admonish tip
+`validator-key` can be replaced with the corresponding AWS/GCP parameters as described [here](upgrade.md#kms-support).
+```
+
 ```admonish warning
 You must keep your validator's wallet well funded to guarantee the liveness of your rollup and prevent faulty proposals
 from delaying the finality of honest sequencing proposals.

@@ -10,7 +10,7 @@ build +ARGS="--release -F prove":
 clippy:
   RISC0_SKIP_BUILD=1 cargo clippy --workspace --all --all-features --all-targets -- -D warnings
 
-devnet-install:
+devnet-fetch:
   git clone --depth 1 --branch v1.9.1 --recursive https://github.com/ethereum-optimism/optimism.git
 
 devnet-build +ARGS="-F devnet -F prove": (build ARGS)

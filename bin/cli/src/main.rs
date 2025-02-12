@@ -26,7 +26,7 @@ use tracing::error;
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     init_tracing_subscriber(cli.verbosity())?;
-    init_tracer_provider(cli.otlp_endpoint())?;
+    init_tracer_provider(cli.telemetry_args())?;
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("cli"));
 
@@ -47,6 +47,8 @@ async fn main() -> anyhow::Result<()> {
             await_tel!(context, kailua_cli::validate::validate(args, data_dir))
         }
         Cli::TestFault(_args) => {
+            #[cfg(not(feature = "devnet"))]
+            unimplemented!("Intentional faults are only available on devnet environments");
             #[cfg(feature = "devnet")]
             await_tel!(context, kailua_cli::fault::fault(_args))
         }

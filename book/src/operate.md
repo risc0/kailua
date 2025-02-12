@@ -15,6 +15,6 @@ guarantee the safety and liveness of your rollup.
 ```
 
 ```admonish danger
-Kailua currently only supports permissionless sequencing.
+Without a Vanguard, Kailua enables fully permissionless sequencing.
 This means that anyone can run these Kailua agents locally for your rollup.
 ```

@@ -38,6 +38,20 @@ cast send [YOUR_DISPUTE_GAME_FACTORY] \
 You have now enabled Kailua sequencing proposals to be published!
 ```
 
+## Designate Vanguard (Optional)
+To assign a Vanguard, you'll need to call `assignVanguard` on the anchoring game instance you created.
+This can be done as follows using your `owner` wallet:
+```shell
+cast send [YOUR_GAME_INSTANCE_ADDRESS] \
+  "assignVanguard(address, uint64)" \
+  [YOUR_VANGUARD_ADDRESS] \
+  [YOUR_VANGUARD_ADVANTAGE]
+```
+
+```admonish success
+You have now designated a Vanguard for Kailua sequencing proposals!
+```
+
 ## Enable Withdrawals (Optional)
 
 To enable your users to perform withdrawals using Kailua sequencing proposals, you will need to call 
