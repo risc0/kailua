@@ -89,6 +89,10 @@ error InvalidDuplicationCounter();
 /// @param initialized This game's l2 block number
 error BlockNumberMismatch(uint256 anchored, uint256 initialized);
 
+/// @notice Occurs when a proposer attempts to extend the chain before the vanguard
+/// @param parentGame The address of the parent proposal being extended
+error VanguardError(address parentGame);
+
 /// @notice Emitted when an output is proven.
 /// @param u The preexisting proposal
 /// @param v The subsequent proposal

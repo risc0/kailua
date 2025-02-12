@@ -111,6 +111,11 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     }
 
     /// @inheritdoc KailuaTournament
+    function minCreationTime() public view override returns (Timestamp minCreationTime_) {
+        minCreationTime_ = createdAt;
+    }
+
+    /// @inheritdoc KailuaTournament
     function parentGame() public view override returns (KailuaTournament parentGame_) {
         parentGame_ = this;
     }
@@ -177,6 +182,12 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
 
     /// @notice Boolean flag to prevent re-entrant calls
     bool internal isLocked;
+
+    /// @notice The leading proposer that can extend the proposal tree
+    address public vanguard;
+
+    /// @notice The duration for which the vanguard may lead
+    Duration public vanguardAdvantage;
 
     modifier nonReentrant() {
         require(!isLocked);
@@ -249,6 +260,12 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         emit BondUpdated(amount);
     }
 
+    /// @notice Updates the vanguard address and advantage duration
+    function assignVanguard(address _vanguard, Duration _vanguardAdvantage) external onlyFactoryOwner {
+        vanguard = _vanguard;
+        vanguardAdvantage = _vanguardAdvantage;
+    }
+
     /// @notice Checks the proposer's bonded amount and creates a new proposal through the factory
     function propose(Claim _rootClaim, bytes calldata _extraData)
         external
@@ -277,6 +294,18 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
             // INVARIANT: Proposers may only extend the proposal set monotonically
             if (previousGame.l2BlockNumber() >= gameContract.l2BlockNumber()) {
                 revert BlockNumberMismatch(previousGame.l2BlockNumber(), gameContract.l2BlockNumber());
+            }
+        }
+        // Check whether the proposer must follow a vanguard if one is set
+        if (vanguard != address(0x0) && vanguard != msg.sender) {
+            // The proposer may only counter the vanguard during the advantage time
+            KailuaTournament proposalParent = gameContract.parentGame();
+            if (proposalParent.childCount() == 0) {
+                // Count the advantage clock since proposal was possible
+                uint64 elapsedAdvantage = uint64(block.timestamp - gameContract.minCreationTime().raw());
+                if (elapsedAdvantage < vanguardAdvantage.raw()) {
+                    revert VanguardError(address(proposalParent));
+                }
             }
         }
         // Record proposer

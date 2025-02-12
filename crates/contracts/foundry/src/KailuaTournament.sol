@@ -357,6 +357,9 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     /// @notice Returns the amount of time left for challenges as of the input timestamp.
     function getChallengerDuration(uint256 asOfTimestamp) public view virtual returns (Duration duration_);
 
+    /// @notice Returns the earliest time at which this proposal could have been created
+    function minCreationTime() public view virtual returns (Timestamp minCreationTime_);
+
     /// @notice Returns the parent game contract.
     function parentGame() public view virtual returns (KailuaTournament parentGame_);
 
