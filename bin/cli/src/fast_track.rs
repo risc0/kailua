@@ -16,11 +16,10 @@ use crate::signer::{DeployerSignerArgs, GuardianSignerArgs, OwnerSignerArgs};
 use crate::stall::Stall;
 use crate::transact::Transact;
 use crate::{retry_with_context, KAILUA_GAME_TYPE};
-use alloy::network::{Network, ReceiptResponse, TxSigner};
+use alloy::network::{Ethereum, Network, ReceiptResponse, TxSigner};
 use alloy::primitives::{Address, Bytes, Uint, U256};
-use alloy::providers::{Provider, ProviderBuilder};
+use alloy::providers::{Provider, ProviderBuilder, RootProvider};
 use alloy::sol_types::SolValue;
-use alloy::transports::Transport;
 use anyhow::{anyhow, bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_client::provider::OpNodeProvider;
@@ -101,9 +100,11 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("fast_track"));
 
-    let op_node_provider =
-        OpNodeProvider(ProviderBuilder::new().on_http(args.op_node_url.as_str().try_into()?));
-    let eth_rpc_provider = ProviderBuilder::new().on_http(args.eth_rpc_url.as_str().try_into()?);
+    let op_node_provider = OpNodeProvider(RootProvider::new_http(
+        args.op_node_url.as_str().try_into()?,
+    ));
+    let eth_rpc_provider =
+        RootProvider::<Ethereum>::new_http(args.eth_rpc_url.as_str().try_into()?);
 
     info!("Fetching rollup configuration from rpc endpoints.");
     // fetch rollup config
@@ -137,7 +138,6 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         args.owner_signer.wallet(Some(config.l1_chain_id))
     )?;
     let owner_provider = ProviderBuilder::new()
-        .with_recommended_fillers()
         .wallet(&owner_wallet)
         .on_http(args.eth_rpc_url.as_str().try_into()?);
 
@@ -180,7 +180,6 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         args.deployer_signer.wallet(Some(config.l1_chain_id))
     )?;
     let deployer_provider = ProviderBuilder::new()
-        .with_recommended_fillers()
         .wallet(&deployer_wallet)
         .on_http(args.eth_rpc_url.as_str().try_into()?);
 
@@ -406,7 +405,6 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         )?;
         let guardian_address = guardian_wallet.default_signer().address();
         let guardian_provider = ProviderBuilder::new()
-            .with_recommended_fillers()
             .wallet(&guardian_wallet)
             .on_http(args.eth_rpc_url.as_str().try_into()?);
         let optimism_portal = OptimismPortal2::new(portal_address, &guardian_provider);
@@ -436,12 +434,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn deploy_verifier<
-    T: Transport + Clone,
-    P1: Provider<T, N>,
-    P2: Provider<T, N>,
-    N: Network,
->(
+pub async fn deploy_verifier<P1: Provider<N>, P2: Provider<N>, N: Network>(
     deployer_provider: P1,
     owner_provider: P2,
     owner_address: Address,

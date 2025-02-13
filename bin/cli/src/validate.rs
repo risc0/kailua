@@ -24,7 +24,7 @@ use alloy::eips::eip4844::{IndexedBlobHash, FIELD_ELEMENTS_PER_BLOB};
 use alloy::network::primitives::HeaderResponse;
 use alloy::network::BlockResponse;
 use alloy::primitives::{Address, Bytes, FixedBytes, B256, U256};
-use alloy::providers::{ProviderBuilder, ReqwestProvider};
+use alloy::providers::{ProviderBuilder, RootProvider};
 use anyhow::{anyhow, bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_client::args::parse_address;
@@ -130,17 +130,13 @@ pub async fn handle_proposals(
 
     // initialize blockchain connections
     info!("Initializing rpc connections.");
-    let op_node_provider =
-        OpNodeProvider(ProviderBuilder::new().on_http(args.core.op_node_url.as_str().try_into()?));
-    let eth_rpc_provider =
-        ProviderBuilder::new().on_http(args.core.eth_rpc_url.as_str().try_into()?);
-    let op_geth_provider =
-        ProviderBuilder::new().on_http(args.core.op_geth_url.as_str().try_into()?);
-    let cl_node_provider = await_tel!(
-        context,
-        BlobProvider::new(args.core.beacon_rpc_url.as_str())
-    )
-    .context("BlobProvier::new")?;
+    let op_node_provider = OpNodeProvider(RootProvider::new_http(
+        args.core.op_node_url.as_str().try_into()?,
+    ));
+    let eth_rpc_provider = RootProvider::new_http(args.core.eth_rpc_url.as_str().try_into()?);
+    let op_geth_provider = RootProvider::new_http(args.core.op_geth_url.as_str().try_into()?);
+    let cl_node_provider = await_tel!(context, BlobProvider::new(args.core.beacon_rpc_url))
+        .context("BlobProvier::new")?;
 
     info!("Fetching rollup configuration from rpc endpoints.");
     // fetch rollup config
@@ -170,7 +166,6 @@ pub async fn handle_proposals(
     )?;
     let validator_address = validator_wallet.default_signer().address();
     let validator_provider = ProviderBuilder::new()
-        .with_recommended_fillers()
         .wallet(validator_wallet)
         .on_http(args.core.eth_rpc_url.as_str().try_into()?);
     info!("Validator address: {validator_address}");
@@ -989,8 +984,8 @@ async fn request_fault_proof(
     parent: &Proposal,
     contender: &Proposal,
     opponent: &Proposal,
-    l1_node_provider: &ReqwestProvider,
-    l2_node_provider: &ReqwestProvider,
+    l1_node_provider: &RootProvider,
+    l2_node_provider: &RootProvider,
     op_node_provider: &OpNodeProvider,
 ) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
@@ -1143,8 +1138,8 @@ async fn request_validity_proof(
     config: &Config,
     parent: &Proposal,
     proposal: &Proposal,
-    l1_node_provider: &ReqwestProvider,
-    l2_node_provider: &ReqwestProvider,
+    l1_node_provider: &RootProvider,
+    l2_node_provider: &RootProvider,
 ) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("request_validity_proof"));
@@ -1326,8 +1321,6 @@ pub async fn handle_proof_requests(
         }
         // kona args
         proving_args.extend(vec![
-            // single chain proving mode
-            String::from("single"),
             // l1 head from on-chain proposal
             String::from("--l1-head"),
             l1_head,

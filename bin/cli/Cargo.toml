@@ -22,6 +22,7 @@ clap.workspace = true
 gcloud-sdk.workspace = true
 hex.workspace = true
 paste.workspace = true
+reqwest.workspace = true
 rocksdb.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -51,7 +52,8 @@ kailua-contracts.workspace = true
 kailua-host.workspace = true
 
 kona-host.workspace = true
-kona-derive = { workspace = true }
+kona-derive.workspace = true
+kona-providers-alloy.workspace = true
 
 bonsai-sdk.workspace = true
 risc0-ethereum-contracts.workspace = true

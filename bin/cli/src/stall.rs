@@ -16,7 +16,6 @@ use alloy::contract::{EthCall, SolCallBuilder};
 use alloy::network::Network;
 use alloy::providers::Provider;
 use alloy::sol_types::SolCall;
-use alloy::transports::Transport;
 use async_trait::async_trait;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
@@ -40,13 +39,13 @@ pub trait Stall<R> {
 impl<
         'req,
         'coder,
-        T: Transport + Clone,
-        P: Provider<T, N>,
+        T: Sync + Send + 'static,
+        P: Provider<N>,
         C: SolCall + 'static + Sync,
         N: Network,
     > Stall<C::Return> for SolCallBuilder<T, P, C, N>
 where
-    EthCall<'req, 'coder, PhantomData<C>, T, N>: IntoFuture,
+    EthCall<'req, 'coder, PhantomData<C>, N>: IntoFuture,
     C::Return: Send,
 {
     async fn stall(&self, span: &'static str) -> C::Return {

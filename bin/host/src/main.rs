@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use alloy::network::primitives::BlockTransactionsKind;
-use alloy::providers::{Provider, ProviderBuilder};
+use alloy::providers::{Provider, RootProvider};
 use alloy_eips::BlockNumberOrTag;
 use anyhow::{bail, Context};
 use clap::Parser;
@@ -21,8 +21,6 @@ use kailua_client::provider::OpNodeProvider;
 use kailua_client::proving::ProvingError;
 use kailua_common::witness::StitchedBootInfo;
 use kailua_host::args::KailuaHostArgs;
-use kona_host::cli::HostMode;
-use kona_host::init_tracing_subscriber;
 use std::collections::BinaryHeap;
 use std::env::set_var;
 use tracing::{info, warn};
@@ -30,24 +28,21 @@ use tracing::{info, warn};
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = KailuaHostArgs::parse();
-    init_tracing_subscriber(args.kona.v)?;
-    set_var("KAILUA_VERBOSITY", args.kona.v.to_string());
+    kona_host::cli::init_tracing_subscriber(args.v)?;
+    set_var("KAILUA_VERBOSITY", args.v.to_string());
 
     // fetch starting block number
-    let HostMode::Single(kona_cfg) = &args.kona.mode;
-    let l2_provider = if kona_cfg.is_offline() {
+    let l2_provider = if args.kona.is_offline() {
         None
     } else {
-        Some(kona_cfg.create_providers().await?.2)
+        Some(args.kona.create_providers().await?.l2)
     };
     let op_node_provider = args.op_node_address.as_ref().map(|addr| {
-        OpNodeProvider(
-            ProviderBuilder::new().on_http(
-                addr.as_str()
-                    .try_into()
-                    .expect("Failed to parse op_node_address"),
-            ),
-        )
+        OpNodeProvider(RootProvider::new_http(
+            addr.as_str()
+                .try_into()
+                .expect("Failed to parse op_node_address"),
+        ))
     });
     // compute individual proofs
     let mut job_pq = BinaryHeap::new();
@@ -55,11 +50,12 @@ async fn main() -> anyhow::Result<()> {
     job_pq.push(args.clone());
     let mut have_split = false;
     while let Some(job_args) = job_pq.pop() {
-        let HostMode::Single(kona_cfg) = &job_args.kona.mode;
-
         let starting_block = if let Some(l2_provider) = l2_provider.as_ref() {
             l2_provider
-                .get_block_by_hash(kona_cfg.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
+                .get_block_by_hash(
+                    job_args.kona.agreed_l2_head_hash,
+                    BlockTransactionsKind::Hashes,
+                )
                 .await?
                 .unwrap()
                 .header
@@ -68,7 +64,7 @@ async fn main() -> anyhow::Result<()> {
             0
         };
 
-        let num_blocks = kona_cfg.claimed_l2_block_number - starting_block;
+        let num_blocks = job_args.kona.claimed_l2_block_number - starting_block;
         if starting_block > 0 {
             info!(
                 "Processing job with {} blocks from block {}",
@@ -76,7 +72,7 @@ async fn main() -> anyhow::Result<()> {
             );
         }
         // Force the proving attempt regardless of witness size if we prove just one block
-        let force_attempt = num_blocks == 1 || kona_cfg.is_offline();
+        let force_attempt = num_blocks == 1 || job_args.kona.is_offline();
 
         match kailua_host::prove::compute_fpvm_proof(
             job_args.clone(),
@@ -129,15 +125,13 @@ async fn main() -> anyhow::Result<()> {
                     .unwrap_or_else(|| panic!("Block {mid_point} not found"));
                 // Lower half workload ends at midpoint
                 let mut lower_job_args = job_args.clone();
-                let HostMode::Single(lower_kona_cfg) = &mut lower_job_args.kona.mode;
-                lower_kona_cfg.claimed_l2_output_root = mid_output;
-                lower_kona_cfg.claimed_l2_block_number = mid_point;
+                lower_job_args.kona.claimed_l2_output_root = mid_output;
+                lower_job_args.kona.claimed_l2_block_number = mid_point;
                 job_pq.push(lower_job_args);
                 // upper half workload starts at midpoint
                 let mut upper_job_args = job_args;
-                let HostMode::Single(upper_kona_cfg) = &mut upper_job_args.kona.mode;
-                upper_kona_cfg.agreed_l2_output_root = mid_output;
-                upper_kona_cfg.agreed_l2_head_hash = mid_block.header.hash;
+                upper_job_args.kona.agreed_l2_output_root = mid_output;
+                upper_job_args.kona.agreed_l2_head_hash = mid_block.header.hash;
                 job_pq.push(upper_job_args);
             }
         }
@@ -149,18 +143,17 @@ async fn main() -> anyhow::Result<()> {
         let mut base_args = args;
         {
             // set last block as starting point
-            let HostMode::Single(base_kona_args) = &mut base_args.kona.mode;
-            base_kona_args.agreed_l2_output_root = base_kona_args.claimed_l2_output_root;
-            base_kona_args.agreed_l2_head_hash = l2_provider
+            base_args.kona.agreed_l2_output_root = base_args.kona.claimed_l2_output_root;
+            base_args.kona.agreed_l2_head_hash = l2_provider
                 .as_ref()
                 .unwrap()
                 .get_block_by_number(
-                    BlockNumberOrTag::Number(base_kona_args.claimed_l2_block_number),
+                    BlockNumberOrTag::Number(base_args.kona.claimed_l2_block_number),
                     BlockTransactionsKind::Hashes,
                 )
                 .await?
                 .unwrap_or_else(|| {
-                    panic!("Block {} not found", base_kona_args.claimed_l2_block_number)
+                    panic!("Block {} not found", base_args.kona.claimed_l2_block_number)
                 })
                 .header
                 .hash;

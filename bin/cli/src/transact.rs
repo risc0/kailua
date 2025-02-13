@@ -15,7 +15,6 @@
 use alloy::contract::{CallBuilder, CallDecoder, EthCall};
 use alloy::network::Network;
 use alloy::providers::Provider;
-use alloy::transports::Transport;
 use anyhow::Context;
 use async_trait::async_trait;
 use opentelemetry::global::tracer;
@@ -39,13 +38,13 @@ pub trait Transact<N: Network> {
 impl<
         'req,
         'coder,
-        T: Transport + Clone,
-        P: Provider<T, N>,
+        T: Sync + Send + 'static,
+        P: Provider<N>,
         D: CallDecoder + Send + Sync + 'static,
         N: Network,
     > Transact<N> for CallBuilder<T, P, D, N>
 where
-    EthCall<'req, 'coder, D, T, N>: IntoFuture,
+    EthCall<'req, 'coder, D, N>: IntoFuture,
 {
     async fn transact(&self, span: &'static str) -> anyhow::Result<N::ReceiptResponse> {
         let tracer = tracer("kailua");

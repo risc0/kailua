@@ -13,10 +13,9 @@
 // limitations under the License.
 
 use crate::args::KailuaHostArgs;
-use alloy::providers::{Provider, ProviderBuilder};
+use alloy::providers::{Provider, ProviderBuilder, RootProvider};
 use anyhow::Context;
 use kailua_client::provider::OpNodeProvider;
-use kona_host::cli::HostMode;
 use maili_genesis::RollupConfig;
 use maili_registry::Registry;
 use opentelemetry::global::tracer;
@@ -31,20 +30,20 @@ pub async fn generate_rollup_config(
     cfg: &mut KailuaHostArgs,
     tmp_dir: &TempDir,
 ) -> anyhow::Result<RollupConfig> {
-    let HostMode::Single(kona_cfg) = &mut cfg.kona.mode;
     // generate a RollupConfig for the target network
-    match kona_cfg.read_rollup_config().ok() {
+    match cfg.kona.read_rollup_config().ok() {
         Some(rollup_config) => Ok(rollup_config),
         None => {
             let registry = Registry::from_chain_list();
             let tmp_cfg_file = tmp_dir.path().join("rollup-config.json");
-            if let Some(rollup_config) = kona_cfg
+            if let Some(rollup_config) = cfg
+                .kona
                 .l2_chain_id
                 .and_then(|chain_id| registry.rollup_configs.get(&chain_id))
             {
                 info!(
                     "Loading config for rollup with chain id {} from registry",
-                    kona_cfg.l2_chain_id.unwrap()
+                    cfg.kona.l2_chain_id.unwrap()
                 );
                 let ser_config = serde_json::to_string(rollup_config)?;
                 fs::write(&tmp_cfg_file, &ser_config).await?;
@@ -52,7 +51,7 @@ pub async fn generate_rollup_config(
                 info!("Fetching rollup config from nodes.");
                 fetch_rollup_config(
                     cfg.op_node_address.as_ref().unwrap().as_str(),
-                    kona_cfg
+                    cfg.kona
                         .l2_node_address
                         .clone()
                         .expect("Missing l2-node-address")
@@ -61,8 +60,8 @@ pub async fn generate_rollup_config(
                 )
                 .await?;
             }
-            kona_cfg.rollup_config_path = Some(tmp_cfg_file);
-            kona_cfg.read_rollup_config()
+            cfg.kona.rollup_config_path = Some(tmp_cfg_file);
+            cfg.kona.read_rollup_config()
         }
     }
 }
@@ -75,8 +74,7 @@ pub async fn fetch_rollup_config(
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("fetch_rollup_config"));
 
-    let op_node_provider =
-        OpNodeProvider(ProviderBuilder::new().on_http(op_node_address.try_into()?));
+    let op_node_provider = OpNodeProvider(RootProvider::new_http(op_node_address.try_into()?));
     let l2_node_provider = ProviderBuilder::new().on_http(l2_node_address.try_into()?);
 
     let mut rollup_config: Value = op_node_provider

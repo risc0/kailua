@@ -9,7 +9,6 @@ use alloy::eips::BlockNumberOrTag;
 use alloy::network::{BlockResponse, Network, ReceiptResponse};
 use alloy::primitives::{Address, Bytes, B256, U256};
 use alloy::providers::Provider;
-use alloy::transports::Transport;
 use alloy_rpc_types_beacon::sidecar::BlobData;
 use anyhow::{bail, Context};
 use kailua_client::provider::OpNodeProvider;
@@ -59,10 +58,10 @@ pub struct Proposal {
 }
 
 impl Proposal {
-    pub async fn load<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+    pub async fn load<P: Provider<N>, N: Network>(
         config: &Config,
         blob_provider: &BlobProvider,
-        tournament_instance: &KailuaTournamentInstance<T, P, N>,
+        tournament_instance: &KailuaTournamentInstance<(), P, N>,
     ) -> anyhow::Result<Self> {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("Proposal::load"));
@@ -95,8 +94,8 @@ impl Proposal {
         }
     }
 
-    async fn load_treasury<T: Transport + Clone, P: Provider<T, N>, N: Network>(
-        treasury_instance: &KailuaTreasuryInstance<T, P, N>,
+    async fn load_treasury<P: Provider<N>, N: Network>(
+        treasury_instance: &KailuaTreasuryInstance<(), P, N>,
     ) -> anyhow::Result<Self> {
         let tracer = tracer("kailua");
         let context =
@@ -157,10 +156,10 @@ impl Proposal {
         })
     }
 
-    async fn load_game<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+    async fn load_game<P: Provider<N>, N: Network>(
         config: &Config,
         blob_provider: &BlobProvider,
-        game_instance: &KailuaGameInstance<T, P, N>,
+        game_instance: &KailuaGameInstance<(), P, N>,
     ) -> anyhow::Result<Self> {
         let tracer = tracer("kailua");
         let context =
@@ -253,11 +252,7 @@ impl Proposal {
         })
     }
 
-    pub async fn fetch_parent_tournament_survivor<
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        N: Network,
-    >(
+    pub async fn fetch_parent_tournament_survivor<P: Provider<N>, N: Network>(
         &self,
         provider: P,
     ) -> anyhow::Result<Option<Address>> {
@@ -298,11 +293,7 @@ impl Proposal {
         }
     }
 
-    pub async fn fetch_parent_tournament_survivor_status<
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        N: Network,
-    >(
+    pub async fn fetch_parent_tournament_survivor_status<P: Provider<N>, N: Network>(
         &self,
         provider: P,
     ) -> anyhow::Result<Option<bool>> {
@@ -325,7 +316,7 @@ impl Proposal {
         Ok(is_survivor_expected)
     }
 
-    pub async fn fetch_finality<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+    pub async fn fetch_finality<P: Provider<N>, N: Network>(
         &self,
         provider: P,
     ) -> anyhow::Result<Option<bool>> {
@@ -342,11 +333,7 @@ impl Proposal {
         )
     }
 
-    pub async fn fetch_is_successor_validity_proven<
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        N: Network,
-    >(
+    pub async fn fetch_is_successor_validity_proven<P: Provider<N>, N: Network>(
         &self,
         provider: P,
     ) -> anyhow::Result<bool> {
@@ -363,11 +350,7 @@ impl Proposal {
             > 0)
     }
 
-    pub async fn fetch_current_challenger_duration<
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        N: Network,
-    >(
+    pub async fn fetch_current_challenger_duration<P: Provider<N>, N: Network>(
         &self,
         provider: P,
     ) -> anyhow::Result<u64> {
@@ -473,14 +456,14 @@ impl Proposal {
         Some(true)
     }
 
-    pub fn tournament_contract_instance<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+    pub fn tournament_contract_instance<P: Provider<N>, N: Network>(
         &self,
         provider: P,
-    ) -> KailuaTournamentInstance<T, P, N> {
+    ) -> KailuaTournamentInstance<(), P, N> {
         KailuaTournament::new(self.contract, provider)
     }
 
-    pub async fn resolve<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+    pub async fn resolve<P: Provider<N>, N: Network>(
         &self,
         provider: P,
     ) -> anyhow::Result<N::ReceiptResponse> {

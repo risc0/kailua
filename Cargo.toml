@@ -27,13 +27,14 @@ bytes = "1.7.2"
 clap = { version = "4.5.21", features = ["derive", "env"] }
 c-kzg = "=1.0.3"
 foundry-compilers = "0.11.0"
-gcloud-sdk = { version = "0.25.8", features = ["google-cloud-kms-v1"] }
+gcloud-sdk = { version = "0.26.3", features = ["google-cloud-kms-v1"] }
 hashbrown = { version = "0.15.0", features = ["rayon"] }
 hex = "0.4.3"
 lazy_static = "1.5.0"
 lru = "0.12.4"
 paste = "1.0.15"
 pot = "3.0.1"
+reqwest = "0.12.12"
 rkyv = { version = "0.8.9", features = ["hashbrown-0_15", "std"] }
 rocksdb = "0.22.0"
 semver = "1.0.23"
@@ -58,26 +59,25 @@ tracing = "0.1.40"
 tracing-opentelemetry = "0.28.0"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-
 # Alloy
-alloy = { version = "0.9.2", default-features = false, features = ["json"] }
+alloy = { version = "0.11.1", default-features = false, features = ["json"] }
 alloy-chains = "0.1.46"
-alloy-consensus = { version = "0.9.2", default-features = false, features = ["serde"] }
-alloy-eips = { version = "0.9.2", default-features = false, features = ["kzg"] }
-alloy-rlp = "0.3.9"
-alloy-primitives = { version = "0.8.18", default-features = false, features = ["map-hashbrown"] }
-alloy-rpc-types-beacon = "0.9.2"
-alloy-sol-types = { version = "0.8.18", features = ["json"] }
+alloy-consensus = { version = "0.11.1", default-features = false, features = ["serde"] }
+alloy-eips = { version = "0.11.1", default-features = false, features = ["kzg"] }
+alloy-rlp = "0.3.11"
+alloy-primitives = { version = "0.8.21", default-features = false, features = ["map-hashbrown"] }
+alloy-rpc-types-beacon = "0.11.1"
+alloy-sol-types = { version = "0.8.20", features = ["json"] }
 
 # Maili
-maili-genesis = { version = "0.1.5", default-features = false, features = ["serde"] }
-maili-protocol = { version = "0.1.5", default-features = false, features = ["serde"] }
-maili-registry = { version = "0.1.5", default-features = false, features = ["map-hashbrown"] }
 maili-consensus = { version = "0.1.5", default-features = false, features = ["serde"] }
+maili-genesis = { version = "0.2.8", default-features = false, features = ["serde"] }
+maili-protocol = { version = "0.2.8", default-features = false, features = ["serde"] }
+maili-registry = { version = "0.2.8", default-features = false, features = ["map-hashbrown"] }
 
 # OP Alloy
-op-alloy-consensus = { version = "0.9.4", default-features = false, features = ["serde"] }
-op-alloy-rpc-types-engine = { version = "0.9.4", default-features = false, features = ["serde"] }
+op-alloy-consensus = { version = "0.10.3", default-features = false, features = ["serde"] }
+op-alloy-rpc-types-engine = { version = "0.10.3", default-features = false, features = ["serde"] }
 
 # Kailua
 kailua-build = { path = "build/risczero" }
@@ -87,15 +87,16 @@ kailua-contracts = { path = "crates/contracts" }
 kailua-host = { path = "bin/host" }
 
 # Kona
-kona-client = { git = "https://github.com/op-rs/kona", rev = "f912b89be07c452da1ee251b7e7c1ba4a50c17d6", default-features = false }
-kona-derive = { git = "https://github.com/op-rs/kona", rev = "f912b89be07c452da1ee251b7e7c1ba4a50c17d6", default-features = false, features = ["serde"] }
-kona-driver = { git = "https://github.com/op-rs/kona", rev = "f912b89be07c452da1ee251b7e7c1ba4a50c17d6" }
-kona-executor = { git = "https://github.com/op-rs/kona", rev = "f912b89be07c452da1ee251b7e7c1ba4a50c17d6" }
-kona-host = { git = "https://github.com/op-rs/kona", rev = "f912b89be07c452da1ee251b7e7c1ba4a50c17d6" }
-kona-mpt = { git = "https://github.com/op-rs/kona", rev = "f912b89be07c452da1ee251b7e7c1ba4a50c17d6", features = ["serde"] }
-kona-preimage = { git = "https://github.com/op-rs/kona", rev = "f912b89be07c452da1ee251b7e7c1ba4a50c17d6", features = ["serde", "rkyv"] }
-kona-proof = { git = "https://github.com/op-rs/kona", rev = "f912b89be07c452da1ee251b7e7c1ba4a50c17d6" }
-kona-std-fpvm = { git = "https://github.com/op-rs/kona", rev = "f912b89be07c452da1ee251b7e7c1ba4a50c17d6" }
+kona-client = { git = "https://github.com/op-rs/kona", rev = "7b16433b4c33d4e3c38f0de00486535d0c970f82", default-features = false }
+kona-derive = { git = "https://github.com/op-rs/kona", rev = "7b16433b4c33d4e3c38f0de00486535d0c970f82", default-features = false, features = ["serde"] }
+kona-driver = { git = "https://github.com/op-rs/kona", rev = "7b16433b4c33d4e3c38f0de00486535d0c970f82" }
+kona-executor = { git = "https://github.com/op-rs/kona", rev = "7b16433b4c33d4e3c38f0de00486535d0c970f82" }
+kona-host = { git = "https://github.com/op-rs/kona", rev = "7b16433b4c33d4e3c38f0de00486535d0c970f82", default-features = false, features = ["single"] }
+kona-mpt = { git = "https://github.com/op-rs/kona", rev = "7b16433b4c33d4e3c38f0de00486535d0c970f82", features = ["serde"] }
+kona-preimage = { git = "https://github.com/op-rs/kona", rev = "7b16433b4c33d4e3c38f0de00486535d0c970f82", features = ["serde", "rkyv", "std"] }
+kona-proof = { git = "https://github.com/op-rs/kona", rev = "7b16433b4c33d4e3c38f0de00486535d0c970f82" }
+kona-providers-alloy = { git = "https://github.com/op-rs/kona", rev = "7b16433b4c33d4e3c38f0de00486535d0c970f82" }
+kona-std-fpvm = { git = "https://github.com/op-rs/kona", rev = "7b16433b4c33d4e3c38f0de00486535d0c970f82" }
 
 # RISC Zero zkVM
 bonsai-sdk = { version = "1.2.1", features = ["non_blocking"] }
@@ -126,12 +127,13 @@ codegen-units = 1
 opt-level = 3
 
 [patch.'https://github.com/op-rs/kona']
-kona-client = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }
-kona-derive = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }
-kona-driver = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }
-kona-executor = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }
-kona-host = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }
-kona-mpt = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }
-kona-preimage = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }
-kona-proof = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }
-kona-std-fpvm = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }
+kona-client = { git = "https://github.com/risc0/kona", branch = "kailua" }
+kona-derive = { git = "https://github.com/risc0/kona", branch = "kailua" }
+kona-driver = { git = "https://github.com/risc0/kona", branch = "kailua" }
+kona-executor = { git = "https://github.com/risc0/kona", branch = "kailua" }
+kona-host = { git = "https://github.com/risc0/kona", branch = "kailua" }
+kona-mpt = { git = "https://github.com/risc0/kona", branch = "kailua" }
+kona-preimage = { git = "https://github.com/risc0/kona", branch = "kailua" }
+kona-proof = { git = "https://github.com/risc0/kona", branch = "kailua" }
+kona-providers-alloy = { git = "https://github.com/risc0/kona", branch = "kailua" }
+kona-std-fpvm = { git = "https://github.com/risc0/kona", branch = "kailua" }

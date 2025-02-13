@@ -23,7 +23,6 @@ use crate::KAILUA_GAME_TYPE;
 use alloy::network::Network;
 use alloy::primitives::U256;
 use alloy::providers::Provider;
-use alloy::transports::Transport;
 use anyhow::{anyhow, bail, Context};
 use config::Config;
 use kailua_client::provider::OpNodeProvider;
@@ -61,9 +60,9 @@ impl KailuaDB {
         options
     }
 
-    pub async fn init<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+    pub async fn init<P: Provider<N>, N: Network>(
         mut data_dir: PathBuf,
-        dispute_game_factory: &IDisputeGameFactoryInstance<T, P, N>,
+        dispute_game_factory: &IDisputeGameFactoryInstance<(), P, N>,
     ) -> anyhow::Result<Self> {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("KailuaDB::init"));
@@ -97,9 +96,9 @@ impl KailuaDB {
         })
     }
 
-    pub async fn load_proposals<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+    pub async fn load_proposals<P: Provider<N>, N: Network>(
         &mut self,
-        dispute_game_factory: &IDisputeGameFactoryInstance<T, P, N>,
+        dispute_game_factory: &IDisputeGameFactoryInstance<(), P, N>,
         op_node_provider: &OpNodeProvider,
         blob_provider: &BlobProvider,
     ) -> anyhow::Result<Vec<u64>> {
@@ -181,9 +180,9 @@ impl KailuaDB {
         Ok(proposals)
     }
 
-    pub async fn load_game_at_index<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+    pub async fn load_game_at_index<P: Provider<N>, N: Network>(
         &mut self,
-        dispute_game_factory: &IDisputeGameFactoryInstance<T, P, N>,
+        dispute_game_factory: &IDisputeGameFactoryInstance<(), P, N>,
         op_node_provider: &OpNodeProvider,
         blob_provider: &BlobProvider,
         index: u64,
@@ -405,11 +404,7 @@ impl KailuaDB {
             .map(|i| self.get_local_proposal(&i).unwrap().output_block_number)
     }
 
-    pub async fn unresolved_canonical_proposals<
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        N: Network,
-    >(
+    pub async fn unresolved_canonical_proposals<P: Provider<N>, N: Network>(
         &self,
         l1_node_provider: &P,
     ) -> anyhow::Result<Vec<u64>> {

@@ -16,7 +16,6 @@ use clap::Parser;
 use kailua_cli::Cli;
 use kailua_client::await_tel;
 use kailua_client::telemetry::init_tracer_provider;
-use kona_host::init_tracing_subscriber;
 use opentelemetry::global::{shutdown_tracer_provider, tracer};
 use opentelemetry::trace::{FutureExt, Status, TraceContextExt, Tracer};
 use tempfile::tempdir;
@@ -25,7 +24,7 @@ use tracing::error;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
-    init_tracing_subscriber(cli.verbosity())?;
+    kona_host::cli::init_tracing_subscriber(cli.verbosity())?;
     init_tracer_provider(cli.telemetry_args())?;
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("cli"));

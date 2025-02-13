@@ -18,8 +18,9 @@ use crate::stall::Stall;
 use crate::transact::Transact;
 use crate::{retry_with_context, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
+use alloy::network::Ethereum;
 use alloy::primitives::{Bytes, B256, U256};
-use alloy::providers::ProviderBuilder;
+use alloy::providers::{ProviderBuilder, RootProvider};
 use alloy::sol_types::SolValue;
 use anyhow::Context;
 use kailua_client::provider::OpNodeProvider;
@@ -50,11 +51,11 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("fault"));
 
-    let op_node_provider = OpNodeProvider(
-        ProviderBuilder::new().on_http(args.propose_args.core.op_node_url.as_str().try_into()?),
-    );
+    let op_node_provider = OpNodeProvider(RootProvider::new_http(
+        args.propose_args.core.op_node_url.as_str().try_into()?,
+    ));
     let eth_rpc_provider =
-        ProviderBuilder::new().on_http(args.propose_args.core.eth_rpc_url.as_str().try_into()?);
+        RootProvider::<Ethereum>::new_http(args.propose_args.core.eth_rpc_url.as_str().try_into()?);
 
     info!("Fetching rollup configuration from rpc endpoints.");
     // fetch rollup config
@@ -89,7 +90,6 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     )?;
     let tester_address = tester_wallet.default_signer().address();
     let tester_provider = ProviderBuilder::new()
-        .with_recommended_fillers()
         .wallet(tester_wallet)
         .on_http(args.propose_args.core.eth_rpc_url.as_str().try_into()?);
 

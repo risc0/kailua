@@ -17,7 +17,6 @@ use alloy::contract::SolCallBuilder;
 use alloy::network::{Network, TransactionBuilder};
 use alloy::primitives::{Address, Uint, U256};
 use alloy::providers::Provider;
-use alloy::transports::Transport;
 use anyhow::Context;
 use kailua_client::telemetry::TelemetryArgs;
 use kailua_contracts::Safe::SafeInstance;
@@ -119,15 +118,9 @@ impl Cli {
     }
 }
 
-pub async fn exec_safe_txn<
-    T: Transport + Clone,
-    P1: Provider<T, N>,
-    P2: Provider<T, N>,
-    C,
-    N: Network,
->(
+pub async fn exec_safe_txn<T, P1: Provider<N>, P2: Provider<N>, C, N: Network>(
     txn: SolCallBuilder<T, P1, C, N>,
-    safe: &SafeInstance<T, P2, N>,
+    safe: &SafeInstance<(), P2, N>,
     from: Address,
 ) -> anyhow::Result<()> {
     let req = txn.into_transaction_request();

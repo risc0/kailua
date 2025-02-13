@@ -13,14 +13,14 @@
 // limitations under the License.
 
 use alloy::primitives::B256;
-use alloy::providers::{Provider, ReqwestProvider};
+use alloy::providers::{Provider, RootProvider};
 use anyhow::Context;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::Tracer;
 use serde_json::Value;
 use std::str::FromStr;
 
-pub struct OpNodeProvider(pub ReqwestProvider);
+pub struct OpNodeProvider(pub RootProvider);
 
 impl OpNodeProvider {
     pub async fn output_at_block(&self, output_block_number: u64) -> anyhow::Result<B256> {

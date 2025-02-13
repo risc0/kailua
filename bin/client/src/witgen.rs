@@ -67,11 +67,7 @@ where
         fpvm_image_id,
     };
     witness.oracle_witness.finalize_preimages();
-    let journal_output = ProofJournal::new(
-        fpvm_image_id,
-        payout_recipient,
-        precondition_hash,
-        boot.as_ref(),
-    );
+    let journal_output =
+        ProofJournal::new(fpvm_image_id, payout_recipient, precondition_hash, &boot);
     Ok((journal_output, witness))
 }

@@ -16,7 +16,6 @@ use crate::stall::Stall;
 use alloy::network::Network;
 use alloy::primitives::{Address, B256};
 use alloy::providers::Provider;
-use alloy::transports::Transport;
 use kailua_contracts::KailuaGame::KailuaGameInstance;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{TraceContextExt, Tracer};
@@ -40,8 +39,8 @@ pub struct Config {
 }
 
 impl Config {
-    pub async fn load<T: Transport + Clone, P: Provider<T, N>, N: Network>(
-        kailua_game_implementation: &KailuaGameInstance<T, P, N>,
+    pub async fn load<P: Provider<N>, N: Network>(
+        kailua_game_implementation: &KailuaGameInstance<(), P, N>,
     ) -> anyhow::Result<Self> {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("Config::load"));

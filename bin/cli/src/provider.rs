@@ -19,8 +19,7 @@ use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::network::{BlockResponse, Network};
 use alloy::primitives::{BlockNumber, B256, U256};
-use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
-use alloy::transports::Transport;
+use alloy::providers::Provider;
 use alloy_rpc_types_beacon::sidecar::{BeaconBlobBundle, BlobData};
 use anyhow::{anyhow, bail, Context};
 use kailua_client::{await_tel, await_tel_res};
@@ -33,27 +32,31 @@ use tracing::debug;
 
 #[derive(Clone, Debug)]
 pub struct BlobProvider {
-    pub cl_node_provider: ReqwestProvider,
+    pub cl_node_endpoint: String,
+    pub client: reqwest::Client,
     pub genesis_time: u64,
     pub seconds_per_slot: u64,
 }
 
 impl BlobProvider {
-    pub async fn new(url: &str) -> anyhow::Result<Self> {
+    pub async fn new(cl_node_endpoint: String) -> anyhow::Result<Self> {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("BlobProvider::new"));
 
-        let cl_node_provider = ProviderBuilder::new().on_http(url.try_into()?);
-        let genesis = Self::provider_get::<Value>(&cl_node_provider, "eth/v1/beacon/genesis")
-            .with_context(context.clone())
-            .await
-            .context("BlobProvider::provider_get")?;
+        let cl_node_endpoint = cl_node_endpoint.trim_end_matches('/').to_owned();
+        let client = reqwest::Client::new();
+
+        let genesis =
+            Self::client_get::<Value>(&client, &cl_node_endpoint, "eth/v1/beacon/genesis")
+                .with_context(context.clone())
+                .await
+                .context("BlobProvider::provider_get")?;
         debug!("genesis {:?}", &genesis);
         let genesis_time = genesis["data"]["genesis_time"]
             .as_str()
             .unwrap()
             .parse::<u64>()?;
-        let spec = Self::provider_get::<Value>(&cl_node_provider, "eth/v1/config/spec")
+        let spec = Self::client_get::<Value>(&client, &cl_node_endpoint, "eth/v1/config/spec")
             .with_context(context.clone())
             .await
             .context("BlobProvider::provider_get")?;
@@ -63,53 +66,40 @@ impl BlobProvider {
             .unwrap()
             .parse::<u64>()?;
         Ok(Self {
-            cl_node_provider,
+            cl_node_endpoint,
+            client,
             genesis_time,
             seconds_per_slot,
         })
-    }
-
-    pub fn provider_url(provider: &ReqwestProvider) -> &str {
-        provider.client().transport().url().trim_end_matches('/')
-    }
-
-    pub fn url(&self) -> &str {
-        self.cl_node_provider
-            .client()
-            .transport()
-            .url()
-            .trim_end_matches('/')
     }
 
     pub fn slot(&self, timestamp: u64) -> u64 {
         (timestamp - self.genesis_time) / self.seconds_per_slot
     }
 
-    pub async fn provider_get<T: DeserializeOwned>(
-        provider: &ReqwestProvider,
+    pub async fn client_get<T: DeserializeOwned>(
+        client: &reqwest::Client,
+        endpoint: &str,
         path: &str,
     ) -> anyhow::Result<T> {
         let tracer = tracer("kailua");
         let context =
-            opentelemetry::Context::current_with_span(tracer.start("BlobProvider::provider_get"));
+            opentelemetry::Context::current_with_span(tracer.start("BlobProvider::client_get"));
 
-        provider
-            .client()
-            .transport()
-            .client()
-            .get(format!("{}/{}", Self::provider_url(provider), path))
+        client
+            .get(format!("{}/{}", endpoint, path))
             .send()
-            .with_context(context.with_span(tracer.start_with_context("send", &context)))
+            .with_context(context.with_span(tracer.start_with_context("Client::send", &context)))
             .await
             .context("send")?
             .json::<T>()
-            .with_context(context.with_span(tracer.start_with_context("json", &context)))
+            .with_context(context.with_span(tracer.start_with_context("Response::json", &context)))
             .await
             .context("json")
     }
 
     pub async fn get<T: DeserializeOwned>(&self, path: &str) -> anyhow::Result<T> {
-        Self::provider_get(&self.cl_node_provider, path).await
+        Self::client_get(&self.client, &self.cl_node_endpoint, path).await
     }
 
     pub async fn get_blob(&self, timestamp: u64, blob_hash: B256) -> anyhow::Result<BlobData> {
@@ -123,7 +113,7 @@ impl BlobProvider {
                 .with_context(context.clone())
                 .await
         )
-        .with_context(context.with_span(tracer.start_with_context("get", &context)))
+        .with_context(context.with_span(tracer.start_with_context("BlobProvider::get", &context)))
         .await
         .context(format!("blob_sidecars {slot}"))?;
 
@@ -206,7 +196,7 @@ pub fn blob_fe_proof(
     }
 }
 
-pub async fn get_next_block<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+pub async fn get_next_block<P: Provider<N>, N: Network>(
     provider: P,
     parent_hash: B256,
 ) -> anyhow::Result<N::BlockResponse> {
@@ -231,7 +221,7 @@ pub async fn get_next_block<T: Transport + Clone, P: Provider<T, N>, N: Network>
     Ok(block)
 }
 
-pub async fn get_block_by_number<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+pub async fn get_block_by_number<P: Provider<N>, N: Network>(
     provider: P,
     block_number: BlockNumber,
 ) -> anyhow::Result<N::BlockResponse> {
@@ -257,7 +247,7 @@ pub async fn get_block_by_number<T: Transport + Clone, P: Provider<T, N>, N: Net
     Ok(block)
 }
 
-pub async fn get_block<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+pub async fn get_block<P: Provider<N>, N: Network>(
     provider: P,
     block_id: BlockNumberOrTag,
 ) -> anyhow::Result<N::BlockResponse> {

@@ -130,7 +130,6 @@ prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data 
   echo "Running host program with zk client program..."
   ./target/{{target}}/kailua-host {{verbosity}} \
     --op-node-address $OP_NODE_ADDRESS \
-    single \
     --l1-head $L1_HEAD \
     --agreed-l2-head-hash $AGREED_L2_HEAD \
     --agreed-l2-output-root $AGREED_L2_OUTPUT_ROOT \
@@ -171,7 +170,6 @@ query block_number l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc:
 prove-offline block_number l2_claim l2_output_root l2_head l1_head l2_chain_id data target="release" verbosity="":
   echo "Running host program with zk client program..."
   ./target/{{target}}/kailua-host {{verbosity}} \
-    single \
     --l1-head {{l1_head}} \
     --agreed-l2-head-hash {{l2_head}} \
     --claimed-l2-output-root {{l2_claim}} \

@@ -22,9 +22,9 @@ use alloy::consensus::BlockHeader;
 use alloy::eips::BlockNumberOrTag;
 use std::future::IntoFuture;
 
-use alloy::network::{BlockResponse, TxSigner};
+use alloy::network::{BlockResponse, Ethereum, TxSigner};
 use alloy::primitives::{Bytes, U256};
-use alloy::providers::{Provider, ProviderBuilder};
+use alloy::providers::{Provider, ProviderBuilder, RootProvider};
 use alloy::sol_types::SolValue;
 use anyhow::Context;
 use kailua_client::provider::OpNodeProvider;
@@ -60,15 +60,13 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
     let context = opentelemetry::Context::current_with_span(tracer.start("propose"));
 
     // initialize blockchain connections
-    let op_node_provider =
-        OpNodeProvider(ProviderBuilder::new().on_http(args.core.op_node_url.as_str().try_into()?));
-    let cl_node_provider = await_tel!(
-        context,
-        BlobProvider::new(args.core.beacon_rpc_url.as_str())
-    )
-    .context("BlobProvider::new")?;
+    let op_node_provider = OpNodeProvider(RootProvider::new_http(
+        args.core.op_node_url.as_str().try_into()?,
+    ));
+    let cl_node_provider = await_tel!(context, BlobProvider::new(args.core.beacon_rpc_url))
+        .context("BlobProvider::new")?;
     let eth_rpc_provider =
-        ProviderBuilder::new().on_http(args.core.eth_rpc_url.as_str().try_into()?);
+        RootProvider::<Ethereum>::new_http(args.core.eth_rpc_url.as_str().try_into()?);
 
     info!("Fetching rollup configuration from rpc endpoints.");
     // fetch rollup config
@@ -98,7 +96,6 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
     )?;
     let proposer_address = proposer_wallet.default_signer().address();
     let proposer_provider = ProviderBuilder::new()
-        .with_recommended_fillers()
         .wallet(&proposer_wallet)
         .on_http(args.core.eth_rpc_url.as_str().try_into()?);
     info!("Proposer address: {proposer_address}");

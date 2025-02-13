@@ -13,20 +13,19 @@
 // limitations under the License.
 
 use alloy_primitives::{Address, B256};
-use clap::Parser;
+use clap::{ArgAction, Parser};
 use kailua_client::telemetry::TelemetryArgs;
 use kailua_client::{
     args::{parse_address, parse_b256},
     boundless::BoundlessArgs,
 };
-use kona_host::cli::HostMode;
 use std::cmp::Ordering;
 
 /// The host binary CLI application arguments.
 #[derive(Parser, Clone, Debug)]
 pub struct KailuaHostArgs {
     #[clap(flatten)]
-    pub kona: kona_host::HostCli,
+    pub kona: kona_host::single::SingleChainHost,
 
     /// Address of OP-NODE endpoint to use
     #[clap(long, env)]
@@ -52,15 +51,17 @@ pub struct KailuaHostArgs {
     pub boundless: BoundlessArgs,
     #[clap(flatten)]
     pub telemetry: TelemetryArgs,
+
+    /// Verbosity level (0-2)
+    #[arg(long, short, action = ArgAction::Count)]
+    pub v: u8,
 }
 
 impl PartialEq<Self> for KailuaHostArgs {
     fn eq(&self, other: &Self) -> bool {
-        let HostMode::Single(self_cfg) = &self.kona.mode;
-        let HostMode::Single(other_cfg) = &other.kona.mode;
-        self_cfg
+        self.kona
             .claimed_l2_block_number
-            .eq(&other_cfg.claimed_l2_block_number)
+            .eq(&other.kona.claimed_l2_block_number)
     }
 }
 
@@ -74,10 +75,8 @@ impl PartialOrd<Self> for KailuaHostArgs {
 
 impl Ord for KailuaHostArgs {
     fn cmp(&self, other: &Self) -> Ordering {
-        let HostMode::Single(self_cfg) = &self.kona.mode;
-        let HostMode::Single(other_cfg) = &other.kona.mode;
-        self_cfg
+        self.kona
             .claimed_l2_block_number
-            .cmp(&other_cfg.claimed_l2_block_number)
+            .cmp(&other.kona.claimed_l2_block_number)
     }
 }

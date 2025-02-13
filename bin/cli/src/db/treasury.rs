@@ -16,7 +16,6 @@ use crate::stall::Stall;
 use alloy::network::Network;
 use alloy::primitives::{Address, U256};
 use alloy::providers::Provider;
-use alloy::transports::Transport;
 use kailua_contracts::{KailuaTreasury::KailuaTreasuryInstance, *};
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{TraceContextExt, Tracer};
@@ -32,8 +31,8 @@ pub struct Treasury {
 }
 
 impl Treasury {
-    pub async fn init<T: Transport + Clone, P: Provider<T, N>, N: Network>(
-        treasury_implementation: &KailuaTreasuryInstance<T, P, N>,
+    pub async fn init<P: Provider<N>, N: Network>(
+        treasury_implementation: &KailuaTreasuryInstance<(), P, N>,
     ) -> anyhow::Result<Self> {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("Treasury::init"));
@@ -52,17 +51,14 @@ impl Treasury {
         })
     }
 
-    pub fn treasury_contract_instance<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+    pub fn treasury_contract_instance<P: Provider<N>, N: Network>(
         &self,
         provider: P,
-    ) -> KailuaTreasuryInstance<T, P, N> {
+    ) -> KailuaTreasuryInstance<(), P, N> {
         KailuaTreasury::new(self.address, provider)
     }
 
-    pub async fn fetch_bond<T: Transport + Clone, P: Provider<T, N>, N: Network>(
-        &mut self,
-        provider: P,
-    ) -> U256 {
+    pub async fn fetch_bond<P: Provider<N>, N: Network>(&mut self, provider: P) -> U256 {
         let tracer = tracer("kailua");
         let context =
             opentelemetry::Context::current_with_span(tracer.start("Treasury::fetch_bond"));
@@ -75,10 +71,7 @@ impl Treasury {
         self.participation_bond
     }
 
-    pub async fn fetch_vanguard<T: Transport + Clone, P: Provider<T, N>, N: Network>(
-        &mut self,
-        provider: P,
-    ) -> Address {
+    pub async fn fetch_vanguard<P: Provider<N>, N: Network>(&mut self, provider: P) -> Address {
         let tracer = tracer("kailua");
         let context =
             opentelemetry::Context::current_with_span(tracer.start("Treasury::fetch_vanguard"));
@@ -89,7 +82,7 @@ impl Treasury {
             ._0
     }
 
-    pub async fn fetch_vanguard_advantage<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+    pub async fn fetch_vanguard_advantage<P: Provider<N>, N: Network>(
         &mut self,
         provider: P,
     ) -> u64 {
@@ -104,7 +97,7 @@ impl Treasury {
             ._0
     }
 
-    pub async fn fetch_balance<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+    pub async fn fetch_balance<P: Provider<N>, N: Network>(
         &mut self,
         provider: P,
         address: Address,
@@ -122,7 +115,7 @@ impl Treasury {
         paid_bond
     }
 
-    pub async fn fetch_proposer<T: Transport + Clone, P: Provider<T, N>, N: Network>(
+    pub async fn fetch_proposer<P: Provider<N>, N: Network>(
         &mut self,
         provider: P,
         address: Address,

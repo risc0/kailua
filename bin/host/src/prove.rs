@@ -26,7 +26,6 @@ use kailua_client::proving::ProvingError;
 use kailua_common::proof::Proof;
 use kailua_common::stitching::stitch_boot_info;
 use kailua_common::witness::StitchedBootInfo;
-use kona_host::cli::HostMode;
 use kona_proof::BootInfo;
 use std::env::set_var;
 use std::path::Path;
@@ -64,12 +63,11 @@ pub async fn compute_fpvm_proof(
         .context("generate_rollup_config")
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     // extract single chain kona config
-    let HostMode::Single(kona_cfg) = &args.kona.mode;
     let boot = BootInfo {
-        l1_head: kona_cfg.l1_head,
-        agreed_l2_output_root: kona_cfg.agreed_l2_output_root,
-        claimed_l2_output_root: kona_cfg.claimed_l2_output_root,
-        claimed_l2_block_number: kona_cfg.claimed_l2_block_number,
+        l1_head: args.kona.l1_head,
+        agreed_l2_output_root: args.kona.agreed_l2_output_root,
+        claimed_l2_output_root: args.kona.claimed_l2_output_root,
+        claimed_l2_block_number: args.kona.claimed_l2_block_number,
         chain_id: rollup_config.l2_chain_id,
         rollup_config,
     };
@@ -82,22 +80,25 @@ pub async fn compute_fpvm_proof(
     );
     // count transactions
     let stitched_count = stitched_boot_info.len();
-    if !kona_cfg.is_offline() {
-        let (.., l2_provider) = kona_cfg
+    if !args.kona.is_offline() {
+        let providers = args
+            .kona
             .create_providers()
             .await
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
         let mut transactions = 0;
-        let starting_block = l2_provider
-            .get_block_by_hash(kona_cfg.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
+        let starting_block = providers
+            .l2
+            .get_block_by_hash(args.kona.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
             .await
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
             .unwrap()
             .header
             .number;
-        let block_count = kona_cfg.claimed_l2_block_number - starting_block;
+        let block_count = args.kona.claimed_l2_block_number - starting_block;
         for i in 0..block_count {
-            transactions += l2_provider
+            transactions += providers
+                .l2
                 .get_block_transaction_count_by_number(BlockNumberOrTag::Number(
                     starting_block + i + 1,
                 ))
