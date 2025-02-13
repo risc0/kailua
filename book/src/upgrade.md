@@ -128,8 +128,8 @@ The next three parameters are the private keys for the respective parent chain w
 * `guardian-key`: Private key for the EOA used as the "Guardian" of the optimism portal.
 
 ##### KMS Support
-Instead of raw private keys, you can also use either AWS or GCP for obtaining transaction signatures from a KMS.
-* AWS: Specify a corresponding `[EOA]-aws-key-id` parameter. (todo: remaining params)
+Instead of raw private keys, you can use either AWS or GCP for obtaining transaction signatures from a KMS.
+* AWS: Specify a corresponding `[EOA]-aws-key-id` parameter. The remainder of the [AWS configuration](https://docs.aws.amazon.com/sdkref/latest/guide/creds-config-files.html) is handled by the AWS SDK.
   * Example: `deployer-aws-key-id`.
 * GCP: Specify the corresponding `[EOA]-google-project-id`, `[EOA]-google-location`, `[EOA]-google-keyring` and `[EOA]-google-key-name` parameters.
   * Example: `owner-google-project-id`, `owner-google-location`, `owner-google-keyring` and `owner-google-key-name`.
