@@ -86,6 +86,7 @@ where
         .await
         .expect("Failed to run map witgen client.")
     };
+
     // unroll map witness into a vec witness
     info!("Running vec witgen client.");
     let (journal_map, witness_vec): (ProofJournal, Witness<VecOracle>) = witgen::run_witgen_client(
@@ -112,6 +113,7 @@ where
     if journal != journal_vec {
         error!("Native journal does not match journal backed by vec witness");
     }
+
     // compute the receipt in the zkvm
     let witness_frame = rkyv::to_bytes::<rkyv::rancor::Error>(&witness_vec)
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?

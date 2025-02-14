@@ -21,11 +21,13 @@ use risc0_zkvm::guest::env;
 use rkyv::rancor::Error;
 
 fn main() {
-    // Read witness data (todo: rkyv access)
-    let witness_data = env::read_frame();
-    log("DESERIALIZE");
-    let witness = rkyv::from_bytes::<Witness<VecOracle>, Error>(&witness_data)
-        .expect("Failed to deserialize witness");
+    let witness = {
+        // Read serialized witness data
+        let witness_data = env::read_frame();
+        log("DESERIALIZE");
+        rkyv::from_bytes::<Witness<VecOracle>, Error>(&witness_data)
+            .expect("Failed to deserialize witness")
+    };
     // Run client using witness
     let proof_journal = run_witness_client(witness);
     // Write the final stitched journal

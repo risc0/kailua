@@ -17,7 +17,7 @@ use crate::witness::WitnessOracle;
 use alloy_primitives::map::HashMap;
 use async_trait::async_trait;
 use kona_preimage::errors::PreimageOracleResult;
-use kona_preimage::{HintWriterClient, PreimageKey, PreimageKeyType, PreimageOracleClient};
+use kona_preimage::{HintWriterClient, PreimageKey, PreimageOracleClient};
 use kona_proof::FlushableCache;
 
 pub type MapPreimageStore = HashMap<PreimageKey, Vec<u8>>;
@@ -43,24 +43,20 @@ impl WitnessOracle for MapOracle {
 
     fn validate_preimages(&self) -> anyhow::Result<()> {
         for (key, value) in &self.preimages {
-            if !matches!(key.key_type(), PreimageKeyType::Blob) {
-                validate_preimage(key, value)?;
-            }
+            validate_preimage(key, value)?;
         }
         Ok(())
     }
 
     fn insert_preimage(&mut self, key: PreimageKey, value: Vec<u8>) {
-        if !matches!(key.key_type(), PreimageKeyType::Blob) {
-            validate_preimage(&key, &value).expect("Attempted to save invalid preimage");
-        }
+        validate_preimage(&key, &value).expect("Attempted to save invalid preimage");
         if let Some(existing) = self.preimages.insert(key, value.clone()) {
-            if existing != value {
-                panic!(
-                    "Attempted to overwrite oracle data {existing:?} for key {} with {value:?}",
-                    key.key_value()
-                )
-            }
+            assert_eq!(
+                existing,
+                value,
+                "Attempted to overwrite oracle data for key {}.",
+                key.key_value()
+            );
         };
     }
 
