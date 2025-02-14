@@ -28,6 +28,7 @@ use tracing::info;
 
 pub async fn run_witgen_client<P, B, O>(
     preimage_oracle: Arc<P>,
+    preimage_oracle_shard_size: usize,
     blob_provider: B,
     payout_recipient: Address,
     precondition_validation_data_hash: B256,
@@ -66,7 +67,9 @@ where
         stitched_boot_info,
         fpvm_image_id,
     };
-    witness.oracle_witness.finalize_preimages();
+    witness
+        .oracle_witness
+        .finalize_preimages(preimage_oracle_shard_size);
     let journal_output =
         ProofJournal::new(fpvm_image_id, payout_recipient, precondition_hash, &boot);
     Ok((journal_output, witness))

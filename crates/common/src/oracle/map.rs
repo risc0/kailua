@@ -60,7 +60,7 @@ impl WitnessOracle for MapOracle {
         };
     }
 
-    fn finalize_preimages(&mut self) {
+    fn finalize_preimages(&mut self, _: usize) {
         self.validate_preimages()
             .expect("Failed to validate preimages during finalization");
     }

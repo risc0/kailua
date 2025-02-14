@@ -39,7 +39,7 @@ pub trait WitnessOracle: CommsClient + FlushableCache + Send + Sync + Debug {
     fn preimage_count(&self) -> usize;
     fn validate_preimages(&self) -> anyhow::Result<()>;
     fn insert_preimage(&mut self, key: PreimageKey, value: Vec<u8>);
-    fn finalize_preimages(&mut self);
+    fn finalize_preimages(&mut self, shard_size: usize);
 }
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]

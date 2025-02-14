@@ -166,7 +166,7 @@ pub async fn run_boundless_client(
     args: MarketProviderConfig,
     storage: Option<StorageProviderConfig>,
     journal: ProofJournal,
-    witness_frame: Vec<u8>,
+    witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Proof>,
     segment_limit: u32,
 ) -> Result<Proof, ProvingError> {
@@ -270,14 +270,16 @@ pub async fn run_boundless_client(
 
     // Preflight execution to get cycle count
     info!("Preflighting execution.");
-    let preflight_witness_frame = witness_frame.clone();
+    let preflight_witness_frames = witness_frames.clone();
     let preflight_stitched_proofs = stitched_proofs.clone();
     let session_info = tokio::task::spawn_blocking(move || {
         let mut builder = ExecutorEnv::builder();
         // Set segment po2
         builder.segment_limit_po2(segment_limit);
         // Pass in witness data
-        builder.write_frame(&preflight_witness_frame);
+        for frame in &preflight_witness_frames {
+            builder.write_frame(frame);
+        }
         // Pass in proofs
         for proof in &preflight_stitched_proofs {
             // todo: convert boundless seals to groth16 receipts
@@ -310,7 +312,10 @@ pub async fn run_boundless_client(
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     info!("Uploaded image to {}", image_url);
     // Upload input
-    let mut builder = InputBuilder::new().write_frame(&witness_frame);
+    let mut builder = InputBuilder::new();
+    for frame in &witness_frames {
+        builder = builder.write_frame(frame);
+    }
     // Pass in proofs
     for proof in &stitched_proofs {
         builder = builder

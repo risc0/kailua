@@ -116,7 +116,7 @@ impl BlobProvider for PreloadedBlobProvider {
         blob_hashes: &[IndexedBlobHash],
     ) -> Result<Vec<Box<Blob>>, Self::Error> {
         let blob_count = blob_hashes.len();
-        log(&format!("Fetch {blob_count} preloaded blob(s)"));
+        log(&format!("FETCH {blob_count} BLOB(S)"));
         let mut blobs = Vec::with_capacity(blob_count);
         for hash in blob_hashes {
             let (blob_hash, blob) = self.entries.pop().unwrap();

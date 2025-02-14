@@ -17,7 +17,7 @@ use crate::KAILUA_GAME_TYPE;
 use alloy::primitives::address;
 use alloy::providers::ProviderBuilder;
 use anyhow::Context;
-use kailua_build::KAILUA_FPVM_ID;
+use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use kailua_client::await_tel;
 use kailua_client::telemetry::TelemetryArgs;
 use kailua_common::config::{config_hash, BN254_CONTROL_ID, CONTROL_ROOT, SET_BUILDER_ID};
@@ -77,6 +77,8 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
         "FPVM_IMAGE_ID: 0x{}",
         hex::encode_upper(Digest::new(KAILUA_FPVM_ID).as_bytes())
     );
+    // report elf size
+    println!("FPVM_ELF_SIZE: {}", KAILUA_FPVM_ELF.len());
     // Report expected Groth16 verifier parameters
     println!(
         "CONTROL_ROOT: 0x{}",
