@@ -182,7 +182,8 @@ Node software other than <code>op-geth</code> is not as reliable for the necessa
   --op-geth-url [YOUR_OP_GETH_URL] \
   --op-node-url [YOUR_OP_NODE_URL] \
   --kailua-host [YOUR_KAILUA_HOST_BINARY_PATH] \
-  --validator-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY]
+  --validator-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY] \
+  --payout-recipient-address [YOUR_FAULT_PROOF_PAYOUT_RECIPIENT]
 </code></pre>
 <div id="admonition-tip" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-title">
 <div class="admonition-title">
@@ -209,10 +210,23 @@ Node software other than <code>op-geth</code> is not as reliable for the necessa
 <li><code>kailua-host</code>: The path to the <code>kailua-host</code> binary to call for proof generation.</li>
 </ul>
 <h3 id="wallet"><a class="header" href="#wallet">Wallet</a></h3>
-<p>The validator requires a funded wallet to be able to publish fault proofs on chain.</p>
+<p>The validator requires a funded wallet to be able to publish fault proofs on chain, and an (optional) alternative address
+to direct fault proof submission payouts towards</p>
 <ul>
 <li><code>validator-key</code>: The private key for the validator wallet.</li>
+<li><code>payout-recipient-address</code>: The ethereum address to use as the recipient of fault proof payouts.</li>
 </ul>
+<div id="admonition-tip-1" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-1-title">
+<div class="admonition-title">
+<div id="admonition-tip-1-title">
+<p>Tip</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-tip-1"></a>
+</div>
+<div>
+<p><code>validator-key</code> can be replaced with the corresponding AWS/GCP parameters as described <a href="upgrade.html#kms-support">here</a>.</p>
+</div>
+</div>
 <div id="admonition-warning" class="admonition admonish-warning" role="note" aria-labelledby="admonition-warning-title">
 <div class="admonition-title">
 <div id="admonition-warning-title">
@@ -345,6 +359,13 @@ These parameters can be passed in as CLI arguments or set as environment variabl
 <p>Running <code>kailua-cli validate</code> with the above extra arguments should now delegate all validator proving to the <a href="https://docs.beboundless.xyz/">Boundless proving network</a>!</p>
 </div>
 </div>
+<h2 id="advanced-settings"><a class="header" href="#advanced-settings">Advanced Settings</a></h2>
+<p>Fault/Validity proof generation can be fine-tuned via the two following environment variables:</p>
+<ul>
+<li><code>SEGMENT_LIMIT</code>: The <a href="https://docs.rs/risc0-zkvm/1.2.3/risc0_zkvm/struct.ExecutorEnvBuilder.html#method.segment_limit_po2">segment size limit</a> used for local proving (Default 21).</li>
+<li><code>MAX_WITNESS_SIZE</code>: The maximum input size per single proof (Default 100MB).</li>
+<li><code>SKIP_ZETH_PREFLIGHT</code>: If set, skips performing a preflight to fetch witness data using zeth.</li>
+</ul>
 
                     </main>
 

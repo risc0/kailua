@@ -174,6 +174,7 @@ This process will require access to your rollup's 'Owner' and 'Guardian' wallets
 <li>Initialize the <code>KailuaTreasury</code> contract to mark the start of sequencing under Kailua.</li>
 <li>Update the rollup's <code>DisputeGameFactory</code> contract to use <code>KailuaGame</code> for sequencing proposals.
 <ul>
+<li>(Optional) Designate a Vanguard proposer.</li>
 <li>(Optional) Enable withdrawals using finalized Kailua proposals.</li>
 </ul>
 </li>
@@ -200,6 +201,25 @@ If the command does not yet support your configuration, you'll need to follow th
 <div>
 <p>You might find it useful to rehearse migration using a local devnet first.</p>
 </div>
+</div>
+<h3 id="estimated-gas-costs"><a class="header" href="#estimated-gas-costs">Estimated Gas Costs</a></h3>
+<p>The below table contains rounded-up gas cost estimates of various contract operations</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Contract</th><th style="text-align: left">Operation</th><th style="text-align: right">Gas</th><th>Notes</th></tr></thead><tbody>
+<tr><td style="text-align: left">RiscZeroVerifierRouter</td><td style="text-align: left">deploy</td><td style="text-align: right">600K</td><td></td></tr>
+<tr><td style="text-align: left">RiscZeroVerifierRouter</td><td style="text-align: left">addVerifier</td><td style="text-align: right">50K</td><td></td></tr>
+<tr><td style="text-align: left">RiscZeroGroth16Verifier</td><td style="text-align: left">deploy</td><td style="text-align: right">1,200K</td><td></td></tr>
+<tr><td style="text-align: left">RiscZeroSetVerifier</td><td style="text-align: left">deploy</td><td style="text-align: right">950K</td><td></td></tr>
+<tr><td style="text-align: left">RiscZeroMockVerifier</td><td style="text-align: left">deploy</td><td style="text-align: right">525K</td><td></td></tr>
+<tr><td style="text-align: left">KailuaTreasury</td><td style="text-align: left">deploy</td><td style="text-align: right">4,800K</td><td></td></tr>
+<tr><td style="text-align: left">KailuaTreasury</td><td style="text-align: left">propose</td><td style="text-align: right">350K</td><td></td></tr>
+<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">deploy</td><td style="text-align: right">4,900K</td><td></td></tr>
+<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">proveValidity</td><td style="text-align: right">400K</td><td>Groth16 proof</td></tr>
+<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">resolve</td><td style="text-align: right">115K</td><td>Undisputed validity</td></tr>
+<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">proveOutputFault</td><td style="text-align: right">275K</td><td>4 kzg proofs</td></tr>
+<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">proveOutputFault</td><td style="text-align: right">625K</td><td>Groth16 + 4 kzg proofs</td></tr>
+<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">proveOutputFault</td><td style="text-align: right">500K</td><td>Groth16 + 2 kzg proofs</td></tr>
+<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">resolve</td><td style="text-align: right">210K</td><td>1 disputed fault</td></tr>
+</tbody></table>
 </div>
 <h2 id="fast-track-migration"><a class="header" href="#fast-track-migration">Fast-track Migration</a></h2>
 <div id="admonition-info" class="admonition admonish-info" role="note" aria-labelledby="admonition-info-title">
@@ -252,6 +272,9 @@ You can enable withdrawals manually later using the <code>OptimismPortal2</code>
       --deployer-key [YOUR_DEPLOYER_KEY] \
       --owner-key [YOUR_OWNER_KEY] \
       --guardian-key [YOUR_GUARDIAN_KEY] \
+\
+      --vanguard-address [YOUR_VANGUARD_ADDRESS] \
+      --vanguard-advantage [YOUR_VANGUARD_ADVANTAGE] \
 \
       --respect-kailua-proposals
 </code></pre>
@@ -311,6 +334,30 @@ You can enable withdrawals manually later using the <code>OptimismPortal2</code>
 <li><code>owner-key</code>: Private key for the sole EOA controlling the Owner "Safe" contract.</li>
 <li><code>guardian-key</code>: Private key for the EOA used as the "Guardian" of the optimism portal.</li>
 </ul>
+<h5 id="kms-support"><a class="header" href="#kms-support">KMS Support</a></h5>
+<p>Instead of raw private keys, you can use either AWS or GCP for obtaining transaction signatures from a KMS.</p>
+<ul>
+<li>AWS: Specify a corresponding <code>[EOA]-aws-key-id</code> parameter. The remainder of the <a href="https://docs.aws.amazon.com/sdkref/latest/guide/creds-config-files.html">AWS configuration</a> is handled by the AWS SDK.
+<ul>
+<li>Example: <code>deployer-aws-key-id</code>.</li>
+</ul>
+</li>
+<li>GCP: Specify the corresponding <code>[EOA]-google-project-id</code>, <code>[EOA]-google-location</code>, <code>[EOA]-google-keyring</code> and <code>[EOA]-google-key-name</code> parameters.
+<ul>
+<li>Example: <code>owner-google-project-id</code>, <code>owner-google-location</code>, <code>owner-google-keyring</code> and <code>owner-google-key-name</code>.</li>
+</ul>
+</li>
+</ul>
+<h4 id="vanguard-proposer"><a class="header" href="#vanguard-proposer">Vanguard Proposer</a></h4>
+<p>The next two (optional) parameters define the Vanguard proposer advantage:</p>
+<ul>
+<li><code>vanguard-address</code>: The address of the designated Vanguard.</li>
+<li><code>vanguard-advantage</code>: The amount of time (in seconds) to grant proposal exclusivity to the Vanguard.
+<ul>
+<li>If unspecified, this defaults to <code>1152921504606846975</code> (a practically indefinite advantage of 36 Billion years).</li>
+</ul>
+</li>
+</ul>
 <h4 id="withdrawals"><a class="header" href="#withdrawals">Withdrawals</a></h4>
 <div id="admonition-bug" class="admonition admonish-bug" role="note" aria-labelledby="admonition-bug-title">
 <div class="admonition-title">
@@ -320,7 +367,7 @@ You can enable withdrawals manually later using the <code>OptimismPortal2</code>
 <a class="admonition-anchor-link" href="#admonition-bug"></a>
 </div>
 <div>
-<p>Changing the respected game type to Kailua may crash the <code>op-proposer</code> provided by optimism.
+<p>Changing the respected game type to Kailua may crash the <code>op-proposer</code> provided by optimism depending on its version.
 This should be inconsequential because you'll need to run the Kailua proposer for further sequencing to take place anyway.</p>
 </div>
 </div>

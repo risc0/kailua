@@ -265,7 +265,7 @@ Optimism's Bedrock contracts <code>v1.4.0</code> and above.</p>
 <h2 id="local-devnet"><a class="header" href="#local-devnet">Local Devnet</a></h2>
 <p>You can deploy a local optimism devnet equipped with Kailua through the following commands:</p>
 <ol>
-<li><code>just devnet-install</code>
+<li><code>just devnet-fetch</code>
 <ul>
 <li>Fetches <code>v1.9.1</code> of the <code>optimism</code> monorepo.</li>
 </ul>
@@ -446,12 +446,13 @@ The timeout period for <code>E</code> had passed before <code>E'</code> was intr
     └── 16491249            // Example FPVM test data for op-sepolia block
 </code></pre>
 <h2 id="cli"><a class="header" href="#cli">CLI</a></h2>
-<p>The CLI for Kailua is designed to support five main commands:</p>
+<p>The CLI for Kailua is designed to support six commands:</p>
 <ul>
 <li><code>config</code>: Outputs configuration information required for migration.</li>
 <li><code>fast-track</code>: Automatically upgrades an existing rollup deployment to utilize Kailua for fault proving.</li>
 <li><code>propose</code>: Monitor a rollup for sequencing state and publish proposals on-chain (akin to op-proposer).</li>
 <li><code>validate</code>: Monitor a rollup for disputes and publish the necessary FPVM proofs for resolution.</li>
+<li><code>benchmark</code>: Generates proofs for performance benchmarking.</li>
 <li><code>fault</code>: Submit garbage proposals to test fault proving.</li>
 </ul>
 <h2 id="contracts"><a class="header" href="#contracts">Contracts</a></h2>
@@ -516,15 +517,16 @@ parameters for your rollup instance:</p>
 <pre><code class="language-shell">kailua-cli config --op-node-url [YOUR_OP_NODE_URL] --op-geth-url [YOUR_OP_GETH_URL] --eth-rpc-url [YOUR_ETH_RPC_URL]
 </code></pre>
 <p>Running the above command against the respective op-sepolia endpoints should produce the following output:</p>
-<pre><code>RISC0_VERSION: 1.2.1
-FPVM_IMAGE_ID: 0x6882F4878D98ECD7483BC588B766C17DA329B1B1699631C4D0AFC9897A9A8A81
+<pre><code>RISC0_VERSION: 1.2.3
+FPVM_IMAGE_ID: 0xC20F44B56D72241F05E74E9C98B1B4812D7F367D639A52362EEB1F5D023E7821
+FPVM_ELF_SIZE: 27266048
 CONTROL_ROOT: 0x8CDAD9242664BE3112ABA377C5425A4DF735EB1C6966472B561D2855932C0469
 CONTROL_ID: 0x04446E66D300EB7FB45C9726BB53C793DDA407A62E9601618BB43C5C14657AC0
 SET_BUILDER_ID: 0x744CCA56CDE6933DEA72752C78B4A6CA894ED620E8AF6437AB05FAD53BCEC40A
 RISC_ZERO_VERIFIER: 0x925D8331DDC0A1F0D96E68CF073DFE1D92B69187
 GENESIS_TIMESTAMP: 1691802540
 BLOCK_TIME: 2
-ROLLUP_CONFIG_HASH: 0xF9CDE5599A197A7615D7207E55188D9D1709073A67A8F2D53EB9184400D4FBCD
+ROLLUP_CONFIG_HASH: 0xADEA0C301681F81EA5CF9DD3A1A4BBE728E88CD540BDA4A5276809C87A9084CD
 DISPUTE_GAME_FACTORY: 0x05F9613ADB30026FFD634F38E5C4DFD30A197FA1
 OPTIMISM_PORTAL: 0x16FC5058F25648194471939DF75CF27A2FDC48BC
 KAILUA_GAME_TYPE: 1337
@@ -557,6 +559,11 @@ to double-check verifier availability.</p>
 </div>
 </div>
 <p>Once you have these values you'll need to save them for later use during migration.</p>
+<h2 id="telemetry"><a class="header" href="#telemetry">Telemetry</a></h2>
+<p>All Kailua binaries and commands support exporting telemetry data to an
+<a href="https://opentelemetry.io/docs/collector/">OTLP Collector</a>.
+The collector endpoint can be specified using the <code>--otlp-collector</code> parameter, or through specifying the
+<code>OTLP_COLLECTOR</code> environment variable.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="parameters"><a class="header" href="#parameters">Parameters</a></h1>
 <p>Before migrating to Kailua, you'll need to decide on a few setup parameters and note them down for later use during
 the migration process.</p>
@@ -678,6 +685,36 @@ Once a new zkVM version is released, there can be a delay in adding it to the ro
 </div>
 <p>You have the choice of either using the already deployed verifier for your parent chain, or deploying and maintaining
 your own verifier contracts, as described in the later sections.</p>
+<h2 id="vanguard-advantage"><a class="header" href="#vanguard-advantage">Vanguard Advantage</a></h2>
+<p>Kailua supports the designation of one proposer as a <em>Vanguard</em>, along with an <em>advantage time</em> for said proposer.
+When set, this designation prevents any other proposer from publishing a proposal for a certain block height until
+either the Vanguard has made a proposal for that height, or the advantage time granted to the Vanguard has passed.
+The advantage time is counted down until after the Vanguard was allowed to publish a proposal.
+The Vanguard still needs to lock up the necessary bond to make proposals.</p>
+<div id="admonition-note-3" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-3-title">
+<div class="admonition-title">
+<div id="admonition-note-3-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="parameters.html#admonition-note-3"></a>
+</div>
+<div>
+<p>Having a Vanguard that makes honest proposals within the advantage time guarantees the safety of the rollup.</p>
+</div>
+</div>
+<div id="admonition-warning" class="admonition admonish-warning" role="note" aria-labelledby="admonition-warning-title">
+<div class="admonition-title">
+<div id="admonition-warning-title">
+<p>Warning</p>
+</div>
+<a class="admonition-anchor-link" href="parameters.html#admonition-warning"></a>
+</div>
+<div>
+<p>If the advantage time is unreasonably long, Vanguard downtime delays the liveness of the rollup.</p>
+</div>
+</div>
+<p>This middleground enables rollups transitioning from a permissioned scheme to enjoy permissionless fault proofs in
+Kailua with an added safety net.</p>
 <div id="admonition-success" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-title">
 <div class="admonition-title">
 <div id="admonition-success-title">
@@ -688,7 +725,8 @@ your own verifier contracts, as described in the later sections.</p>
 <div>
 <p>Once you've got your parameters all planned out, you're ready for the next step!</p>
 </div>
-</div><div style="break-before: page; page-break-before: always;"></div><h1 id="on-chain-contracts"><a class="header" href="#on-chain-contracts">On-chain Contracts</a></h1>
+</div>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="on-chain-contracts"><a class="header" href="#on-chain-contracts">On-chain Contracts</a></h1>
 <p>In order to utilize Kailua, you'll need to deploy the Kailua dispute contracts, and configure your rollup to use them.
 This process will require access to your rollup's 'Owner' and 'Guardian' wallets.</p>
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
@@ -703,6 +741,7 @@ This process will require access to your rollup's 'Owner' and 'Guardian' wallets
 <li>Initialize the <code>KailuaTreasury</code> contract to mark the start of sequencing under Kailua.</li>
 <li>Update the rollup's <code>DisputeGameFactory</code> contract to use <code>KailuaGame</code> for sequencing proposals.
 <ul>
+<li>(Optional) Designate a Vanguard proposer.</li>
 <li>(Optional) Enable withdrawals using finalized Kailua proposals.</li>
 </ul>
 </li>
@@ -729,6 +768,25 @@ If the command does not yet support your configuration, you'll need to follow th
 <div>
 <p>You might find it useful to rehearse migration using a local devnet first.</p>
 </div>
+</div>
+<h3 id="estimated-gas-costs"><a class="header" href="#estimated-gas-costs">Estimated Gas Costs</a></h3>
+<p>The below table contains rounded-up gas cost estimates of various contract operations</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">Contract</th><th style="text-align: left">Operation</th><th style="text-align: right">Gas</th><th>Notes</th></tr></thead><tbody>
+<tr><td style="text-align: left">RiscZeroVerifierRouter</td><td style="text-align: left">deploy</td><td style="text-align: right">600K</td><td></td></tr>
+<tr><td style="text-align: left">RiscZeroVerifierRouter</td><td style="text-align: left">addVerifier</td><td style="text-align: right">50K</td><td></td></tr>
+<tr><td style="text-align: left">RiscZeroGroth16Verifier</td><td style="text-align: left">deploy</td><td style="text-align: right">1,200K</td><td></td></tr>
+<tr><td style="text-align: left">RiscZeroSetVerifier</td><td style="text-align: left">deploy</td><td style="text-align: right">950K</td><td></td></tr>
+<tr><td style="text-align: left">RiscZeroMockVerifier</td><td style="text-align: left">deploy</td><td style="text-align: right">525K</td><td></td></tr>
+<tr><td style="text-align: left">KailuaTreasury</td><td style="text-align: left">deploy</td><td style="text-align: right">4,800K</td><td></td></tr>
+<tr><td style="text-align: left">KailuaTreasury</td><td style="text-align: left">propose</td><td style="text-align: right">350K</td><td></td></tr>
+<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">deploy</td><td style="text-align: right">4,900K</td><td></td></tr>
+<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">proveValidity</td><td style="text-align: right">400K</td><td>Groth16 proof</td></tr>
+<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">resolve</td><td style="text-align: right">115K</td><td>Undisputed validity</td></tr>
+<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">proveOutputFault</td><td style="text-align: right">275K</td><td>4 kzg proofs</td></tr>
+<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">proveOutputFault</td><td style="text-align: right">625K</td><td>Groth16 + 4 kzg proofs</td></tr>
+<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">proveOutputFault</td><td style="text-align: right">500K</td><td>Groth16 + 2 kzg proofs</td></tr>
+<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">resolve</td><td style="text-align: right">210K</td><td>1 disputed fault</td></tr>
+</tbody></table>
 </div>
 <h2 id="fast-track-migration"><a class="header" href="#fast-track-migration">Fast-track Migration</a></h2>
 <div id="admonition-info" class="admonition admonish-info" role="note" aria-labelledby="admonition-info-title">
@@ -781,6 +839,9 @@ You can enable withdrawals manually later using the <code>OptimismPortal2</code>
       --deployer-key [YOUR_DEPLOYER_KEY] \
       --owner-key [YOUR_OWNER_KEY] \
       --guardian-key [YOUR_GUARDIAN_KEY] \
+\
+      --vanguard-address [YOUR_VANGUARD_ADDRESS] \
+      --vanguard-advantage [YOUR_VANGUARD_ADVANTAGE] \
 \
       --respect-kailua-proposals
 </code></pre>
@@ -840,6 +901,30 @@ You can enable withdrawals manually later using the <code>OptimismPortal2</code>
 <li><code>owner-key</code>: Private key for the sole EOA controlling the Owner "Safe" contract.</li>
 <li><code>guardian-key</code>: Private key for the EOA used as the "Guardian" of the optimism portal.</li>
 </ul>
+<h5 id="kms-support"><a class="header" href="#kms-support">KMS Support</a></h5>
+<p>Instead of raw private keys, you can use either AWS or GCP for obtaining transaction signatures from a KMS.</p>
+<ul>
+<li>AWS: Specify a corresponding <code>[EOA]-aws-key-id</code> parameter. The remainder of the <a href="https://docs.aws.amazon.com/sdkref/latest/guide/creds-config-files.html">AWS configuration</a> is handled by the AWS SDK.
+<ul>
+<li>Example: <code>deployer-aws-key-id</code>.</li>
+</ul>
+</li>
+<li>GCP: Specify the corresponding <code>[EOA]-google-project-id</code>, <code>[EOA]-google-location</code>, <code>[EOA]-google-keyring</code> and <code>[EOA]-google-key-name</code> parameters.
+<ul>
+<li>Example: <code>owner-google-project-id</code>, <code>owner-google-location</code>, <code>owner-google-keyring</code> and <code>owner-google-key-name</code>.</li>
+</ul>
+</li>
+</ul>
+<h4 id="vanguard-proposer"><a class="header" href="#vanguard-proposer">Vanguard Proposer</a></h4>
+<p>The next two (optional) parameters define the Vanguard proposer advantage:</p>
+<ul>
+<li><code>vanguard-address</code>: The address of the designated Vanguard.</li>
+<li><code>vanguard-advantage</code>: The amount of time (in seconds) to grant proposal exclusivity to the Vanguard.
+<ul>
+<li>If unspecified, this defaults to <code>1152921504606846975</code> (a practically indefinite advantage of 36 Billion years).</li>
+</ul>
+</li>
+</ul>
 <h4 id="withdrawals"><a class="header" href="#withdrawals">Withdrawals</a></h4>
 <div id="admonition-bug" class="admonition admonish-bug" role="note" aria-labelledby="admonition-bug-title">
 <div class="admonition-title">
@@ -849,7 +934,7 @@ You can enable withdrawals manually later using the <code>OptimismPortal2</code>
 <a class="admonition-anchor-link" href="upgrade.html#admonition-bug"></a>
 </div>
 <div>
-<p>Changing the respected game type to Kailua may crash the <code>op-proposer</code> provided by optimism.
+<p>Changing the respected game type to Kailua may crash the <code>op-proposer</code> provided by optimism depending on its version.
 This should be inconsequential because you'll need to run the Kailua proposer for further sequencing to take place anyway.</p>
 </div>
 </div>
@@ -1472,6 +1557,25 @@ This can be done as follows using your <code>owner</code> wallet:</p>
 <p>You have now enabled Kailua sequencing proposals to be published!</p>
 </div>
 </div>
+<h2 id="designate-vanguard-optional"><a class="header" href="#designate-vanguard-optional">Designate Vanguard (Optional)</a></h2>
+<p>To assign a Vanguard, you'll need to call <code>assignVanguard</code> on the anchoring game instance you created.
+This can be done as follows using your <code>owner</code> wallet:</p>
+<pre><code class="language-shell">cast send [YOUR_GAME_INSTANCE_ADDRESS] \
+  "assignVanguard(address, uint64)" \
+  [YOUR_VANGUARD_ADDRESS] \
+  [YOUR_VANGUARD_ADVANTAGE]
+</code></pre>
+<div id="admonition-success-1" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-1-title">
+<div class="admonition-title">
+<div id="admonition-success-1-title">
+<p>Success</p>
+</div>
+<a class="admonition-anchor-link" href="game.html#admonition-success-1"></a>
+</div>
+<div>
+<p>You have now designated a Vanguard for Kailua sequencing proposals!</p>
+</div>
+</div>
 <h2 id="enable-withdrawals-optional"><a class="header" href="#enable-withdrawals-optional">Enable Withdrawals (Optional)</a></h2>
 <p>To enable your users to perform withdrawals using Kailua sequencing proposals, you will need to call
 <code>setRespectedGameType</code> on your <code>OptimismPortal2</code> contract using your <code>guardian</code> wallet.</p>
@@ -1491,12 +1595,12 @@ However, you will later run the Kailua proposer agent for sequencing anyway.</p>
   "setRespectedGameType(uint32)" \
   [YOUR_KAILUA_GAME_TYPE]
 </code></pre>
-<div id="admonition-success-1" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-1-title">
+<div id="admonition-success-2" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-2-title">
 <div class="admonition-title">
-<div id="admonition-success-1-title">
+<div id="admonition-success-2-title">
 <p>Success</p>
 </div>
-<a class="admonition-anchor-link" href="game.html#admonition-success-1"></a>
+<a class="admonition-anchor-link" href="game.html#admonition-success-2"></a>
 </div>
 <div>
 <p>You have now enabled withdrawals using resolved (finalized) Kailua sequencing proposals!</p>
@@ -1538,8 +1642,8 @@ guarantee the safety and liveness of your rollup.</p>
 <a class="admonition-anchor-link" href="operate.html#admonition-danger"></a>
 </div>
 <div>
-<p>Kailua currently only supports permissionless sequencing.
-This means that anyone can run these Kailua agents locally for your rollup.</p>
+<p>Without a Vanguard, sequencing in Kailua is fully permissionless at all time.
+Anyone can run these Kailua agents for your rollup and publish proposals when possible.</p>
 </div>
 </div>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="kailua-proposer"><a class="header" href="#kailua-proposer">Kailua Proposer</a></h1>
@@ -1590,6 +1694,17 @@ This allows it to restart quickly without requesting a lot of old on-chain data 
 <ul>
 <li><code>proposer-key</code>: The private key for the proposer wallet.</li>
 </ul>
+<div id="admonition-tip-1" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-1-title">
+<div class="admonition-title">
+<div id="admonition-tip-1-title">
+<p>Tip</p>
+</div>
+<a class="admonition-anchor-link" href="proposer.html#admonition-tip-1"></a>
+</div>
+<div>
+<p><code>proposer-key</code> can be replaced with the corresponding AWS/GCP parameters as described <a href="upgrade.html#kms-support">here</a>.</p>
+</div>
+</div>
 <div id="admonition-danger" class="admonition admonish-danger" role="note" aria-labelledby="admonition-danger-title">
 <div class="admonition-title">
 <div id="admonition-danger-title">
@@ -1649,7 +1764,8 @@ Node software other than <code>op-geth</code> is not as reliable for the necessa
   --op-geth-url [YOUR_OP_GETH_URL] \
   --op-node-url [YOUR_OP_NODE_URL] \
   --kailua-host [YOUR_KAILUA_HOST_BINARY_PATH] \
-  --validator-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY]
+  --validator-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY] \
+  --payout-recipient-address [YOUR_FAULT_PROOF_PAYOUT_RECIPIENT]
 </code></pre>
 <div id="admonition-tip" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-title">
 <div class="admonition-title">
@@ -1676,10 +1792,23 @@ Node software other than <code>op-geth</code> is not as reliable for the necessa
 <li><code>kailua-host</code>: The path to the <code>kailua-host</code> binary to call for proof generation.</li>
 </ul>
 <h3 id="wallet-1"><a class="header" href="#wallet-1">Wallet</a></h3>
-<p>The validator requires a funded wallet to be able to publish fault proofs on chain.</p>
+<p>The validator requires a funded wallet to be able to publish fault proofs on chain, and an (optional) alternative address
+to direct fault proof submission payouts towards</p>
 <ul>
 <li><code>validator-key</code>: The private key for the validator wallet.</li>
+<li><code>payout-recipient-address</code>: The ethereum address to use as the recipient of fault proof payouts.</li>
 </ul>
+<div id="admonition-tip-1" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-1-title">
+<div class="admonition-title">
+<div id="admonition-tip-1-title">
+<p>Tip</p>
+</div>
+<a class="admonition-anchor-link" href="validator.html#admonition-tip-1"></a>
+</div>
+<div>
+<p><code>validator-key</code> can be replaced with the corresponding AWS/GCP parameters as described <a href="upgrade.html#kms-support">here</a>.</p>
+</div>
+</div>
 <div id="admonition-warning" class="admonition admonish-warning" role="note" aria-labelledby="admonition-warning-title">
 <div class="admonition-title">
 <div id="admonition-warning-title">
@@ -1812,6 +1941,13 @@ These parameters can be passed in as CLI arguments or set as environment variabl
 <p>Running <code>kailua-cli validate</code> with the above extra arguments should now delegate all validator proving to the <a href="https://docs.beboundless.xyz/">Boundless proving network</a>!</p>
 </div>
 </div>
+<h2 id="advanced-settings"><a class="header" href="#advanced-settings">Advanced Settings</a></h2>
+<p>Fault/Validity proof generation can be fine-tuned via the two following environment variables:</p>
+<ul>
+<li><code>SEGMENT_LIMIT</code>: The <a href="https://docs.rs/risc0-zkvm/1.2.3/risc0_zkvm/struct.ExecutorEnvBuilder.html#method.segment_limit_po2">segment size limit</a> used for local proving (Default 21).</li>
+<li><code>MAX_WITNESS_SIZE</code>: The maximum input size per single proof (Default 100MB).</li>
+<li><code>SKIP_ZETH_PREFLIGHT</code>: If set, skips performing a preflight to fetch witness data using zeth.</li>
+</ul>
 
                     </main>
 

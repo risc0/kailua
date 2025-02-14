@@ -221,6 +221,25 @@ This can be done as follows using your <code>owner</code> wallet:</p>
 <p>You have now enabled Kailua sequencing proposals to be published!</p>
 </div>
 </div>
+<h2 id="designate-vanguard-optional"><a class="header" href="#designate-vanguard-optional">Designate Vanguard (Optional)</a></h2>
+<p>To assign a Vanguard, you'll need to call <code>assignVanguard</code> on the anchoring game instance you created.
+This can be done as follows using your <code>owner</code> wallet:</p>
+<pre><code class="language-shell">cast send [YOUR_GAME_INSTANCE_ADDRESS] \
+  "assignVanguard(address, uint64)" \
+  [YOUR_VANGUARD_ADDRESS] \
+  [YOUR_VANGUARD_ADVANTAGE]
+</code></pre>
+<div id="admonition-success-1" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-1-title">
+<div class="admonition-title">
+<div id="admonition-success-1-title">
+<p>Success</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-success-1"></a>
+</div>
+<div>
+<p>You have now designated a Vanguard for Kailua sequencing proposals!</p>
+</div>
+</div>
 <h2 id="enable-withdrawals-optional"><a class="header" href="#enable-withdrawals-optional">Enable Withdrawals (Optional)</a></h2>
 <p>To enable your users to perform withdrawals using Kailua sequencing proposals, you will need to call
 <code>setRespectedGameType</code> on your <code>OptimismPortal2</code> contract using your <code>guardian</code> wallet.</p>
@@ -240,12 +259,12 @@ However, you will later run the Kailua proposer agent for sequencing anyway.</p>
   "setRespectedGameType(uint32)" \
   [YOUR_KAILUA_GAME_TYPE]
 </code></pre>
-<div id="admonition-success-1" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-1-title">
+<div id="admonition-success-2" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-2-title">
 <div class="admonition-title">
-<div id="admonition-success-1-title">
+<div id="admonition-success-2-title">
 <p>Success</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-success-1"></a>
+<a class="admonition-anchor-link" href="#admonition-success-2"></a>
 </div>
 <div>
 <p>You have now enabled withdrawals using resolved (finalized) Kailua sequencing proposals!</p>

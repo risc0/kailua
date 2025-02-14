@@ -280,6 +280,36 @@ Once a new zkVM version is released, there can be a delay in adding it to the ro
 </div>
 <p>You have the choice of either using the already deployed verifier for your parent chain, or deploying and maintaining
 your own verifier contracts, as described in the later sections.</p>
+<h2 id="vanguard-advantage"><a class="header" href="#vanguard-advantage">Vanguard Advantage</a></h2>
+<p>Kailua supports the designation of one proposer as a <em>Vanguard</em>, along with an <em>advantage time</em> for said proposer.
+When set, this designation prevents any other proposer from publishing a proposal for a certain block height until
+either the Vanguard has made a proposal for that height, or the advantage time granted to the Vanguard has passed.
+The advantage time is counted down until after the Vanguard was allowed to publish a proposal.
+The Vanguard still needs to lock up the necessary bond to make proposals.</p>
+<div id="admonition-note-3" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-3-title">
+<div class="admonition-title">
+<div id="admonition-note-3-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-note-3"></a>
+</div>
+<div>
+<p>Having a Vanguard that makes honest proposals within the advantage time guarantees the safety of the rollup.</p>
+</div>
+</div>
+<div id="admonition-warning" class="admonition admonish-warning" role="note" aria-labelledby="admonition-warning-title">
+<div class="admonition-title">
+<div id="admonition-warning-title">
+<p>Warning</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-warning"></a>
+</div>
+<div>
+<p>If the advantage time is unreasonably long, Vanguard downtime delays the liveness of the rollup.</p>
+</div>
+</div>
+<p>This middleground enables rollups transitioning from a permissioned scheme to enjoy permissionless fault proofs in
+Kailua with an added safety net.</p>
 <div id="admonition-success" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-title">
 <div class="admonition-title">
 <div id="admonition-success-title">
@@ -291,6 +321,7 @@ your own verifier contracts, as described in the later sections.</p>
 <p>Once you've got your parameters all planned out, you're ready for the next step!</p>
 </div>
 </div>
+
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
