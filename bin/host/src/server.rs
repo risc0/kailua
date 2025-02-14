@@ -18,11 +18,7 @@ use anyhow::anyhow;
 use kailua_client::proving::ProvingError;
 use kailua_common::proof::Proof;
 use kailua_common::witness::StitchedBootInfo;
-use kona_host::cli::HostMode;
-use kona_host::single::{start_native_preimage_server, SingleChainFetcher};
 use kona_preimage::{BidirectionalChannel, HintWriter, OracleReader};
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::info;
 
 /// Starts the [PreimageServer] and the client program in separate threads. The client program is
@@ -44,40 +40,19 @@ pub async fn start_server_and_native_client(
     force_attempt: bool,
 ) -> Result<(), ProvingError> {
     // Instantiate data channels
-    let hint_chan =
-        BidirectionalChannel::new().map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-    let preimage_chan =
-        BidirectionalChannel::new().map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-    // Create chain client
-    let HostMode::Single(kona_cfg) = args.kona.mode;
-    let kv_store = kona_cfg.construct_kv_store();
-    let fetcher = if !kona_cfg.is_offline() {
-        let (l1_provider, blob_provider, l2_provider) = kona_cfg
-            .create_providers()
-            .await
-            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-        Some(Arc::new(RwLock::new(SingleChainFetcher::new(
-            kv_store.clone(),
-            l1_provider,
-            blob_provider,
-            l2_provider,
-            kona_cfg.agreed_l2_head_hash,
-        ))))
-    } else {
-        None
-    };
+    let hint = BidirectionalChannel::new().map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+    let preimage = BidirectionalChannel::new().map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     // Create the server and start it.
-    let server_task = tokio::spawn(start_native_preimage_server(
-        kv_store,
-        fetcher,
-        hint_chan.host,
-        preimage_chan.host,
-    ));
+    let server_task = args
+        .kona
+        .start_server(hint.host, preimage.host)
+        .await
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     // Start the client program in a separate child process.
     let program_task = tokio::spawn(kailua_client::proving::run_proving_client(
         args.boundless,
-        OracleReader::new(preimage_chan.client),
-        HintWriter::new(hint_chan.client),
+        OracleReader::new(preimage.client),
+        HintWriter::new(hint.client),
         args.payout_recipient_address.unwrap_or_default(),
         precondition_validation_data_hash,
         stitched_boot_info,

@@ -28,7 +28,7 @@ Kailua enables rollup operators to add a new fault proof contract, compatible wi
 
 ## Devnet Usage
 
-1. `just devnet-install`
+1. `just devnet-fetch`
     * Fetches `v1.9.1` of the `optimism` monorepo.
 2. `just devnet-build`
     * Builds the local cargo and foundry projects.

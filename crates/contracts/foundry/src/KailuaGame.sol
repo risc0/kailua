@@ -172,8 +172,8 @@ contract KailuaGame is KailuaTournament {
         // Register this new game in the parent game's contract
         parentGame_.appendChild();
 
-        // Do not permit proposals if l2 block is still inside the gap
-        if (block.timestamp <= GENESIS_TIME_STAMP + thisL2BlockNumber * L2_BLOCK_TIME + PROPOSAL_TIME_GAP) {
+        // Do not permit proposals if l2 block is still inside the proposal gap
+        if (block.timestamp <= minCreationTime().raw()) {
             revert ClockTimeExceeded();
         }
     }
@@ -281,5 +281,10 @@ contract KailuaGame is KailuaTournament {
         uint64 elapsed = uint64(asOfTimestamp - createdAt.raw());
         uint64 maximum = MAX_CLOCK_DURATION.raw();
         duration_ = elapsed >= maximum ? Duration.wrap(0) : Duration.wrap(maximum - elapsed);
+    }
+
+    /// @inheritdoc KailuaTournament
+    function minCreationTime() public view override returns (Timestamp minCreationTime_) {
+        minCreationTime_ = Timestamp.wrap(uint64(GENESIS_TIME_STAMP + l2BlockNumber() * L2_BLOCK_TIME + PROPOSAL_TIME_GAP));
     }
 }

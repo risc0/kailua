@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::client::log;
 use alloy_eips::eip4844::{
     kzg_to_versioned_hash, Blob, IndexedBlobHash, BLS_MODULUS, BYTES_PER_BLOB,
     FIELD_ELEMENTS_PER_BLOB,
@@ -114,7 +115,9 @@ impl BlobProvider for PreloadedBlobProvider {
         _block_ref: &BlockInfo,
         blob_hashes: &[IndexedBlobHash],
     ) -> Result<Vec<Box<Blob>>, Self::Error> {
-        let mut blobs = Vec::with_capacity(blob_hashes.len());
+        let blob_count = blob_hashes.len();
+        log(&format!("FETCH {blob_count} BLOB(S)"));
+        let mut blobs = Vec::with_capacity(blob_count);
         for hash in blob_hashes {
             let (blob_hash, blob) = self.entries.pop().unwrap();
             if hash.hash == blob_hash {

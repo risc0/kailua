@@ -12,12 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy::consensus::{Blob, BlobTransactionSidecar};
+use crate::{retry, retry_with_context};
+use alloy::consensus::{Blob, BlobTransactionSidecar, BlockHeader};
 use alloy::eips::eip4844::{kzg_to_versioned_hash, BLS_MODULUS, FIELD_ELEMENTS_PER_BLOB};
-use alloy::primitives::{B256, U256};
-use alloy::providers::{Provider, ProviderBuilder, ReqwestProvider};
+use alloy::eips::{BlockId, BlockNumberOrTag};
+use alloy::network::primitives::BlockTransactionsKind;
+use alloy::network::{BlockResponse, Network};
+use alloy::primitives::{BlockNumber, B256, U256};
+use alloy::providers::Provider;
 use alloy_rpc_types_beacon::sidecar::{BeaconBlobBundle, BlobData};
-use anyhow::{bail, Context};
+use anyhow::{anyhow, bail, Context};
+use kailua_client::{await_tel, await_tel_res};
+use opentelemetry::global::tracer;
+use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::ops::{Div, Sub};
@@ -25,77 +32,90 @@ use tracing::debug;
 
 #[derive(Clone, Debug)]
 pub struct BlobProvider {
-    pub cl_node_provider: ReqwestProvider,
+    pub cl_node_endpoint: String,
+    pub client: reqwest::Client,
     pub genesis_time: u64,
     pub seconds_per_slot: u64,
 }
 
 impl BlobProvider {
-    pub async fn new(url: &str) -> anyhow::Result<Self> {
-        let cl_node_provider = ProviderBuilder::new().on_http(url.try_into()?);
+    pub async fn new(cl_node_endpoint: String) -> anyhow::Result<Self> {
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(tracer.start("BlobProvider::new"));
+
+        let cl_node_endpoint = cl_node_endpoint.trim_end_matches('/').to_owned();
+        let client = reqwest::Client::new();
+
         let genesis =
-            Self::provider_get::<Value>(&cl_node_provider, "eth/v1/beacon/genesis").await?;
+            Self::client_get::<Value>(&client, &cl_node_endpoint, "eth/v1/beacon/genesis")
+                .with_context(context.clone())
+                .await
+                .context("BlobProvider::provider_get")?;
         debug!("genesis {:?}", &genesis);
         let genesis_time = genesis["data"]["genesis_time"]
             .as_str()
             .unwrap()
             .parse::<u64>()?;
-        let spec = Self::provider_get::<Value>(&cl_node_provider, "eth/v1/config/spec").await?;
+        let spec = Self::client_get::<Value>(&client, &cl_node_endpoint, "eth/v1/config/spec")
+            .with_context(context.clone())
+            .await
+            .context("BlobProvider::provider_get")?;
         debug!("spec {:?}", &spec);
         let seconds_per_slot = spec["data"]["SECONDS_PER_SLOT"]
             .as_str()
             .unwrap()
             .parse::<u64>()?;
         Ok(Self {
-            cl_node_provider,
+            cl_node_endpoint,
+            client,
             genesis_time,
             seconds_per_slot,
         })
-    }
-
-    pub fn provider_url(provider: &ReqwestProvider) -> &str {
-        provider.client().transport().url().trim_end_matches('/')
-    }
-
-    pub fn url(&self) -> &str {
-        self.cl_node_provider
-            .client()
-            .transport()
-            .url()
-            .trim_end_matches('/')
     }
 
     pub fn slot(&self, timestamp: u64) -> u64 {
         (timestamp - self.genesis_time) / self.seconds_per_slot
     }
 
-    pub async fn provider_get<T: DeserializeOwned>(
-        provider: &ReqwestProvider,
+    pub async fn client_get<T: DeserializeOwned>(
+        client: &reqwest::Client,
+        endpoint: &str,
         path: &str,
     ) -> anyhow::Result<T> {
-        provider
-            .client()
-            .transport()
-            .client()
-            .get(format!("{}/{}", Self::provider_url(provider), path))
+        let tracer = tracer("kailua");
+        let context =
+            opentelemetry::Context::current_with_span(tracer.start("BlobProvider::client_get"));
+
+        client
+            .get(format!("{}/{}", endpoint, path))
             .send()
+            .with_context(context.with_span(tracer.start_with_context("Client::send", &context)))
             .await
-            .context("get")?
+            .context("send")?
             .json::<T>()
+            .with_context(context.with_span(tracer.start_with_context("Response::json", &context)))
             .await
             .context("json")
     }
 
     pub async fn get<T: DeserializeOwned>(&self, path: &str) -> anyhow::Result<T> {
-        Self::provider_get(&self.cl_node_provider, path).await
+        Self::client_get(&self.client, &self.cl_node_endpoint, path).await
     }
 
     pub async fn get_blob(&self, timestamp: u64, blob_hash: B256) -> anyhow::Result<BlobData> {
+        let tracer = tracer("kailua");
+        let context =
+            opentelemetry::Context::current_with_span(tracer.start("BlobProvider::get_blob"));
+
         let slot = self.slot(timestamp);
-        let blobs = self
-            .get::<BeaconBlobBundle>(&format!("eth/v1/beacon/blob_sidecars/{slot}"))
-            .await
-            .context(format!("blob_sidecars {slot}"))?;
+        let blobs = retry!(
+            self.get::<BeaconBlobBundle>(&format!("eth/v1/beacon/blob_sidecars/{slot}"))
+                .with_context(context.clone())
+                .await
+        )
+        .with_context(context.with_span(tracer.start_with_context("BlobProvider::get", &context)))
+        .await
+        .context(format!("blob_sidecars {slot}"))?;
 
         let blob_count = blobs.len();
         for blob in blobs {
@@ -174,4 +194,78 @@ pub fn blob_fe_proof(
     } else {
         bail!("Generated invalid kzg proof.")
     }
+}
+
+pub async fn get_next_block<P: Provider<N>, N: Network>(
+    provider: P,
+    parent_hash: B256,
+) -> anyhow::Result<N::BlockResponse> {
+    let tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(tracer.start("get_next_block"));
+
+    let block_parent = await_tel_res!(
+        context,
+        tracer,
+        "Provider::get_block_by_hash",
+        retry_with_context!(async {
+            provider
+                .get_block_by_hash(parent_hash, BlockTransactionsKind::Hashes)
+                .await
+                .context("get_block_by_hash")?
+                .ok_or_else(|| anyhow!("Failed to fetch parent block"))
+        })
+    )?;
+    let parent_number = block_parent.header().number();
+    let block = await_tel!(context, get_block_by_number(&provider, parent_number + 1))?;
+
+    Ok(block)
+}
+
+pub async fn get_block_by_number<P: Provider<N>, N: Network>(
+    provider: P,
+    block_number: BlockNumber,
+) -> anyhow::Result<N::BlockResponse> {
+    let tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(tracer.start("get_block_by_number"));
+
+    let block = await_tel_res!(
+        context,
+        tracer,
+        "Provider::get_block_by_number",
+        retry_with_context!(async {
+            provider
+                .get_block_by_number(
+                    BlockNumberOrTag::Number(block_number),
+                    BlockTransactionsKind::Hashes,
+                )
+                .await
+                .context("get_block_by_number")?
+                .ok_or_else(|| anyhow!("Failed to fetch block"))
+        })
+    )?;
+
+    Ok(block)
+}
+
+pub async fn get_block<P: Provider<N>, N: Network>(
+    provider: P,
+    block_id: BlockNumberOrTag,
+) -> anyhow::Result<N::BlockResponse> {
+    let tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(tracer.start("get_block"));
+
+    let block = await_tel_res!(
+        context,
+        tracer,
+        "Provider::get_block",
+        retry_with_context!(async {
+            provider
+                .get_block(BlockId::Number(block_id), BlockTransactionsKind::Hashes)
+                .await
+                .context("get_block")?
+                .ok_or_else(|| anyhow!("Failed to fetch block"))
+        })
+    )?;
+
+    Ok(block)
 }

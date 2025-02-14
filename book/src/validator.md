@@ -18,7 +18,8 @@ kailua-cli validate \
   --op-geth-url [YOUR_OP_GETH_URL] \
   --op-node-url [YOUR_OP_NODE_URL] \
   --kailua-host [YOUR_KAILUA_HOST_BINARY_PATH] \
-  --validator-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY]
+  --validator-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY] \
+  --payout-recipient-address [YOUR_FAULT_PROOF_PAYOUT_RECIPIENT]
 ```
 
 ```admonish tip
@@ -37,8 +38,14 @@ To create a fault proof, the validator invokes the `kailua-host` binary.
 * `kailua-host`: The path to the `kailua-host` binary to call for proof generation.
 
 ### Wallet
-The validator requires a funded wallet to be able to publish fault proofs on chain.
+The validator requires a funded wallet to be able to publish fault proofs on chain, and an (optional) alternative address
+to direct fault proof submission payouts towards
 * `validator-key`: The private key for the validator wallet.
+* `payout-recipient-address`: The ethereum address to use as the recipient of fault proof payouts.
+
+```admonish tip
+`validator-key` can be replaced with the corresponding AWS/GCP parameters as described [here](upgrade.md#kms-support).
+```
 
 ```admonish warning
 You must keep your validator's wallet well funded to guarantee the liveness of your rollup and prevent faulty proposals
@@ -121,3 +128,10 @@ The below second set of parameters determine where the proven executable and its
 ```admonish success
 Running `kailua-cli validate` with the above extra arguments should now delegate all validator proving to the [Boundless proving network](https://docs.beboundless.xyz/)!
 ```
+
+## Advanced Settings
+
+Fault/Validity proof generation can be fine-tuned via the two following environment variables:
+* `SEGMENT_LIMIT`: The [segment size limit](https://docs.rs/risc0-zkvm/1.2.3/risc0_zkvm/struct.ExecutorEnvBuilder.html#method.segment_limit_po2) used for local proving (Default 21).
+* `MAX_WITNESS_SIZE`: The maximum input size per single proof (Default 100MB).
+* `SKIP_ZETH_PREFLIGHT`: If set, skips performing a preflight to fetch witness data using zeth.

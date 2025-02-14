@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use kailua_common::oracle::vec::VecOracle;
+use kailua_common::oracle::vec::{PreimageVecEntry, VecOracle};
 use kailua_common::{
     client::{log, run_witness_client},
     witness::Witness,
@@ -21,11 +21,34 @@ use risc0_zkvm::guest::env;
 use rkyv::rancor::Error;
 
 fn main() {
-    // Read witness data (todo: rkyv access)
-    let witness_data = env::read_frame();
-    log("DESERIALIZE");
-    let witness = rkyv::from_bytes::<Witness<VecOracle>, Error>(&witness_data)
-        .expect("Failed to deserialize witness");
+    // Load main witness
+    let witness = {
+        // Read serialized witness data
+        let witness_data = env::read_frame();
+        log("DESERIALIZE");
+        rkyv::from_bytes::<Witness<VecOracle>, Error>(&witness_data)
+            .expect("Failed to deserialize witness")
+    };
+    // Load extension shards
+    for (i, entry) in witness
+        .oracle_witness
+        .preimages
+        .lock()
+        .unwrap()
+        .iter_mut()
+        .enumerate()
+    {
+        if !entry.is_empty() {
+            continue;
+        }
+        let shard_data = env::read_frame();
+        log(&format!("DESERIALIZE SHARD {i}"));
+        let shard = rkyv::from_bytes::<PreimageVecEntry, Error>(&shard_data)
+            .expect("Failed to deserialize shard");
+
+        let _ = core::mem::replace(entry, shard);
+    }
+
     // Run client using witness
     let proof_journal = run_witness_client(witness);
     // Write the final stitched journal

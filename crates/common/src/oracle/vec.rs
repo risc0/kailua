@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::oracle::validate_preimage;
+use crate::oracle::{needs_validation, validate_preimage};
 use crate::witness::WitnessOracle;
+use alloy_primitives::map::HashMap;
+use anyhow::bail;
 use async_trait::async_trait;
 use kona_preimage::errors::PreimageOracleResult;
 use kona_preimage::{HintWriterClient, PreimageKey, PreimageOracleClient};
@@ -27,48 +29,50 @@ use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use tracing::warn;
 
-pub type VecPreimageStore = Arc<Mutex<Vec<(PreimageKey, Vec<u8>)>>>;
+pub type IndexedPreimage = (PreimageKey, Vec<u8>, Option<(usize, usize)>);
+pub type PreimageVecEntry = Vec<IndexedPreimage>;
+pub type PreimageVecStore = Arc<Mutex<Vec<PreimageVecEntry>>>;
 
-pub struct VecPreimageStoreRkyv;
+pub struct PreimageVecStoreRkyv;
 
-impl ArchiveWith<VecPreimageStore> for VecPreimageStoreRkyv {
-    type Archived = Archived<Vec<(PreimageKey, Vec<u8>)>>;
-    type Resolver = Resolver<Vec<(PreimageKey, Vec<u8>)>>;
+impl ArchiveWith<PreimageVecStore> for PreimageVecStoreRkyv {
+    type Archived = Archived<Vec<PreimageVecEntry>>;
+    type Resolver = Resolver<Vec<PreimageVecEntry>>;
 
     fn resolve_with(
-        field: &VecPreimageStore,
+        field: &PreimageVecStore,
         resolver: Self::Resolver,
         out: Place<Self::Archived>,
     ) {
         let locked_vec = field.lock().unwrap();
-        <Vec<(PreimageKey, Vec<u8>)> as Archive>::resolve(&locked_vec, resolver, out);
+        <Vec<PreimageVecEntry> as Archive>::resolve(&locked_vec, resolver, out);
     }
 }
 
-impl<S> SerializeWith<VecPreimageStore, S> for VecPreimageStoreRkyv
+impl<S> SerializeWith<PreimageVecStore, S> for PreimageVecStoreRkyv
 where
     S: Fallible + rkyv::ser::Allocator + rkyv::ser::Writer + ?Sized,
     <S as Fallible>::Error: rkyv::rancor::Source,
 {
     fn serialize_with(
-        field: &VecPreimageStore,
+        field: &PreimageVecStore,
         serializer: &mut S,
     ) -> Result<Self::Resolver, S::Error> {
         let locked_vec = field.lock().unwrap();
-        <Vec<(PreimageKey, Vec<u8>)> as Serialize<S>>::serialize(&locked_vec, serializer)
+        <Vec<PreimageVecEntry> as Serialize<S>>::serialize(&locked_vec, serializer)
     }
 }
 
-impl<D: Fallible> DeserializeWith<Archived<Vec<(PreimageKey, Vec<u8>)>>, VecPreimageStore, D>
-    for VecPreimageStoreRkyv
+impl<D: Fallible> DeserializeWith<Archived<Vec<PreimageVecEntry>>, PreimageVecStore, D>
+    for PreimageVecStoreRkyv
 where
     D: Fallible + ?Sized,
     <D as Fallible>::Error: rkyv::rancor::Source,
 {
     fn deserialize_with(
-        field: &Archived<Vec<(PreimageKey, Vec<u8>)>>,
+        field: &Archived<Vec<PreimageVecEntry>>,
         deserializer: &mut D,
-    ) -> Result<VecPreimageStore, D::Error> {
+    ) -> Result<PreimageVecStore, D::Error> {
         let raw_vec = rkyv::Deserialize::deserialize(field, deserializer)?;
         Ok(Arc::new(Mutex::new(raw_vec)))
     }
@@ -76,31 +80,78 @@ where
 
 #[derive(Clone, Debug, Default, rkyv::Serialize, rkyv::Archive, rkyv::Deserialize)]
 pub struct VecOracle {
-    #[rkyv(with = VecPreimageStoreRkyv)]
-    pub preimages: VecPreimageStore,
+    #[rkyv(with = PreimageVecStoreRkyv)]
+    pub preimages: PreimageVecStore,
 }
 
 impl WitnessOracle for VecOracle {
     fn preimage_count(&self) -> usize {
-        self.preimages.lock().unwrap().len()
+        self.preimages.lock().unwrap().iter().map(Vec::len).sum()
     }
 
     fn validate_preimages(&self) -> anyhow::Result<()> {
-        for (key, value) in self.preimages.lock().unwrap().iter() {
-            validate_preimage(key, value)?;
+        let preimages = self.preimages.lock().unwrap();
+        for entry in preimages.iter() {
+            for (key, value, prev) in entry {
+                if !needs_validation(&key.key_type()) {
+                    continue;
+                } else if let Some((i, j)) = prev {
+                    let expected = &preimages[*i][*j].1;
+                    if expected != value {
+                        bail!("Cached preimage validation failed");
+                    }
+                } else {
+                    validate_preimage(key, value)?;
+                }
+            }
         }
         Ok(())
     }
 
     fn insert_preimage(&mut self, key: PreimageKey, value: Vec<u8>) {
         validate_preimage(&key, &value).expect("Attempted to save invalid preimage");
-        self.preimages.lock().unwrap().push((key, value));
+        let mut preimages = self.preimages.lock().unwrap();
+        if preimages.is_empty() {
+            preimages.push(Vec::new());
+        }
+        preimages.last_mut().unwrap().push((key, value, None));
     }
 
-    fn finalize_preimages(&mut self) {
+    fn finalize_preimages(&mut self, shard_size: usize) {
         self.validate_preimages()
             .expect("Failed to validate preimages during finalization");
-        self.preimages.lock().unwrap().reverse();
+        let mut preimages = self.preimages.lock().unwrap();
+        // flatten and sort
+        let mut flat_vec = core::mem::take(preimages.deref_mut())
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        // sort by expected access
+        flat_vec.reverse();
+        // shard vectors by size limit
+        let mut sharded_vec = vec![vec![]];
+        let mut last_shard_size = 0;
+        for value in flat_vec {
+            if value.1.len() + last_shard_size > shard_size {
+                sharded_vec.push(vec![]);
+                last_shard_size = 0;
+            }
+            last_shard_size += value.1.len();
+            sharded_vec.last_mut().unwrap().push(value);
+        }
+        let _ = core::mem::replace(preimages.deref_mut(), sharded_vec);
+        // add validation pointers
+        let mut cache: HashMap<PreimageKey, (usize, usize)> =
+            HashMap::with_capacity(preimages.len());
+        for (i, entry) in preimages.iter_mut().enumerate() {
+            for (j, (key, _, pointer)) in entry.iter_mut().enumerate() {
+                if !needs_validation(&key.key_type()) {
+                    continue;
+                } else if let Some(prev) = cache.insert(*key, (i, j)) {
+                    pointer.replace(prev);
+                }
+            }
+        }
     }
 }
 
@@ -108,7 +159,7 @@ impl FlushableCache for VecOracle {
     fn flush(&self) {}
 }
 
-pub type PreimageQueue = VecDeque<(PreimageKey, Vec<u8>)>;
+pub type PreimageQueue = VecDeque<IndexedPreimage>;
 
 lazy_static! {
     static ref QUEUE: Arc<Mutex<PreimageQueue>> = Default::default();
@@ -119,18 +170,25 @@ impl PreimageOracleClient for VecOracle {
     async fn get(&self, key: PreimageKey) -> PreimageOracleResult<Vec<u8>> {
         let mut preimages = self.preimages.lock().unwrap();
         let mut queue = QUEUE.lock().unwrap();
-        // address variations in memory access operations due to hashmap usages
+        // handle variations in memory access operations due to hashmap usages
         loop {
-            let (last_key, value) = preimages.pop().expect("VecOracle Exhausted");
+            let entry = preimages.last_mut().expect("VecOracle Exhausted");
+            loop {
+                let Some((last_key, value, _)) = entry.pop() else {
+                    break;
+                };
 
-            if key == last_key {
-                if !queue.is_empty() {
-                    warn!("VecOracle temp queue has {} elements", queue.len());
-                    preimages.extend(core::mem::take(queue.deref_mut()));
+                if key == last_key {
+                    if !queue.is_empty() {
+                        warn!("VecOracle temp queue has {} elements", queue.len());
+                        entry.extend(core::mem::take(queue.deref_mut()));
+                    }
+                    return Ok(value);
                 }
-                return Ok(value);
+                // keep entry in queue for later use, pointer is no longer necessary
+                queue.push_front((last_key, value, None));
             }
-            queue.push_front((last_key, value));
+            preimages.pop();
         }
     }
 

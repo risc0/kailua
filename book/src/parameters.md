@@ -95,6 +95,24 @@ Once a new zkVM version is released, there can be a delay in adding it to the ro
 You have the choice of either using the already deployed verifier for your parent chain, or deploying and maintaining
 your own verifier contracts, as described in the later sections.
 
+## Vanguard Advantage
+Kailua supports the designation of one proposer as a *Vanguard*, along with an *advantage time* for said proposer.
+When set, this designation prevents any other proposer from publishing a proposal for a certain block height until
+either the Vanguard has made a proposal for that height, or the advantage time granted to the Vanguard has passed.
+The advantage time is counted down until after the Vanguard was allowed to publish a proposal.
+The Vanguard still needs to lock up the necessary bond to make proposals.
+
+```admonish note
+Having a Vanguard that makes honest proposals within the advantage time guarantees the safety of the rollup.
+```
+
+```admonish warning
+If the advantage time is unreasonably long, Vanguard downtime delays the liveness of the rollup.
+```
+
+This middleground enables rollups transitioning from a permissioned scheme to enjoy permissionless fault proofs in
+Kailua with an added safety net.
+
 ```admonish success
 Once you've got your parameters all planned out, you're ready for the next step!
 ```

@@ -118,7 +118,7 @@ where
     };
 
     stitch_boot_info(
-        boot.as_ref(),
+        &boot,
         fpvm_image_id,
         payout_recipient_address,
         precondition_hash,

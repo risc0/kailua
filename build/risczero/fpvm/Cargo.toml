@@ -41,11 +41,3 @@ crypto-bigint = { git = "https://github.com/risc0/RustCrypto-crypto-bigint", tag
 k256 = { git = "https://github.com/risc0/RustCrypto-elliptic-curves", tag = "k256/v0.13.3-risczero.1" }
 sha2 = { git = "https://github.com/risc0/RustCrypto-hashes", tag = "sha2-v0.10.8-risczero.0" }
 tiny-keccak = { git = "https://github.com/risc0/tiny-keccak", tag = "tiny-keccak/v2.0.2-risczero.0" }
-
-[patch.'https://github.com/op-rs/kona']
-kona-derive = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }
-kona-driver = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }
-kona-executor = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }
-kona-mpt = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }
-kona-preimage = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }
-kona-proof = { git = "https://github.com/hashcashier/kona", branch = "rkhalil/rkyv-derive" }

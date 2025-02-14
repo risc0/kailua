@@ -21,7 +21,7 @@ use anyhow::{bail, Context};
 use kona_derive::traits::BlobProvider;
 use kona_driver::Driver;
 use kona_executor::TrieDBProvider;
-use kona_preimage::{CommsClient, PreimageKeyType};
+use kona_preimage::{CommsClient, PreimageKey};
 use kona_proof::errors::OracleProviderError;
 use kona_proof::executor::KonaExecutor;
 use kona_proof::l1::{OracleL1ChainProvider, OraclePipeline};
@@ -41,7 +41,7 @@ pub fn run_kailua_client<
     precondition_validation_data_hash: B256,
     oracle: Arc<O>,
     mut beacon: B,
-) -> anyhow::Result<(Arc<BootInfo>, B256, Option<B256>)>
+) -> anyhow::Result<(BootInfo, B256, Option<B256>)>
 where
     <B as BlobProvider>::Error: Debug,
 {
@@ -50,11 +50,10 @@ where
         //                          PROLOGUE                          //
         ////////////////////////////////////////////////////////////////
         log("BOOT");
-        let boot = Arc::new(
-            BootInfo::load(oracle.as_ref())
-                .await
-                .context("BootInfo::load")?,
-        );
+        let boot = BootInfo::load(oracle.as_ref())
+            .await
+            .context("BootInfo::load")?;
+        let rollup_config = Arc::new(boot.rollup_config.clone());
 
         log("PRECONDITION");
         let precondition_data = precondition::load_precondition_data(
@@ -64,11 +63,12 @@ where
         )
         .await?;
 
-        let safe_head_hash = fetch_safe_head_hash(oracle.as_ref(), boot.as_ref()).await?;
+        let safe_head_hash =
+            fetch_safe_head_hash(oracle.as_ref(), boot.agreed_l2_output_root).await?;
 
         let mut l1_provider = OracleL1ChainProvider::new(boot.l1_head, oracle.clone());
         let mut l2_provider =
-            OracleL2ChainProvider::new(safe_head_hash, boot.rollup_config.clone(), oracle.clone());
+            OracleL2ChainProvider::new(safe_head_hash, rollup_config.clone(), oracle.clone());
 
         // The claimed L2 block number must be greater than or equal to the L2 safe head.
         // Fetch the safe head's block header.
@@ -87,7 +87,7 @@ where
         log("DERIVATION & EXECUTION");
         // Create a new derivation driver with the given boot information and oracle.
         let cursor = new_pipeline_cursor(
-            &boot.rollup_config,
+            rollup_config.as_ref(),
             safe_head,
             &mut l1_provider,
             &mut l2_provider,
@@ -95,17 +95,21 @@ where
         .await?;
         l2_provider.set_cursor(cursor.clone());
 
-        let cfg = Arc::new(boot.rollup_config.clone());
         let pipeline = OraclePipeline::new(
-            cfg.clone(),
+            rollup_config.clone(),
             cursor.clone(),
             oracle.clone(),
             beacon,
             l1_provider.clone(),
             l2_provider.clone(),
         );
-        let executor =
-            KonaExecutor::new(&cfg, l2_provider.clone(), l2_provider.clone(), None, None);
+        let executor = KonaExecutor::new(
+            rollup_config.as_ref(),
+            l2_provider.clone(),
+            l2_provider.clone(),
+            None,
+            None,
+        );
         let mut driver = Driver::new(cursor, executor, pipeline);
 
         // Run the derivation pipeline until we are able to produce the output root of the claimed
@@ -114,19 +118,19 @@ where
         let mut output_roots = Vec::with_capacity(expected_output_count);
         for starting_block in safe_head_number..boot.claimed_l2_block_number {
             // Advance to the next target
-            let (output_number, _, output_root) = driver
+            let (output_block, output_root) = driver
                 .advance_to_target(&boot.rollup_config, Some(starting_block + 1))
                 .await?;
             // Stop if nothing new was derived
-            if output_number == starting_block {
+            if output_block.block_info.number == starting_block {
                 // A mismatch indicates that there is insufficient L1 data available to produce
                 // an L2 output root at the claimed block number
                 log("HALT");
                 break;
             } else {
                 log(&format!(
-                    "OUTPUT: {output_number}/{}",
-                    boot.claimed_l2_block_number
+                    "OUTPUT: {}/{}",
+                    output_block.block_info.number, boot.claimed_l2_block_number
                 ));
             }
             // Append newly computed output root
@@ -178,18 +182,20 @@ where
 /// [BootInfo].
 pub async fn fetch_safe_head_hash<O>(
     caching_oracle: &O,
-    boot_info: &BootInfo,
+    agreed_l2_output_root: B256,
 ) -> Result<B256, OracleProviderError>
 where
     O: CommsClient,
 {
     let mut output_preimage = [0u8; 128];
     HintType::StartingL2Output
-        .get_exact_preimage(
-            caching_oracle,
-            boot_info.agreed_l2_output_root,
-            PreimageKeyType::Keccak256,
-            &mut output_preimage,
+        .with_data(&[agreed_l2_output_root.as_ref()])
+        .send(caching_oracle)
+        .await?;
+    caching_oracle
+        .get_exact(
+            PreimageKey::new_keccak256(*agreed_l2_output_root),
+            output_preimage.as_mut(),
         )
         .await?;
 

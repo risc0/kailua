@@ -20,6 +20,13 @@ use kona_preimage::errors::{PreimageOracleError, PreimageOracleResult};
 use kona_preimage::{PreimageKey, PreimageKeyType};
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 
+pub fn needs_validation(key_type: &PreimageKeyType) -> bool {
+    !matches!(
+        key_type,
+        PreimageKeyType::Local | PreimageKeyType::GlobalGeneric
+    )
+}
+
 /// Recomputes the [PreimageKey] for a piece of data to validate its authenticity
 pub fn validate_preimage(key: &PreimageKey, value: &[u8]) -> PreimageOracleResult<()> {
     let key_type = key.key_type();
@@ -33,7 +40,7 @@ pub fn validate_preimage(key: &PreimageKey, value: &[u8]) -> PreimageOracleResul
             unimplemented!("Precompile acceleration is not yet supported.");
         }
         PreimageKeyType::Blob => {
-            unreachable!("Blob key types should not be validated.");
+            unreachable!("Blob key types should not be loaded.");
         }
         PreimageKeyType::Local | PreimageKeyType::GlobalGeneric => None,
     };
