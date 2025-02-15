@@ -11,4 +11,15 @@ forge script script/TestToken.s.sol:TransferTokens --rpc-url http://127.0.0.1:95
 
 ```
 
+# Benchmarking
+
+There a three shell scripts to assist with benchmarking ERC20 txs. 
+
+`block_monitor.sh` is for logging. 
+
+`publisher.sh` is for creating and publishing transactions on the chain. 
+
+`runner.sh` is for running the prover with different iterations. Will output a csv parsed from the log. 
+
+
 Note: private key is just a test key
