@@ -17,7 +17,7 @@ use crate::{bonsai, boundless, proof, witgen, zkvm};
 use alloy_primitives::{Address, B256};
 use anyhow::anyhow;
 use kailua_common::blobs::PreloadedBlobProvider;
-use kailua_common::client::run_witness_client;
+use kailua_common::client::stateless::run_stateless_client;
 use kailua_common::journal::ProofJournal;
 use kailua_common::oracle::map::MapOracle;
 use kailua_common::oracle::vec::VecOracle;
@@ -111,7 +111,7 @@ where
         ));
         cloned_with_arc
     };
-    let journal_vec = run_witness_client(cloned_witness_vec);
+    let journal_vec = run_stateless_client(cloned_witness_vec);
     if journal != journal_vec {
         error!("Native journal does not match journal backed by vec witness");
     }

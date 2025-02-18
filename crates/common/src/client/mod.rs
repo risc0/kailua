@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::blobs::PreloadedBlobProvider;
-use crate::journal::ProofJournal;
-use crate::witness::{Witness, WitnessOracle};
-use crate::{precondition, stitching};
+use crate::precondition;
 use alloy_primitives::{Sealed, B256};
 use anyhow::{bail, Context};
 use kona_derive::traits::BlobProvider;
@@ -30,7 +27,9 @@ use kona_proof::sync::new_pipeline_cursor;
 use kona_proof::{BootInfo, FlushableCache, HintType};
 use std::fmt::Debug;
 use std::sync::Arc;
-use tracing::log::warn;
+
+pub mod stateless;
+pub mod stitching;
 
 /// Executes the Kona client to compute a list of subsequent outputs. Additionally validates
 /// the Kailua Fault/Validity preconditions on proposals for proof generation.
@@ -209,39 +208,4 @@ pub fn log(msg: &str) {
     risc0_zkvm::guest::env::log(msg);
     #[cfg(not(target_os = "zkvm"))]
     tracing::info!("{msg}");
-}
-
-pub fn run_witness_client<O: WitnessOracle>(witness: Witness<O>) -> ProofJournal {
-    log(&format!(
-        "ORACLE: {} PREIMAGES",
-        witness.oracle_witness.preimage_count()
-    ));
-    witness
-        .oracle_witness
-        .validate_preimages()
-        .expect("Failed to validate preimages");
-    let oracle = Arc::new(witness.oracle_witness);
-    log(&format!(
-        "BEACON: {} BLOBS",
-        witness.blobs_witness.blobs.len()
-    ));
-    let beacon = PreloadedBlobProvider::from(witness.blobs_witness);
-
-    let proof_journal = stitching::run_stitching_client(
-        witness.precondition_validation_data_hash,
-        oracle.clone(),
-        beacon,
-        witness.fpvm_image_id,
-        witness.payout_recipient_address,
-        witness.stitched_boot_info,
-    );
-
-    if oracle.preimage_count() > 0 {
-        warn!(
-            "Found {} extra preimages in witness",
-            oracle.preimage_count()
-        );
-    }
-
-    proof_journal
 }

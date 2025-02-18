@@ -20,7 +20,6 @@ hashbrown.workspace = true
 lazy_static.workspace = true
 lru.workspace = true
 pot.workspace = true
-revm.workspace = true
 rkyv.workspace = true
 spin.workspace = true
 

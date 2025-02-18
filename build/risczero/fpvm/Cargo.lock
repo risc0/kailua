@@ -2036,7 +2036,6 @@ dependencies = [
  "op-alloy-consensus",
  "op-alloy-rpc-types-engine",
  "pot",
- "revm",
  "risc0-aggregation",
  "risc0-groth16",
  "risc0-zkvm",
@@ -2056,6 +2055,7 @@ dependencies = [
  "risc0-zkvm",
  "risc0-zkvm-platform",
  "rkyv",
+ "substrate-bn",
 ]
 
 [[package]]
@@ -3995,7 +3995,7 @@ dependencies = [
 [[package]]
 name = "substrate-bn"
 version = "0.6.0"
-source = "git+https://github.com/risc0/paritytech-bn?rev=77f8a3f5d8576137a8c316d5781cdb724441b8fa#77f8a3f5d8576137a8c316d5781cdb724441b8fa"
+source = "git+https://github.com/risc0/paritytech-bn?branch=release%2Fv0.6.0#77f8a3f5d8576137a8c316d5781cdb724441b8fa"
 dependencies = [
  "bytemuck",
  "byteorder",

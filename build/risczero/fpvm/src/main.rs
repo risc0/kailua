@@ -14,11 +14,12 @@
 
 use kailua_common::oracle::vec::{PreimageVecEntry, VecOracle};
 use kailua_common::{
-    client::{log, run_witness_client},
+    client::log,
     witness::Witness,
 };
 use risc0_zkvm::guest::env;
 use rkyv::rancor::Error;
+use kailua_common::client::stateless::run_stateless_client;
 
 fn main() {
     // Load main witness
@@ -50,7 +51,7 @@ fn main() {
     }
 
     // Run client using witness
-    let proof_journal = run_witness_client(witness);
+    let proof_journal = run_stateless_client(witness);
     // Write the final stitched journal
     env::commit_slice(&proof_journal.encode_packed());
 }
