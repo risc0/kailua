@@ -2080,7 +2080,7 @@ dependencies = [
 [[package]]
 name = "kona-derive"
 version = "0.2.3"
-source = "git+https://github.com/op-rs/kona?rev=96aba6aa72053f628ac1047548530f27f7c9d25c#96aba6aa72053f628ac1047548530f27f7c9d25c"
+source = "git+https://github.com/op-rs/kona?rev=44251d0b5a5a2c5a647e8ce50f80a5a9036f022d#44251d0b5a5a2c5a647e8ce50f80a5a9036f022d"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -2100,7 +2100,7 @@ dependencies = [
 [[package]]
 name = "kona-driver"
 version = "0.2.3"
-source = "git+https://github.com/op-rs/kona?rev=96aba6aa72053f628ac1047548530f27f7c9d25c#96aba6aa72053f628ac1047548530f27f7c9d25c"
+source = "git+https://github.com/op-rs/kona?rev=44251d0b5a5a2c5a647e8ce50f80a5a9036f022d#44251d0b5a5a2c5a647e8ce50f80a5a9036f022d"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives",
@@ -2121,7 +2121,7 @@ dependencies = [
 [[package]]
 name = "kona-executor"
 version = "0.2.3"
-source = "git+https://github.com/op-rs/kona?rev=96aba6aa72053f628ac1047548530f27f7c9d25c#96aba6aa72053f628ac1047548530f27f7c9d25c"
+source = "git+https://github.com/op-rs/kona?rev=44251d0b5a5a2c5a647e8ce50f80a5a9036f022d#44251d0b5a5a2c5a647e8ce50f80a5a9036f022d"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -2140,7 +2140,7 @@ dependencies = [
 [[package]]
 name = "kona-mpt"
 version = "0.1.2"
-source = "git+https://github.com/op-rs/kona?rev=96aba6aa72053f628ac1047548530f27f7c9d25c#96aba6aa72053f628ac1047548530f27f7c9d25c"
+source = "git+https://github.com/op-rs/kona?rev=44251d0b5a5a2c5a647e8ce50f80a5a9036f022d#44251d0b5a5a2c5a647e8ce50f80a5a9036f022d"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -2152,7 +2152,7 @@ dependencies = [
 [[package]]
 name = "kona-preimage"
 version = "0.2.1"
-source = "git+https://github.com/op-rs/kona?rev=96aba6aa72053f628ac1047548530f27f7c9d25c#96aba6aa72053f628ac1047548530f27f7c9d25c"
+source = "git+https://github.com/op-rs/kona?rev=44251d0b5a5a2c5a647e8ce50f80a5a9036f022d#44251d0b5a5a2c5a647e8ce50f80a5a9036f022d"
 dependencies = [
  "alloy-primitives",
  "async-channel",
@@ -2166,7 +2166,7 @@ dependencies = [
 [[package]]
 name = "kona-proof"
 version = "0.2.3"
-source = "git+https://github.com/op-rs/kona?rev=96aba6aa72053f628ac1047548530f27f7c9d25c#96aba6aa72053f628ac1047548530f27f7c9d25c"
+source = "git+https://github.com/op-rs/kona?rev=44251d0b5a5a2c5a647e8ce50f80a5a9036f022d#44251d0b5a5a2c5a647e8ce50f80a5a9036f022d"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",

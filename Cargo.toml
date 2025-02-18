@@ -88,16 +88,16 @@ kailua-contracts = { path = "crates/contracts" }
 kailua-host = { path = "bin/host" }
 
 # Kona
-kona-client = { git = "https://github.com/op-rs/kona", rev = "96aba6aa72053f628ac1047548530f27f7c9d25c", default-features = false }
-kona-derive = { git = "https://github.com/op-rs/kona", rev = "96aba6aa72053f628ac1047548530f27f7c9d25c", default-features = false, features = ["serde"] }
-kona-driver = { git = "https://github.com/op-rs/kona", rev = "96aba6aa72053f628ac1047548530f27f7c9d25c" }
-kona-executor = { git = "https://github.com/op-rs/kona", rev = "96aba6aa72053f628ac1047548530f27f7c9d25c" }
-kona-host = { git = "https://github.com/op-rs/kona", rev = "96aba6aa72053f628ac1047548530f27f7c9d25c", default-features = false, features = ["single"] }
-kona-mpt = { git = "https://github.com/op-rs/kona", rev = "96aba6aa72053f628ac1047548530f27f7c9d25c", features = ["serde"] }
-kona-preimage = { git = "https://github.com/op-rs/kona", rev = "96aba6aa72053f628ac1047548530f27f7c9d25c", features = ["serde", "rkyv", "std"] }
-kona-proof = { git = "https://github.com/op-rs/kona", rev = "96aba6aa72053f628ac1047548530f27f7c9d25c" }
-kona-providers-alloy = { git = "https://github.com/op-rs/kona", rev = "96aba6aa72053f628ac1047548530f27f7c9d25c" }
-kona-std-fpvm = { git = "https://github.com/op-rs/kona", rev = "96aba6aa72053f628ac1047548530f27f7c9d25c" }
+kona-client = { git = "https://github.com/op-rs/kona", rev = "44251d0b5a5a2c5a647e8ce50f80a5a9036f022d", default-features = false }
+kona-derive = { git = "https://github.com/op-rs/kona", rev = "44251d0b5a5a2c5a647e8ce50f80a5a9036f022d", default-features = false, features = ["serde"] }
+kona-driver = { git = "https://github.com/op-rs/kona", rev = "44251d0b5a5a2c5a647e8ce50f80a5a9036f022d" }
+kona-executor = { git = "https://github.com/op-rs/kona", rev = "44251d0b5a5a2c5a647e8ce50f80a5a9036f022d" }
+kona-host = { git = "https://github.com/op-rs/kona", rev = "44251d0b5a5a2c5a647e8ce50f80a5a9036f022d", default-features = false, features = ["single"] }
+kona-mpt = { git = "https://github.com/op-rs/kona", rev = "44251d0b5a5a2c5a647e8ce50f80a5a9036f022d", features = ["serde"] }
+kona-preimage = { git = "https://github.com/op-rs/kona", rev = "44251d0b5a5a2c5a647e8ce50f80a5a9036f022d", features = ["serde", "rkyv", "std"] }
+kona-proof = { git = "https://github.com/op-rs/kona", rev = "44251d0b5a5a2c5a647e8ce50f80a5a9036f022d" }
+kona-providers-alloy = { git = "https://github.com/op-rs/kona", rev = "44251d0b5a5a2c5a647e8ce50f80a5a9036f022d" }
+kona-std-fpvm = { git = "https://github.com/op-rs/kona", rev = "44251d0b5a5a2c5a647e8ce50f80a5a9036f022d" }
 
 # RISC Zero zkVM
 bonsai-sdk = { version = "1.2.1", features = ["non_blocking"] }
