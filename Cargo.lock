@@ -5101,6 +5101,7 @@ dependencies = [
  "op-alloy-consensus 0.10.3",
  "op-alloy-rpc-types-engine",
  "pot",
+ "revm 19.5.0",
  "risc0-aggregation",
  "risc0-groth16",
  "risc0-zkvm",

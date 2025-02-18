@@ -2004,7 +2004,7 @@ dependencies = [
  "ecdsa",
  "elliptic-curve",
  "once_cell",
- "risc0-bigint2",
+ "risc0-bigint2 1.2.3",
  "sha2",
 ]
 
@@ -2036,6 +2036,7 @@ dependencies = [
  "op-alloy-consensus",
  "op-alloy-rpc-types-engine",
  "pot",
+ "revm",
  "risc0-aggregation",
  "risc0-groth16",
  "risc0-zkvm",
@@ -3282,6 +3283,15 @@ dependencies = [
 
 [[package]]
 name = "risc0-bigint2"
+version = "1.2.1"
+source = "git+https://github.com/risc0/risc0.git?rev=ac029674f588d6f913dab3f5ea96683c6a71b869#ac029674f588d6f913dab3f5ea96683c6a71b869"
+dependencies = [
+ "include_bytes_aligned",
+ "stability",
+]
+
+[[package]]
+name = "risc0-bigint2"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d35dd8c534a739099bfb3e5ccfb40ab6e104865205fc3863448cd1e97af6a594"
@@ -3985,13 +3995,15 @@ dependencies = [
 [[package]]
 name = "substrate-bn"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b5bbfa79abbae15dd642ea8176a21a635ff3c00059961d1ea27ad04e5b441c"
+source = "git+https://github.com/risc0/paritytech-bn?rev=77f8a3f5d8576137a8c316d5781cdb724441b8fa#77f8a3f5d8576137a8c316d5781cdb724441b8fa"
 dependencies = [
+ "bytemuck",
  "byteorder",
  "crunchy",
+ "crypto-bigint",
  "lazy_static",
  "rand 0.8.5",
+ "risc0-bigint2 1.2.1",
  "rustc-hex",
 ]
 
