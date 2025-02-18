@@ -56,6 +56,7 @@ where
         precondition_validation_data_hash,
         oracle,
         beacon,
+        vec![],
     )?;
     // Construct witness
     let fpvm_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(KAILUA_FPVM_ID));

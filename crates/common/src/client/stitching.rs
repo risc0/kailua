@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::client::{log, run_kailua_client};
+use crate::client::log;
 use crate::config::SET_BUILDER_ID;
 use crate::executor::Execution;
 use crate::journal::ProofJournal;
@@ -50,12 +50,22 @@ where
     let proven_fpvm_journals = load_stitching_journals(fpvm_image_id);
 
     // todo: Queue up precomputed executions
+    let execution_cache = stitched_executions
+        .iter()
+        .flatten()
+        .cloned()
+        .rev()
+        .collect::<Vec<_>>();
 
     // Attempt to recompute the output hash at the target block number using kona
     log("RUN");
-    let (boot, precondition_hash) =
-        run_kailua_client(precondition_validation_data_hash, oracle.clone(), beacon)
-            .expect("Failed to compute output hash.");
+    let (boot, precondition_hash) = crate::client::run_kailua_client(
+        precondition_validation_data_hash,
+        oracle.clone(),
+        beacon,
+        execution_cache,
+    )
+    .expect("Failed to compute output hash.");
 
     // Stitch recursively composed execution-only proofs
     stitch_executions(
@@ -171,6 +181,11 @@ pub fn stitch_executions(
     #[cfg(target_os = "zkvm")] proven_fpvm_journals: &HashSet<Digest>,
 ) {
     let config_hash = crate::config::config_hash(&boot.rollup_config).unwrap();
+    // When running an execution-only proof, we may only have one batch validated by the kailua client
+    if boot.l1_head.is_zero() {
+        assert_eq!(1, stitched_executions.len());
+        return;
+    };
     for execution_trace in stitched_executions {
         let mut iterator = execution_trace.iter();
         // Instantiate reference block

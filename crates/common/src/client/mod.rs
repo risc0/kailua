@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::executor::{new_execution_cursor, CachedExecutor, Execution};
 use crate::precondition;
 use alloy_primitives::{Sealed, B256};
 use anyhow::{bail, Context};
 use kona_derive::traits::BlobProvider;
-use kona_driver::Driver;
+use kona_driver::{Driver, Executor};
 use kona_executor::TrieDBProvider;
 use kona_preimage::{CommsClient, PreimageKey};
 use kona_proof::errors::OracleProviderError;
@@ -40,6 +41,7 @@ pub fn run_kailua_client<
     precondition_validation_data_hash: B256,
     oracle: Arc<O>,
     mut beacon: B,
+    execution_cache: Vec<Arc<Execution>>,
 ) -> anyhow::Result<(BootInfo, B256)>
 where
     <B as BlobProvider>::Error: Debug,
@@ -53,14 +55,6 @@ where
             .await
             .context("BootInfo::load")?;
         let rollup_config = Arc::new(boot.rollup_config.clone());
-
-        log("PRECONDITION");
-        let precondition_data = precondition::load_precondition_data(
-            precondition_validation_data_hash,
-            oracle.clone(),
-            &mut beacon,
-        )
-        .await?;
 
         let safe_head_hash =
             fetch_safe_head_hash(oracle.as_ref(), boot.agreed_l2_output_root).await?;
@@ -79,10 +73,72 @@ where
             bail!("Invalid claim");
         }
         let safe_head_number = safe_head.number;
+        let expected_output_count = (boot.claimed_l2_block_number - safe_head_number) as usize;
+
+        ////////////////////////////////////////////////////////////////
+        //                     EXECUTION CACHING                      //
+        ////////////////////////////////////////////////////////////////
+        if boot.l1_head.is_zero() {
+            log("EXECUTION ONLY");
+            let cursor =
+                new_execution_cursor(rollup_config.as_ref(), safe_head.clone(), &mut l2_provider)
+                    .await?;
+            l2_provider.set_cursor(cursor.clone());
+
+            let mut kona_executor = KonaExecutor::new(
+                rollup_config.as_ref(),
+                l2_provider.clone(),
+                l2_provider.clone(),
+                None,
+                None,
+            );
+            kona_executor.update_safe_head(safe_head);
+
+            // Validate expected block count
+            assert_eq!(expected_output_count, execution_cache.len());
+
+            // Validate executed chain
+            for execution in execution_cache {
+                // Verify initial state
+                assert_eq!(
+                    execution.agreed_output,
+                    kona_executor.compute_output_root()?
+                );
+                // Verify transition
+                assert_eq!(
+                    execution.artifacts,
+                    kona_executor
+                        .execute_payload(execution.attributes.clone())
+                        .await?
+                );
+                // Update safe head
+                kona_executor.update_safe_head(execution.artifacts.block_header.clone());
+                // Verify post state
+                assert_eq!(
+                    execution.claimed_output,
+                    kona_executor.compute_output_root()?
+                );
+                log(&format!(
+                    "OUTPUT: {}/{}",
+                    execution.artifacts.block_header.number, boot.claimed_l2_block_number
+                ));
+            }
+
+            // Validate final output against claimed output hash
+            return Ok((boot, B256::ZERO, Some(kona_executor.compute_output_root()?)));
+        }
 
         ////////////////////////////////////////////////////////////////
         //                   DERIVATION & EXECUTION                   //
         ////////////////////////////////////////////////////////////////
+        log("PRECONDITION");
+        let precondition_data = precondition::load_precondition_data(
+            precondition_validation_data_hash,
+            oracle.clone(),
+            &mut beacon,
+        )
+        .await?;
+
         log("DERIVATION & EXECUTION");
         // Create a new derivation driver with the given boot information and oracle.
         let cursor = new_pipeline_cursor(
@@ -102,18 +158,20 @@ where
             l1_provider.clone(),
             l2_provider.clone(),
         );
-        let executor = KonaExecutor::new(
-            rollup_config.as_ref(),
-            l2_provider.clone(),
-            l2_provider.clone(),
-            None,
-            None,
-        );
-        let mut driver = Driver::new(cursor, executor, pipeline);
+        let cached_executor = CachedExecutor {
+            cache: execution_cache,
+            executor: KonaExecutor::new(
+                rollup_config.as_ref(),
+                l2_provider.clone(),
+                l2_provider.clone(),
+                None,
+                None,
+            ),
+        };
+        let mut driver = Driver::new(cursor, cached_executor, pipeline);
 
         // Run the derivation pipeline until we are able to produce the output root of the claimed
         // L2 block.
-        let expected_output_count = (boot.claimed_l2_block_number - safe_head_number) as usize;
         let mut output_roots = Vec::with_capacity(expected_output_count);
         for starting_block in safe_head_number..boot.claimed_l2_block_number {
             // Advance to the next target

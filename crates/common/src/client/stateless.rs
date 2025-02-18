@@ -13,15 +13,15 @@
 // limitations under the License.
 
 use crate::blobs::PreloadedBlobProvider;
-use crate::client;
-use crate::client::stitching;
+use crate::client::log;
+use crate::client::stitching::run_stitching_client;
 use crate::journal::ProofJournal;
 use crate::witness::{Witness, WitnessOracle};
 use std::sync::Arc;
 use tracing::log::warn;
 
 pub fn run_stateless_client<O: WitnessOracle>(witness: Witness<O>) -> ProofJournal {
-    client::log(&format!(
+    log(&format!(
         "ORACLE: {} PREIMAGES",
         witness.oracle_witness.preimage_count()
     ));
@@ -30,13 +30,13 @@ pub fn run_stateless_client<O: WitnessOracle>(witness: Witness<O>) -> ProofJourn
         .validate_preimages()
         .expect("Failed to validate preimages");
     let oracle = Arc::new(witness.oracle_witness);
-    client::log(&format!(
+    log(&format!(
         "BEACON: {} BLOBS",
         witness.blobs_witness.blobs.len()
     ));
     let beacon = PreloadedBlobProvider::from(witness.blobs_witness);
 
-    let proof_journal = stitching::run_stitching_client(
+    let proof_journal = run_stitching_client(
         witness.precondition_validation_data_hash,
         oracle.clone(),
         beacon,
