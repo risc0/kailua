@@ -52,7 +52,7 @@ where
         witness: blobs_witness.clone(),
     };
     // Run client
-    let (boot, precondition_hash, _) = kailua_common::client::run_kailua_client(
+    let (boot, precondition_hash) = kailua_common::client::run_kailua_client(
         precondition_validation_data_hash,
         oracle,
         beacon,

@@ -12,13 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::client;
+use crate::client::{log, run_kailua_client};
+use crate::config::SET_BUILDER_ID;
+use crate::executor::Execution;
 use crate::journal::ProofJournal;
+use crate::proof::Proof;
 use crate::witness::StitchedBootInfo;
+use alloy_primitives::map::HashSet;
 use alloy_primitives::{Address, B256};
 use kona_derive::prelude::BlobProvider;
 use kona_preimage::CommsClient;
 use kona_proof::{BootInfo, FlushableCache};
+use risc0_zkvm::serde::Deserializer;
+use risc0_zkvm::sha::{Digest, Digestible};
+use risc0_zkvm::{Groth16ReceiptVerifierParameters, MaybePruned, ReceiptClaim};
+use serde::Deserialize;
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -31,92 +39,35 @@ pub fn run_stitching_client<
     beacon: B,
     fpvm_image_id: B256,
     payout_recipient_address: Address,
+    stitched_executions: Vec<Vec<Arc<Execution>>>,
     stitched_boot_info: Vec<StitchedBootInfo>,
 ) -> ProofJournal
 where
     <B as BlobProvider>::Error: Debug,
 {
-    // Attempt to recompute the output hash at the target block number using kona
-    client::log("RUN");
-    let (boot, precondition_hash, _) =
-        client::run_kailua_client(precondition_validation_data_hash, oracle.clone(), beacon)
-            .expect("Failed to compute output hash.");
-
     // Verify proofs recursively for boundless composition
     #[cfg(target_os = "zkvm")]
-    let proven_fpvm_journals = {
-        use crate::config::SET_BUILDER_ID;
-        use crate::proof::Proof;
-        use alloy_primitives::map::HashSet;
-        use risc0_zkvm::serde::Deserializer;
-        use risc0_zkvm::sha::{Digest, Digestible};
-        use risc0_zkvm::{Groth16ReceiptVerifierParameters, MaybePruned, ReceiptClaim};
-        use serde::Deserialize;
+    let proven_fpvm_journals = load_stitching_journals(fpvm_image_id);
 
-        let fpvm_image_id = Digest::from(fpvm_image_id.0);
-        let mut proven_fpvm_journals = HashSet::new();
-        let mut verifying_params: Option<Digest> = None;
+    // todo: Queue up precomputed executions
 
-        loop {
-            let Ok(proof) =
-                Proof::deserialize(&mut Deserializer::new(risc0_zkvm::guest::env::stdin()))
-            else {
-                client::log(&format!("PROOFS {}", proven_fpvm_journals.len()));
-                break;
-            };
+    // Attempt to recompute the output hash at the target block number using kona
+    log("RUN");
+    let (boot, precondition_hash) =
+        run_kailua_client(precondition_validation_data_hash, oracle.clone(), beacon)
+            .expect("Failed to compute output hash.");
 
-            let journal_digest = proof.journal().digest();
-            client::log(&format!("VERIFY {journal_digest}"));
+    // Stitch recursively composed execution-only proofs
+    stitch_executions(
+        &boot,
+        fpvm_image_id,
+        payout_recipient_address,
+        &stitched_executions,
+        #[cfg(target_os = "zkvm")]
+        &proven_fpvm_journals,
+    );
 
-            match proof {
-                Proof::ZKVMReceipt(receipt) => {
-                    receipt
-                        .verify(fpvm_image_id)
-                        .expect("Failed to verify receipt for {journal_digest}.");
-                }
-                Proof::BoundlessSeal(..) => {
-                    unimplemented!("Convert BoundlessSeal to SetBuilderReceipt");
-                }
-                Proof::SetBuilderReceipt(receipt, set_builder_siblings, journal) => {
-                    // Support only proofs with default verifier params
-                    assert_eq!(
-                        &receipt.verifier_parameters,
-                        verifying_params.get_or_insert_with(|| {
-                            Groth16ReceiptVerifierParameters::default().digest()
-                        })
-                    );
-                    // build the claim for the fpvm
-                    let fpvm_claim_digest =
-                        ReceiptClaim::ok(fpvm_image_id, MaybePruned::Pruned(journal.digest()))
-                            .digest();
-                    // construct set builder root from merkle proof
-                    let set_builder_journal = crate::proof::encoded_set_builder_journal(
-                        &fpvm_claim_digest,
-                        set_builder_siblings,
-                        fpvm_image_id,
-                    );
-                    // Verify set builder claim digest equivalence
-                    assert_eq!(
-                        receipt.claim.digest(),
-                        ReceiptClaim::ok(
-                            SET_BUILDER_ID.0,
-                            MaybePruned::Pruned(set_builder_journal.digest()),
-                        )
-                        .digest()
-                    );
-                    // Verify set builder receipt validity
-                    receipt.verify_integrity().expect(&format!(
-                        "Failed to verify Groth16Receipt for {journal_digest}."
-                    ));
-                }
-            }
-
-            proven_fpvm_journals.insert(journal_digest);
-        }
-
-        proven_fpvm_journals
-    };
-
+    // Stitch recursively composed proofs
     stitch_boot_info(
         &boot,
         fpvm_image_id,
@@ -124,8 +75,143 @@ where
         precondition_hash,
         stitched_boot_info,
         #[cfg(target_os = "zkvm")]
-        proven_fpvm_journals,
+        &proven_fpvm_journals,
     )
+}
+
+pub fn load_stitching_journals(fpvm_image_id: B256) -> HashSet<Digest> {
+    log("VERIFY");
+
+    let fpvm_image_id = Digest::from(fpvm_image_id.0);
+    let mut proven_fpvm_journals = HashSet::new();
+    let mut verifying_params: Option<Digest> = None;
+
+    loop {
+        let Ok(proof) = Proof::deserialize(&mut Deserializer::new(risc0_zkvm::guest::env::stdin()))
+        else {
+            log(&format!("PROOFS {}", proven_fpvm_journals.len()));
+            break proven_fpvm_journals;
+        };
+
+        let journal_digest = proof.journal().digest();
+        log(&format!("VERIFY {journal_digest}"));
+
+        match proof {
+            Proof::ZKVMReceipt(receipt) => {
+                receipt
+                    .verify(fpvm_image_id)
+                    .expect("Failed to verify receipt for {journal_digest}.");
+            }
+            Proof::BoundlessSeal(..) => {
+                unimplemented!("Convert BoundlessSeal to SetBuilderReceipt");
+            }
+            Proof::SetBuilderReceipt(receipt, set_builder_siblings, journal) => {
+                // Support only proofs with default verifier params
+                assert_eq!(
+                    &receipt.verifier_parameters,
+                    verifying_params.get_or_insert_with(|| {
+                        Groth16ReceiptVerifierParameters::default().digest()
+                    })
+                );
+                // build the claim for the fpvm
+                let fpvm_claim_digest =
+                    ReceiptClaim::ok(fpvm_image_id, MaybePruned::Pruned(journal.digest())).digest();
+                // construct set builder root from merkle proof
+                let set_builder_journal = crate::proof::encoded_set_builder_journal(
+                    &fpvm_claim_digest,
+                    set_builder_siblings,
+                    fpvm_image_id,
+                );
+                // Verify set builder claim digest equivalence
+                assert_eq!(
+                    receipt.claim.digest(),
+                    ReceiptClaim::ok(
+                        SET_BUILDER_ID.0,
+                        MaybePruned::Pruned(set_builder_journal.digest()),
+                    )
+                    .digest()
+                );
+                // Verify set builder receipt validity
+                receipt.verify_integrity().unwrap_or_else(|e| {
+                    panic!("Failed to verify Groth16Receipt for {journal_digest}: {e:?}")
+                });
+            }
+        }
+
+        proven_fpvm_journals.insert(journal_digest);
+    }
+}
+
+#[cfg(target_os = "zkvm")]
+pub fn verify_stitching_journal(
+    fpvm_image_id: B256,
+    proof_journal: Vec<u8>,
+    proven_fpvm_journals: &HashSet<Digest>,
+) {
+    let journal_digest = proof_journal.digest();
+    if proven_fpvm_journals.contains(&journal_digest) {
+        log(&format!("FOUND {journal_digest}"));
+    } else {
+        log(&format!("ASSUME {journal_digest}"));
+        risc0_zkvm::guest::env::verify(fpvm_image_id.0, &proof_journal)
+            .expect("Failed to verify stitched journal assumption");
+    }
+}
+
+#[cfg(not(target_os = "zkvm"))]
+pub fn verify_stitching_journal(_fpvm_image_id: B256, __proof_journal: Vec<u8>) {
+    // noop
+}
+
+pub fn stitch_executions(
+    boot: &BootInfo,
+    fpvm_image_id: B256,
+    payout_recipient_address: Address,
+    stitched_executions: &Vec<Vec<Arc<Execution>>>,
+    #[cfg(target_os = "zkvm")] proven_fpvm_journals: &HashSet<Digest>,
+) {
+    let config_hash = crate::config::config_hash(&boot.rollup_config).unwrap();
+    for execution_trace in stitched_executions {
+        let mut iterator = execution_trace.iter();
+        // Instantiate reference block
+        let safe_block = iterator.next().expect("Empty execution trace");
+        let mut stitched_boot = StitchedBootInfo {
+            l1_head: B256::ZERO,
+            agreed_l2_output_root: safe_block.agreed_output,
+            claimed_l2_output_root: safe_block.claimed_output,
+            claimed_l2_block_number: safe_block.artifacts.block_header.number,
+        };
+
+        // Validate continuity of successor blocks
+        for successor in iterator {
+            assert_eq!(
+                successor.agreed_output,
+                stitched_boot.claimed_l2_output_root
+            );
+            assert_eq!(
+                successor.artifacts.block_header.number,
+                stitched_boot.claimed_l2_block_number + 1
+            );
+
+            stitched_boot.agreed_l2_output_root = successor.agreed_output;
+            stitched_boot.claimed_l2_output_root = successor.claimed_output;
+            stitched_boot.claimed_l2_block_number = successor.artifacts.block_header.number;
+        }
+        // Require transition proof for entire batch
+        verify_stitching_journal(
+            fpvm_image_id,
+            ProofJournal::new_stitched(
+                fpvm_image_id,
+                payout_recipient_address,
+                B256::ZERO,
+                B256::from(config_hash),
+                &stitched_boot,
+            )
+            .encode_packed(),
+            #[cfg(target_os = "zkvm")]
+            proven_fpvm_journals,
+        )
+    }
 }
 
 pub fn stitch_boot_info(
@@ -134,9 +220,7 @@ pub fn stitch_boot_info(
     payout_recipient_address: Address,
     precondition_hash: B256,
     stitched_boot_info: Vec<StitchedBootInfo>,
-    #[cfg(target_os = "zkvm")] proven_fpvm_journals: alloy_primitives::map::HashSet<
-        risc0_zkvm::sha::Digest,
-    >,
+    #[cfg(target_os = "zkvm")] proven_fpvm_journals: &HashSet<Digest>,
 ) -> ProofJournal {
     // Stitch boots together into a journal
     let mut stitched_journal = ProofJournal::new(
@@ -155,27 +239,19 @@ pub fn stitch_boot_info(
             stitched_boot.claimed_l2_output_root
         );
         // Require proof assumption
-        #[cfg(target_os = "zkvm")]
-        {
-            use risc0_zkvm::sha::Digestible;
-
-            let proof_journal = ProofJournal::new_stitched(
+        verify_stitching_journal(
+            fpvm_image_id,
+            ProofJournal::new_stitched(
                 fpvm_image_id,
                 payout_recipient_address,
                 precondition_hash,
                 stitched_journal.config_hash,
                 &stitched_boot,
             )
-            .encode_packed();
-            let journal_digest = proof_journal.digest();
-            if proven_fpvm_journals.contains(&journal_digest) {
-                client::log(&format!("FOUND {journal_digest}"));
-            } else {
-                client::log(&format!("ASSUME {journal_digest}"));
-                risc0_zkvm::guest::env::verify(fpvm_image_id.0, &proof_journal)
-                    .expect("Failed to verify stitched boot assumption");
-            }
-        }
+            .encode_packed(),
+            #[cfg(target_os = "zkvm")]
+            proven_fpvm_journals,
+        );
         // Require continuity
         if stitched_boot.claimed_l2_output_root == stitched_journal.agreed_l2_output_root {
             // Backward stitch

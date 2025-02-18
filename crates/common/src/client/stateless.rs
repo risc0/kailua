@@ -42,6 +42,7 @@ pub fn run_stateless_client<O: WitnessOracle>(witness: Witness<O>) -> ProofJourn
         beacon,
         witness.fpvm_image_id,
         witness.payout_recipient_address,
+        vec![],
         witness.stitched_boot_info,
     );
 

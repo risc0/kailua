@@ -40,7 +40,7 @@ pub fn run_kailua_client<
     precondition_validation_data_hash: B256,
     oracle: Arc<O>,
     mut beacon: B,
-) -> anyhow::Result<(BootInfo, B256, Option<B256>)>
+) -> anyhow::Result<(BootInfo, B256)>
 where
     <B as BlobProvider>::Error: Debug,
 {
@@ -174,7 +174,7 @@ where
         assert_eq!(boot.claimed_l2_output_root, B256::ZERO);
     }
 
-    Ok((boot, precondition_hash, output_hash))
+    Ok((boot, precondition_hash))
 }
 
 /// Fetches the safe head hash of the L2 chain based on the agreed upon L2 output root in the
