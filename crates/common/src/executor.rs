@@ -33,7 +33,7 @@ use op_alloy_rpc_types_engine::OpPayloadAttributes;
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use spin::RwLock;
 use std::fmt::Debug;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Debug, Default, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Execution {
@@ -55,6 +55,7 @@ pub struct Execution {
 pub struct CachedExecutor<E: Executor + Send + Sync + Debug> {
     pub cache: Vec<Arc<Execution>>,
     pub executor: E,
+    pub collection_target: Option<Arc<Mutex<Vec<Execution>>>>,
 }
 
 #[async_trait]
@@ -82,6 +83,17 @@ impl<E: Executor + Send + Sync + Debug> Executor for CachedExecutor<E> {
         {
             let artifacts = self.cache.pop().unwrap().artifacts.clone();
             self.update_safe_head(artifacts.block_header.clone());
+            return Ok(artifacts);
+        }
+        if let Some(collection_target) = &self.collection_target {
+            let artifacts = self.executor.execute_payload(attributes.clone()).await?;
+            let mut collection_target = collection_target.lock().unwrap();
+            collection_target.push(Execution {
+                agreed_output,
+                attributes,
+                artifacts: artifacts.clone(),
+                claimed_output: Default::default(),
+            });
             return Ok(artifacts);
         }
         self.executor.execute_payload(attributes).await

@@ -14,7 +14,7 @@
 
 use crate::client::log;
 use crate::config::SET_BUILDER_ID;
-use crate::executor::{compute_receipts_root, exec_precondition_hash, Execution};
+use crate::executor::Execution;
 use crate::journal::ProofJournal;
 use crate::proof::Proof;
 use crate::witness::StitchedBootInfo;
@@ -68,6 +68,7 @@ where
         oracle.clone(),
         beacon,
         execution_cache,
+        None,
     )
     .expect("Failed to compute output hash.");
 
@@ -191,62 +192,47 @@ pub fn stitch_executions(
         return;
     };
     for execution_trace in stitched_executions {
-        let precondition_hash = exec_precondition_hash(execution_trace.as_slice());
-        let mut iterator = execution_trace.iter();
-        // Instantiate reference block
-        let first_execution = iterator.next().expect("Empty execution trace");
-        // Validate receipts
-        assert_eq!(
-            first_execution.artifacts.block_header.receipts_root,
-            compute_receipts_root(
-                first_execution.artifacts.receipts.as_slice(),
-                &boot.rollup_config,
-                first_execution.attributes.payload_attributes.timestamp
-            )
-        );
-        let mut stitched_boot = StitchedBootInfo {
-            l1_head: B256::ZERO,
-            agreed_l2_output_root: first_execution.agreed_output,
-            claimed_l2_output_root: first_execution.claimed_output,
-            claimed_l2_block_number: first_execution.artifacts.block_header.number,
-        };
-
-        // Validate continuity of successor blocks
-        for successor in iterator {
-            // Validate succession
+        let precondition_hash = crate::executor::exec_precondition_hash(execution_trace.as_slice());
+        // Validate receipt roots
+        for execution in execution_trace {
             assert_eq!(
-                successor.agreed_output,
-                stitched_boot.claimed_l2_output_root
-            );
-            assert_eq!(
-                successor.artifacts.block_header.number,
-                stitched_boot.claimed_l2_block_number + 1
-            );
-            // Validate receipts
-            assert_eq!(
-                successor.artifacts.block_header.receipts_root,
-                compute_receipts_root(
-                    successor.artifacts.receipts.as_slice(),
+                execution.artifacts.block_header.receipts_root,
+                crate::executor::compute_receipts_root(
+                    execution.artifacts.receipts.as_slice(),
                     &boot.rollup_config,
-                    successor.attributes.payload_attributes.timestamp
+                    execution.attributes.payload_attributes.timestamp
                 )
             );
-            // Update transition
-            stitched_boot.agreed_l2_output_root = successor.agreed_output;
-            stitched_boot.claimed_l2_output_root = successor.claimed_output;
-            stitched_boot.claimed_l2_block_number = successor.artifacts.block_header.number;
         }
+        // Construct expected proof journal
+        let encoded_journal = ProofJournal::new_stitched(
+            fpvm_image_id,
+            payout_recipient_address,
+            precondition_hash,
+            B256::from(config_hash),
+            &StitchedBootInfo {
+                l1_head: B256::ZERO,
+                agreed_l2_output_root: execution_trace
+                    .first()
+                    .expect("Empty execution trace")
+                    .agreed_output,
+                claimed_l2_output_root: execution_trace
+                    .last()
+                    .expect("Empty execution trace")
+                    .claimed_output,
+                claimed_l2_block_number: execution_trace
+                    .last()
+                    .expect("Empty execution trace")
+                    .artifacts
+                    .block_header
+                    .number,
+            },
+        )
+        .encode_packed();
         // Require transition proof for entire batch
         verify_stitching_journal(
             fpvm_image_id,
-            ProofJournal::new_stitched(
-                fpvm_image_id,
-                payout_recipient_address,
-                precondition_hash,
-                B256::from(config_hash),
-                &stitched_boot,
-            )
-            .encode_packed(),
+            encoded_journal,
             #[cfg(target_os = "zkvm")]
             proven_fpvm_journals,
         )

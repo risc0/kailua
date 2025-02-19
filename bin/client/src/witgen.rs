@@ -16,6 +16,7 @@ use crate::witness::{BlobWitnessProvider, OracleWitnessProvider};
 use alloy_primitives::{Address, B256};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_common::blobs::BlobWitnessData;
+use kailua_common::executor::Execution;
 use kailua_common::journal::ProofJournal;
 use kailua_common::witness::{StitchedBootInfo, Witness, WitnessOracle};
 use kona_derive::prelude::BlobProvider;
@@ -32,6 +33,7 @@ pub async fn run_witgen_client<P, B, O>(
     blob_provider: B,
     payout_recipient: Address,
     precondition_validation_data_hash: B256,
+    execution_trace: Vec<Arc<Execution>>,
     stitched_boot_info: Vec<StitchedBootInfo>,
 ) -> anyhow::Result<(ProofJournal, Witness<O>)>
 where
@@ -52,12 +54,21 @@ where
         witness: blobs_witness.clone(),
     };
     // Run client
+    let collection_target = Arc::new(Mutex::new(Vec::new()));
     let (boot, precondition_hash) = kailua_common::client::run_kailua_client(
         precondition_validation_data_hash,
         oracle,
         beacon,
-        vec![],
+        execution_trace,
+        Some(collection_target.clone()),
     )?;
+    // Fix claimed output of captured executions
+    let mut executions = collection_target.lock().unwrap();
+    for i in 1..executions.len() {
+        executions[i - 1].claimed_output = executions[i].agreed_output;
+    }
+    executions.last_mut().unwrap().claimed_output = boot.claimed_l2_output_root;
+    let stitched_executions = vec![core::mem::take(executions.deref_mut())];
     // Construct witness
     let fpvm_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(KAILUA_FPVM_ID));
     let mut witness = Witness {
@@ -65,7 +76,7 @@ where
         blobs_witness: core::mem::take(blobs_witness.lock().unwrap().deref_mut()),
         payout_recipient_address: payout_recipient,
         precondition_validation_data_hash,
-        stitched_executions: vec![], // todo: populate this
+        stitched_executions,
         stitched_boot_info,
         fpvm_image_id,
     };

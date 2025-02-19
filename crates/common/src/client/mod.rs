@@ -27,7 +27,7 @@ use kona_proof::l2::OracleL2ChainProvider;
 use kona_proof::sync::new_pipeline_cursor;
 use kona_proof::{BootInfo, FlushableCache, HintType};
 use std::fmt::Debug;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 pub mod stateless;
 pub mod stitching;
@@ -42,6 +42,7 @@ pub fn run_kailua_client<
     oracle: Arc<O>,
     mut beacon: B,
     execution_trace: Vec<Arc<Execution>>,
+    collection_target: Option<Arc<Mutex<Vec<Execution>>>>,
 ) -> anyhow::Result<(BootInfo, B256)>
 where
     <B as BlobProvider>::Error: Debug,
@@ -188,6 +189,7 @@ where
                 None,
                 None,
             ),
+            collection_target,
         };
         let mut driver = Driver::new(cursor, cached_executor, pipeline);
 
