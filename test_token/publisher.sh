@@ -9,9 +9,12 @@ PRIVATE_KEY="0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba"
 L2_RPC="http://127.0.0.1:9545"
 
 # Validate args
-[[ $# -eq 1 ]] || { echo "Usage: $0 <concurrent_threads>"; exit 1; }
+[[ $# -eq 1 ]] || {
+    echo "Usage: $0 <concurrent_threads>"
+    exit 1
+}
 concurrent_threads=$1 # note that this input is essentially how many tx/block. hardware dependent.
-num_txs=$((concurrent_threads * 100)) 
+num_txs=$((concurrent_threads * 100))
 
 # Signal handling
 cleanup() {
@@ -31,7 +34,7 @@ while IFS= read -r recipient && ((tx_count < num_txs)); do
     [[ -z "$recipient" || "$recipient" =~ ^# ]] && continue
 
     echo "Preparing tx $tx_count to recipient: $recipient"
-    
+
     signed_tx=$(cast mktx \
         --private-key "$PRIVATE_KEY" \
         --rpc-url "$L2_RPC" \
@@ -41,28 +44,27 @@ while IFS= read -r recipient && ((tx_count < num_txs)); do
         "transfer(address,uint256)" \
         "$recipient" \
         "$TRANSFER_AMOUNT")
-    
-    echo "$signed_tx" > "$tmpdir/$tx_count"
+
+    echo "$signed_tx" >"$tmpdir/$tx_count"
     ((current_nonce++))
     ((tx_count++))
-    
+
     ((tx_count % 100 == 0)) && echo "Prepared $tx_count transactions"
-done < addresses.txt
+done <addresses.txt
 
 echo "Submitting $tx_count transactions with $concurrent_threads threads..."
 
 # Submit transactions
-for ((i=0; i<tx_count; i=i+concurrent_threads)); do
+for ((i = 0; i < tx_count; i = i + concurrent_threads)); do
     batch_end=$((i + concurrent_threads))
     ((batch_end > tx_count)) && batch_end=$tx_count
-    
-    for ((j=i; j<batch_end; j++)); do
-        (cast publish --rpc-url "$L2_RPC" "$(cat "$tmpdir/$j")" && \
-         echo "Published tx $j") &
+
+    for ((j = i; j < batch_end; j++)); do
+        (cast publish --rpc-url "$L2_RPC" "$(cat "$tmpdir/$j")" &&
+            echo "Published tx $j") &
     done
     wait
 done
 
 cleanup
 echo "Transfer complete - processed $tx_count transactions"
-
