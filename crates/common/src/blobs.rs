@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use crate::client::log;
+use crate::rkyv::{BlobDef, Bytes48Def};
 use alloy_eips::eip4844::{
-    kzg_to_versioned_hash, Blob, IndexedBlobHash, BLS_MODULUS, BYTES_PER_BLOB,
-    FIELD_ELEMENTS_PER_BLOB,
+    kzg_to_versioned_hash, Blob, IndexedBlobHash, BLS_MODULUS, FIELD_ELEMENTS_PER_BLOB,
 };
 use alloy_primitives::{B256, U256};
 use alloy_rpc_types_beacon::sidecar::BlobData;
@@ -42,37 +42,6 @@ pub struct BlobWitnessData {
     pub commitments: Vec<Bytes48>,
     #[rkyv(with = rkyv::with::Map<Bytes48Def>)]
     pub proofs: Vec<Bytes48>,
-}
-
-#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
-#[rkyv(remote = Blob)]
-#[rkyv(archived = ArchivedBlob)]
-struct BlobDef(pub [u8; BYTES_PER_BLOB]);
-
-impl From<BlobDef> for Blob {
-    fn from(value: BlobDef) -> Self {
-        Self(value.0)
-    }
-}
-
-#[derive(
-    rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Debug, Copy, Clone, Hash, PartialEq, Eq,
-)]
-#[rkyv(remote = Bytes48)]
-#[rkyv(archived = ArchivedBytes48)]
-pub struct Bytes48Def {
-    #[rkyv(getter = get_48_bytes)]
-    bytes: [u8; 48usize],
-}
-
-fn get_48_bytes(value: &Bytes48) -> [u8; 48] {
-    value.into_inner()
-}
-
-impl From<Bytes48Def> for Bytes48 {
-    fn from(value: Bytes48Def) -> Self {
-        Self::from(value.bytes)
-    }
 }
 
 #[derive(Clone, Debug, Default)]

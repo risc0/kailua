@@ -13,30 +13,41 @@
 // limitations under the License.
 
 use crate::config::safe_default;
+use crate::rkyv::{B256Def, ExecutionArtifactsRkyv, OpPayloadAttributesRkyv};
 use alloy_consensus::Header;
 use alloy_eips::eip4895::Withdrawal;
+use alloy_eips::Encodable2718;
 use alloy_primitives::{Bytes, Sealed, B256, B64};
 use async_trait::async_trait;
 use kona_driver::{Executor, PipelineCursor, TipCursor};
 use kona_executor::ExecutionArtifacts;
+use kona_mpt::ordered_trie_with_encoder;
 use kona_preimage::CommsClient;
 use kona_proof::errors::OracleProviderError;
 use kona_proof::l2::OracleL2ChainProvider;
 use kona_proof::FlushableCache;
 use maili_genesis::RollupConfig;
 use maili_protocol::{BatchValidationProvider, BlockInfo};
+use op_alloy_consensus::OpReceiptEnvelope;
 use op_alloy_rpc_types_engine::OpPayloadAttributes;
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use spin::RwLock;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-// #[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[derive(Debug)]
+#[derive(Clone, Debug, Default, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Execution {
+    /// Output root prior to execution
+    #[rkyv(with = B256Def)]
     pub agreed_output: B256,
+    /// Derived attributes to be executed
+    #[rkyv(with = OpPayloadAttributesRkyv)]
     pub attributes: OpPayloadAttributes,
+    /// Output block from execution
+    #[rkyv(with = ExecutionArtifactsRkyv)]
     pub artifacts: ExecutionArtifacts,
+    /// Output root after execution
+    #[rkyv(with = B256Def)]
     pub claimed_output: B256,
 }
 
@@ -123,7 +134,7 @@ pub fn attributes_hash(attributes: &OpPayloadAttributes) -> anyhow::Result<B256>
                 .payload_attributes
                 .withdrawals
                 .as_ref()
-                .map(withdrawals_hash),
+                .map(|wds| withdrawals_hash(wds.as_slice())),
             B256::ZERO,
         )?
         .as_slice(),
@@ -150,7 +161,7 @@ pub fn attributes_hash(attributes: &OpPayloadAttributes) -> anyhow::Result<B256>
     Ok(digest.into())
 }
 
-pub fn withdrawals_hash(withdrawals: &Vec<Withdrawal>) -> B256 {
+pub fn withdrawals_hash(withdrawals: &[Withdrawal]) -> B256 {
     let hashed_bytes = withdrawals
         .iter()
         .map(|w| {
@@ -178,4 +189,67 @@ pub fn transactions_hash(transactions: &Vec<Bytes>) -> B256 {
         .try_into()
         .unwrap();
     digest.into()
+}
+
+pub fn exec_precondition_hash(executions: &[Arc<Execution>]) -> B256 {
+    let hashed_bytes = executions
+        .iter()
+        .map(|e| {
+            [
+                e.agreed_output.0,
+                attributes_hash(&e.attributes)
+                    .expect("Unhashable attributes.")
+                    .0,
+                e.artifacts.block_header.hash().0,
+                e.claimed_output.0,
+            ]
+            .concat()
+        })
+        .collect::<Vec<_>>()
+        .concat();
+    let digest: [u8; 32] = SHA2::hash_bytes(hashed_bytes.as_slice())
+        .as_bytes()
+        .try_into()
+        .unwrap();
+    digest.into()
+}
+
+/// Computes the receipts root from the given set of receipts.
+///
+/// ## Takes
+/// - `receipts`: The receipts to compute the root for.
+/// - `config`: The rollup config to use for the computation.
+/// - `timestamp`: The timestamp to use for the computation.
+///
+/// ## Returns
+/// The computed receipts root.
+pub fn compute_receipts_root(
+    receipts: &[OpReceiptEnvelope],
+    config: &RollupConfig,
+    timestamp: u64,
+) -> B256 {
+    // There is a minor bug in op-geth and op-erigon where in the Regolith hardfork,
+    // the receipt root calculation does not inclide the deposit nonce in the
+    // receipt encoding. In the Regolith hardfork, we must strip the deposit nonce
+    // from the receipt encoding to match the receipt root calculation.
+    if config.is_regolith_active(timestamp) && !config.is_canyon_active(timestamp) {
+        let receipts = receipts
+            .iter()
+            .cloned()
+            .map(|receipt| match receipt {
+                OpReceiptEnvelope::Deposit(mut deposit_receipt) => {
+                    deposit_receipt.receipt.deposit_nonce = None;
+                    OpReceiptEnvelope::Deposit(deposit_receipt)
+                }
+                _ => receipt,
+            })
+            .collect::<Vec<_>>();
+
+        ordered_trie_with_encoder(receipts.as_ref(), |receipt, mut buf| {
+            receipt.encode_2718(&mut buf)
+        })
+        .root()
+    } else {
+        ordered_trie_with_encoder(receipts, |receipt, mut buf| receipt.encode_2718(&mut buf)).root()
+    }
 }

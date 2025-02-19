@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::executor::{new_execution_cursor, CachedExecutor, Execution};
+use crate::executor::{exec_precondition_hash, new_execution_cursor, CachedExecutor, Execution};
 use crate::precondition;
 use alloy_primitives::{Sealed, B256};
 use anyhow::{bail, Context};
@@ -32,8 +32,8 @@ use std::sync::Arc;
 pub mod stateless;
 pub mod stitching;
 
-/// Executes the Kona client to compute a list of subsequent outputs. Additionally validates
-/// the Kailua Fault/Validity preconditions on proposals for proof generation.
+/// Executes the Kona client to compute a list of subsequent outputs.
+/// Modified to validate the Kailua Fault/Validity/Execution preconditions.
 pub fn run_kailua_client<
     O: CommsClient + FlushableCache + Send + Sync + Debug,
     B: BlobProvider + Send + Sync + Debug + Clone,
@@ -41,7 +41,7 @@ pub fn run_kailua_client<
     precondition_validation_data_hash: B256,
     oracle: Arc<O>,
     mut beacon: B,
-    execution_cache: Vec<Arc<Execution>>,
+    execution_trace: Vec<Arc<Execution>>,
 ) -> anyhow::Result<(BootInfo, B256)>
 where
     <B as BlobProvider>::Error: Debug,
@@ -95,10 +95,27 @@ where
             kona_executor.update_safe_head(safe_head);
 
             // Validate expected block count
-            assert_eq!(expected_output_count, execution_cache.len());
+            assert_eq!(expected_output_count, execution_trace.len());
+
+            // Validate non-empty execution trace
+            assert!(!execution_trace.is_empty());
+
+            // Calculate precondition hash
+            let precondition_hash = exec_precondition_hash(execution_trace.as_slice());
+
+            // Validate terminating block number
+            assert_eq!(
+                execution_trace
+                    .last()
+                    .unwrap()
+                    .artifacts
+                    .block_header
+                    .number,
+                boot.claimed_l2_block_number
+            );
 
             // Validate executed chain
-            for execution in execution_cache {
+            for execution in execution_trace {
                 // Verify initial state
                 assert_eq!(
                     execution.agreed_output,
@@ -125,7 +142,11 @@ where
             }
 
             // Validate final output against claimed output hash
-            return Ok((boot, B256::ZERO, Some(kona_executor.compute_output_root()?)));
+            return Ok((
+                boot,
+                precondition_hash,
+                Some(kona_executor.compute_output_root()?),
+            ));
         }
 
         ////////////////////////////////////////////////////////////////
@@ -159,7 +180,7 @@ where
             l2_provider.clone(),
         );
         let cached_executor = CachedExecutor {
-            cache: execution_cache,
+            cache: execution_trace,
             executor: KonaExecutor::new(
                 rollup_config.as_ref(),
                 l2_provider.clone(),

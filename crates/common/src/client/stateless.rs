@@ -14,7 +14,6 @@
 
 use crate::blobs::PreloadedBlobProvider;
 use crate::client::log;
-use crate::client::stitching::run_stitching_client;
 use crate::journal::ProofJournal;
 use crate::witness::{Witness, WitnessOracle};
 use std::sync::Arc;
@@ -36,13 +35,13 @@ pub fn run_stateless_client<O: WitnessOracle>(witness: Witness<O>) -> ProofJourn
     ));
     let beacon = PreloadedBlobProvider::from(witness.blobs_witness);
 
-    let proof_journal = run_stitching_client(
+    let proof_journal = crate::client::stitching::run_stitching_client(
         witness.precondition_validation_data_hash,
         oracle.clone(),
         beacon,
         witness.fpvm_image_id,
         witness.payout_recipient_address,
-        vec![],
+        witness.stitched_executions,
         witness.stitched_boot_info,
     );
 

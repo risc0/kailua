@@ -14,7 +14,7 @@
 
 use crate::client::log;
 use crate::config::SET_BUILDER_ID;
-use crate::executor::Execution;
+use crate::executor::{compute_receipts_root, exec_precondition_hash, Execution};
 use crate::journal::ProofJournal;
 use crate::proof::Proof;
 use crate::witness::StitchedBootInfo;
@@ -39,7 +39,7 @@ pub fn run_stitching_client<
     beacon: B,
     fpvm_image_id: B256,
     payout_recipient_address: Address,
-    stitched_executions: Vec<Vec<Arc<Execution>>>,
+    stitched_executions: Vec<Vec<Execution>>,
     stitched_boot_info: Vec<StitchedBootInfo>,
 ) -> ProofJournal
 where
@@ -49,7 +49,11 @@ where
     #[cfg(target_os = "zkvm")]
     let proven_fpvm_journals = load_stitching_journals(fpvm_image_id);
 
-    // todo: Queue up precomputed executions
+    // Queue up precomputed executions
+    let stitched_executions = stitched_executions
+        .into_iter()
+        .map(|trace| trace.into_iter().map(Arc::new).collect::<Vec<_>>())
+        .collect::<Vec<_>>();
     let execution_cache = stitched_executions
         .iter()
         .flatten()
@@ -187,18 +191,29 @@ pub fn stitch_executions(
         return;
     };
     for execution_trace in stitched_executions {
+        let precondition_hash = exec_precondition_hash(execution_trace.as_slice());
         let mut iterator = execution_trace.iter();
         // Instantiate reference block
-        let safe_block = iterator.next().expect("Empty execution trace");
+        let first_execution = iterator.next().expect("Empty execution trace");
+        // Validate receipts
+        assert_eq!(
+            first_execution.artifacts.block_header.receipts_root,
+            compute_receipts_root(
+                first_execution.artifacts.receipts.as_slice(),
+                &boot.rollup_config,
+                first_execution.attributes.payload_attributes.timestamp
+            )
+        );
         let mut stitched_boot = StitchedBootInfo {
             l1_head: B256::ZERO,
-            agreed_l2_output_root: safe_block.agreed_output,
-            claimed_l2_output_root: safe_block.claimed_output,
-            claimed_l2_block_number: safe_block.artifacts.block_header.number,
+            agreed_l2_output_root: first_execution.agreed_output,
+            claimed_l2_output_root: first_execution.claimed_output,
+            claimed_l2_block_number: first_execution.artifacts.block_header.number,
         };
 
         // Validate continuity of successor blocks
         for successor in iterator {
+            // Validate succession
             assert_eq!(
                 successor.agreed_output,
                 stitched_boot.claimed_l2_output_root
@@ -207,7 +222,16 @@ pub fn stitch_executions(
                 successor.artifacts.block_header.number,
                 stitched_boot.claimed_l2_block_number + 1
             );
-
+            // Validate receipts
+            assert_eq!(
+                successor.artifacts.block_header.receipts_root,
+                compute_receipts_root(
+                    successor.artifacts.receipts.as_slice(),
+                    &boot.rollup_config,
+                    successor.attributes.payload_attributes.timestamp
+                )
+            );
+            // Update transition
             stitched_boot.agreed_l2_output_root = successor.agreed_output;
             stitched_boot.claimed_l2_output_root = successor.claimed_output;
             stitched_boot.claimed_l2_block_number = successor.artifacts.block_header.number;
@@ -218,7 +242,7 @@ pub fn stitch_executions(
             ProofJournal::new_stitched(
                 fpvm_image_id,
                 payout_recipient_address,
-                B256::ZERO,
+                precondition_hash,
                 B256::from(config_hash),
                 &stitched_boot,
             )

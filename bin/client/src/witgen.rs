@@ -65,6 +65,7 @@ where
         blobs_witness: core::mem::take(blobs_witness.lock().unwrap().deref_mut()),
         payout_recipient_address: payout_recipient,
         precondition_validation_data_hash,
+        stitched_executions: vec![], // todo: populate this
         stitched_boot_info,
         fpvm_image_id,
     };
