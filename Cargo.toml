@@ -68,6 +68,7 @@ alloy-eips = { version = "0.11.1", default-features = false, features = ["kzg"] 
 alloy-rlp = "0.3.11"
 alloy-primitives = { version = "0.8.21", default-features = false, features = ["map-hashbrown"] }
 alloy-rpc-types-beacon = "0.11.1"
+alloy-rpc-types-engine = { version = "0.11.1", default-features = false }
 alloy-sol-types = { version = "0.8.20", features = ["json"] }
 
 # Maili

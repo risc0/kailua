@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::config::safe_default;
 use alloy_consensus::Header;
-use alloy_primitives::{Sealed, B256};
+use alloy_eips::eip4895::Withdrawal;
+use alloy_primitives::{Bytes, Sealed, B256, B64};
 use async_trait::async_trait;
 use kona_driver::{Executor, PipelineCursor, TipCursor};
 use kona_executor::ExecutionArtifacts;
@@ -24,6 +26,7 @@ use kona_proof::FlushableCache;
 use maili_genesis::RollupConfig;
 use maili_protocol::{BatchValidationProvider, BlockInfo};
 use op_alloy_rpc_types_engine::OpPayloadAttributes;
+use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use spin::RwLock;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -101,4 +104,78 @@ where
 
     // Wrap the cursor in a shared read-write lock
     Ok(Arc::new(RwLock::new(cursor)))
+}
+
+pub fn attributes_hash(attributes: &OpPayloadAttributes) -> anyhow::Result<B256> {
+    let hashed_bytes = [
+        attributes
+            .payload_attributes
+            .timestamp
+            .to_be_bytes()
+            .as_slice(),
+        attributes.payload_attributes.prev_randao.as_slice(),
+        attributes
+            .payload_attributes
+            .suggested_fee_recipient
+            .as_slice(),
+        safe_default(
+            attributes
+                .payload_attributes
+                .withdrawals
+                .as_ref()
+                .map(withdrawals_hash),
+            B256::ZERO,
+        )?
+        .as_slice(),
+        safe_default(
+            attributes.payload_attributes.parent_beacon_block_root,
+            B256::ZERO,
+        )?
+        .as_slice(),
+        safe_default(
+            attributes.transactions.as_ref().map(transactions_hash),
+            B256::ZERO,
+        )?
+        .as_slice(),
+        &[safe_default(attributes.no_tx_pool, false)? as u8],
+        safe_default(attributes.gas_limit, u64::MAX)?
+            .to_be_bytes()
+            .as_slice(),
+        safe_default(attributes.eip_1559_params, B64::ZERO)?.as_slice(),
+    ]
+    .concat();
+    let digest: [u8; 32] = SHA2::hash_bytes(hashed_bytes.as_slice())
+        .as_bytes()
+        .try_into()?;
+    Ok(digest.into())
+}
+
+pub fn withdrawals_hash(withdrawals: &Vec<Withdrawal>) -> B256 {
+    let hashed_bytes = withdrawals
+        .iter()
+        .map(|w| {
+            [
+                w.index.to_be_bytes().as_slice(),
+                w.validator_index.to_be_bytes().as_slice(),
+                w.address.as_slice(),
+                w.amount.to_be_bytes().as_slice(),
+            ]
+            .concat()
+        })
+        .collect::<Vec<_>>()
+        .concat();
+    let digest: [u8; 32] = SHA2::hash_bytes(hashed_bytes.as_slice())
+        .as_bytes()
+        .try_into()
+        .unwrap();
+    digest.into()
+}
+
+pub fn transactions_hash(transactions: &Vec<Bytes>) -> B256 {
+    let hashed_bytes = alloy_rlp::encode(transactions);
+    let digest: [u8; 32] = SHA2::hash_bytes(hashed_bytes.as_slice())
+        .as_bytes()
+        .try_into()
+        .unwrap();
+    digest.into()
 }

@@ -25,7 +25,7 @@ pub const BN254_CONTROL_ID: B256 =
 pub const SET_BUILDER_ID: B256 =
     b256!("744cca56cde6933dea72752c78b4a6ca894ed620e8af6437ab05fad53bcec40a");
 
-fn safe_default<V: Debug + Eq>(opt: Option<V>, default: V) -> anyhow::Result<V> {
+pub fn safe_default<V: Debug + Eq>(opt: Option<V>, default: V) -> anyhow::Result<V> {
     if let Some(v) = opt {
         if v == default {
             anyhow::bail!(format!("Unsafe value! {v:?}"))

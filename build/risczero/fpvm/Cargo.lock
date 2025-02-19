@@ -2017,6 +2017,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "alloy-rpc-types-beacon",
+ "alloy-rpc-types-engine",
  "anyhow",
  "async-trait",
  "bincode",

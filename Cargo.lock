@@ -5082,6 +5082,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "alloy-rpc-types-beacon",
+ "alloy-rpc-types-engine 0.11.1",
  "anyhow",
  "async-trait",
  "bincode",
