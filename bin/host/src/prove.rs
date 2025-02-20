@@ -74,7 +74,7 @@ pub async fn compute_fpvm_proof(
     let proof_journal = stitch_boot_info(
         &boot,
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
-        args.payout_recipient_address.unwrap_or_default(),
+        args.proving.payout_recipient_address.unwrap_or_default(),
         precondition_hash,
         stitched_boot_info.clone(),
     );

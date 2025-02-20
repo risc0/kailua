@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::args::parse_address;
 use crate::boundless::BoundlessArgs;
 use crate::{bonsai, boundless, proof, witgen, zkvm};
 use alloy_primitives::{Address, B256};
 use anyhow::anyhow;
+use clap::Parser;
 use kailua_common::journal::ProofJournal;
 use kailua_common::oracle::vec::VecOracle;
 use kailua_common::proof::Proof;
@@ -31,6 +33,18 @@ use tracing::{error, info, warn};
 
 /// The size of the LRU cache in the oracle.
 pub const ORACLE_LRU_SIZE: usize = 1024;
+
+#[derive(Parser, Clone, Debug)]
+pub struct ProvingArgs {
+    #[clap(long, env, value_parser = parse_address)]
+    pub payout_recipient_address: Option<Address>,
+    #[clap(long, env, required = false, default_value_t = 21)]
+    pub segment_limit: u32,
+    #[clap(long, env, required = false, default_value_t = 104_857_600)]
+    pub max_witness_size: usize,
+    #[clap(long, env, default_value_t = false)]
+    pub skip_derivation_proof: bool,
+}
 
 #[derive(thiserror::Error, Debug)]
 pub enum ProvingError {

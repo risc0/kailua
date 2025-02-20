@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::boundless::BoundlessArgs;
+use crate::proving::ProvingArgs;
 use alloy_primitives::{Address, B256};
 use clap::Parser;
 use std::str::FromStr;
@@ -23,17 +24,11 @@ pub struct KailuaClientArgs {
     #[arg(long, env, action = clap::ArgAction::Count)]
     pub kailua_verbosity: u8,
 
-    #[clap(long, env, value_parser = parse_address)]
-    pub payout_recipient_address: Option<Address>,
-
     #[clap(long, env, value_parser = parse_b256)]
     pub precondition_validation_data_hash: Option<B256>,
 
-    #[clap(long, env, required = false, default_value_t = 21)]
-    pub segment_limit: u32,
-
-    #[clap(long, env, required = false, default_value_t = 104_857_600)]
-    pub max_witness_size: usize,
+    #[clap(flatten)]
+    pub proving: ProvingArgs,
 
     #[clap(flatten)]
     pub boundless: BoundlessArgs,

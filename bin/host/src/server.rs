@@ -53,14 +53,14 @@ pub async fn start_server_and_native_client(
         args.boundless,
         OracleReader::new(preimage.client),
         HintWriter::new(hint.client),
-        args.payout_recipient_address.unwrap_or_default(),
+        args.proving.payout_recipient_address.unwrap_or_default(),
         precondition_validation_data_hash,
         stitched_boot_info,
         stitched_proofs,
         prove_snark,
         force_attempt,
-        args.segment_limit,
-        args.max_witness_size,
+        args.proving.segment_limit,
+        args.proving.max_witness_size,
     ));
     // Execute both tasks and wait for them to complete.
     info!("Starting preimage server and client program.");
