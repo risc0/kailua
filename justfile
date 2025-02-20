@@ -106,6 +106,8 @@ bench l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data start length range count 
 prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data target="release" verbosity="":
   #!/usr/bin/env bash
 
+  set -x
+
   L1_NODE_ADDRESS="{{l1_rpc}}"
   L1_BEACON_ADDRESS="{{l1_beacon_rpc}}"
   L2_NODE_ADDRESS="{{l2_rpc}}"
