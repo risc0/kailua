@@ -22,20 +22,19 @@ async fn main() -> anyhow::Result<()> {
     kona_host::cli::init_tracing_subscriber(args.kailua_verbosity)?;
     let precondition_validation_data_hash =
         args.precondition_validation_data_hash.unwrap_or_default();
-    let payout_recipient_address = args.proving.payout_recipient_address.unwrap_or_default();
 
     kailua_client::proving::run_proving_client(
+        args.proving,
         args.boundless,
         ORACLE_READER,
         HINT_WRITER,
-        payout_recipient_address,
         precondition_validation_data_hash,
         vec![],
         vec![],
+        vec![],
         true,
         true,
-        args.proving.segment_limit,
-        args.proving.max_witness_size,
+        true,
     )
     .await?;
 

@@ -30,6 +30,14 @@ use serde::Deserialize;
 use std::fmt::Debug;
 use std::sync::Arc;
 
+#[derive(Clone, Debug, Default, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+pub struct StitchedData {
+    pub stitched_executions: Vec<Vec<Execution>>,
+    pub stitched_boot_info: Vec<StitchedBootInfo>,
+    #[rkyv(with = rkyv::with::Skip)]
+    pub stitched_proofs: Vec<Proof>,
+}
+
 pub fn run_stitching_client<
     O: CommsClient + FlushableCache + Send + Sync + Debug,
     B: BlobProvider + Send + Sync + Debug + Clone,
@@ -50,16 +58,7 @@ where
     let proven_fpvm_journals = load_stitching_journals(fpvm_image_id);
 
     // Queue up precomputed executions
-    let stitched_executions = stitched_executions
-        .into_iter()
-        .map(|trace| trace.into_iter().map(Arc::new).collect::<Vec<_>>())
-        .collect::<Vec<_>>();
-    let execution_cache = stitched_executions
-        .iter()
-        .flatten()
-        .cloned()
-        .rev()
-        .collect::<Vec<_>>();
+    let (stitched_executions, execution_cache) = split_executions(stitched_executions);
 
     // Attempt to recompute the output hash at the target block number using kona
     log("RUN");
@@ -176,6 +175,21 @@ pub fn verify_stitching_journal(
 #[cfg(not(target_os = "zkvm"))]
 pub fn verify_stitching_journal(_fpvm_image_id: B256, __proof_journal: Vec<u8>) {
     // noop
+}
+
+pub fn split_executions(
+    stitched_executions: Vec<Vec<Execution>>,
+) -> (Vec<Vec<Arc<Execution>>>, Vec<Arc<Execution>>) {
+    let stitched_executions = stitched_executions
+        .into_iter()
+        .map(|trace| trace.into_iter().map(Arc::new).collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    let execution_cache = stitched_executions
+        .iter()
+        .flatten()
+        .cloned()
+        .collect::<Vec<_>>();
+    (stitched_executions, execution_cache)
 }
 
 pub fn stitch_executions(

@@ -15,6 +15,7 @@
 use crate::blobs::BlobWitnessData;
 use crate::executor::Execution;
 use crate::journal::ProofJournal;
+use crate::oracle::vec::VecOracle;
 use crate::rkyv::{AddressDef, B256Def};
 use alloy_primitives::{Address, B256};
 use kona_preimage::{CommsClient, PreimageKey};
@@ -33,6 +34,14 @@ pub struct Witness<O: WitnessOracle> {
     pub stitched_boot_info: Vec<StitchedBootInfo>,
     #[rkyv(with = B256Def)]
     pub fpvm_image_id: B256,
+}
+
+impl Witness<VecOracle> {
+    pub fn deep_clone(&self) -> Self {
+        let mut cloned_with_arc = self.clone();
+        cloned_with_arc.oracle_witness = cloned_with_arc.oracle_witness.deep_clone();
+        cloned_with_arc
+    }
 }
 
 pub trait WitnessOracle: CommsClient + FlushableCache + Send + Sync + Debug {

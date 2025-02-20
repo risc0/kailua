@@ -197,7 +197,7 @@ where
         let block_header = alloy_rlp::decode_exact::<Header>(field.0.as_slice())
             .unwrap()
             .seal_slow();
-        let receipts = alloy_rlp::decode_exact(field.0.as_slice()).unwrap();
+        let receipts = alloy_rlp::decode_exact(field.1.as_slice()).unwrap();
         Ok(ExecutionArtifacts {
             block_header,
             receipts,

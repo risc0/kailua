@@ -16,6 +16,7 @@ use crate::args::KailuaHostArgs;
 use alloy_primitives::B256;
 use anyhow::anyhow;
 use kailua_client::proving::ProvingError;
+use kailua_common::executor::Execution;
 use kailua_common::proof::Proof;
 use kailua_common::witness::StitchedBootInfo;
 use kona_preimage::{BidirectionalChannel, HintWriter, OracleReader};
@@ -31,13 +32,16 @@ use tracing::info;
 /// - `Ok(exit_code)` if the client program exits successfully.
 /// - `Err(_)` if the client program failed to execute, was killed by a signal, or the host program
 ///   exited first.
+#[allow(clippy::too_many_arguments)]
 pub async fn start_server_and_native_client(
     args: KailuaHostArgs,
     precondition_validation_data_hash: B256,
+    stitched_executions: Vec<Vec<Execution>>,
     stitched_boot_info: Vec<StitchedBootInfo>,
     stitched_proofs: Vec<Proof>,
     prove_snark: bool,
     force_attempt: bool,
+    seek_proof: bool,
 ) -> Result<(), ProvingError> {
     // Instantiate data channels
     let hint = BidirectionalChannel::new().map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
@@ -50,17 +54,17 @@ pub async fn start_server_and_native_client(
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     // Start the client program in a separate child process.
     let program_task = tokio::spawn(kailua_client::proving::run_proving_client(
+        args.proving,
         args.boundless,
         OracleReader::new(preimage.client),
         HintWriter::new(hint.client),
-        args.proving.payout_recipient_address.unwrap_or_default(),
         precondition_validation_data_hash,
+        stitched_executions,
         stitched_boot_info,
         stitched_proofs,
         prove_snark,
         force_attempt,
-        args.proving.segment_limit,
-        args.proving.max_witness_size,
+        seek_proof,
     ));
     // Execute both tasks and wait for them to complete.
     info!("Starting preimage server and client program.");

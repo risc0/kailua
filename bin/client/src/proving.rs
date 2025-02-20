@@ -18,6 +18,8 @@ use crate::{bonsai, boundless, proof, witgen, zkvm};
 use alloy_primitives::{Address, B256};
 use anyhow::anyhow;
 use clap::Parser;
+use kailua_common::client::stitching::split_executions;
+use kailua_common::executor::Execution;
 use kailua_common::journal::ProofJournal;
 use kailua_common::oracle::vec::VecOracle;
 use kailua_common::proof::Proof;
@@ -46,10 +48,22 @@ pub struct ProvingArgs {
     pub skip_derivation_proof: bool,
 }
 
+impl ProvingArgs {
+    pub fn can_fit_witness(&self, witness: &Witness<VecOracle>) -> bool {
+        let witness_frames =
+            encode_witness_frames(witness.deep_clone()).expect("Failed to encode VecOracle");
+        let witness_size = witness_frames.iter().map(|f| f.len()).sum::<usize>();
+        witness_size < self.max_witness_size
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum ProvingError {
-    #[error("WitnessSizeError error: found {0} expected {0}")]
-    WitnessSizeError(usize, usize),
+    #[error("SeekProofError error: witness {0}")]
+    SeekProofError(usize, Vec<Vec<Execution>>),
+
+    #[error("WitnessSizeError error: size {0} limit {0}")]
+    WitnessSizeError(usize, usize, Vec<Vec<Execution>>),
 
     #[error("ExecutionError error: ZKVM failed {0:?}")]
     ExecutionError(anyhow::Error),
@@ -60,24 +74,29 @@ pub enum ProvingError {
 
 #[allow(clippy::too_many_arguments)]
 pub async fn run_proving_client<P, H>(
+    proving: ProvingArgs,
     boundless: BoundlessArgs,
     oracle_client: P,
     hint_client: H,
-    payout_recipient: Address,
     precondition_validation_data_hash: B256,
+    stitched_executions: Vec<Vec<Execution>>,
     stitched_boot_info: Vec<StitchedBootInfo>,
     stitched_proofs: Vec<Proof>,
     prove_snark: bool,
     force_attempt: bool,
-    segment_limit: u32,
-    max_witness_size: usize,
+    seek_proof: bool,
 ) -> Result<(), ProvingError>
 where
     P: PreimageOracleClient + Send + Sync + Debug + Clone + 'static,
     H: HintWriterClient + Send + Sync + Debug + Clone + 'static,
 {
     // preload all data natively into a hashmap
-    info!("Running map witgen client.");
+    let (_, execution_cache) = split_executions(stitched_executions.clone());
+    info!(
+        "Running vec witgen client with {} cached executions ({} traces).",
+        execution_cache.len(),
+        stitched_executions.len()
+    );
     let (journal, mut witness_vec): (ProofJournal, Witness<VecOracle>) = {
         // Instantiate oracles
         let preimage_oracle = Arc::new(CachingOracle::new(
@@ -89,104 +108,52 @@ where
         // Run witness generation with oracles
         witgen::run_witgen_client(
             preimage_oracle,
-            max_witness_size,
+            proving.max_witness_size / 10,
             blob_provider,
-            payout_recipient,
+            proving.payout_recipient_address.unwrap_or_default(),
             precondition_validation_data_hash,
-            vec![], // todo: populate execution trace
+            execution_cache.clone(),
             stitched_boot_info.clone(),
         )
         .await
-        .expect("Failed to run map witgen client.")
+        .expect("Failed to run vec witgen client.")
     };
-    witness_vec.stitched_executions.clear();
 
-    // // unroll map witness into a vec witness
-    // info!("Running vec witgen client.");
-    // let (journal_map, mut witness_vec): (ProofJournal, Witness<VecOracle>) = witgen::run_witgen_client(
-    //     Arc::new(witness_map.oracle_witness.clone()),
-    //     max_witness_size / 10,
-    //     PreloadedBlobProvider::from(witness_map.blobs_witness.clone()),
-    //     payout_recipient,
-    //     precondition_validation_data_hash,
-    //     vec![], // todo: populate execution trace
-    //     stitched_boot_info.clone(),
-    // )
-    // .await
-    // .expect("Failed to run vec witgen client.");
-    // witness_vec.stitched_executions.clear();
-    //
-    // if journal != journal_map {
-    //     error!("Native journal does not match journal backed by map witness");
-    // }
-    // info!("Running vec witness client.");
-    // let cloned_witness_vec = {
-    //     let mut cloned_with_arc = witness_vec.clone();
-    //     cloned_with_arc.oracle_witness.preimages = Arc::new(Mutex::new(
-    //         witness_vec.oracle_witness.preimages.lock().unwrap().clone(),
-    //     ));
-    //     cloned_with_arc
-    // };
-    // let journal_vec = run_stateless_client(cloned_witness_vec);
-    // if journal != journal_vec {
-    //     error!("Native journal does not match journal backed by vec witness");
-    // }
+    let execution_trace =
+        core::mem::replace(&mut witness_vec.stitched_executions, stitched_executions);
 
-    // compute the zkvm proof
-    let witness_frames = encode_witness_frames(witness_vec).expect("Failed to encode VecOracle");
-    let witness_size = witness_frames.iter().map(|f| f.len()).sum::<usize>();
-    info!("Witness size: {}", witness_size);
-    if witness_size > max_witness_size {
-        warn!("Witness too large.");
+    // check if we can prove this workload
+    let (main_witness_size, witness_size) = sum_witness_size(&witness_vec);
+    info!("Witness size: {witness_size} ({main_witness_size} main)");
+    if witness_size > proving.max_witness_size {
+        warn!(
+            "Witness size {} exceeds limit {}.",
+            witness_size, proving.max_witness_size
+        );
         if !force_attempt {
             warn!("Aborting.");
             return Err(ProvingError::WitnessSizeError(
                 witness_size,
-                max_witness_size,
+                proving.max_witness_size,
+                execution_trace,
             ));
         }
         warn!("Continuing..");
     }
-    let proof = match boundless.market {
-        Some(args) => {
-            boundless::run_boundless_client(
-                args,
-                boundless.storage,
-                journal,
-                witness_frames,
-                stitched_proofs,
-                segment_limit,
-            )
-            .await?
-        }
-        None => {
-            if bonsai::should_use_bonsai() {
-                bonsai::run_bonsai_client(witness_frames, stitched_proofs, prove_snark).await?
-            } else {
-                zkvm::run_zkvm_client(witness_frames, stitched_proofs, prove_snark, segment_limit)
-                    .await?
-            }
-        }
-    };
 
-    // Prepare proof file
-    let proof_journal = ProofJournal::decode_packed(proof.journal().as_ref())
-        .expect("Failed to decode proof output");
-    let mut output_file = File::create(proof::proof_file_name(&proof_journal))
-        .await
-        .expect("Failed to create proof output file");
-    // Write proof data to file
-    let proof_bytes = bincode::serialize(&proof).expect("Could not serialize proof.");
-    output_file
-        .write_all(proof_bytes.as_slice())
-        .await
-        .expect("Failed to write proof to file");
-    output_file
-        .flush()
-        .await
-        .expect("Failed to flush proof output file data.");
+    if !seek_proof {
+        return Err(ProvingError::SeekProofError(witness_size, execution_trace));
+    }
 
-    Ok(())
+    seek_fpvm_proof(
+        &proving,
+        boundless.clone(),
+        journal,
+        encode_witness_frames(witness_vec).expect("Failed to encode VecOracle"),
+        stitched_proofs,
+        prove_snark,
+    )
+    .await
 }
 
 pub fn encode_witness_frames(witness_vec: Witness<VecOracle>) -> anyhow::Result<Vec<Vec<u8>>> {
@@ -208,4 +175,73 @@ pub fn encode_witness_frames(witness_vec: Witness<VecOracle>) -> anyhow::Result<
         .to_vec();
 
     Ok([vec![main_frame], shards].concat())
+}
+
+pub fn sum_witness_size(witness: &Witness<VecOracle>) -> (usize, usize) {
+    let witness_frames =
+        encode_witness_frames(witness.deep_clone()).expect("Failed to encode VecOracle");
+    (
+        witness_frames.first().map(|f| f.len()).unwrap(),
+        witness_frames.iter().map(|f| f.len()).sum::<usize>(),
+    )
+}
+pub async fn seek_fpvm_proof(
+    proving: &ProvingArgs,
+    boundless: BoundlessArgs,
+    journal: ProofJournal,
+    witness_frames: Vec<Vec<u8>>,
+    stitched_proofs: Vec<Proof>,
+    prove_snark: bool,
+) -> Result<(), ProvingError> {
+    // compute the zkvm proof
+    let proof = match boundless.market {
+        Some(marked_provider_config) => {
+            boundless::run_boundless_client(
+                marked_provider_config,
+                boundless.storage,
+                journal,
+                witness_frames,
+                stitched_proofs,
+                proving.segment_limit,
+            )
+            .await?
+        }
+        None => {
+            if bonsai::should_use_bonsai() {
+                bonsai::run_bonsai_client(witness_frames, stitched_proofs, prove_snark).await?
+            } else {
+                zkvm::run_zkvm_client(
+                    witness_frames,
+                    stitched_proofs,
+                    prove_snark,
+                    proving.segment_limit,
+                )
+                .await?
+            }
+        }
+    };
+
+    // Save proof file to disk
+    save_proof_to_disk(&proof).await;
+
+    Ok(())
+}
+
+pub async fn save_proof_to_disk(proof: &Proof) {
+    // Save proof file to disk
+    let proof_journal = ProofJournal::decode_packed(proof.journal().as_ref())
+        .expect("Failed to decode proof output");
+    let mut output_file = File::create(proof::proof_file_name(&proof_journal))
+        .await
+        .expect("Failed to create proof output file");
+    // Write proof data to file
+    let proof_bytes = bincode::serialize(proof).expect("Could not serialize proof.");
+    output_file
+        .write_all(proof_bytes.as_slice())
+        .await
+        .expect("Failed to write proof to file");
+    output_file
+        .flush()
+        .await
+        .expect("Failed to flush proof output file data.");
 }

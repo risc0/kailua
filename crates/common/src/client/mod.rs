@@ -41,7 +41,7 @@ pub fn run_kailua_client<
     precondition_validation_data_hash: B256,
     oracle: Arc<O>,
     mut beacon: B,
-    execution_trace: Vec<Arc<Execution>>,
+    execution_cache: Vec<Arc<Execution>>,
     collection_target: Option<Arc<Mutex<Vec<Execution>>>>,
 ) -> anyhow::Result<(BootInfo, B256)>
 where
@@ -57,6 +57,7 @@ where
             .context("BootInfo::load")?;
         let rollup_config = Arc::new(boot.rollup_config.clone());
 
+        log("SAFE HEAD HASH");
         let safe_head_hash =
             fetch_safe_head_hash(oracle.as_ref(), boot.agreed_l2_output_root).await?;
 
@@ -66,6 +67,7 @@ where
 
         // The claimed L2 block number must be greater than or equal to the L2 safe head.
         // Fetch the safe head's block header.
+        log("SAFE HEAD");
         let safe_head = l2_provider
             .header_by_hash(safe_head_hash)
             .map(|header| Sealed::new_unchecked(header, safe_head_hash))?;
@@ -96,17 +98,17 @@ where
             kona_executor.update_safe_head(safe_head);
 
             // Validate expected block count
-            assert_eq!(expected_output_count, execution_trace.len());
+            assert_eq!(expected_output_count, execution_cache.len());
 
             // Validate non-empty execution trace
-            assert!(!execution_trace.is_empty());
+            assert!(!execution_cache.is_empty());
 
             // Calculate precondition hash
-            let precondition_hash = exec_precondition_hash(execution_trace.as_slice());
+            let precondition_hash = exec_precondition_hash(execution_cache.as_slice());
 
             // Validate terminating block number
             assert_eq!(
-                execution_trace
+                execution_cache
                     .last()
                     .unwrap()
                     .artifacts
@@ -116,7 +118,7 @@ where
             );
 
             // Validate executed chain
-            for execution in execution_trace {
+            for execution in execution_cache {
                 // Verify initial state
                 assert_eq!(
                     execution.agreed_output,
@@ -181,7 +183,12 @@ where
             l2_provider.clone(),
         );
         let cached_executor = CachedExecutor {
-            cache: execution_trace,
+            cache: {
+                // The cache elements will be popped from first to last
+                let mut cache = execution_cache;
+                cache.reverse();
+                cache
+            },
             executor: KonaExecutor::new(
                 rollup_config.as_ref(),
                 l2_provider.clone(),

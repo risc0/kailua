@@ -25,7 +25,7 @@ use lazy_static::lazy_static;
 use std::collections::VecDeque;
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
-use tracing::warn;
+use tracing::{info, warn};
 
 pub type IndexedPreimage = (PreimageKey, Vec<u8>, Option<(usize, usize)>);
 pub type PreimageVecEntry = Vec<IndexedPreimage>;
@@ -35,6 +35,14 @@ pub type PreimageVecStore = Arc<Mutex<Vec<PreimageVecEntry>>>;
 pub struct VecOracle {
     #[rkyv(with = PreimageVecStoreRkyv)]
     pub preimages: PreimageVecStore,
+}
+
+impl VecOracle {
+    pub fn deep_clone(&self) -> Self {
+        let mut cloned_with_arc = self.clone();
+        cloned_with_arc.preimages = Arc::new(Mutex::new(self.preimages.lock().unwrap().clone()));
+        cloned_with_arc
+    }
 }
 
 impl WitnessOracle for VecOracle {
@@ -71,6 +79,7 @@ impl WitnessOracle for VecOracle {
     }
 
     fn finalize_preimages(&mut self, shard_size: usize) {
+        info!("Finalizing preimages with shard size: {shard_size}");
         self.validate_preimages()
             .expect("Failed to validate preimages during finalization");
         let mut preimages = self.preimages.lock().unwrap();
@@ -125,7 +134,12 @@ impl PreimageOracleClient for VecOracle {
         let mut queue = QUEUE.lock().unwrap();
         // handle variations in memory access operations due to hashmap usages
         loop {
-            let entry = preimages.last_mut().expect("VecOracle Exhausted");
+            let entry = preimages.last_mut().unwrap_or_else(|| {
+                panic!(
+                    "Exhausted VecOracle seeking {key} ({} queued preimages)",
+                    queue.len()
+                )
+            });
             loop {
                 let Some((last_key, value, _)) = entry.pop() else {
                     break;

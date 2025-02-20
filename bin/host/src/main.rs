@@ -44,6 +44,7 @@ async fn main() -> anyhow::Result<()> {
                 .expect("Failed to parse op_node_address"),
         ))
     });
+
     // compute individual proofs
     let mut job_pq = BinaryHeap::new();
     let mut proofs = Vec::new();
@@ -86,15 +87,16 @@ async fn main() -> anyhow::Result<()> {
             Ok(proof) => {
                 proofs.push(proof);
             }
-            Err(e) => {
-                match e {
-                    ProvingError::WitnessSizeError(f, e) => {
+            Err(err) => {
+                // Handle error case
+                match err {
+                    ProvingError::WitnessSizeError(f, t, ..) => {
                         if force_attempt {
-                            unreachable!(
-                                "Received WitnessSizeError({f},{e}) for a forced proving attempt."
+                            bail!(
+                                "Received WitnessSizeError({f},{t}) for a forced proving attempt: {err:?}"
                             );
                         }
-                        warn!("Proof witness size {f} above safety threshold {e}. Splitting workload.")
+                        warn!("Proof witness size {f} above safety threshold {t}. Splitting workload.")
                     }
                     ProvingError::ExecutionError(e) => {
                         if force_attempt {
@@ -105,6 +107,7 @@ async fn main() -> anyhow::Result<()> {
                     ProvingError::OtherError(e) => {
                         bail!("Irrecoverable proving error: {e:?}")
                     }
+                    ProvingError::SeekProofError(..) => unreachable!("SeekProofError bubbled up"),
                 }
                 // Split workload at midpoint (num_blocks > 1)
                 have_split = true;
@@ -123,12 +126,12 @@ async fn main() -> anyhow::Result<()> {
                     )
                     .await?
                     .unwrap_or_else(|| panic!("Block {mid_point} not found"));
-                // Lower half workload ends at midpoint
+                // Lower half workload ends at midpoint (inclusive)
                 let mut lower_job_args = job_args.clone();
                 lower_job_args.kona.claimed_l2_output_root = mid_output;
                 lower_job_args.kona.claimed_l2_block_number = mid_point;
                 job_pq.push(lower_job_args);
-                // upper half workload starts at midpoint
+                // upper half workload starts after midpoint
                 let mut upper_job_args = job_args;
                 upper_job_args.kona.agreed_l2_output_root = mid_output;
                 upper_job_args.kona.agreed_l2_head_hash = mid_block.header.hash;

@@ -33,7 +33,7 @@ pub async fn run_witgen_client<P, B, O>(
     blob_provider: B,
     payout_recipient: Address,
     precondition_validation_data_hash: B256,
-    execution_trace: Vec<Arc<Execution>>,
+    execution_cache: Vec<Arc<Execution>>,
     stitched_boot_info: Vec<StitchedBootInfo>,
 ) -> anyhow::Result<(ProofJournal, Witness<O>)>
 where
@@ -59,7 +59,7 @@ where
         precondition_validation_data_hash,
         oracle,
         beacon,
-        execution_trace,
+        execution_cache,
         Some(collection_target.clone()),
     )?;
     // Fix claimed output of captured executions
@@ -67,7 +67,9 @@ where
     for i in 1..executions.len() {
         executions[i - 1].claimed_output = executions[i].agreed_output;
     }
-    executions.last_mut().unwrap().claimed_output = boot.claimed_l2_output_root;
+    if let Some(last_exec) = executions.last_mut() {
+        last_exec.claimed_output = boot.claimed_l2_output_root;
+    }
     let stitched_executions = vec![core::mem::take(executions.deref_mut())];
     // Construct witness
     let fpvm_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(KAILUA_FPVM_ID));

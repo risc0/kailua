@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::client::log;
 use crate::config::safe_default;
 use crate::rkyv::{B256Def, ExecutionArtifactsRkyv, OpPayloadAttributesRkyv};
 use alloy_consensus::Header;
 use alloy_eips::eip4895::Withdrawal;
 use alloy_eips::Encodable2718;
 use alloy_primitives::{Bytes, Sealed, B256, B64};
+use anyhow::Context;
 use async_trait::async_trait;
 use kona_driver::{Executor, PipelineCursor, TipCursor};
 use kona_executor::ExecutionArtifacts;
@@ -82,6 +84,7 @@ impl<E: Executor + Send + Sync + Debug> Executor for CachedExecutor<E> {
             .unwrap_or(Ok(false))?
         {
             let artifacts = self.cache.pop().unwrap().artifacts.clone();
+            log(&format!("CACHE {}", artifacts.block_header.number));
             self.update_safe_head(artifacts.block_header.clone());
             return Ok(artifacts);
         }
@@ -148,23 +151,29 @@ pub fn attributes_hash(attributes: &OpPayloadAttributes) -> anyhow::Result<B256>
                 .as_ref()
                 .map(|wds| withdrawals_hash(wds.as_slice())),
             B256::ZERO,
-        )?
+        )
+        .context("safe_default withdrawals")?
         .as_slice(),
         safe_default(
             attributes.payload_attributes.parent_beacon_block_root,
             B256::ZERO,
-        )?
+        )
+        .context("safe_default parent_beacon_block_root")?
         .as_slice(),
         safe_default(
             attributes.transactions.as_ref().map(transactions_hash),
             B256::ZERO,
-        )?
+        )
+        .context("safe_default transactions_hash")?
         .as_slice(),
-        &[safe_default(attributes.no_tx_pool, false)? as u8],
-        safe_default(attributes.gas_limit, u64::MAX)?
+        &[safe_default(attributes.no_tx_pool, false).context("safe_default no_tx_pool")? as u8],
+        safe_default(attributes.gas_limit, u64::MAX)
+            .context("safe_default gas_limit")?
             .to_be_bytes()
             .as_slice(),
-        safe_default(attributes.eip_1559_params, B64::ZERO)?.as_slice(),
+        safe_default(attributes.eip_1559_params, B64::new([0xff; 8]))
+            .context("safe_default eip_1559_params")?
+            .as_slice(),
     ]
     .concat();
     let digest: [u8; 32] = SHA2::hash_bytes(hashed_bytes.as_slice())
