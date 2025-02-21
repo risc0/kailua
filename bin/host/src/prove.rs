@@ -41,7 +41,7 @@ pub async fn compute_fpvm_proof(
     stitched_boot_info: Vec<StitchedBootInfo>,
     stitched_proofs: Vec<Proof>,
     prove_snark: bool,
-) -> Result<Proof, ProvingError> {
+) -> Result<Option<Proof>, ProvingError> {
     // preload precondition data into KV store
     let (precondition_hash, precondition_validation_data_hash) =
         match fetch_precondition_data(&args)
@@ -108,14 +108,14 @@ pub async fn compute_fpvm_proof(
     //  1. try entire proof
     //      on failure, take execution trace
     //  2. try derivation-only proof
-    //      on failure, report witness size error unless forced attempt
+    //      on failure, report error
     //  3. compute series of execution-only proofs
     //  4. compute derivation-proof with stitched executions
 
-    // generate master proof
     let stitching_only = args.kona.agreed_l2_output_root == args.kona.claimed_l2_output_root;
+    // generate master proof
     info!("Attempting complete proof.");
-    let proof_result = compute_cached_proof(
+    let complete_proof_result = compute_cached_proof(
         args.clone(),
         rollup_config.clone(),
         precondition_hash,
@@ -123,42 +123,49 @@ pub async fn compute_fpvm_proof(
         vec![],
         stitched_boot_info.clone(),
         stitched_proofs.clone(),
-        prove_snark,
-        stitching_only,
-        true,
+        prove_snark,                         // pass through snark requirement
+        stitching_only, // force attempting to compute the proof if it only combines boot infos
+        !args.proving.skip_derivation_proof, // skip seeking a complete proof if skipping derivation
     )
     .await;
-    // on WitnessSizeError, extract execution trace
-    let Err(ProvingError::WitnessSizeError(_, _, executed_blocks)) = proof_result else {
-        return proof_result;
+    // on WitnessSizeError or SeekProofError, extract execution trace
+    let executed_blocks = match complete_proof_result {
+        Err(ProvingError::WitnessSizeError(_, _, executed_blocks)) => executed_blocks,
+        Err(ProvingError::SeekProofError(_, executed_blocks)) => executed_blocks,
+        other_result => return Ok(Some(other_result?)),
     };
-    // perform derivation-only run without seeking a proof
+    // flatten executed l2 blocks
     let (_, execution_cache) = split_executions(executed_blocks.clone());
-    info!(
-        "Performing derivation-only run for {} executions.",
-        execution_cache.len()
-    );
-    let derivation_only_result = compute_cached_proof(
-        args.clone(),
-        rollup_config.clone(),
-        precondition_hash,
-        precondition_validation_data_hash,
-        executed_blocks.clone(),
-        stitched_boot_info.clone(),
-        stitched_proofs.clone(),
-        false,
-        true,
-        false,
-    )
-    .await;
-    // propagate unexpected error up on failure to trigger higher-level division
-    let Err(ProvingError::SeekProofError(..)) = derivation_only_result else {
-        warn!(
-            "Unexpected derivation-only result (is_ok={}).",
-            derivation_only_result.is_ok()
+
+    // perform a derivation-only run to check its provability
+    if !args.proving.skip_derivation_proof {
+        info!(
+            "Performing derivation-only run for {} executions.",
+            execution_cache.len()
         );
-        return derivation_only_result;
-    };
+        let derivation_only_result = compute_cached_proof(
+            args.clone(),
+            rollup_config.clone(),
+            precondition_hash,
+            precondition_validation_data_hash,
+            executed_blocks.clone(),
+            stitched_boot_info.clone(),
+            stitched_proofs.clone(),
+            false,
+            true,
+            false,
+        )
+        .await;
+        // propagate unexpected error up on failure to trigger higher-level division
+        let Err(ProvingError::SeekProofError(..)) = derivation_only_result else {
+            warn!(
+                "Unexpected derivation-only result (is_ok={}).",
+                derivation_only_result.is_ok()
+            );
+            return Ok(Some(derivation_only_result?));
+        };
+    }
+
     // compute execution proofs
     let mut job_pq = BinaryHeap::new();
     let mut proofs = Vec::new();
@@ -243,6 +250,9 @@ pub async fn compute_fpvm_proof(
                     ProvingError::SeekProofError(_, _) => {
                         unreachable!("Sought proof, found SeekProofError {err:?}")
                     }
+                    ProvingError::DerivationProofError(_) => {
+                        unreachable!("Sought proof, found DerivationProofError {err:?}")
+                    }
                 }
                 // Split workload at midpoint (num_blocks > 1)
                 let mid_point = starting_block + num_blocks / 2;
@@ -266,6 +276,11 @@ pub async fn compute_fpvm_proof(
     }
     stitched_executions.reverse();
 
+    // Return no proof if derivation is not required
+    if args.proving.skip_derivation_proof {
+        return Ok(None);
+    }
+
     // Combine execution proofs with derivation proof
     let total_blocks = stitched_executions.iter().map(|e| e.len()).sum::<usize>();
     info!(
@@ -273,19 +288,21 @@ pub async fn compute_fpvm_proof(
         proofs.len(),
         stitched_executions.len()
     );
-    compute_cached_proof(
-        args,
-        rollup_config,
-        precondition_hash,
-        precondition_validation_data_hash,
-        stitched_executions,
-        stitched_boot_info,
-        [stitched_proofs, proofs].concat(),
-        prove_snark,
-        true,
-        true,
-    )
-    .await
+    Ok(Some(
+        compute_cached_proof(
+            args,
+            rollup_config,
+            precondition_hash,
+            precondition_validation_data_hash,
+            stitched_executions,
+            stitched_boot_info,
+            [stitched_proofs, proofs].concat(),
+            prove_snark,
+            true,
+            true,
+        )
+        .await?,
+    ))
 }
 
 #[allow(clippy::too_many_arguments)]

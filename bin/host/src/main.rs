@@ -79,7 +79,9 @@ async fn main() -> anyhow::Result<()> {
             .await
         {
             Ok(proof) => {
-                proofs.push(proof);
+                if let Some(proof) = proof {
+                    proofs.push(proof);
+                }
             }
             Err(err) => {
                 // Handle error case
@@ -102,6 +104,10 @@ async fn main() -> anyhow::Result<()> {
                         bail!("Irrecoverable proving error: {e:?}")
                     }
                     ProvingError::SeekProofError(..) => unreachable!("SeekProofError bubbled up"),
+                    ProvingError::DerivationProofError(proofs) => {
+                        info!("Computed {proofs} execution-only proofs.");
+                        continue;
+                    }
                 }
                 // Split workload at midpoint (num_blocks > 1)
                 have_split = true;

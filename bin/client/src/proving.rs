@@ -59,6 +59,9 @@ impl ProvingArgs {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ProvingError {
+    #[error("DerivationProofError error: execution proofs {0}")]
+    DerivationProofError(usize),
+
     #[error("SeekProofError error: witness {0}")]
     SeekProofError(usize, Vec<Vec<Execution>>),
 
