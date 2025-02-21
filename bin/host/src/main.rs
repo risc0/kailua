@@ -75,14 +75,8 @@ async fn main() -> anyhow::Result<()> {
         // Force the proving attempt regardless of witness size if we prove just one block
         let force_attempt = num_blocks == 1 || job_args.kona.is_offline();
 
-        match kailua_host::prove::compute_fpvm_proof(
-            job_args.clone(),
-            vec![],
-            vec![],
-            !have_split,
-            force_attempt,
-        )
-        .await
+        match kailua_host::prove::compute_fpvm_proof(job_args.clone(), vec![], vec![], !have_split)
+            .await
         {
             Ok(proof) => {
                 proofs.push(proof);
@@ -166,7 +160,7 @@ async fn main() -> anyhow::Result<()> {
             .iter()
             .map(StitchedBootInfo::from)
             .collect::<Vec<_>>();
-        kailua_host::prove::compute_fpvm_proof(base_args, stitched_boot_info, proofs, true, true)
+        kailua_host::prove::compute_fpvm_proof(base_args, stitched_boot_info, proofs, true)
             .await
             .context("Failed to compute FPVM proof.")?;
     }

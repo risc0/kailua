@@ -41,7 +41,6 @@ pub async fn compute_fpvm_proof(
     stitched_boot_info: Vec<StitchedBootInfo>,
     stitched_proofs: Vec<Proof>,
     prove_snark: bool,
-    _force_attempt: bool,
 ) -> Result<Proof, ProvingError> {
     // preload precondition data into KV store
     let (precondition_hash, precondition_validation_data_hash) =
@@ -80,6 +79,7 @@ pub async fn compute_fpvm_proof(
             .await
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
         let mut transactions = 0;
+        let mut gas = 0;
         let starting_block = providers
             .l2
             .get_block_by_hash(args.kona.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
@@ -90,19 +90,19 @@ pub async fn compute_fpvm_proof(
             .number;
         let block_count = args.kona.claimed_l2_block_number - starting_block;
         for i in 0..block_count {
-            transactions += providers
+            let block = providers
                 .l2
-                .get_block_transaction_count_by_number(BlockNumberOrTag::Number(
-                    starting_block + i + 1,
-                ))
+                .get_block_by_number(
+                    BlockNumberOrTag::Number(starting_block + i + 1),
+                    BlockTransactionsKind::Hashes,
+                )
                 .await
                 .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
                 .expect("Failed to get transaction count for block {i}");
+            transactions += block.transactions.len();
+            gas += block.header.gas_used;
         }
-        info!(
-            "Proving {} transactions over {} blocks.",
-            transactions, block_count
-        );
+        info!("Proving {transactions} transactions for {gas} gas over {block_count} blocks.");
     }
 
     //  1. try entire proof
@@ -169,6 +169,7 @@ pub async fn compute_fpvm_proof(
         args
     });
     // divide and conquer executions
+    let mut stitched_executions = vec![];
     while let Some(job_args) = job_pq.pop() {
         let starting_block = execution_cache
             .iter()
@@ -198,16 +199,16 @@ pub async fn compute_fpvm_proof(
 
         // Force the proving attempt regardless of witness size if we prove just one block
         let force_attempt = num_blocks == 1;
-        let stitched_executions = vec![executed_blocks
+        let executed_blocks = executed_blocks
             .iter()
             .map(|a| a.as_ref().clone())
-            .collect::<Vec<_>>()];
+            .collect::<Vec<_>>();
         match compute_cached_proof(
             job_args.clone(),
             rollup_config.clone(),
             precondition_hash,
             B256::ZERO,
-            stitched_executions,
+            vec![executed_blocks.clone()],
             vec![],
             vec![],
             false,
@@ -219,6 +220,7 @@ pub async fn compute_fpvm_proof(
             Ok(proof) => {
                 // conquered
                 proofs.push(proof);
+                stitched_executions.push(executed_blocks);
             }
             Err(err) => {
                 // divide or bail out on error
@@ -262,18 +264,21 @@ pub async fn compute_fpvm_proof(
             }
         }
     }
+    stitched_executions.reverse();
 
     // Combine execution proofs with derivation proof
+    let total_blocks = stitched_executions.iter().map(|e| e.len()).sum::<usize>();
     info!(
-        "Combining {} execution proofs with derivation proof.",
-        proofs.len()
+        "Combining {}/{} execution proofs for {total_blocks} blocks with derivation proof.",
+        proofs.len(),
+        stitched_executions.len()
     );
     compute_cached_proof(
         args,
         rollup_config,
         precondition_hash,
         precondition_validation_data_hash,
-        executed_blocks,
+        stitched_executions,
         stitched_boot_info,
         [stitched_proofs, proofs].concat(),
         prove_snark,
