@@ -21,7 +21,7 @@ use kona_derive::prelude::BlobProvider;
 use kona_preimage::errors::PreimageOracleResult;
 use kona_preimage::{CommsClient, HintWriterClient, PreimageKey, PreimageOracleClient};
 use kona_proof::FlushableCache;
-use maili_protocol::BlockInfo;
+use kona_protocol::BlockInfo;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 use tracing::debug;

@@ -43,7 +43,7 @@ use kailua_common::precondition::{
 use kailua_common::proof::Proof;
 use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
-use maili_protocol::BlockInfo;
+use kona_protocol::BlockInfo;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use risc0_zkvm::is_dev_mode;

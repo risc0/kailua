@@ -43,16 +43,16 @@ opentelemetry-zipkin.workspace = true
 alloy = { workspace = true, features = ["full", "kzg", "signer-aws", "signer-gcp"] }
 alloy-rpc-types-beacon.workspace = true
 
-maili-protocol.workspace = true
-
 kailua-build.workspace = true
 kailua-client.workspace = true
 kailua-common.workspace = true
 kailua-contracts.workspace = true
 kailua-host.workspace = true
 
+kona-genesis.workspace = true
 kona-host.workspace = true
 kona-derive.workspace = true
+kona-protocol.workspace = true
 kona-providers-alloy.workspace = true
 
 bonsai-sdk.workspace = true
