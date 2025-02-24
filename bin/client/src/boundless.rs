@@ -323,7 +323,9 @@ pub async fn run_boundless_client(
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     }
     // Build final input
-    let input = builder.build();
+    let input = builder
+        .build_vec()
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     let input_url = boundless_client
         .upload_input(&input)
         .await
@@ -331,8 +333,8 @@ pub async fn run_boundless_client(
     info!("Uploaded input to {input_url}");
     let request_input = Input::url(input_url);
     let request = {
-        let mut req = ProofRequest::default()
-            .with_image_url(&image_url)
+        let mut req = ProofRequest::builder()
+            .with_image_url(image_url.as_str())
             .with_input(request_input)
             .with_requirements(requirements)
             .with_offer(
@@ -347,7 +349,9 @@ pub async fn run_boundless_client(
                     )
                     .with_ramp_up_period(10)
                     .with_timeout(1500),
-            );
+            )
+            .build()
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
         req.id = boundless_client
             .boundless_market
             .request_id_from_nonce()

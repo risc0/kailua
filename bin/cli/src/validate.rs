@@ -1428,7 +1428,7 @@ fn maybe_patch_proof(
             // Patch the image id of the receipt to match the expected one
             if let risc0_zkvm::InnerReceipt::Fake(fake_inner_receipt) = &mut receipt.inner {
                 if let risc0_zkvm::MaybePruned::Value(claim) = &mut fake_inner_receipt.claim {
-                    warn!("DEVNET-ONLY: Patching fake receipt image id to match game contract.");
+                    warn!("DEV-MODE ONLY: Patching fake receipt image id to match game contract.");
                     claim.pre = risc0_zkvm::MaybePruned::Pruned(expected_fpvm_image_id);
                     if let risc0_zkvm::MaybePruned::Value(Some(output)) = &mut claim.output {
                         if let risc0_zkvm::MaybePruned::Value(journal) = &mut output.journal {

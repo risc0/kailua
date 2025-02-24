@@ -3285,12 +3285,13 @@ dependencies = [
 
 [[package]]
 name = "risc0-aggregation"
-version = "0.1.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "275c1323bb48e38146b43aab653bfafc48f9baef752d29a374eb75e92ced006c"
+checksum = "fb8ec3e28d8c341e44d433e3facfa279454ed210d5393b3c1e95197013e6c0f4"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
+ "bytemuck",
  "hex",
  "risc0-binfmt",
  "risc0-zkp",

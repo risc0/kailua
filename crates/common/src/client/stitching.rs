@@ -112,6 +112,7 @@ pub fn load_stitching_journals(fpvm_image_id: B256) -> HashSet<Digest> {
 
         match proof {
             Proof::ZKVMReceipt(receipt) => {
+                // Validate RISC Zero receipts natively
                 receipt
                     .verify(fpvm_image_id)
                     .expect("Failed to verify receipt for {journal_digest}.");
