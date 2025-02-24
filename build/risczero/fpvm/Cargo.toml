@@ -28,8 +28,8 @@ substrate-bn = "=0.6.0"
 
 kailua-common = { path = "../../../crates/common" }
 
-risc0-zkvm = { version = "1.2.3", features = ["std", "heap-embedded-alloc", "unstable"] }
-risc0-zkvm-platform = { version = "1.2.3", features = ["sys-getenv"] }
+risc0-zkvm = { version = "1.2.4", features = ["std", "heap-embedded-alloc", "unstable"] }
+risc0-zkvm-platform = { version = "1.2.4", features = ["sys-getenv"] }
 
 [features]
 disable-dev-mode = [
