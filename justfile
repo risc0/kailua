@@ -84,7 +84,7 @@ devnet-validate fastforward="0" target="debug" verbosity="" l1_rpc="http://127.0
       --validator-key {{validator}} \
       {{verbosity}}
 
-devnet-prove block_number block_count target="debug" verbosity="" data=".localtestdata": (prove block_number block_count "http://localhost:8545" "http://localhost:5052" "http://localhost:9545" "http://localhost:7545" data target verbosity)
+devnet-prove block_number block_count="1" target="debug" verbosity="" data=".localtestdata": (prove block_number block_count "http://localhost:8545" "http://localhost:5052" "http://localhost:9545" "http://localhost:7545" data target verbosity)
 
 bench l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data start length range count target="release" verbosity="":
     ./target/{{target}}/kailua-cli benchmark \

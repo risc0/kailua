@@ -5190,6 +5190,7 @@ dependencies = [
  "kona-registry",
  "opentelemetry",
  "risc0-zkvm",
+ "rocksdb",
  "serde",
  "serde_json",
  "tempfile",

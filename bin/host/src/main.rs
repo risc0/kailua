@@ -15,19 +15,25 @@
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::providers::{Provider, RootProvider};
 use alloy_eips::BlockNumberOrTag;
-use anyhow::{bail, Context};
+use alloy_primitives::B256;
+use anyhow::{anyhow, bail, Context};
 use clap::Parser;
 use kailua_client::provider::OpNodeProvider;
 use kailua_client::proving::ProvingError;
 use kailua_common::witness::StitchedBootInfo;
 use kailua_host::args::KailuaHostArgs;
+use kailua_host::config::generate_rollup_config;
+use kailua_host::preflight::{
+    concurrent_execution_preflight, fetch_precondition_data, zeth_execution_preflight,
+};
 use std::collections::BinaryHeap;
 use std::env::set_var;
+use tempfile::tempdir;
 use tracing::{info, warn};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args = KailuaHostArgs::parse();
+    let mut args = KailuaHostArgs::parse();
     kona_host::cli::init_tracing_subscriber(args.v)?;
     set_var("KAILUA_VERBOSITY", args.v.to_string());
 
@@ -44,6 +50,52 @@ async fn main() -> anyhow::Result<()> {
                 .expect("Failed to parse op_node_address"),
         ))
     });
+
+    // set tmp data dir if data dir unset
+    let tmp_dir = tempdir().map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+    if args.kona.data_dir.is_none() {
+        args.kona.data_dir = Some(tmp_dir.path().to_path_buf());
+    }
+    // fetch rollup config
+    let rollup_config = generate_rollup_config(&mut args, &tmp_dir)
+        .await
+        .context("generate_rollup_config")
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+    // preload precondition data into KV store
+    let (precondition_hash, precondition_validation_data_hash) =
+        match fetch_precondition_data(&args)
+            .await
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
+        {
+            Some(data) => {
+                let precondition_validation_data_hash = data.hash();
+                set_var(
+                    "PRECONDITION_VALIDATION_DATA_HASH",
+                    precondition_validation_data_hash.to_string(),
+                );
+                (data.precondition_hash(), precondition_validation_data_hash)
+            }
+            None => (B256::ZERO, B256::ZERO),
+        };
+    if args.num_preflight_threads > 1 {
+        // run parallelized preflight instances to populate kv store
+        info!(
+            "Running concurrent preflights with {} threads",
+            args.num_preflight_threads
+        );
+        concurrent_execution_preflight(
+            &args,
+            rollup_config.clone(),
+            op_node_provider.as_ref().expect("Missing op_node_provider"),
+        )
+        .await
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+    } else if !args.skip_zeth_preflight {
+        // run zeth preflight to fetch all the necessary preimages
+        zeth_execution_preflight(&args, rollup_config.clone())
+            .await
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+    }
 
     // compute individual proofs
     let mut job_pq = BinaryHeap::new();
@@ -75,8 +127,17 @@ async fn main() -> anyhow::Result<()> {
         // Force the proving attempt regardless of witness size if we prove just one block
         let force_attempt = num_blocks == 1 || job_args.kona.is_offline();
 
-        match kailua_host::prove::compute_fpvm_proof(job_args.clone(), vec![], vec![], !have_split)
-            .await
+        match kailua_host::prove::compute_fpvm_proof(
+            job_args.clone(),
+            rollup_config.clone(),
+            None,
+            precondition_hash,
+            precondition_validation_data_hash,
+            vec![],
+            vec![],
+            !have_split,
+        )
+        .await
         {
             Ok(proof) => {
                 if let Some(proof) = proof {
@@ -166,9 +227,18 @@ async fn main() -> anyhow::Result<()> {
             .iter()
             .map(StitchedBootInfo::from)
             .collect::<Vec<_>>();
-        kailua_host::prove::compute_fpvm_proof(base_args, stitched_boot_info, proofs, true)
-            .await
-            .context("Failed to compute FPVM proof.")?;
+        kailua_host::prove::compute_fpvm_proof(
+            base_args,
+            rollup_config.clone(),
+            None,
+            precondition_hash,
+            precondition_validation_data_hash,
+            stitched_boot_info,
+            proofs,
+            true,
+        )
+        .await
+        .context("Failed to compute FPVM proof.")?;
     }
 
     info!("Exiting host program.");

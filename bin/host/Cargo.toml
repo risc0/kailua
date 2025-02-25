@@ -16,6 +16,7 @@ bincode.workspace = true
 bytemuck.workspace = true
 clap.workspace = true
 hashbrown = { workspace = true, features = ["rayon"] }
+rocksdb = { workspace = true, features = ["multi-threaded-cf"] }
 serde.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true

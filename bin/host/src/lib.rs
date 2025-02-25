@@ -14,6 +14,7 @@
 
 pub mod args;
 pub mod config;
+pub mod kv;
 pub mod preflight;
 pub mod prove;
 pub mod server;

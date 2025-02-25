@@ -13,13 +13,16 @@
 // limitations under the License.
 
 use crate::args::KailuaHostArgs;
+use crate::server::create_disk_kv_store;
 use alloy::consensus::Transaction;
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::providers::{Provider, RootProvider};
 use alloy_chains::NamedChain;
 use alloy_eips::eip4844::IndexedBlobHash;
+use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::{keccak256, B256};
 use anyhow::bail;
+use kailua_client::provider::OpNodeProvider;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
 use kona_genesis::RollupConfig;
@@ -28,7 +31,7 @@ use kona_preimage::{PreimageKey, PreimageKeyType};
 use kona_protocol::BlockInfo;
 use std::env::set_var;
 use std::iter::zip;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 use zeth_core::driver::CoreDriver;
 use zeth_core::mpt::{MptNode, MptNodeData};
 use zeth_core::stateless::data::StatelessClientData;
@@ -269,4 +272,86 @@ pub async fn fetch_precondition_data(
         warn!("Proving without a precondition hash.");
         Ok(None)
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn concurrent_execution_preflight(
+    args: &KailuaHostArgs,
+    rollup_config: RollupConfig,
+    op_node_provider: &OpNodeProvider,
+) -> anyhow::Result<()> {
+    let l2_provider = args.kona.create_providers().await?.l2;
+    let starting_block = l2_provider
+        .get_block_by_hash(args.kona.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
+        .await?
+        .unwrap()
+        .header
+        .number;
+    let mut num_blocks = args.kona.claimed_l2_block_number - starting_block;
+    if num_blocks == 0 {
+        return Ok(());
+    }
+    let blocks_per_thread = num_blocks / args.num_preflight_threads;
+    let mut extra_blocks = num_blocks % args.num_preflight_threads;
+    let mut jobs = vec![];
+    let mut args = args.clone();
+    let disk_kv_store = create_disk_kv_store(&args.kona);
+    while num_blocks > 0 {
+        let processed_blocks = if extra_blocks > 0 {
+            extra_blocks -= 1;
+            blocks_per_thread + 1
+        } else {
+            blocks_per_thread
+        };
+        num_blocks = num_blocks.saturating_sub(processed_blocks);
+
+        // update ending block
+        args.kona.claimed_l2_block_number = l2_provider
+            .get_block_by_hash(args.kona.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
+            .await?
+            .unwrap()
+            .header
+            .number
+            + processed_blocks;
+        args.kona.claimed_l2_output_root = op_node_provider
+            .output_at_block(args.kona.claimed_l2_block_number)
+            .await?;
+        // queue new job
+        jobs.push(tokio::spawn(crate::prove::compute_cached_proof(
+            args.clone(),
+            rollup_config.clone(),
+            disk_kv_store.clone(),
+            B256::ZERO,
+            B256::ZERO,
+            vec![],
+            vec![],
+            vec![],
+            false,
+            true,
+            false,
+        )));
+        // jobs.push(args.clone());
+        // update starting block for next job
+        if num_blocks > 0 {
+            args.kona.agreed_l2_head_hash = l2_provider
+                .get_block_by_number(
+                    BlockNumberOrTag::Number(args.kona.claimed_l2_block_number),
+                    BlockTransactionsKind::Hashes,
+                )
+                .await?
+                .unwrap()
+                .header
+                .hash;
+            args.kona.agreed_l2_output_root = args.kona.claimed_l2_output_root;
+        }
+    }
+    // Await all tasks
+    for job in jobs {
+        let result = job.await?;
+        if let Err(e) = result {
+            error!("Error during preflight execution: {e:?}");
+        }
+    }
+
+    Ok(())
 }

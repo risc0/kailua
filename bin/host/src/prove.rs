@@ -13,8 +13,7 @@
 // limitations under the License.
 
 use crate::args::KailuaHostArgs;
-use crate::config::generate_rollup_config;
-use crate::preflight::{fetch_precondition_data, zeth_execution_preflight};
+use crate::kv::RWLKeyValueStore;
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::providers::Provider;
 use alloy_eips::BlockNumberOrTag;
@@ -30,44 +29,21 @@ use kailua_common::witness::StitchedBootInfo;
 use kona_genesis::RollupConfig;
 use kona_proof::BootInfo;
 use std::collections::BinaryHeap;
-use std::env::set_var;
 use std::path::Path;
-use tempfile::tempdir;
 use tracing::{info, warn};
 
 /// Computes a receipt if it is not cached
+#[allow(clippy::too_many_arguments)]
 pub async fn compute_fpvm_proof(
-    mut args: KailuaHostArgs,
+    args: KailuaHostArgs,
+    rollup_config: RollupConfig,
+    disk_kv_store: Option<RWLKeyValueStore>,
+    precondition_hash: B256,
+    precondition_validation_data_hash: B256,
     stitched_boot_info: Vec<StitchedBootInfo>,
     stitched_proofs: Vec<Proof>,
     prove_snark: bool,
 ) -> Result<Option<Proof>, ProvingError> {
-    // preload precondition data into KV store
-    let (precondition_hash, precondition_validation_data_hash) =
-        match fetch_precondition_data(&args)
-            .await
-            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
-        {
-            Some(data) => {
-                let precondition_validation_data_hash = data.hash();
-                set_var(
-                    "PRECONDITION_VALIDATION_DATA_HASH",
-                    precondition_validation_data_hash.to_string(),
-                );
-                (data.precondition_hash(), precondition_validation_data_hash)
-            }
-            None => (B256::ZERO, B256::ZERO),
-        };
-    // fetch rollup config
-    let tmp_dir = tempdir().map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-    let rollup_config = generate_rollup_config(&mut args, &tmp_dir)
-        .await
-        .context("generate_rollup_config")
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-    // set tmp data dir if unset
-    if args.kona.data_dir.is_none() {
-        args.kona.data_dir = Some(tmp_dir.path().to_path_buf());
-    }
     // report transaction count
     if !stitched_boot_info.is_empty() {
         info!("Stitching {} sub-proofs", stitched_boot_info.len());
@@ -118,6 +94,7 @@ pub async fn compute_fpvm_proof(
     let complete_proof_result = compute_cached_proof(
         args.clone(),
         rollup_config.clone(),
+        disk_kv_store.clone(),
         precondition_hash,
         precondition_validation_data_hash,
         vec![],
@@ -146,6 +123,7 @@ pub async fn compute_fpvm_proof(
         let derivation_only_result = compute_cached_proof(
             args.clone(),
             rollup_config.clone(),
+            disk_kv_store.clone(),
             precondition_hash,
             precondition_validation_data_hash,
             executed_blocks.clone(),
@@ -213,6 +191,7 @@ pub async fn compute_fpvm_proof(
         match compute_cached_proof(
             job_args.clone(),
             rollup_config.clone(),
+            disk_kv_store.clone(),
             precondition_hash,
             B256::ZERO,
             vec![executed_blocks.clone()],
@@ -292,6 +271,7 @@ pub async fn compute_fpvm_proof(
         compute_cached_proof(
             args,
             rollup_config,
+            disk_kv_store,
             precondition_hash,
             precondition_validation_data_hash,
             stitched_executions,
@@ -309,6 +289,7 @@ pub async fn compute_fpvm_proof(
 pub async fn compute_cached_proof(
     args: KailuaHostArgs,
     rollup_config: RollupConfig,
+    disk_kv_store: Option<RWLKeyValueStore>,
     precondition_hash: B256,
     precondition_validation_data_hash: B256,
     stitched_executions: Vec<Vec<Execution>>,
@@ -341,16 +322,11 @@ pub async fn compute_cached_proof(
         info!("Proving skipped. Proof file {proof_file_name} already exists.");
     } else {
         info!("Computing uncached proof.");
-        // run zeth preflight to fetch the necessary preimages
-        if !args.skip_zeth_preflight {
-            zeth_execution_preflight(&args, boot.rollup_config)
-                .await
-                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-        }
 
         // generate a proof using the kailua client and kona server
         crate::server::start_server_and_native_client(
             args,
+            disk_kv_store,
             precondition_validation_data_hash,
             stitched_executions,
             stitched_boot_info,
