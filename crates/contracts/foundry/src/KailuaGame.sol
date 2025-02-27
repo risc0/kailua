@@ -153,15 +153,10 @@ contract KailuaGame is KailuaTournament {
             proposalBlobHashes.push(Hash.wrap(hash));
         }
 
-        // If a validity proof was submitted, do not allow conflicting proposals to be created
+        // If a proof was submitted, do not allow bad proposals to be created
         KailuaTournament parentGame_ = parentGame();
-        if (parentGame_.provenAt(0, 0).raw() > 0) {
-            if (
-                rootClaim().raw() != parentGame_.validChildRootClaim()
-                    || blobsHash() != parentGame_.validChildBlobsHash()
-            ) {
-                revert ProvenFaulty();
-            }
+        if (!parentGame_.isViableSignature(signature())) {
+            revert ProvenFaulty();
         }
 
         // Allow only the treasury to create new games
@@ -203,11 +198,8 @@ contract KailuaGame is KailuaTournament {
         }
 
         // INVARIANT: Cannot resolve unless proven valid or the clock has expired
-        if (parentGame_.provenAt(0, 0).raw() > 0) {
-            if (
-                rootClaim().raw() != parentGame_.validChildRootClaim()
-                    || blobsHash() != parentGame_.validChildBlobsHash()
-            ) {
+        if (parentGame_.validChildSignature() != 0) {
+            if (signature() != parentGame_.validChildSignature()) {
                 revert ProvenFaulty();
             }
         } else if (getChallengerDuration(block.timestamp).raw() > 0) {
@@ -285,6 +277,7 @@ contract KailuaGame is KailuaTournament {
 
     /// @inheritdoc KailuaTournament
     function minCreationTime() public view override returns (Timestamp minCreationTime_) {
-        minCreationTime_ = Timestamp.wrap(uint64(GENESIS_TIME_STAMP + l2BlockNumber() * L2_BLOCK_TIME + PROPOSAL_TIME_GAP));
+        minCreationTime_ =
+            Timestamp.wrap(uint64(GENESIS_TIME_STAMP + l2BlockNumber() * L2_BLOCK_TIME + PROPOSAL_TIME_GAP));
     }
 }

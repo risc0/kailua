@@ -22,9 +22,8 @@ import "./vendor/FlatR0ImportV1.2.0.sol";
 /// @custom:value NONE indicates that no proof has been submitted yet.
 enum ProofStatus {
     NONE,
-    U_LOSE_V_LOSE,
-    U_LOSE_V_WIN,
-    U_WIN_V_LOSE
+    FAULT,
+    VALIDITY
 }
 
 // 0xd36871fd
@@ -93,11 +92,10 @@ error BlockNumberMismatch(uint256 anchored, uint256 initialized);
 /// @param parentGame The address of the parent proposal being extended
 error VanguardError(address parentGame);
 
-/// @notice Emitted when an output is proven.
-/// @param u The preexisting proposal
-/// @param v The subsequent proposal
-/// @param status The proven status of the match
-event Proven(uint64 indexed u, uint64 indexed v, ProofStatus indexed status);
+/// @notice Emitted when a proof is submitted.
+/// @param signature The proposal signature
+/// @param status The proven status
+event Proven(bytes32 indexed signature, ProofStatus indexed status);
 
 /// @notice Emitted when the participation bond is updated
 /// @param amount The new required bond amount
