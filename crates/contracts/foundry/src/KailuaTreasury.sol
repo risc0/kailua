@@ -30,6 +30,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     // ------------------------------
 
     constructor(
+        KailuaTournamentLogic _tournament,
         IRiscZeroVerifier _verifierContract,
         bytes32 _imageId,
         bytes32 _configHash,
@@ -39,6 +40,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         IDisputeGameFactory _disputeGameFactory
     )
         KailuaTournament(
+            _tournament,
             KailuaTreasury(this),
             _verifierContract,
             _imageId,

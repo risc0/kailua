@@ -15,123 +15,49 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
+import "./KailuaLib.sol";
+import "./vendor/FlatOPImportV1.4.0.sol";
 import "./vendor/FlatOPImportV1.4.0.sol";
 import "./vendor/FlatR0ImportV1.2.0.sol";
-import "./KailuaLib.sol";
 
-abstract contract KailuaTournament is Clone, IDisputeGame {
+abstract contract KailuaTournamentState is Clone, IDisputeGame {
     // ------------------------------
     // Immutable configuration
     // ------------------------------
 
     /// @notice The Kailua Treasury Implementation contract address
-    IKailuaTreasury internal immutable KAILUA_TREASURY;
+    IKailuaTreasury public immutable KAILUA_TREASURY;
 
     /// @notice The RISC Zero verifier contract
-    IRiscZeroVerifier internal immutable RISC_ZERO_VERIFIER;
+    IRiscZeroVerifier public immutable RISC_ZERO_VERIFIER;
 
     /// @notice The RISC Zero image id of the fault proof program
-    bytes32 internal immutable FPVM_IMAGE_ID;
+    bytes32 public immutable FPVM_IMAGE_ID;
 
     /// @notice The hash of the game configuration
-    bytes32 internal immutable ROLLUP_CONFIG_HASH;
+    bytes32 public immutable ROLLUP_CONFIG_HASH;
 
     /// @notice The number of outputs a proposal must publish
-    uint256 internal immutable PROPOSAL_OUTPUT_COUNT;
+    uint256 public immutable PROPOSAL_OUTPUT_COUNT;
 
     /// @notice The number of blocks each output must cover
-    uint256 internal immutable OUTPUT_BLOCK_SPAN;
+    uint256 public immutable OUTPUT_BLOCK_SPAN;
 
     /// @notice The number of blobs a claim must provide
-    uint256 internal immutable PROPOSAL_BLOBS;
+    uint256 public immutable PROPOSAL_BLOBS;
 
     /// @notice The game type ID
-    GameType internal immutable GAME_TYPE;
+    GameType public immutable GAME_TYPE;
 
     /// @notice The dispute game factory
-    IDisputeGameFactory internal immutable DISPUTE_GAME_FACTORY;
-
-    /// @notice Returns the address of the Kailua Treasury used by tournament instances
-    function treasury() public view returns (IKailuaTreasury treasury_) {
-        treasury_ = KAILUA_TREASURY;
-    }
-
-    /// @notice Returns the address of the RISC Zero verifier used by this contract
-    function verifier() public view returns (IRiscZeroVerifier verifier_) {
-        verifier_ = RISC_ZERO_VERIFIER;
-    }
-
-    /// @notice Returns the RISC Zero Image ID of the FPVM program used by this contract
-    function imageId() public view returns (bytes32 imageId_) {
-        imageId_ = FPVM_IMAGE_ID;
-    }
-
-    /// @notice Returns the hash of the configuration of this game
-    function configHash() public view returns (bytes32 configHash_) {
-        configHash_ = ROLLUP_CONFIG_HASH;
-    }
-
-    /// @notice Returns the number of outputs that were published with this game
-    function proposalOutputCount() public view returns (uint256 proposalOutputCount_) {
-        proposalOutputCount_ = PROPOSAL_OUTPUT_COUNT;
-    }
-
-    /// @notice Returns the number of blocks covered by each output in this game
-    function outputBlockSpan() public view returns (uint256 outputBlockSpan_) {
-        outputBlockSpan_ = OUTPUT_BLOCK_SPAN;
-    }
-
-    /// @notice Returns the number of blobs containing intermediate blob data
-    function proposalBlobs() public view returns (uint256 proposalBlobs_) {
-        proposalBlobs_ = PROPOSAL_BLOBS;
-    }
-
-    function disputeGameFactory() public view returns (IDisputeGameFactory factory_) {
-        factory_ = DISPUTE_GAME_FACTORY;
-    }
-
-    constructor(
-        IKailuaTreasury _kailuaTreasury,
-        IRiscZeroVerifier _verifierContract,
-        bytes32 _imageId,
-        bytes32 _configHash,
-        uint256 _proposalOutputCount,
-        uint256 _outputBlockSpan,
-        GameType _gameType,
-        IDisputeGameFactory _disputeGameFactory
-    ) {
-        KAILUA_TREASURY = _kailuaTreasury;
-        RISC_ZERO_VERIFIER = _verifierContract;
-        FPVM_IMAGE_ID = _imageId;
-        ROLLUP_CONFIG_HASH = _configHash;
-        PROPOSAL_OUTPUT_COUNT = _proposalOutputCount;
-        OUTPUT_BLOCK_SPAN = _outputBlockSpan;
-        PROPOSAL_BLOBS = (_proposalOutputCount / KailuaLib.FIELD_ELEMENTS_PER_BLOB)
-            + ((_proposalOutputCount % KailuaLib.FIELD_ELEMENTS_PER_BLOB) == 0 ? 0 : 1);
-        GAME_TYPE = _gameType;
-        DISPUTE_GAME_FACTORY = _disputeGameFactory;
-    }
-
-    /// @notice The blob hashes used to create the game
-    Hash[] public proposalBlobHashes;
-
-    function initializeInternal() internal {
-        // INVARIANT: The game must not have already been initialized.
-        if (createdAt.raw() > 0) revert AlreadyInitialized();
-
-        // Set the game's starting timestamp
-        createdAt = Timestamp.wrap(uint64(block.timestamp));
-
-        // Set the game's index in the factory
-        gameIndex = disputeGameFactory().gameCount();
-
-        // Initialize contenderList
-        contenderList.push(0);
-    }
+    IDisputeGameFactory public immutable DISPUTE_GAME_FACTORY;
 
     // ------------------------------
     // Tournament
     // ------------------------------
+
+    /// @notice The blob hashes used to create the game
+    Hash[] public proposalBlobHashes;
 
     /// @notice The game's index in the factory
     uint256 public gameIndex;
@@ -160,25 +86,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     /// @notice The signature of the child accepted through a validity proof
     bytes32 public validChildSignature;
 
-    /// @notice Returns the number of children
-    function childCount() external view returns (uint256 count_) {
-        count_ = children.length;
-    }
-
-    /// @notice Registers a new proposal that extends this one
-    function appendChild() external {
-        // INVARIANT: The calling contract is a newly deployed contract by the dispute game factory
-        if (!KAILUA_TREASURY.isProposing()) {
-            revert UnknownGame();
-        }
-
-        // INVARIANT: The calling KailuaGame contract is not referring to itself as a parent
-        if (msg.sender == address(this)) {
-            revert InvalidParent();
-        }
-
-        // Append new child to children list
-        children.push(KailuaTournament(msg.sender));
+    /// @notice Returns the hash of the output claim and all blob hashes associated with this proposal
+    function signature() public view returns (bytes32 signature_) {
+        // note: the absence of the l1Head in the signature implies that
+        // the proposal gap should absolutely guarantee derivation
+        signature_ = sha256(abi.encodePacked(rootClaim().raw(), proposalBlobHashes));
     }
 
     /// @notice Returns whether a child can be considered valid
@@ -197,6 +109,75 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             payoutRecipient = prover[validChildSignature];
         }
     }
+
+    /// @notice Returns true iff the child proposal was eliminated
+    function isChildEliminated(KailuaTournament child) internal view returns (bool) {
+        address _proposer = KAILUA_TREASURY.proposerOf(address(child));
+        uint256 eliminationRound = KAILUA_TREASURY.eliminationRound(_proposer);
+        if (eliminationRound == 0 || eliminationRound > child.gameIndex()) {
+            // This proposer has not been eliminated as of their proposal at gameIndex
+            return false;
+        }
+        return true;
+    }
+
+    // ------------------------------
+    // IDisputeGame implementation
+    // ------------------------------
+
+    /// @inheritdoc IDisputeGame
+    Timestamp public createdAt;
+
+    /// @inheritdoc IDisputeGame
+    Timestamp public resolvedAt;
+
+    /// @inheritdoc IDisputeGame
+    GameStatus public status;
+
+    /// @inheritdoc IDisputeGame
+    function gameType() external view returns (GameType gameType_) {
+        gameType_ = GAME_TYPE;
+    }
+
+    /// @inheritdoc IDisputeGame
+    function gameCreator() public pure returns (address creator_) {
+        creator_ = _getArgAddress(0x00);
+    }
+
+    /// @inheritdoc IDisputeGame
+    function rootClaim() public pure returns (Claim rootClaim_) {
+        rootClaim_ = Claim.wrap(_getArgBytes32(0x14));
+    }
+
+    /// @inheritdoc IDisputeGame
+    function l1Head() public pure returns (Hash l1Head_) {
+        l1Head_ = Hash.wrap(_getArgBytes32(0x34));
+    }
+
+    /// @notice The l2BlockNumber of the claim's output root.
+    function l2BlockNumber() public pure returns (uint256 l2BlockNumber_) {
+        l2BlockNumber_ = uint256(_getArgUint64(0x54));
+    }
+
+    /// @inheritdoc IDisputeGame
+    function gameData() external view returns (GameType gameType_, Claim rootClaim_, bytes memory extraData_) {
+        gameType_ = GAME_TYPE;
+        rootClaim_ = this.rootClaim();
+        extraData_ = this.extraData();
+    }
+}
+
+contract KailuaTournamentLogic is KailuaTournamentState {
+    /// @inheritdoc IInitializable
+    function initialize() external payable override {}
+    /// @inheritdoc IDisputeGame
+    function extraData() external pure returns (bytes memory extraData_) {}
+    /// @inheritdoc IDisputeGame
+    function resolve() external returns (GameStatus status_) {}
+
+    // ------------------------------
+    // Tournament
+    // ------------------------------
 
     /// @notice Eliminates children until at least one remains
     function pruneChildren(uint256 eliminationLimit) external returns (KailuaTournament survivor) {
@@ -334,49 +315,9 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         }
     }
 
-    /// @notice Returns true iff the child proposal was eliminated
-    function isChildEliminated(KailuaTournament child) internal view returns (bool) {
-        address _proposer = KAILUA_TREASURY.proposerOf(address(child));
-        uint256 eliminationRound = KAILUA_TREASURY.eliminationRound(_proposer);
-        if (eliminationRound == 0 || eliminationRound > child.gameIndex()) {
-            // This proposer has not been eliminated as of their proposal at gameIndex
-            return false;
-        }
-        return true;
-    }
-
-    /// @notice Returns the amount of time left for challenges as of the input timestamp.
-    function getChallengerDuration(uint256 asOfTimestamp) public view virtual returns (Duration duration_);
-
-    /// @notice Returns the earliest time at which this proposal could have been created
-    function minCreationTime() public view virtual returns (Timestamp minCreationTime_);
-
-    /// @notice Returns the parent game contract.
-    function parentGame() public view virtual returns (KailuaTournament parentGame_);
-
-    /// @notice Returns the proposer address
-    function proposer() public view returns (address proposer_) {
-        proposer_ = KAILUA_TREASURY.proposerOf(address(this));
-    }
-
-    /// @notice Returns the hash of the output claim and all blob hashes associated with this proposal
-    function signature() public view returns (bytes32 signature_) {
-        // note: the absence of the l1Head in the signature implies that
-        // the proposal gap should absolutely guarantee derivation
-        signature_ = sha256(abi.encodePacked(
-            rootClaim().raw(),
-            proposalBlobHashes
-        ));
-    }
-
     // ------------------------------
     // Validity proving
     // ------------------------------
-
-    /// @notice Returns the hash of all blob hashes associated with this proposal
-    function blobsHash() public view returns (bytes32 blobsHash_) {
-        blobsHash_ = sha256(abi.encodePacked(proposalBlobHashes));
-    }
 
     /// @notice Proves that a proposal is valid
     function proveValidity(address payoutRecipient, uint64 childIndex, bytes calldata encodedSeal) external {
@@ -443,14 +384,6 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     // Fault proving
     // ------------------------------
 
-    /// @notice Verifies that an intermediate output was part of the proposal
-    function verifyIntermediateOutput(
-        uint64 outputNumber,
-        uint256 outputFe,
-        bytes calldata blobCommitment,
-        bytes calldata kzgProof
-    ) external virtual returns (bool success);
-
     /// @notice Proves that a proposal committed to an incorrect transition
     function proveOutputFault(
         address payoutRecipient,
@@ -475,7 +408,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         }
 
         // INVARIANT: Proofs can only show disparities
-        if (KailuaLib.hashToFe(computedOutputHash) == proposedOutputFe) {
+        if (KailuaKZGLib.hashToFe(computedOutputHash) == proposedOutputFe) {
             revert NoConflict();
         }
 
@@ -494,7 +427,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             // Prove common output publication
             require(
                 childContract.verifyIntermediateOutput(
-                    co[1] - 1, KailuaLib.hashToFe(acceptedOutputHash), blobCommitments[0], kzgProofs[0]
+                    co[1] - 1, KailuaKZGLib.hashToFe(acceptedOutputHash), blobCommitments[0], kzgProofs[0]
                 ),
                 "bad child acceptedOutput kzg proof"
             );
@@ -503,7 +436,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         // Validate the claimed output roots.
         if (co[1] == PROPOSAL_OUTPUT_COUNT - 1) {
             // Note: proposedOutputFe must be a canonical point or comparison below will fail
-            require(proposedOutputFe == KailuaLib.hashToFe(childContract.rootClaim().raw()), "bad proposedOutputFe");
+            require(proposedOutputFe == KailuaKZGLib.hashToFe(childContract.rootClaim().raw()), "bad proposedOutputFe");
         } else {
             // Note: proposedOutputFe must be a canonical point or point eval precompile call will fail
             // Prove divergent output publication
@@ -579,7 +512,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         uint64 trailOffset = co[1] - 1;
 
         // INVARIANT: The trail divergence occurs at the last blob
-        if (KailuaLib.blobIndex(trailOffset) != PROPOSAL_BLOBS - 1) {
+        if (KailuaKZGLib.blobIndex(trailOffset) != PROPOSAL_BLOBS - 1) {
             revert InvalidDataRemainder();
         }
 
@@ -612,49 +545,169 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         // Set the game's proving timestamp
         provenAt[childSignature] = Timestamp.wrap(uint64(block.timestamp));
     }
+}
+
+abstract contract KailuaTournament is KailuaTournamentState {
+    KailuaTournamentLogic public immutable TOURNAMENT;
+
+    // Source:
+    // https://github.com/OpenZeppelin/openzeppelin-contracts/blob/fa995ef1fe66e1447783cb6038470aba23a6343f/contracts/proxy/Proxy.sol#L22
+    function _delegate() internal {
+        address implementation = address(TOURNAMENT);
+        assembly {
+            // Copy msg.data. We take full control of memory in this inline assembly
+            // block because it will not return to Solidity code. We overwrite the
+            // Solidity scratch pad at memory position 0.
+            calldatacopy(0, 0, calldatasize())
+
+            // Call the implementation.
+            // out and outsize are 0 because we don't know the size yet.
+            let result := delegatecall(gas(), implementation, 0, calldatasize(), 0, 0)
+
+            // Copy the returned data.
+            returndatacopy(0, 0, returndatasize())
+
+            switch result
+            // delegatecall returns 0 on error.
+            case 0 { revert(0, returndatasize()) }
+            default { return(0, returndatasize()) }
+        }
+    }
 
     // ------------------------------
-    // IDisputeGame implementation
+    // Immutable configuration
     // ------------------------------
 
-    /// @notice The starting timestamp of the game
-    Timestamp public createdAt;
-
-    /// @inheritdoc IDisputeGame
-    Timestamp public resolvedAt;
-
-    /// @inheritdoc IDisputeGame
-    GameStatus public status;
-
-    /// @notice Returns the game type.
-    function gameType() external view returns (GameType gameType_) {
-        gameType_ = GAME_TYPE;
+    constructor(
+        KailuaTournamentLogic _tournament,
+        IKailuaTreasury _kailuaTreasury,
+        IRiscZeroVerifier _verifierContract,
+        bytes32 _imageId,
+        bytes32 _configHash,
+        uint256 _proposalOutputCount,
+        uint256 _outputBlockSpan,
+        GameType _gameType,
+        IDisputeGameFactory _disputeGameFactory
+    ) {
+        TOURNAMENT = _tournament;
+        KAILUA_TREASURY = _kailuaTreasury;
+        RISC_ZERO_VERIFIER = _verifierContract;
+        FPVM_IMAGE_ID = _imageId;
+        ROLLUP_CONFIG_HASH = _configHash;
+        PROPOSAL_OUTPUT_COUNT = _proposalOutputCount;
+        OUTPUT_BLOCK_SPAN = _outputBlockSpan;
+        PROPOSAL_BLOBS = (_proposalOutputCount / KailuaKZGLib.FIELD_ELEMENTS_PER_BLOB)
+            + ((_proposalOutputCount % KailuaKZGLib.FIELD_ELEMENTS_PER_BLOB) == 0 ? 0 : 1);
+        GAME_TYPE = _gameType;
+        DISPUTE_GAME_FACTORY = _disputeGameFactory;
     }
 
-    /// @inheritdoc IDisputeGame
-    function gameCreator() public pure returns (address creator_) {
-        creator_ = _getArgAddress(0x00);
+    function initializeInternal() internal {
+        // INVARIANT: The game must not have already been initialized.
+        if (createdAt.raw() > 0) revert AlreadyInitialized();
+
+        // Set the game's starting timestamp
+        createdAt = Timestamp.wrap(uint64(block.timestamp));
+
+        // Set the game's index in the factory
+        gameIndex = DISPUTE_GAME_FACTORY.gameCount();
+
+        // Initialize contenderList
+        contenderList.push(0);
     }
 
-    /// @inheritdoc IDisputeGame
-    function rootClaim() public pure returns (Claim rootClaim_) {
-        rootClaim_ = Claim.wrap(_getArgBytes32(0x14));
+    // ------------------------------
+    // Tournament
+    // ------------------------------
+
+    /// @notice Returns the number of children
+    function childCount() external view returns (uint256 count_) {
+        count_ = children.length;
     }
 
-    /// @inheritdoc IDisputeGame
-    function l1Head() public pure returns (Hash l1Head_) {
-        l1Head_ = Hash.wrap(_getArgBytes32(0x34));
+    /// @notice Registers a new proposal that extends this one
+    function appendChild() external {
+        // INVARIANT: The calling contract is a newly deployed contract by the dispute game factory
+        if (!KAILUA_TREASURY.isProposing()) {
+            revert UnknownGame();
+        }
+
+        // INVARIANT: The calling KailuaGame contract is not referring to itself as a parent
+        if (msg.sender == address(this)) {
+            revert InvalidParent();
+        }
+
+        // Append new child to children list
+        children.push(KailuaTournament(msg.sender));
     }
 
-    /// @notice The l2BlockNumber of the claim's output root.
-    function l2BlockNumber() public pure returns (uint256 l2BlockNumber_) {
-        l2BlockNumber_ = uint256(_getArgUint64(0x54));
+    /// @notice Returns the amount of time left for challenges as of the input timestamp.
+    function getChallengerDuration(uint256 asOfTimestamp) public view virtual returns (Duration duration_);
+
+    /// @notice Returns the earliest time at which this proposal could have been created
+    function minCreationTime() public view virtual returns (Timestamp minCreationTime_);
+
+    /// @notice Returns the parent game contract.
+    function parentGame() public view virtual returns (KailuaTournament parentGame_);
+
+    /// @notice Returns the proposer address
+    function proposer() public view returns (address proposer_) {
+        proposer_ = KAILUA_TREASURY.proposerOf(address(this));
     }
 
-    /// @inheritdoc IDisputeGame
-    function gameData() external view returns (GameType gameType_, Claim rootClaim_, bytes memory extraData_) {
-        gameType_ = this.gameType();
-        rootClaim_ = this.rootClaim();
-        extraData_ = this.extraData();
+    /// @notice Eliminates children until at least one remains
+    function pruneChildren(uint256 eliminationLimit) external returns (KailuaTournament survivor) {
+        _delegate();
+    }
+
+    // ------------------------------
+    // Validity proving
+    // ------------------------------
+
+    /// @notice Returns the hash of all blob hashes associated with this proposal
+    function blobsHash() public view returns (bytes32 blobsHash_) {
+        blobsHash_ = sha256(abi.encodePacked(proposalBlobHashes));
+    }
+
+    /// @notice Proves that a proposal is valid
+    function proveValidity(address payoutRecipient, uint64 childIndex, bytes calldata encodedSeal) external {
+        _delegate();
+    }
+
+    // ------------------------------
+    // Fault proving
+    // ------------------------------
+
+    /// @notice Verifies that an intermediate output was part of the proposal
+    function verifyIntermediateOutput(
+        uint64 outputNumber,
+        uint256 outputFe,
+        bytes calldata blobCommitment,
+        bytes calldata kzgProof
+    ) external virtual returns (bool success);
+
+    /// @notice Proves that a proposal committed to an incorrect transition
+    function proveOutputFault(
+        address payoutRecipient,
+        uint64[2] calldata co,
+        bytes calldata encodedSeal,
+        bytes32 acceptedOutputHash,
+        uint256 proposedOutputFe,
+        bytes32 computedOutputHash,
+        bytes[] calldata blobCommitments,
+        bytes[] calldata kzgProofs
+    ) external {
+        _delegate();
+    }
+
+    /// @notice Proves that a proposal contains invalid trailing data
+    function proveTrailFault(
+        address payoutRecipient,
+        uint64[2] calldata co,
+        uint256 proposedOutputFe,
+        bytes[] calldata blobCommitments,
+        bytes[] calldata kzgProofs
+    ) external {
+        _delegate();
     }
 }

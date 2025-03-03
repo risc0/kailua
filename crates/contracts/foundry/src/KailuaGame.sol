@@ -31,38 +31,19 @@ contract KailuaGame is KailuaTournament {
     // ------------------------------
 
     /// @notice The duration after which the proposal is accepted
-    Duration internal immutable MAX_CLOCK_DURATION;
+    Duration public immutable MAX_CLOCK_DURATION;
 
     /// @notice The timestamp of the genesis l2 block
-    uint256 internal immutable GENESIS_TIME_STAMP;
+    uint256 public immutable GENESIS_TIME_STAMP;
 
     /// @notice The time between l2 blocks
-    uint256 internal immutable L2_BLOCK_TIME;
+    uint256 public immutable L2_BLOCK_TIME;
 
     /// @notice The minimum gap between the l1 and proposed l2 tip timestamps
-    uint256 internal immutable PROPOSAL_TIME_GAP;
-
-    /// @notice Returns the max clock duration.
-    function maxClockDuration() public view returns (Duration maxClockDuration_) {
-        maxClockDuration_ = MAX_CLOCK_DURATION;
-    }
-
-    /// @notice Returns the timestamp of the genesis L2 block
-    function genesisTimeStamp() public view returns (uint256 genesisTimeStamp_) {
-        genesisTimeStamp_ = GENESIS_TIME_STAMP;
-    }
-
-    /// @notice Returns the inter-block time of the L2
-    function l2BlockTime() public view returns (uint256 l2BlockTime_) {
-        l2BlockTime_ = L2_BLOCK_TIME;
-    }
-
-    /// @notice Returns the required gap between the current l1 timestamp and the proposal's l2 timestamp
-    function proposalTimeGap() public view returns (uint256 proposalTimeGap_) {
-        proposalTimeGap_ = PROPOSAL_TIME_GAP;
-    }
+    uint256 public immutable PROPOSAL_TIME_GAP;
 
     constructor(
+        KailuaTournamentLogic _tournament,
         IKailuaTreasury _kailuaTreasury,
         IRiscZeroVerifier _verifierContract,
         bytes32 _imageId,
@@ -71,12 +52,12 @@ contract KailuaGame is KailuaTournament {
         uint256 _outputBlockSpan,
         GameType _gameType,
         IDisputeGameFactory _disputeGameFactory,
-        uint256 _genesisTimeStamp,
-        uint256 _l2BlockTime,
-        uint256 _proposalTimeGap,
+        // solve stack too deep error
+        uint256[3] memory _genesisTimeStamp_l2BlockTime_proposalTimeGap,
         Duration _maxClockDuration
     )
         KailuaTournament(
+            _tournament,
             _kailuaTreasury,
             _verifierContract,
             _imageId,
@@ -88,9 +69,9 @@ contract KailuaGame is KailuaTournament {
         )
     {
         MAX_CLOCK_DURATION = _maxClockDuration;
-        GENESIS_TIME_STAMP = _genesisTimeStamp;
-        L2_BLOCK_TIME = _l2BlockTime;
-        PROPOSAL_TIME_GAP = _proposalTimeGap;
+        GENESIS_TIME_STAMP = _genesisTimeStamp_l2BlockTime_proposalTimeGap[0];
+        L2_BLOCK_TIME = _genesisTimeStamp_l2BlockTime_proposalTimeGap[1];
+        PROPOSAL_TIME_GAP = _genesisTimeStamp_l2BlockTime_proposalTimeGap[2];
     }
 
     // ------------------------------
@@ -254,12 +235,12 @@ contract KailuaGame is KailuaTournament {
         bytes calldata blobCommitment,
         bytes calldata kzgProof
     ) external override returns (bool success) {
-        uint256 blobIndex = KailuaLib.blobIndex(outputNumber);
-        uint32 blobPosition = KailuaLib.fieldElementIndex(outputNumber);
-        bytes32 proposalBlobHash = KailuaLib.versionedKZGHash(blobCommitment);
+        uint256 blobIndex = KailuaKZGLib.blobIndex(outputNumber);
+        uint32 blobPosition = KailuaKZGLib.fieldElementIndex(outputNumber);
+        bytes32 proposalBlobHash = KailuaKZGLib.versionedKZGHash(blobCommitment);
         // Note: The below check also implies that we can validate only against known blobs
         require(proposalBlobHash == proposalBlobHashes[blobIndex].raw(), "bad proposalBlobHash");
-        success = KailuaLib.verifyKZGBlobProof(proposalBlobHash, blobPosition, outputFe, blobCommitment, kzgProof);
+        success = KailuaKZGLib.verifyKZGBlobProof(proposalBlobHash, blobPosition, outputFe, blobCommitment, kzgProof);
     }
 
     /// @inheritdoc KailuaTournament
