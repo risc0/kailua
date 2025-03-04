@@ -213,31 +213,7 @@ pub async fn fetch_precondition_data(
             );
         }
 
-        let precondition_validation_data = if cfg.precondition_params.len() == 1 {
-            if cfg.precondition_block_hashes.len() != 2 {
-                bail!(
-                    "Expected exactly 2 blob references. Found {}",
-                    cfg.precondition_block_hashes.len()
-                );
-            }
-            PreconditionValidationData::Fault(
-                cfg.precondition_params[0],
-                Box::new([
-                    get_blob_fetch_request(
-                        &providers.l1,
-                        cfg.precondition_block_hashes[0],
-                        cfg.precondition_blob_hashes[0],
-                    )
-                    .await?,
-                    get_blob_fetch_request(
-                        &providers.l1,
-                        cfg.precondition_block_hashes[1],
-                        cfg.precondition_blob_hashes[1],
-                    )
-                    .await?,
-                ]),
-            )
-        } else if cfg.precondition_params.len() == 3 {
+        let precondition_validation_data = if cfg.precondition_params.len() == 3 {
             let mut fetch_requests = Vec::with_capacity(cfg.precondition_block_hashes.len());
             for (block_hash, blob_hash) in zip(
                 cfg.precondition_block_hashes.iter(),

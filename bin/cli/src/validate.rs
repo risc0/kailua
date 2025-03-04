@@ -1142,7 +1142,6 @@ pub async fn handle_proof_requests(
                 .map(|r| (r.block_ref.hash.to_string(), r.blob_hash.hash.to_string()))
                 .unzip();
             let params = match precondition_data {
-                PreconditionValidationData::Fault(agreement_index, _) => vec![agreement_index],
                 PreconditionValidationData::Validity(
                     global_l2_head_number,
                     proposal_output_count,

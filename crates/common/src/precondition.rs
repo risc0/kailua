@@ -28,7 +28,6 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum PreconditionValidationData {
-    Fault(u64, Box<[BlobFetchRequest; 2]>),
     Validity(u64, u64, u64, Vec<BlobFetchRequest>),
 }
 
@@ -44,7 +43,6 @@ impl PreconditionValidationData {
 
     pub fn blob_fetch_requests(&self) -> &[BlobFetchRequest] {
         match self {
-            PreconditionValidationData::Fault(_, requests) => requests.as_slice(),
             PreconditionValidationData::Validity(_, _, _, requests) => requests.as_slice(),
         }
     }
@@ -55,13 +53,6 @@ impl PreconditionValidationData {
 
     pub fn precondition_hash(&self) -> B256 {
         match self {
-            PreconditionValidationData::Fault(agreement_index, divergent_blobs) => {
-                divergence_precondition_hash(
-                    agreement_index,
-                    &divergent_blobs[0].blob_hash.hash,
-                    &divergent_blobs[1].blob_hash.hash,
-                )
-            }
             PreconditionValidationData::Validity(
                 global_l2_head_number,
                 proposal_output_count,
@@ -168,28 +159,6 @@ pub fn validate_precondition(
 ) -> anyhow::Result<B256> {
     let precondition_hash = precondition_validation_data.precondition_hash();
     match precondition_validation_data {
-        PreconditionValidationData::Fault(divergence_index, _) => {
-            // Check equivalence of two blobs until potential divergence point
-            if divergence_index == 0 {
-                bail!("Unexpected divergence index 0");
-            } else if divergence_index > FIELD_ELEMENTS_PER_BLOB {
-                bail!(
-                    "Divergence index value {divergence_index} exceeds {FIELD_ELEMENTS_PER_BLOB}"
-                );
-            }
-            // Check for equality
-            for i in 0..divergence_index {
-                let index = 32 * i as usize;
-                if blobs[0][index..index + 32] != blobs[1][index..index + 32] {
-                    bail!("Elements at equivalence position {i} in blobs are not equal.");
-                }
-            }
-            // Check for inequality
-            let index = 32 * divergence_index as usize;
-            if blobs[0][index..index + 32] == blobs[1][index..index + 32] {
-                bail!("Elements at divergence position {divergence_index} in blobs are equal.");
-            }
-        }
         PreconditionValidationData::Validity(
             global_l2_head_number,
             proposal_output_count,
