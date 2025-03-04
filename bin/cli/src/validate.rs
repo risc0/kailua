@@ -911,7 +911,6 @@ pub async fn handle_proposals(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn request_fault_proof(
     channel: &mut DuplexChannel<Message>,
     config: &Config,

@@ -31,7 +31,7 @@ pub struct KailuaHostArgs {
     /// Whether to skip running the zeth preflight engine
     #[clap(long, env, default_value_t = true)]
     pub skip_zeth_preflight: bool,
-    #[clap(long, env, default_value_t = 1)]
+    #[clap(long, env, default_value_t = 4)]
     pub num_preflight_threads: u64,
 
     #[clap(flatten)]
