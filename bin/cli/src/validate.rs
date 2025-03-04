@@ -279,7 +279,7 @@ pub async fn handle_proposals(
                     .filter(|p| **p < proposal_index)
                     .any(|p| {
                         // Fetch prior predecessor from db
-                        let Some(predecessor) = kailua_db.get_local_proposal(&p) else {
+                        let Some(predecessor) = kailua_db.get_local_proposal(p) else {
                             error!("Proposal {p} missing from database.");
                             return false;
                         };
@@ -540,14 +540,6 @@ pub async fn handle_proposals(
                     }
                 }
 
-                let debug_res = parent_contract
-                    .debug(child_index)
-                    .stall_with_context(context.clone(), "KailuaTreasury::debug")
-                    .await
-                    ._0
-                    .0;
-                info!("DEBUG: {}", hex::encode(&debug_res));
-
                 match parent_contract
                     .proveValidity(
                         proof_journal.payout_recipient,
@@ -725,7 +717,7 @@ pub async fn handle_proposals(
                     } else {
                         info!("Proposal common output publication confirmed.");
                     }
-                    proposal_has_output && proposal_has_output
+                    proposal_has_output
                 };
                 if is_agreed_output_confirmed {
                     info!(

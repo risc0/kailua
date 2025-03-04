@@ -193,36 +193,10 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         Some(address) => Address::from_str(address)?,
     };
 
-    // Deploy KailuaTournamentLogic contract
-    info!("Deploying KailuaTournamentLogic contract to L1 rpc.");
-    let receipt = KailuaTournamentLogic::deploy_builder(
-        &deployer_provider,
-        verifier_contract_address,
-        bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
-        rollup_config_hash.into(),
-        Uint::from(args.proposal_output_count),
-        Uint::from(args.output_block_span),
-        KAILUA_GAME_TYPE,
-        dgf_address,
-    )
-    .transact_with_context(context.clone(), "KailuaTournamentLogic::deploy")
-    .await
-    .context("KailuaTournamentLogic::deploy")?;
-    info!("KailuaTournamentLogic::deploy: {} gas", receipt.gas_used);
-    let kailua_tournament_implementation = KailuaTournamentLogic::new(
-        receipt
-            .contract_address
-            .ok_or_else(|| anyhow!("KailuaTournamentLogic not deployed"))?,
-        &deployer_provider,
-    );
-    info!("{:?}", &kailua_tournament_implementation);
-    let kailua_tournament_address = *kailua_tournament_implementation.address();
-
     // Deploy KailuaTreasury contract
     info!("Deploying KailuaTreasury contract to L1 rpc.");
     let receipt = KailuaTreasury::deploy_builder(
         &deployer_provider,
-        kailua_tournament_address,
         verifier_contract_address,
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
         rollup_config_hash.into(),
@@ -360,7 +334,6 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     info!("Deploying KailuaGame contract to L1 rpc.");
     let receipt = KailuaGame::deploy_builder(
         &deployer_provider,
-        kailua_tournament_address,
         *kailua_treasury_implementation.address(),
         verifier_contract_address,
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
@@ -369,11 +342,9 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         Uint::from(args.output_block_span),
         KAILUA_GAME_TYPE,
         dgf_address,
-        [
-            U256::from(config.genesis.l2_time),
-            U256::from(config.block_time),
-            U256::from(args.proposal_time_gap),
-        ],
+        U256::from(config.genesis.l2_time),
+        U256::from(config.block_time),
+        U256::from(args.proposal_time_gap),
         args.challenge_timeout,
     )
     .transact_with_context(context.clone(), "KailuaGame::deploy")

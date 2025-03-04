@@ -43,7 +43,6 @@ contract KailuaGame is KailuaTournament {
     uint256 public immutable PROPOSAL_TIME_GAP;
 
     constructor(
-        KailuaTournamentLogic _tournament,
         IKailuaTreasury _kailuaTreasury,
         IRiscZeroVerifier _verifierContract,
         bytes32 _imageId,
@@ -52,12 +51,12 @@ contract KailuaGame is KailuaTournament {
         uint256 _outputBlockSpan,
         GameType _gameType,
         IDisputeGameFactory _disputeGameFactory,
-        // solve stack too deep error
-        uint256[3] memory _genesisTimeStamp_l2BlockTime_proposalTimeGap,
+        uint256 _genesisTimeStamp,
+        uint256 _l2BlockTime,
+        uint256 _proposalTimeGap,
         Duration _maxClockDuration
     )
         KailuaTournament(
-            _tournament,
             _kailuaTreasury,
             _verifierContract,
             _imageId,
@@ -69,9 +68,9 @@ contract KailuaGame is KailuaTournament {
         )
     {
         MAX_CLOCK_DURATION = _maxClockDuration;
-        GENESIS_TIME_STAMP = _genesisTimeStamp_l2BlockTime_proposalTimeGap[0];
-        L2_BLOCK_TIME = _genesisTimeStamp_l2BlockTime_proposalTimeGap[1];
-        PROPOSAL_TIME_GAP = _genesisTimeStamp_l2BlockTime_proposalTimeGap[2];
+        GENESIS_TIME_STAMP = _genesisTimeStamp;
+        L2_BLOCK_TIME = _l2BlockTime;
+        PROPOSAL_TIME_GAP = _proposalTimeGap;
     }
 
     // ------------------------------
