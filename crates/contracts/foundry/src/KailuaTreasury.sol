@@ -200,7 +200,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
 
     modifier onlyFactoryOwner() {
         OwnableUpgradeable factoryContract = OwnableUpgradeable(address(DISPUTE_GAME_FACTORY));
-        require(msg.sender == factoryContract.owner(), "Ownable: caller is not the owner");
+        require(msg.sender == factoryContract.owner(), "not owner");
         _;
     }
 

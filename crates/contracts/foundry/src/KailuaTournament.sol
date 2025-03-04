@@ -26,31 +26,31 @@ abstract contract KailuaTournamentState is Clone, IDisputeGame {
     // ------------------------------
 
     /// @notice The Kailua Treasury Implementation contract address
-    IKailuaTreasury public immutable KAILUA_TREASURY;
+    IKailuaTreasury public KAILUA_TREASURY;
 
     /// @notice The RISC Zero verifier contract
-    IRiscZeroVerifier public immutable RISC_ZERO_VERIFIER;
+    IRiscZeroVerifier public RISC_ZERO_VERIFIER;
 
     /// @notice The RISC Zero image id of the fault proof program
-    bytes32 public immutable FPVM_IMAGE_ID;
+    bytes32 public FPVM_IMAGE_ID;
 
     /// @notice The hash of the game configuration
-    bytes32 public immutable ROLLUP_CONFIG_HASH;
+    bytes32 public ROLLUP_CONFIG_HASH;
 
     /// @notice The number of outputs a proposal must publish
-    uint256 public immutable PROPOSAL_OUTPUT_COUNT;
+    uint256 public PROPOSAL_OUTPUT_COUNT;
 
     /// @notice The number of blocks each output must cover
-    uint256 public immutable OUTPUT_BLOCK_SPAN;
+    uint256 public OUTPUT_BLOCK_SPAN;
 
     /// @notice The number of blobs a claim must provide
-    uint256 public immutable PROPOSAL_BLOBS;
+    uint256 public PROPOSAL_BLOBS;
 
     /// @notice The game type ID
-    GameType public immutable GAME_TYPE;
+    GameType public GAME_TYPE;
 
     /// @notice The dispute game factory
-    IDisputeGameFactory public immutable DISPUTE_GAME_FACTORY;
+    IDisputeGameFactory public DISPUTE_GAME_FACTORY;
 
     // ------------------------------
     // Tournament
@@ -175,12 +175,58 @@ contract KailuaTournamentLogic is KailuaTournamentState {
     /// @inheritdoc IDisputeGame
     function resolve() external returns (GameStatus status_) {}
 
+//    function debug(uint64 childIndex) public view returns (bytes memory) {
+//        KailuaTournament childContract = children[childIndex];
+//        bytes32 preconditionHash = bytes32(0x0);
+//        if (PROPOSAL_OUTPUT_COUNT > 1) {
+//            preconditionHash = sha256(
+//                abi.encodePacked(
+//                    uint64(l2BlockNumber()),
+//                    uint64(PROPOSAL_OUTPUT_COUNT),
+//                    uint64(OUTPUT_BLOCK_SPAN),
+//                    childContract.blobsHash()
+//                )
+//            );
+//        }
+//        uint64 claimBlockNumber = uint64(l2BlockNumber() + PROPOSAL_OUTPUT_COUNT * OUTPUT_BLOCK_SPAN);
+//
+//        return abi.encodePacked(
+//            preconditionHash,
+//            // The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
+//            childContract.l1Head().raw(),
+//            // The accepted output
+//            rootClaim().raw(),
+//            // The proposed output
+//            childContract.rootClaim().raw(),
+//            // The claim block number
+//            claimBlockNumber,
+//            // The rollup configuration hash
+//            ROLLUP_CONFIG_HASH,
+//            // The FPVM Image ID
+//            FPVM_IMAGE_ID
+//        );
+//    }
+
+    function updateProofStatus(address payoutRecipient, bytes32 childSignature, ProofStatus outcome) internal {
+        // Update proof status
+        proofStatus[childSignature] = outcome;
+
+        // Announce proof status
+        emit Proven(childSignature, outcome);
+
+        // Set the game's prover address
+        prover[childSignature] = payoutRecipient;
+
+        // Set the game's proving timestamp
+        provenAt[childSignature] = Timestamp.wrap(uint64(block.timestamp));
+    }
+
     // ------------------------------
     // Tournament
     // ------------------------------
 
     /// @notice Eliminates children until at least one remains
-    function pruneChildren(uint256 eliminationLimit) external returns (KailuaTournament survivor) {
+    function pruneChildren(uint256 eliminationLimit) external returns (KailuaTournament) {
         // INVARIANT: Only finalized proposals may prune tournaments
         if (status != GameStatus.DEFENDER_WINS) {
             revert GameNotResolved();
@@ -310,9 +356,12 @@ contract KailuaTournamentLogic is KailuaTournamentState {
 
             // Return the sole survivor if no more matches can be played
             if (v == children.length || eliminationLimit > 0) {
-                survivor = contender;
+                return contender;
             }
         }
+
+        // No survivor yet
+        return KailuaTournament(address(0x0));
     }
 
     // ------------------------------
@@ -519,12 +568,7 @@ contract KailuaTournamentLogic is KailuaTournamentState {
         // Validate the claimed output root publications
         // Note: proposedOutputFe must be a canonical field element or point eval precompile call will fail
         require(
-            childContract.verifyIntermediateOutput(
-                trailOffset,
-                proposedOutputFe,
-                blobCommitment,
-                kzgProof
-            ),
+            childContract.verifyIntermediateOutput(trailOffset, proposedOutputFe, blobCommitment, kzgProof),
             "bad child proposedOutput kzg proof"
         );
 
@@ -532,19 +576,6 @@ contract KailuaTournamentLogic is KailuaTournamentState {
         updateProofStatus(payoutRecipient, childSignature, ProofStatus.FAULT);
     }
 
-    function updateProofStatus(address payoutRecipient, bytes32 childSignature, ProofStatus outcome) internal {
-        // Update proof status
-        proofStatus[childSignature] = outcome;
-
-        // Announce proof status
-        emit Proven(childSignature, outcome);
-
-        // Set the game's prover address
-        prover[childSignature] = payoutRecipient;
-
-        // Set the game's proving timestamp
-        provenAt[childSignature] = Timestamp.wrap(uint64(block.timestamp));
-    }
 }
 
 abstract contract KailuaTournament is KailuaTournamentState {
@@ -552,27 +583,38 @@ abstract contract KailuaTournament is KailuaTournamentState {
 
     // Source:
     // https://github.com/OpenZeppelin/openzeppelin-contracts/blob/fa995ef1fe66e1447783cb6038470aba23a6343f/contracts/proxy/Proxy.sol#L22
-    function _delegate() internal {
-        address implementation = address(TOURNAMENT);
-        assembly {
-            // Copy msg.data. We take full control of memory in this inline assembly
-            // block because it will not return to Solidity code. We overwrite the
-            // Solidity scratch pad at memory position 0.
-            calldatacopy(0, 0, calldatasize())
-
-            // Call the implementation.
-            // out and outsize are 0 because we don't know the size yet.
-            let result := delegatecall(gas(), implementation, 0, calldatasize(), 0, 0)
-
-            // Copy the returned data.
-            returndatacopy(0, 0, returndatasize())
-
-            switch result
-            // delegatecall returns 0 on error.
-            case 0 { revert(0, returndatasize()) }
-            default { return(0, returndatasize()) }
+    function _delegate() internal returns (bytes memory) {
+        //        address implementation = address(TOURNAMENT);
+        //        assembly {
+        //            // Copy msg.data. We take full control of memory in this inline assembly
+        //            // block because it will not return to Solidity code. We overwrite the
+        //            // Solidity scratch pad at memory position 0.
+        //            calldatacopy(0, 0, calldatasize())
+        //
+        //            // Call the implementation.
+        //            // out and outsize are 0 because we don't know the size yet.
+        //            let result := delegatecall(gas(), implementation, 0, calldatasize(), 0, 0)
+        //
+        //            // Copy the returned data.
+        //            returndatacopy(0, 0, returndatasize())
+        //
+        //            switch result
+        //            // delegatecall returns 0 on error.
+        //            case 0 { revert(0, returndatasize()) }
+        //            default { return(0, returndatasize()) }
+        //        }
+        (bool success, bytes memory result) = address(TOURNAMENT).delegatecall(msg.data);
+        if (success == false) {
+            assembly {
+                revert(add(result, 32), mload(result))
+            }
         }
+        return result;
     }
+
+//    function debug(uint64 childIndex) public returns (bytes memory) {
+//        return _delegate();
+//    }
 
     // ------------------------------
     // Immutable configuration
@@ -656,8 +698,8 @@ abstract contract KailuaTournament is KailuaTournamentState {
     }
 
     /// @notice Eliminates children until at least one remains
-    function pruneChildren(uint256 eliminationLimit) external returns (KailuaTournament survivor) {
-        _delegate();
+    function pruneChildren(uint256 eliminationLimit) external returns (KailuaTournament) {
+        return abi.decode(_delegate(), (KailuaTournament));
     }
 
     // ------------------------------
@@ -705,8 +747,8 @@ abstract contract KailuaTournament is KailuaTournamentState {
         address payoutRecipient,
         uint64[2] calldata co,
         uint256 proposedOutputFe,
-        bytes calldata blobCommitments,
-        bytes calldata kzgProofs
+        bytes calldata blobCommitment,
+        bytes calldata kzgProof
     ) external {
         _delegate();
     }

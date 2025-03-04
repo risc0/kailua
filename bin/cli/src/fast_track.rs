@@ -195,10 +195,19 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
 
     // Deploy KailuaTournamentLogic contract
     info!("Deploying KailuaTournamentLogic contract to L1 rpc.");
-    let receipt = KailuaTournamentLogic::deploy_builder(&deployer_provider)
-        .transact_with_context(context.clone(), "KailuaTournamentLogic::deploy")
-        .await
-        .context("KailuaTournamentLogic::deploy")?;
+    let receipt = KailuaTournamentLogic::deploy_builder(
+        &deployer_provider,
+        verifier_contract_address,
+        bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
+        rollup_config_hash.into(),
+        Uint::from(args.proposal_output_count),
+        Uint::from(args.output_block_span),
+        KAILUA_GAME_TYPE,
+        dgf_address,
+    )
+    .transact_with_context(context.clone(), "KailuaTournamentLogic::deploy")
+    .await
+    .context("KailuaTournamentLogic::deploy")?;
     info!("KailuaTournamentLogic::deploy: {} gas", receipt.gas_used);
     let kailua_tournament_implementation = KailuaTournamentLogic::new(
         receipt

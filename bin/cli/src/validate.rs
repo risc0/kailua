@@ -294,6 +294,10 @@ pub async fn handle_proposals(
                 );
                 continue;
             }
+            // Skip attempting to fault prove correct proposals
+            if let Some(true) = proposal.is_correct() {
+                continue;
+            }
 
             // Check that a fault proof had not already been posted
             let proof_status = parent_contract
@@ -535,6 +539,14 @@ pub async fn handle_proposals(
                         info!("Block number {expected_block_number} confirmed.");
                     }
                 }
+
+                let debug_res = parent_contract
+                    .debug(child_index)
+                    .stall_with_context(context.clone(), "KailuaTreasury::debug")
+                    .await
+                    ._0
+                    .0;
+                info!("DEBUG: {}", hex::encode(&debug_res));
 
                 match parent_contract
                     .proveValidity(

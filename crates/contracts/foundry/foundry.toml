@@ -3,7 +3,7 @@ src = "src"
 out = "out"
 libs = ["lib"]
 optimizer = true
-optimizer_runs = 10
+optimizer_runs = 10_000_000
 ffi = true
 evm_version = "cancun"
 

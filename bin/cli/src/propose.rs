@@ -202,7 +202,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             // Check if can prune next set of children in parent tournament
             if proposal.has_parent() {
                 let can_resolve = loop {
-                    let Ok(result) = await_tel_res!(
+                    let result = await_tel_res!(
                         context,
                         tracer,
                         "KailuaTournament::pruneChildren",
@@ -210,12 +210,16 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                             .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
                             .call()
                             .into_future()
-                    ) else {
+                    );
+
+                    if let Err(err) = result {
+                        warn!("pruneChildren: {err:?}");
                         break false;
                     };
+                    let result = result.unwrap();
 
                     // Final prune will be during resolution
-                    if !result.survivor.is_zero() {
+                    if !result._0.is_zero() {
                         break true;
                     }
 

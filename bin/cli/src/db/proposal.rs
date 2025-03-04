@@ -318,7 +318,7 @@ impl Proposal {
                 .call()
                 .into_future()
         )?
-        .survivor;
+        ._0;
         if survivor.is_zero() {
             Ok(None)
         } else {
@@ -526,7 +526,7 @@ impl Proposal {
                     .call()
                     .into_future()
             )?
-            .survivor;
+            ._0;
 
             // If a survivor is returned we don't need pruning
             if !survivor.is_zero() {
