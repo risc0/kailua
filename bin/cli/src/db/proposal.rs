@@ -32,28 +32,47 @@ pub const ELIMINATIONS_LIMIT: u64 = 128;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Proposal {
     // pointers
+    /// Address of the contract instance
     pub contract: Address,
+    /// DGF Index of the game
     pub index: u64,
+    /// DGF Index of the game's parent
     pub parent: u64,
+    /// Address of the proposer
     pub proposer: Address,
     // claim data
+    /// Contract creation timestamp
     pub created_at: u64,
+    /// All intermediate output blobs
     pub io_blobs: Vec<(B256, BlobData)>,
+    /// Individual intermediate output field elements
     pub io_field_elements: Vec<U256>,
+    /// Individual trailing data field elements
     pub trail_field_elements: Vec<U256>,
+    /// Claimed output root
     pub output_root: B256,
+    /// Claimed output root block number
     pub output_block_number: u64,
+    /// Proposal L1 head
     pub l1_head: B256,
+    /// Proposal IO/Claim signature
+    pub signature: B256,
     // tournament data
+    /// List of child proposals
     pub children: Vec<u64>,
-    pub survivor: Option<u64>,
-    pub contender: Option<u64>,
+    /// Index of successor proposal
+    pub successor: Option<u64>,
     // correctness
+    /// Correctness of each intermediate output in proposal
     pub correct_io: Vec<Option<bool>>,
+    /// Correctness of each trailing data element in proposal
     pub correct_trail: Vec<Option<bool>>,
+    /// Correctness of claimed output root
     pub correct_claim: Option<bool>,
+    /// Correctness of parent proposal
     pub correct_parent: Option<bool>,
     // resolution
+    /// Whether the proposal is canonical
     pub canonical: Option<bool>,
 }
 
@@ -133,6 +152,13 @@ impl Proposal {
             .l1Head_
             .0
             .into();
+        let signature = treasury_instance
+            .signature()
+            .stall_with_context(context.clone(), "KailuaTreasury::signature")
+            .await
+            .signature_
+            .0
+            .into();
         Ok(Self {
             contract: *treasury_instance.address(),
             index,
@@ -145,9 +171,9 @@ impl Proposal {
             output_root,
             output_block_number,
             l1_head,
+            signature,
             children: Default::default(),
-            survivor: None,
-            contender: None,
+            successor: None,
             correct_io: vec![],
             correct_trail: vec![],
             correct_claim: Some(true),
@@ -226,6 +252,13 @@ impl Proposal {
             .l1Head_
             .0
             .into();
+        let signature = game_instance
+            .signature()
+            .stall_with_context(context.clone(), "KailuaGame::signature")
+            .await
+            .signature_
+            .0
+            .into();
         let trail_len = trail_field_elements.len();
         Ok(Self {
             contract: *game_instance.address(),
@@ -239,9 +272,9 @@ impl Proposal {
             output_root,
             output_block_number,
             l1_head,
+            signature,
             children: Default::default(),
-            survivor: None,
-            contender: None,
+            successor: None,
             correct_io: repeat(None)
                 .take((config.proposal_output_count - 1) as usize)
                 .collect(),
@@ -341,13 +374,13 @@ impl Proposal {
         let context =
             opentelemetry::Context::current_with_span(tracer.start("Proposal::fetch_finality"));
 
-        Ok(self
+        Ok(!self
             .tournament_contract_instance(provider)
-            .provenAt(U256::ZERO, U256::ZERO)
-            .stall_with_context(context.clone(), "KailuaTournament::provenAt")
+            .validChildSignature()
+            .stall_with_context(context.clone(), "KailuaTournament::validChildSignature")
             .await
             ._0
-            > 0)
+            .is_zero())
     }
 
     pub async fn fetch_current_challenger_duration<P: Provider<N>, N: Network>(
@@ -431,16 +464,19 @@ impl Proposal {
     }
 
     pub fn is_correct(&self) -> Option<bool> {
-        // False case
+        // A proposal is false if it extends an incorrect parent proposal
         if let Some(false) = self.correct_parent {
             return Some(false);
         }
+        // A proposal is false if its root claim is incorrect
         if let Some(false) = self.correct_claim {
             return Some(false);
         }
+        // A proposal is false if any of the intermediate commitments can be proven false
         if self.correct_io.iter().flatten().any(|c| !c) {
             return Some(false);
         }
+        // A proposal is false if it contains non-zero trailing io data
         if self.correct_trail.iter().flatten().any(|c| !c) {
             return Some(false);
         }
@@ -478,7 +514,9 @@ impl Proposal {
             .parentGame_;
         let parent_tournament_instance = KailuaTournament::new(parent_tournament, &provider);
 
+        // Issue any necessary pre-emptive pruning calls
         loop {
+            // check if calling pruneChildren doesn't fail
             let survivor = await_tel_res!(
                 context,
                 tracer,
@@ -490,6 +528,7 @@ impl Proposal {
             )?
             .survivor;
 
+            // If a survivor is returned we don't need pruning
             if !survivor.is_zero() {
                 break;
             }
@@ -506,6 +545,7 @@ impl Proposal {
             );
         }
 
+        // Issue resolution call
         let receipt = contract_instance
             .resolve()
             .transact_with_context(context.clone(), "KailuaTournament::resolve")
@@ -520,46 +560,25 @@ impl Proposal {
         self.index != self.parent
     }
 
-    pub fn divergence_point(&self, proposal: &Proposal) -> Option<usize> {
+    pub fn divergence_point(&self) -> Option<usize> {
         // Check divergence in IO
-        for i in 0..self.io_field_elements.len() {
-            if self.io_field_elements[i] != proposal.io_field_elements[i] {
+        for i in 0..self.correct_io.len() {
+            if let Some(false) = self.correct_io[i] {
                 return Some(i);
             }
         }
         // Check divergence in final claim
-        if self.output_root != proposal.output_root {
+        if let Some(false) = self.correct_claim {
             return Some(self.io_field_elements.len());
         }
-        // Check divergence in trail
-        for i in 0..self.trail_field_elements.len() {
-            if self.trail_field_elements[i] != proposal.trail_field_elements[i] {
+        // Check divergence in trail data
+        for i in 0..self.correct_trail.len() {
+            if let Some(false) = self.correct_trail[i] {
                 return Some(self.io_field_elements.len() + i + 1);
             }
         }
         // Report equivalence
         None
-    }
-
-    /// Returns true iff self (as contender) wins against opponent
-    pub fn wins_against(&self, opponent: &Proposal, timeout: u64) -> bool {
-        // If the survivor hasn't been challenged for as long as the timeout, declare them winner
-        if opponent.created_at - self.created_at >= timeout {
-            return true;
-        }
-        // Check provable outcome
-        match self.divergence_point(opponent) {
-            // u wins if v is a duplicate
-            None => true,
-            // u wins if v is wrong (even if u is wrong)
-            Some(point) => match point.cmp(&self.io_field_elements.len()) {
-                Ordering::Less => !opponent.correct_io[point].unwrap(),
-                Ordering::Equal => !opponent.correct_claim.unwrap(),
-                Ordering::Greater => {
-                    !opponent.correct_trail[point - self.io_field_elements.len() - 1].unwrap()
-                }
-            },
-        }
     }
 
     pub fn append_child(&mut self, child_index: u64) -> bool {
@@ -577,14 +596,6 @@ impl Proposal {
             .enumerate()
             .find(|(_, idx)| *idx == &proposal_index)
             .map(|r| r.0 as u64)
-    }
-
-    pub fn has_precondition_for(&self, position: u64) -> bool {
-        if position <= self.io_field_elements.len() as u64 {
-            (position % FIELD_ELEMENTS_PER_BLOB) > 0
-        } else {
-            true
-        }
     }
 
     pub fn requires_vanguard_advantage(&self, proposer: Address, vanguard: Address) -> bool {
@@ -652,5 +663,9 @@ impl Proposal {
 
     pub fn blobs_hash(&self) -> B256 {
         blobs_hash(self.io_blobs.iter().map(|(h, _)| h))
+    }
+
+    pub fn signature(&self) -> B256 {
+        self.signature
     }
 }

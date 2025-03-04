@@ -103,24 +103,24 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         &tester_provider,
     );
     let kailua_treasury_address = kailua_game_implementation
-        .treasury()
-        .stall_with_context(context.clone(), "KailuaGame::treasury")
+        .KAILUA_TREASURY()
+        .stall_with_context(context.clone(), "KailuaGame::KAILUA_TREASURY")
         .await
-        .treasury_;
+        ._0;
     let kailua_treasury_instance = KailuaTreasury::new(kailua_treasury_address, &tester_provider);
 
     // load constants
     let proposal_output_count: u64 = kailua_game_implementation
-        .proposalOutputCount()
-        .stall_with_context(context.clone(), "KailuaGame::proposalOutputCount")
+        .PROPOSAL_OUTPUT_COUNT()
+        .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_OUTPUT_COUNT")
         .await
-        .proposalOutputCount_
+        ._0
         .to();
     let output_block_span: u64 = kailua_game_implementation
-        .outputBlockSpan()
-        .stall_with_context(context.clone(), "KailuaGame::outputBlockSpan")
+        .OUTPUT_BLOCK_SPAN()
+        .stall_with_context(context.clone(), "KailuaGame::OUTPUT_BLOCK_SPAN")
         .await
-        .outputBlockSpan_
+        ._0
         .to();
     let proposal_block_count = proposal_output_count * output_block_span;
 

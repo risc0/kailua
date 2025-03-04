@@ -487,8 +487,8 @@ contract KailuaTournamentLogic is KailuaTournamentState {
         address payoutRecipient,
         uint64[2] calldata co,
         uint256 proposedOutputFe,
-        bytes[] calldata blobCommitments,
-        bytes[] calldata kzgProofs
+        bytes calldata blobCommitment,
+        bytes calldata kzgProof
     ) external {
         KailuaTournament childContract = children[co[0]];
         // INVARIANT: Proofs cannot be submitted unless the children are playing.
@@ -522,8 +522,8 @@ contract KailuaTournamentLogic is KailuaTournamentState {
             childContract.verifyIntermediateOutput(
                 trailOffset,
                 proposedOutputFe,
-                blobCommitments[blobCommitments.length - 1],
-                kzgProofs[kzgProofs.length - 1]
+                blobCommitment,
+                kzgProof
             ),
             "bad child proposedOutput kzg proof"
         );
@@ -705,8 +705,8 @@ abstract contract KailuaTournament is KailuaTournamentState {
         address payoutRecipient,
         uint64[2] calldata co,
         uint256 proposedOutputFe,
-        bytes[] calldata blobCommitments,
-        bytes[] calldata kzgProofs
+        bytes calldata blobCommitments,
+        bytes calldata kzgProofs
     ) external {
         _delegate();
     }

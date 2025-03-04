@@ -293,7 +293,7 @@ impl KailuaDB {
 
     pub fn determine_if_canonical(&mut self, proposal: &mut Proposal) -> Option<bool> {
         if proposal.is_correct()? && !self.was_proposer_eliminated_before(proposal) {
-            // Consider updating canonical chain tip
+            // Consider updating canonical chain tip if none exists or proposal has greater height
             if self
                 .canonical_tip_height()
                 .map_or(true, |h| h < proposal.output_block_number)
@@ -329,25 +329,7 @@ impl KailuaDB {
             );
         }
         self.set_local_proposal(opponent.parent, &parent)?;
-        // Ignore skipped proposals
-        let contender = parent
-            .survivor
-            .map(|index| self.get_local_proposal(&index).unwrap());
-        if let Some(contender) = contender.as_ref() {
-            // Ignore self-conflict
-            if contender.proposer == opponent.proposer {
-                return Ok(false);
-            }
-            // Ignore duplicate proposals
-            if contender.divergence_point(opponent).is_none() {
-                return Ok(false);
-            }
-            // Skip proposals arriving after the timeout period
-            if opponent.created_at - contender.created_at >= self.config.timeout {
-                return Ok(false);
-            }
-        }
-        // Participate in tournament only if this is a correct or first bad proposal
+        // Participate in tournament only if this is not a post-bad proposal
         if self.was_proposer_eliminated_before(opponent) {
             return Ok(false);
         }
@@ -355,17 +337,19 @@ impl KailuaDB {
         if !parent.canonical.unwrap_or_default() {
             return Ok(false);
         }
-        // Update the contender
-        opponent.contender = parent.survivor;
-        // Determine if opponent is the next survivor
-        if contender
-            .as_ref()
-            .map(|contender| !contender.wins_against(opponent, self.config.timeout))
-            .unwrap_or(true)
+        // Ignore timed-out counter-proposals
+        if let Some(successor) = parent
+            .successor
+            .map(|index| self.get_local_proposal(&index).unwrap())
         {
-            // If the old survivor (if any) is defeated,
-            // set this proposal as the new survivor
-            parent.survivor = Some(opponent.index);
+            // Skip proposals arriving after the timeout period for the correct proposal
+            if opponent.created_at - successor.created_at >= self.config.timeout {
+                return Ok(false);
+            }
+        }
+        // Determine if opponent is the next successor
+        if let Some(true) = opponent.canonical {
+            parent.successor = Some(opponent.index);
             self.set_local_proposal(opponent.parent, &parent)?;
         }
         Ok(true)

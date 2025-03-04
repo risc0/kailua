@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use foundry_compilers::multi::MultiCompilerSettings;
-use foundry_compilers::{Project, ProjectPathsConfig};
+use foundry_compilers::{
+    artifacts::EvmVersion, multi::MultiCompilerSettings, Project, ProjectPathsConfig,
+};
 
 fn main() {
     let mut settings = MultiCompilerSettings::default();
     settings.solc.optimizer.enabled = Some(true);
+    settings.solc.optimizer.runs = Some(10);
+    settings.solc.evm_version = Some(EvmVersion::Cancun);
     let project = Project::builder()
         .settings(settings)
         .paths(ProjectPathsConfig::builder().build_with_root("foundry"))

@@ -4,7 +4,6 @@ out = "out"
 libs = ["lib"]
 optimizer = true
 optimizer_runs = 10
-#via_ir = true
 ffi = true
 evm_version = "cancun"
 

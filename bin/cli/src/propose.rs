@@ -145,9 +145,9 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         )
         .context("KailuaDB::load_proposals")?;
 
-        // abort on failure
+        // alert on honesty compromise
         if let Some(elimination_index) = kailua_db.state.eliminations.get(&proposer_address) {
-            anyhow::bail!(
+            error!(
                 "Proposer {proposer_address} honesty compromised at proposal {elimination_index}."
             );
         }

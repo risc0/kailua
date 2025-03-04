@@ -46,76 +46,76 @@ impl Config {
         let context = opentelemetry::Context::current_with_span(tracer.start("Config::load"));
 
         let treasury = kailua_game_implementation
-            .treasury()
-            .stall_with_context(context.clone(), "KailuaGame::treasury")
+            .KAILUA_TREASURY()
+            .stall_with_context(context.clone(), "KailuaGame::KAILUA_TREASURY")
             .await
-            .treasury_;
+            ._0;
         let game = *kailua_game_implementation.address();
         let verifier = kailua_game_implementation
-            .verifier()
-            .stall_with_context(context.clone(), "KailuaGame::verifier")
+            .RISC_ZERO_VERIFIER()
+            .stall_with_context(context.clone(), "KailuaGame::RISC_ZERO_VERIFIER")
             .await
-            .verifier_;
+            ._0;
         let image_id = kailua_game_implementation
-            .imageId()
-            .stall_with_context(context.clone(), "")
+            .FPVM_IMAGE_ID()
+            .stall_with_context(context.clone(), "KailuaGame::FPVM_IMAGE_ID")
             .await
-            .imageId_;
+            ._0;
         let cfg_hash = kailua_game_implementation
-            .configHash()
-            .stall_with_context(context.clone(), "KailuaGame::configHash")
+            .ROLLUP_CONFIG_HASH()
+            .stall_with_context(context.clone(), "KailuaGame::ROLLUP_CONFIG_HASH")
             .await
-            .configHash_;
+            ._0;
         let proposal_output_count = kailua_game_implementation
-            .proposalOutputCount()
-            .stall_with_context(context.clone(), "KailuaGame::proposalOutputCount")
+            .PROPOSAL_OUTPUT_COUNT()
+            .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_OUTPUT_COUNT")
             .await
-            .proposalOutputCount_
+            ._0
             .to();
         let output_block_span = kailua_game_implementation
-            .outputBlockSpan()
-            .stall_with_context(context.clone(), "KailuaGame::outputBlockSpan")
+            .OUTPUT_BLOCK_SPAN()
+            .stall_with_context(context.clone(), "KailuaGame::OUTPUT_BLOCK_SPAN")
             .await
-            .outputBlockSpan_
+            ._0
             .to();
         let proposal_blobs = kailua_game_implementation
-            .proposalBlobs()
-            .stall_with_context(context.clone(), "KailuaGame::proposalBlobs")
+            .PROPOSAL_BLOBS()
+            .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_BLOBS")
             .await
-            .proposalBlobs_
+            ._0
             .to();
         let game_type = kailua_game_implementation
-            .gameType()
-            .stall_with_context(context.clone(), "KailuaGame::gameType")
+            .GAME_TYPE()
+            .stall_with_context(context.clone(), "KailuaGame::GAME_TYPE")
             .await
-            .gameType_ as u8;
+            ._0 as u8;
         let factory = kailua_game_implementation
-            .disputeGameFactory()
-            .stall_with_context(context.clone(), "KailuaGame::disputeGameFactory")
+            .DISPUTE_GAME_FACTORY()
+            .stall_with_context(context.clone(), "KailuaGame::DISPUTE_GAME_FACTORY")
             .await
-            .factory_;
+            ._0;
         let timeout = kailua_game_implementation
-            .maxClockDuration()
-            .stall_with_context(context.clone(), "KailuaGame::maxClockDuration")
+            .MAX_CLOCK_DURATION()
+            .stall_with_context(context.clone(), "KailuaGame::MAX_CLOCK_DURATION")
             .await
-            .maxClockDuration_;
+            ._0;
         let genesis_time = kailua_game_implementation
-            .genesisTimeStamp()
-            .stall_with_context(context.clone(), "KailuaGame::genesisTimeStamp")
+            .GENESIS_TIME_STAMP()
+            .stall_with_context(context.clone(), "KailuaGame::GENESIS_TIME_STAMP")
             .await
-            .genesisTimeStamp_
+            ._0
             .to();
         let block_time = kailua_game_implementation
-            .l2BlockTime()
-            .stall_with_context(context.clone(), "KailuaGame::l2BlockTime")
+            .L2_BLOCK_TIME()
+            .stall_with_context(context.clone(), "KailuaGame::L2_BLOCK_TIME")
             .await
-            .l2BlockTime_
+            ._0
             .to();
         let proposal_gap = kailua_game_implementation
-            .proposalTimeGap()
-            .stall_with_context(context.clone(), "KailuaGame::proposalTimeGap")
+            .PROPOSAL_TIME_GAP()
+            .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_TIME_GAP")
             .await
-            .proposalTimeGap_
+            ._0
             .to();
         Ok(Self {
             treasury,
