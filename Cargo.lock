@@ -5019,14 +5019,14 @@ dependencies = [
 
 [[package]]
 name = "kailua-build"
-version = "0.1.0"
+version = "0.3.0-alpha.0"
 dependencies = [
  "risc0-build",
 ]
 
 [[package]]
 name = "kailua-cli"
-version = "0.1.0"
+version = "0.3.0-alpha.0"
 dependencies = [
  "alloy 0.11.1",
  "alloy-rpc-types-beacon",
@@ -5075,7 +5075,7 @@ dependencies = [
 
 [[package]]
 name = "kailua-client"
-version = "0.1.0"
+version = "0.3.0-alpha.0"
 dependencies = [
  "alloy 0.11.1",
  "alloy-primitives",
@@ -5117,7 +5117,7 @@ dependencies = [
 
 [[package]]
 name = "kailua-common"
-version = "0.1.0"
+version = "0.3.0-alpha.0"
 dependencies = [
  "alloy-consensus 0.11.1",
  "alloy-eips 0.11.1",
@@ -5142,6 +5142,7 @@ dependencies = [
  "lazy_static",
  "lru 0.12.5",
  "op-alloy-consensus 0.10.5",
+ "op-alloy-flz",
  "op-alloy-rpc-types-engine",
  "pot",
  "risc0-aggregation",
@@ -5156,7 +5157,7 @@ dependencies = [
 
 [[package]]
 name = "kailua-contracts"
-version = "0.1.0"
+version = "0.3.0-alpha.0"
 dependencies = [
  "alloy 0.11.1",
  "alloy-sol-types",
@@ -5165,7 +5166,7 @@ dependencies = [
 
 [[package]]
 name = "kailua-host"
-version = "0.1.0"
+version = "0.3.0-alpha.0"
 dependencies = [
  "alloy 0.11.1",
  "alloy-chains",

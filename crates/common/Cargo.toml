@@ -1,6 +1,6 @@
 [package]
 name = "kailua-common"
-version = "0.1.0"
+version = "0.3.0-alpha.0"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
@@ -31,6 +31,7 @@ alloy-rpc-types-beacon.workspace = true
 alloy-rpc-types-engine.workspace = true
 
 op-alloy-consensus.workspace = true
+op-alloy-flz.workspace = true
 op-alloy-rpc-types-engine.workspace = true
 
 kona-driver.workspace = true

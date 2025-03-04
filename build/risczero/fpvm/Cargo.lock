@@ -2031,7 +2031,7 @@ dependencies = [
 
 [[package]]
 name = "kailua-common"
-version = "0.1.0"
+version = "0.3.0-alpha.0"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -2056,6 +2056,7 @@ dependencies = [
  "lazy_static",
  "lru 0.12.5",
  "op-alloy-consensus",
+ "op-alloy-flz",
  "op-alloy-rpc-types-engine",
  "pot",
  "risc0-aggregation",
@@ -2070,7 +2071,7 @@ dependencies = [
 
 [[package]]
 name = "kailua-fpvm"
-version = "0.1.0"
+version = "0.3.0-alpha.0"
 dependencies = [
  "c-kzg",
  "kailua-common",
