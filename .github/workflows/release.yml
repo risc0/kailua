@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  release-build:
     runs-on: [self-hosted, prod, "${{ matrix.os }}", "${{ matrix.arch }}", cpu]
 
     strategy:
@@ -20,12 +20,12 @@ jobs:
       matrix:
         include:
           - build: linux
-            os: ubuntu-latest
+            os: Linux
             arch: X64
             target: x86_64-unknown-linux-musl
 
           - build: macos
-            os: macos-latest
+            os: macOS
             arch: ARM64
             target: x86_64-apple-darwin
 
