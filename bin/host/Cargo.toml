@@ -61,3 +61,15 @@ zeth-preflight-optimism.workspace = true
 prove = [
     "risc0-zkvm/prove"
 ]
+cuda = [
+    "risc0-zkvm/cuda"
+]
+metal = [
+    "risc0-zkvm/metal"
+]
+disable-dev-mode = [
+    "risc0-zkvm/disable-dev-mode"
+]
+rebuild-fpvm = [
+    "kailua-build/rebuild-fpvm"
+]

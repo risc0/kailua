@@ -9,9 +9,7 @@ Before you can start migrating your rollup, you'll need to build and install Kai
 commands from the root project directory:
 
 ```admonish tip
-Do not run these `install` commands in parallel.
-Each binary installation will take time to reproducibly build the FPVM program in release mode.
-If you install them in parallel, GitHub may throttle you, leading to a docker build error.
+If you have modified the FPVM binary, you will need to build/install using `-F rebuild-fpvm`.
 ```
 
 ### CLI Binary
@@ -24,6 +22,12 @@ cargo install kailua-cli --path bin/cli --locked
 At the cost of longer compilation time, you can embed the RISC Zero prover logic into `kailua-host` instead of having 
 it utilize your locally installed RISC Zero `r0vm`.
 To do this, add `-F prove` to the command below.
+```
+
+```admonish tip
+For GPU-accelerated local proving, use one of the following feature flags:
+* Apple: `-F metal`
+* Nvidia: `-F cuda`
 ```
 
 ```shell
