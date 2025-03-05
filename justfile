@@ -4,7 +4,7 @@ set fallback := true
 default:
   @just --list
 
-build +ARGS="--release -F prove":
+build +ARGS="--release -F prove --locked":
   cargo build {{ARGS}}
 
 clippy:
@@ -13,7 +13,7 @@ clippy:
 devnet-fetch:
   git clone --depth 1 --branch v1.9.1 --recursive https://github.com/ethereum-optimism/optimism.git
 
-devnet-build +ARGS="-F devnet -F prove": (build ARGS)
+devnet-build +ARGS="-F devnet -F prove --locked": (build ARGS)
 
 devnet-up:
   make -C optimism devnet-up > devnet.log

@@ -130,6 +130,12 @@ pub async fn fetch_rollup_config(
             rollup_config[fork] = json!(value);
         }
     }
+    // remove unused fields
+    {
+        let rollup_config_map = rollup_config.as_object_mut().unwrap();
+        rollup_config_map.remove("chain_op_config");
+        rollup_config_map.remove("alt_da_config");
+    }
     // export
     let ser_config = serde_json::to_string(&rollup_config)?;
     if let Some(json_file_path) = json_file_path {
