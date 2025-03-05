@@ -1,0 +1,238 @@
+// Copyright 2025 RISC Zero, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use crate::validate::ValidateArgs;
+use alloy::primitives::{Address, B256};
+use kailua_common::precondition::PreconditionValidationData;
+use std::path::PathBuf;
+
+#[derive(Debug, Clone)]
+pub struct Task {
+    pub proposal_index: u64,
+    pub proving_args: Vec<String>,
+    pub proof_file_name: String,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn create_proving_args(
+    args: &ValidateArgs,
+    data_dir: PathBuf,
+    l2_chain_id: String,
+    payout_recipient: Address,
+    precondition_validation_data: Option<PreconditionValidationData>,
+    l1_head: B256,
+    agreed_l2_head_hash: B256,
+    agreed_l2_output_root: B256,
+    claimed_l2_block_number: u64,
+    claimed_l2_output_root: B256,
+) -> Vec<String> {
+    // Prepare kailua-host parameters
+    let verbosity = [
+        String::from("-"),
+        (0..args.core.v).map(|_| 'v').collect::<String>(),
+    ]
+    .concat();
+    let mut proving_args = vec![
+        // wallet address for payouts
+        String::from("--payout-recipient-address"),
+        payout_recipient.to_string(),
+        // l2 el node
+        String::from("--op-node-address"),
+        args.core.op_node_url.clone(),
+    ];
+    // precondition data
+    if let Some(precondition_data) = precondition_validation_data {
+        let (block_hashes, blob_hashes): (Vec<_>, Vec<_>) = precondition_data
+            .blob_fetch_requests()
+            .iter()
+            .map(|r| (r.block_ref.hash.to_string(), r.blob_hash.hash.to_string()))
+            .unzip();
+        let params = match precondition_data {
+            PreconditionValidationData::Validity(
+                global_l2_head_number,
+                proposal_output_count,
+                output_block_span,
+                _,
+            ) => vec![
+                global_l2_head_number,
+                proposal_output_count,
+                output_block_span,
+            ],
+        }
+        .into_iter()
+        .map(|p| p.to_string())
+        .collect::<Vec<_>>();
+
+        proving_args.extend(vec![
+            String::from("--precondition-params"),
+            params.join(","),
+            String::from("--precondition-block-hashes"),
+            block_hashes.join(","),
+            String::from("--precondition-blob-hashes"),
+            blob_hashes.join(","),
+        ]);
+    }
+    // boundless args
+    if let Some(market) = &args.boundless.market {
+        proving_args.extend(market.to_arg_vec(&args.boundless.storage));
+    }
+    // data directory
+    let data_dir = data_dir.join(format!(
+        "{}-{}",
+        &agreed_l2_output_root.to_string()[..10].to_string(),
+        &claimed_l2_output_root.to_string()[..10].to_string()
+    ));
+    // kona args
+    proving_args.extend(vec![
+        // l1 head from on-chain proposal
+        String::from("--l1-head"),
+        l1_head.to_string(),
+        // l2 starting block hash from on-chain proposal
+        String::from("--agreed-l2-head-hash"),
+        agreed_l2_head_hash.to_string(),
+        // l2 starting output root
+        String::from("--agreed-l2-output-root"),
+        agreed_l2_output_root.to_string(),
+        // proposed output root
+        String::from("--claimed-l2-output-root"),
+        claimed_l2_output_root.to_string(),
+        // proposed block number
+        String::from("--claimed-l2-block-number"),
+        claimed_l2_block_number.to_string(),
+        // rollup chain id
+        String::from("--l2-chain-id"),
+        l2_chain_id.clone(),
+        // l1 el node
+        String::from("--l1-node-address"),
+        args.core.eth_rpc_url.clone(),
+        // l1 cl node
+        String::from("--l1-beacon-address"),
+        args.core.beacon_rpc_url.clone(),
+        // l2 el node
+        String::from("--l2-node-address"),
+        args.core.op_geth_url.clone(),
+        // path to cache
+        String::from("--data-dir"),
+        data_dir.to_str().unwrap().to_string(),
+        // run the client natively
+        String::from("--native"),
+    ]);
+    // verbosity level
+    if args.core.v > 0 {
+        proving_args.push(verbosity);
+    }
+    proving_args
+}
+
+#[cfg(feature = "devnet")]
+pub fn maybe_patch_proof(
+    mut proof: kailua_common::proof::Proof,
+    expected_fpvm_image_id: [u8; 32],
+    expected_set_builder_image_id: [u8; 32],
+) -> anyhow::Result<kailua_common::proof::Proof> {
+    // Return the proof if we can't patch it
+    if !is_dev_mode() {
+        return Ok(proof);
+    }
+
+    use alloy::sol_types::SolValue;
+    use anyhow::Context;
+    use risc0_zkvm::is_dev_mode;
+    use risc0_zkvm::sha::Digestible;
+    use tracing::{error, warn};
+
+    let expected_fpvm_image_id = risc0_zkvm::sha::Digest::from(expected_fpvm_image_id);
+
+    match &mut proof {
+        kailua_common::proof::Proof::ZKVMReceipt(receipt) => {
+            // Patch the image id of the receipt to match the expected one
+            if let risc0_zkvm::InnerReceipt::Fake(fake_inner_receipt) = &mut receipt.inner {
+                if let risc0_zkvm::MaybePruned::Value(claim) = &mut fake_inner_receipt.claim {
+                    warn!("DEV-MODE ONLY: Patching fake receipt image id to match game contract.");
+                    claim.pre = risc0_zkvm::MaybePruned::Pruned(expected_fpvm_image_id);
+                    if let risc0_zkvm::MaybePruned::Value(Some(output)) = &mut claim.output {
+                        if let risc0_zkvm::MaybePruned::Value(journal) = &mut output.journal {
+                            let n = journal.len();
+                            journal[n - 32..n].copy_from_slice(expected_fpvm_image_id.as_bytes());
+                            receipt.journal.bytes[n - 32..n]
+                                .copy_from_slice(expected_fpvm_image_id.as_bytes());
+                        }
+                    }
+                }
+            }
+        }
+        kailua_common::proof::Proof::BoundlessSeal(seal_data, journal) => {
+            let expected_boundless_selector = kailua_client::boundless::set_verifier_selector(
+                expected_set_builder_image_id.into(),
+            );
+            let expected_set_builder_image_id =
+                risc0_zkvm::sha::Digest::from(expected_set_builder_image_id);
+            // Just use the proof if everything is in order
+            if &seal_data[..4] == expected_boundless_selector.as_slice() {
+                return Ok(proof);
+            }
+            // Amend the seal with a fake proof for the set root
+            match kailua_contracts::SetVerifierSeal::abi_decode(&seal_data[4..], true) {
+                Ok(mut seal) => {
+                    if seal.rootSeal.is_empty() {
+                        // build the claim for the fpvm
+                        let fpvm_claim_digest = risc0_zkvm::ReceiptClaim::ok(
+                            expected_fpvm_image_id,
+                            journal.bytes.clone(),
+                        )
+                        .digest();
+                        // convert the merkle path into Digest instances
+                        let set_builder_siblings: Vec<_> = seal
+                            .path
+                            .iter()
+                            .map(|n| risc0_zkvm::sha::Digest::from(n.0))
+                            .collect();
+                        // construct set builder root from merkle proof
+                        let set_builder_journal = kailua_common::proof::encoded_set_builder_journal(
+                            &fpvm_claim_digest,
+                            set_builder_siblings,
+                            expected_set_builder_image_id,
+                        );
+                        // create fake proof for the root
+                        let set_builder_seal =
+                            risc0_ethereum_contracts::encode_seal(&risc0_zkvm::Receipt::new(
+                                risc0_zkvm::InnerReceipt::Fake(risc0_zkvm::FakeReceipt::new(
+                                    risc0_zkvm::ReceiptClaim::ok(
+                                        expected_set_builder_image_id,
+                                        set_builder_journal.clone(),
+                                    ),
+                                )),
+                                set_builder_journal.clone(),
+                            ))
+                            .context("encode_seal (fake boundless)")?;
+                        // replace empty root seal with constructed fake proof
+                        seal.rootSeal = set_builder_seal.into();
+                        // amend proof
+                        warn!("DEVNET-ONLY: Patching proof with faux set verifier seal.");
+                        *seal_data = [
+                            expected_boundless_selector.as_slice(),
+                            seal.abi_encode().as_slice(),
+                        ]
+                        .concat();
+                    }
+                }
+                Err(e) => {
+                    error!("Could not abi decode seal from boundless: {e:?}")
+                }
+            }
+        }
+        kailua_common::proof::Proof::SetBuilderReceipt(..) => {}
+    }
+    Ok(proof)
+}

@@ -29,14 +29,14 @@ The below table contains rounded-up gas cost estimates of various contract opera
 
 | Contract                | Operation        |    Gas | Notes                  |
 |:------------------------|:-----------------|-------:|------------------------|
-| RiscZeroVerifierRouter  | deploy           |   600K |                        |
+| RiscZeroVerifierRouter  | deploy           |   800K |                        |
 | RiscZeroVerifierRouter  | addVerifier      |    50K |                        |
-| RiscZeroGroth16Verifier | deploy           | 1,200K |                        |
-| RiscZeroSetVerifier     | deploy           |   950K |                        |
-| RiscZeroMockVerifier    | deploy           |   525K |                        |
-| KailuaTreasury          | deploy           | 4,800K |                        |
+| RiscZeroGroth16Verifier | deploy           | 1,300K |                        |
+| RiscZeroSetVerifier     | deploy           | 1,060K |                        |
+| RiscZeroMockVerifier    | deploy           |   615K |                        |
+| KailuaTreasury          | deploy           | 4,900K |                        |
 | KailuaTreasury          | propose          |   350K |                        |
-| KailuaGame              | deploy           | 4,900K |                        |
+| KailuaGame              | deploy           | 4,725K |                        |
 | KailuaGame              | proveValidity    |   400K | Groth16 proof          |
 | KailuaGame              | resolve          |   115K | Undisputed validity    |
 | KailuaGame              | proveOutputFault |   275K | 4 kzg proofs           |

@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::channel::DuplexChannel;
+pub mod proving;
+
+use crate::channel::{AsyncChannel, DuplexChannel};
 use crate::db::config::Config;
 use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
 use crate::provider::{get_block_by_number, get_next_block, BlobProvider};
 use crate::signer::ValidatorSignerArgs;
 use crate::transact::Transact;
+use crate::validate::proving::{create_proving_args, Task};
 use crate::{retry_with_context, stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::IndexedBlobHash;
 use alloy::network::primitives::HeaderResponse;
@@ -50,6 +53,7 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
 use tokio::process::Command;
+use tokio::sync::mpsc::Sender;
 use tokio::time::sleep;
 use tokio::{spawn, try_join};
 use tracing::{debug, error, info, warn};
@@ -65,6 +69,9 @@ pub struct ValidateArgs {
     /// Fast-forward block height
     #[clap(long, env, required = false, default_value_t = 0)]
     pub fast_forward_target: u64,
+    /// How many proofs to compute simultaneously
+    #[clap(long, env, default_value_t = 1)]
+    pub num_concurrent_proofs: u64,
 
     /// Secret key of L1 wallet to use for challenging and proving outputs
     #[clap(flatten)]
@@ -442,7 +449,7 @@ pub async fn handle_proposals(
                 .0;
             // patch the proof if in dev mode
             #[cfg(feature = "devnet")]
-            let proof = maybe_patch_proof(
+            let proof = proving::maybe_patch_proof(
                 proof,
                 expected_fpvm_image_id,
                 kailua_common::config::SET_BUILDER_ID.0,
@@ -1078,6 +1085,18 @@ pub async fn handle_proof_requests(
         .payout_recipient_address
         .unwrap_or_else(|| validator_wallet.default_signer().address());
     info!("Proof payout recipient: {payout_recipient}");
+
+    let task_channel: AsyncChannel<Task> = async_channel::unbounded();
+    let mut proving_handlers = vec![];
+    // instantiate worker pool
+    for _ in 0..args.num_concurrent_proofs {
+        proving_handlers.push(spawn(handle_proving_tasks(
+            args.kailua_host.clone(),
+            task_channel.clone(),
+            channel.sender.clone(),
+        )));
+    }
+
     // Run proof generator loop
     loop {
         // Dequeue messages
@@ -1098,7 +1117,7 @@ pub async fn handle_proof_requests(
             bail!("Unexpected message type.");
         };
         info!("Processing proof for local index {proposal_index}.");
-        // Prepare kailua-host parameters
+        // Compute proof file name
         let precondition_hash = precondition_validation_data
             .as_ref()
             .map(|d| d.precondition_hash())
@@ -1114,138 +1133,99 @@ pub async fn handle_proof_requests(
             fpvm_image_id,
         };
         let proof_file_name = proof_file_name(&proof_journal);
-        let payout_recipient = payout_recipient.to_string();
-        let l1_head = l1_head.to_string();
-        let agreed_l2_head_hash = agreed_l2_head_hash.to_string();
-        let agreed_l2_output_root = agreed_l2_output_root.to_string();
-        let claimed_l2_output_root = claimed_l2_output_root.to_string();
-        let claimed_l2_block_number = claimed_l2_block_number.to_string();
-        let verbosity = [
-            String::from("-"),
-            (0..args.core.v).map(|_| 'v').collect::<String>(),
-        ]
-        .concat();
-        let mut proving_args = vec![
-            // wallet address for payouts
-            String::from("--payout-recipient-address"),
-            payout_recipient,
-            // l2 el node
-            String::from("--op-node-address"),
-            args.core.op_node_url.clone(),
-        ];
-        // precondition data
-        if let Some(precondition_data) = precondition_validation_data {
-            let (block_hashes, blob_hashes): (Vec<_>, Vec<_>) = precondition_data
-                .blob_fetch_requests()
-                .iter()
-                .map(|r| (r.block_ref.hash.to_string(), r.blob_hash.hash.to_string()))
-                .unzip();
-            let params = match precondition_data {
-                PreconditionValidationData::Validity(
-                    global_l2_head_number,
-                    proposal_output_count,
-                    output_block_span,
-                    _,
-                ) => vec![
-                    global_l2_head_number,
-                    proposal_output_count,
-                    output_block_span,
-                ],
-            }
-            .into_iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>();
-
-            proving_args.extend(vec![
-                String::from("--precondition-params"),
-                params.join(","),
-                String::from("--precondition-block-hashes"),
-                block_hashes.join(","),
-                String::from("--precondition-blob-hashes"),
-                blob_hashes.join(","),
-            ]);
-        }
-        // boundless args
-        if let Some(market) = &args.boundless.market {
-            proving_args.extend(market.to_arg_vec(&args.boundless.storage));
-        }
-        // kona args
-        proving_args.extend(vec![
-            // l1 head from on-chain proposal
-            String::from("--l1-head"),
-            l1_head,
-            // l2 starting block hash from on-chain proposal
-            String::from("--agreed-l2-head-hash"),
-            agreed_l2_head_hash,
-            // l2 starting output root
-            String::from("--agreed-l2-output-root"),
-            agreed_l2_output_root,
-            // proposed output root
-            String::from("--claimed-l2-output-root"),
-            claimed_l2_output_root,
-            // proposed block number
-            String::from("--claimed-l2-block-number"),
-            claimed_l2_block_number,
-            // rollup chain id
-            String::from("--l2-chain-id"),
+        // Prepare kailua-host proving args
+        let proving_args = create_proving_args(
+            &args,
+            data_dir.clone(),
             l2_chain_id.clone(),
-            // l1 el node
-            String::from("--l1-node-address"),
-            args.core.eth_rpc_url.clone(),
-            // l1 cl node
-            String::from("--l1-beacon-address"),
-            args.core.beacon_rpc_url.clone(),
-            // l2 el node
-            String::from("--l2-node-address"),
-            args.core.op_geth_url.clone(),
-            // path to cache
-            String::from("--data-dir"),
-            data_dir.to_str().unwrap().to_string(),
-            // run the client natively
-            String::from("--native"),
-        ]);
-        // verbosity level
-        if args.core.v > 0 {
-            proving_args.push(verbosity);
-        }
+            payout_recipient,
+            precondition_validation_data,
+            l1_head,
+            agreed_l2_head_hash,
+            agreed_l2_output_root,
+            claimed_l2_block_number,
+            claimed_l2_output_root,
+        );
+        // Send to task pool
+        task_channel
+            .0
+            .send(Task {
+                proposal_index,
+                proving_args,
+                proof_file_name,
+            })
+            .await
+            .context("task channel closed")?;
+    }
+}
+
+pub async fn handle_proving_tasks(
+    kailua_host: PathBuf,
+    task_channel: AsyncChannel<Task>,
+    proof_sender: Sender<Message>,
+) -> anyhow::Result<()> {
+    let tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(tracer.start("handle_proving_tasks"));
+
+    loop {
+        let Task {
+            proposal_index,
+            proving_args,
+            proof_file_name,
+        } = task_channel
+            .1
+            .recv()
+            .await
+            .context("task receiver channel closed")?;
+
         // Prove via kailua-host (re dev mode/bonsai: env vars inherited!)
-        let mut kailua_host_command = Command::new(&args.kailua_host);
+        let mut kailua_host_command = Command::new(&kailua_host);
         // get fake receipts when building under devnet
         if is_dev_mode() {
             kailua_host_command.env("RISC0_DEV_MODE", "1");
         }
         // pass arguments to point at target block
-        kailua_host_command.args(proving_args);
+        kailua_host_command.args(proving_args.clone());
         debug!("kailua_host_command {:?}", &kailua_host_command);
-        {
-            match await_tel_res!(
-                context,
-                tracer,
-                "KailuaHost",
-                kailua_host_command
-                    .kill_on_drop(true)
-                    .spawn()
-                    .context("Invoking kailua-host")?
-                    .wait()
-            ) {
-                Ok(proving_task) => {
-                    if !proving_task.success() {
-                        error!("Proving task failure.");
-                    } else {
-                        info!("Proving task successful.");
-                    }
-                }
-                Err(e) => {
-                    error!("Failed to invoke kailua-host: {e:?}");
+        // call the kailua-host binary to generate a proof
+        match await_tel_res!(
+            context,
+            tracer,
+            "KailuaHost",
+            kailua_host_command
+                .kill_on_drop(true)
+                .spawn()
+                .context("Invoking kailua-host")?
+                .wait()
+        ) {
+            Ok(proving_task) => {
+                if !proving_task.success() {
+                    error!("Proving task failure.");
+                } else {
+                    info!("Proving task successful.");
                 }
             }
+            Err(e) => {
+                error!("Failed to invoke kailua-host: {e:?}");
+                // retry proving task
+                task_channel
+                    .0
+                    .send(Task {
+                        proposal_index,
+                        proving_args,
+                        proof_file_name,
+                    })
+                    .await
+                    .context("task channel closed")?;
+                continue;
+            }
         }
+        // wait for io then read computed proof from disk
         sleep(Duration::from_secs(1)).await;
         match read_proof_file(&proof_file_name).await {
             Ok(proof) => {
                 // Send proof via the channel
-                channel
-                    .sender
+                proof_sender
                     .send(Message::Proof(proposal_index, proof))
                     .await?;
                 info!("Proof for local index {proposal_index} complete.");
@@ -1255,103 +1235,4 @@ pub async fn handle_proof_requests(
             }
         }
     }
-}
-
-#[cfg(feature = "devnet")]
-fn maybe_patch_proof(
-    mut proof: Proof,
-    expected_fpvm_image_id: [u8; 32],
-    expected_set_builder_image_id: [u8; 32],
-) -> anyhow::Result<Proof> {
-    // Return the proof if we can't patch it
-    if !is_dev_mode() {
-        return Ok(proof);
-    }
-
-    use alloy::sol_types::SolValue;
-    use risc0_zkvm::sha::Digestible;
-
-    let expected_fpvm_image_id = risc0_zkvm::sha::Digest::from(expected_fpvm_image_id);
-
-    match &mut proof {
-        Proof::ZKVMReceipt(receipt) => {
-            // Patch the image id of the receipt to match the expected one
-            if let risc0_zkvm::InnerReceipt::Fake(fake_inner_receipt) = &mut receipt.inner {
-                if let risc0_zkvm::MaybePruned::Value(claim) = &mut fake_inner_receipt.claim {
-                    warn!("DEV-MODE ONLY: Patching fake receipt image id to match game contract.");
-                    claim.pre = risc0_zkvm::MaybePruned::Pruned(expected_fpvm_image_id);
-                    if let risc0_zkvm::MaybePruned::Value(Some(output)) = &mut claim.output {
-                        if let risc0_zkvm::MaybePruned::Value(journal) = &mut output.journal {
-                            let n = journal.len();
-                            journal[n - 32..n].copy_from_slice(expected_fpvm_image_id.as_bytes());
-                            receipt.journal.bytes[n - 32..n]
-                                .copy_from_slice(expected_fpvm_image_id.as_bytes());
-                        }
-                    }
-                }
-            }
-        }
-        Proof::BoundlessSeal(seal_data, journal) => {
-            let expected_boundless_selector = kailua_client::boundless::set_verifier_selector(
-                expected_set_builder_image_id.into(),
-            );
-            let expected_set_builder_image_id =
-                risc0_zkvm::sha::Digest::from(expected_set_builder_image_id);
-            // Just use the proof if everything is in order
-            if &seal_data[..4] == expected_boundless_selector.as_slice() {
-                return Ok(proof);
-            }
-            // Amend the seal with a fake proof for the set root
-            match kailua_contracts::SetVerifierSeal::abi_decode(&seal_data[4..], true) {
-                Ok(mut seal) => {
-                    if seal.rootSeal.is_empty() {
-                        // build the claim for the fpvm
-                        let fpvm_claim_digest = risc0_zkvm::ReceiptClaim::ok(
-                            expected_fpvm_image_id,
-                            journal.bytes.clone(),
-                        )
-                        .digest();
-                        // convert the merkle path into Digest instances
-                        let set_builder_siblings: Vec<_> = seal
-                            .path
-                            .iter()
-                            .map(|n| risc0_zkvm::sha::Digest::from(n.0))
-                            .collect();
-                        // construct set builder root from merkle proof
-                        let set_builder_journal = kailua_common::proof::encoded_set_builder_journal(
-                            &fpvm_claim_digest,
-                            set_builder_siblings,
-                            expected_set_builder_image_id,
-                        );
-                        // create fake proof for the root
-                        let set_builder_seal =
-                            risc0_ethereum_contracts::encode_seal(&risc0_zkvm::Receipt::new(
-                                risc0_zkvm::InnerReceipt::Fake(risc0_zkvm::FakeReceipt::new(
-                                    risc0_zkvm::ReceiptClaim::ok(
-                                        expected_set_builder_image_id,
-                                        set_builder_journal.clone(),
-                                    ),
-                                )),
-                                set_builder_journal.clone(),
-                            ))
-                            .context("encode_seal (fake boundless)")?;
-                        // replace empty root seal with constructed fake proof
-                        seal.rootSeal = set_builder_seal.into();
-                        // amend proof
-                        warn!("DEVNET-ONLY: Patching proof with faux set verifier seal.");
-                        *seal_data = [
-                            expected_boundless_selector.as_slice(),
-                            seal.abi_encode().as_slice(),
-                        ]
-                        .concat();
-                    }
-                }
-                Err(e) => {
-                    error!("Could not abi decode seal from boundless: {e:?}")
-                }
-            }
-        }
-        Proof::SetBuilderReceipt(..) => {}
-    }
-    Ok(proof)
 }

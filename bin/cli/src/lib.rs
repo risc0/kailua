@@ -43,7 +43,7 @@ pub const KAILUA_GAME_TYPE: u32 = 1337;
 #[command(bin_name = "kailua-cli")]
 #[command(author, version, about, long_about = None)]
 #[allow(clippy::large_enum_variant)]
-pub enum Cli {
+pub enum KailuaCli {
     Config(config::ConfigArgs),
     FastTrack(fast_track::FastTrackArgs),
     Propose(propose::ProposeArgs),
@@ -75,45 +75,45 @@ pub struct CoreArgs {
     pub data_dir: Option<PathBuf>,
 }
 
-impl Cli {
+impl KailuaCli {
     pub fn verbosity(&self) -> u8 {
         match self {
-            Cli::Config(args) => args.v,
-            Cli::FastTrack(args) => args.v,
-            Cli::Propose(args) => args.core.v,
-            Cli::Validate(args) => args.core.v,
-            Cli::TestFault(args) => args.propose_args.core.v,
-            Cli::Benchmark(args) => args.core.v,
+            KailuaCli::Config(args) => args.v,
+            KailuaCli::FastTrack(args) => args.v,
+            KailuaCli::Propose(args) => args.core.v,
+            KailuaCli::Validate(args) => args.core.v,
+            KailuaCli::TestFault(args) => args.propose_args.core.v,
+            KailuaCli::Benchmark(args) => args.core.v,
         }
     }
 
     pub fn data_dir(&self) -> Option<PathBuf> {
         match self {
-            Cli::Propose(args) => args.core.data_dir.clone(),
-            Cli::Validate(args) => args.core.data_dir.clone(),
+            KailuaCli::Propose(args) => args.core.data_dir.clone(),
+            KailuaCli::Validate(args) => args.core.data_dir.clone(),
             _ => None,
         }
     }
 
     pub fn otlp_endpoint(&self) -> Option<String> {
         match self {
-            Cli::Config(args) => args.telemetry.otlp_collector.clone(),
-            Cli::FastTrack(args) => args.telemetry.otlp_collector.clone(),
-            Cli::Propose(args) => args.telemetry.otlp_collector.clone(),
-            Cli::Validate(args) => args.telemetry.otlp_collector.clone(),
-            Cli::TestFault(args) => args.propose_args.telemetry.otlp_collector.clone(),
-            Cli::Benchmark(args) => args.telemetry.otlp_collector.clone(),
+            KailuaCli::Config(args) => args.telemetry.otlp_collector.clone(),
+            KailuaCli::FastTrack(args) => args.telemetry.otlp_collector.clone(),
+            KailuaCli::Propose(args) => args.telemetry.otlp_collector.clone(),
+            KailuaCli::Validate(args) => args.telemetry.otlp_collector.clone(),
+            KailuaCli::TestFault(args) => args.propose_args.telemetry.otlp_collector.clone(),
+            KailuaCli::Benchmark(args) => args.telemetry.otlp_collector.clone(),
         }
     }
 
     pub fn telemetry_args(&self) -> &TelemetryArgs {
         match self {
-            Cli::Config(args) => &args.telemetry,
-            Cli::FastTrack(args) => &args.telemetry,
-            Cli::Propose(args) => &args.telemetry,
-            Cli::Validate(args) => &args.telemetry,
-            Cli::TestFault(args) => &args.propose_args.telemetry,
-            Cli::Benchmark(args) => &args.telemetry,
+            KailuaCli::Config(args) => &args.telemetry,
+            KailuaCli::FastTrack(args) => &args.telemetry,
+            KailuaCli::Propose(args) => &args.telemetry,
+            KailuaCli::Validate(args) => &args.telemetry,
+            KailuaCli::TestFault(args) => &args.propose_args.telemetry,
+            KailuaCli::Benchmark(args) => &args.telemetry,
         }
     }
 }

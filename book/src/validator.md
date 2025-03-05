@@ -132,6 +132,7 @@ Running `kailua-cli validate` with the above extra arguments should now delegate
 ## Advanced Settings
 
 Fault/Validity proof generation can be fine-tuned via the two following environment variables:
+* `NUM_CONCURRENT_PROOFS`: The maximum number of proving tasks to run concurrently (Default 1).
 * `SEGMENT_LIMIT`: The [segment size limit](https://docs.rs/risc0-zkvm/1.2.3/risc0_zkvm/struct.ExecutorEnvBuilder.html#method.segment_limit_po2) used for local proving (Default 21).
 * `MAX_WITNESS_SIZE`: The maximum input size per single proof (Default 100MB).
 * `SKIP_ZETH_PREFLIGHT`: If set to false (defaults to true), performs a preflight to fetch witness data using zeth.

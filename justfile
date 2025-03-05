@@ -8,12 +8,12 @@ build +ARGS="--release -F prove --locked":
   cargo build {{ARGS}}
 
 clippy:
-  RISC0_SKIP_BUILD=1 cargo clippy --workspace --all --all-features --all-targets -- -D warnings
+  RISC0_SKIP_BUILD=1 cargo clippy --workspace --all --all-targets -- -D warnings
 
 devnet-fetch:
   git clone --depth 1 --branch v1.9.1 --recursive https://github.com/ethereum-optimism/optimism.git
 
-devnet-build +ARGS="-F devnet -F prove --locked": (build ARGS)
+devnet-build +ARGS="-F devnet -F prove": (build ARGS)
 
 devnet-up:
   make -C optimism devnet-up > devnet.log
