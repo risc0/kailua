@@ -1,0 +1,81 @@
+name: Release Kailua
+
+on:
+  push:
+    tags:
+      - "v*.*.**"
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  release:
+    runs-on: [self-hosted, prod, "${{ matrix.os }}", "${{ matrix.arch }}", cpu]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - build: linux
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+
+          - build: linux
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+
+          - build: macos
+            os: macos-latest
+            target: x86_64-apple-darwin
+
+    env:
+      TARGET: ${{ matrix.target }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get the release version from the tag
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - uses: risc0/risc0/.github/actions/rustup@main
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: risc0/risc0/.github/actions/sccache@main
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --verbose --release --locked -F prove --target ${{ matrix.target }}
+
+      - name: Build archive
+        shell: bash
+        run: |
+          binary_name="kailua"
+
+          dirname="$binary_name-${{ env.VERSION }}-${{ matrix.target }}"
+          mkdir "$dirname"
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            mv "target/${{ matrix.target }}/release/$binary_name-cli.exe" "$dirname"
+            mv "target/${{ matrix.target }}/release/$binary_name-host.exe" "$dirname"
+          else
+            mv "target/${{ matrix.target }}/release/$binary_name-cli" "$dirname"
+            mv "target/${{ matrix.target }}/release/$binary_name-host" "$dirname"
+          fi
+
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            7z a "$dirname.zip" "$dirname"
+            echo "ASSET=$dirname.zip" >> $GITHUB_ENV
+          else
+            tar -czf "$dirname.tar.gz" "$dirname"
+            echo "ASSET=$dirname.tar.gz" >> $GITHUB_ENV
+          fi
+
+      - uses: svenstaro/upload-release-action@v2
+        with:
+          overwrite: true
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ env.ASSET }}
