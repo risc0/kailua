@@ -22,7 +22,7 @@ jobs:
           - build: linux
             os: Linux
             arch: X64
-            target: x86_64-unknown-linux-musl
+            target: x86_64-unknown-linux-gnu
 
           - build: macos
             os: macOS
@@ -40,6 +40,7 @@ jobs:
         shell: bash
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
+      - uses: risc0/risc0/.github/actions/rustup@72e272696bf890ec227ec0f24c43eebd0168d26d
       - uses: risc0/risc0/.github/actions/rustup@72e272696bf890ec227ec0f24c43eebd0168d26d
         with:
           targets: ${{ matrix.target }}
