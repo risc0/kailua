@@ -362,9 +362,15 @@ These parameters can be passed in as CLI arguments or set as environment variabl
 <h2 id="advanced-settings"><a class="header" href="#advanced-settings">Advanced Settings</a></h2>
 <p>Fault/Validity proof generation can be fine-tuned via the two following environment variables:</p>
 <ul>
+<li><code>NUM_CONCURRENT_PROOFS</code>: The maximum number of proving tasks to run concurrently (Default 1).</li>
 <li><code>SEGMENT_LIMIT</code>: The <a href="https://docs.rs/risc0-zkvm/1.2.3/risc0_zkvm/struct.ExecutorEnvBuilder.html#method.segment_limit_po2">segment size limit</a> used for local proving (Default 21).</li>
 <li><code>MAX_WITNESS_SIZE</code>: The maximum input size per single proof (Default 100MB).</li>
-<li><code>SKIP_ZETH_PREFLIGHT</code>: If set, skips performing a preflight to fetch witness data using zeth.</li>
+<li><code>SKIP_ZETH_PREFLIGHT</code>: If set to false (defaults to true), performs a preflight to fetch witness data using zeth.</li>
+<li><code>NUM_PREFLIGHT_THREADS</code>: (default 4) Sets the number of concurrent threads to use for fetching preflight data.</li>
+</ul>
+<p>When manually computing individual proofs, the following parameters (or equiv. env. vars) take effect:</p>
+<ul>
+<li><code>SKIP_DERIVATION_PROOF</code>: Skips provably deriving L2 transactions using L1 data.</li>
 </ul>
 
                     </main>
