@@ -36,12 +36,6 @@ sol!(
 
 sol!(
     #[sol(rpc)]
-    KailuaTournamentLogic,
-    "foundry/out/KailuaTournament.sol/KailuaTournamentLogic.json"
-);
-
-sol!(
-    #[sol(rpc)]
     IRiscZeroVerifier,
     "foundry/out/FlatR0ImportV1.2.0.sol/IRiscZeroVerifier.json"
 );
