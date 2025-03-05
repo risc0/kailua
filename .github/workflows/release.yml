@@ -21,10 +21,12 @@ jobs:
         include:
           - build: linux
             os: ubuntu-latest
+            arch: X64
             target: x86_64-unknown-linux-musl
 
           - build: macos
             os: macos-latest
+            arch: ARM64
             target: x86_64-apple-darwin
 
     env:
