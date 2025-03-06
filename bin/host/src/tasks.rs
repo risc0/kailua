@@ -42,7 +42,7 @@ pub struct Cached {
 }
 
 impl Cached {
-    pub async fn compute(self) -> Result<Proof, ProvingError> {
+    pub async fn compute_cached(self) -> Result<Proof, ProvingError> {
         prove::compute_cached_proof(
             self.args,
             self.rollup_config,
@@ -55,6 +55,24 @@ impl Cached {
             self.prove_snark,
             self.force_attempt,
             self.seek_proof,
+        )
+        .await
+    }
+
+    pub async fn compute_fpvm(
+        self,
+        task_sender: Sender<Oneshot>,
+    ) -> Result<Option<Proof>, ProvingError> {
+        prove::compute_fpvm_proof(
+            self.args,
+            self.rollup_config,
+            self.disk_kv_store,
+            self.precondition_hash,
+            self.precondition_validation_data_hash,
+            self.stitched_boot_info,
+            self.stitched_proofs,
+            self.prove_snark,
+            task_sender,
         )
         .await
     }
@@ -125,7 +143,7 @@ pub async fn handle_oneshot_tasks(task_receiver: Receiver<Oneshot>) -> anyhow::R
         if let Err(res) = result_sender
             .send(OneshotResult {
                 cached: cached_task.clone(),
-                result: cached_task.compute().await,
+                result: cached_task.compute_cached().await,
             })
             .await
         {

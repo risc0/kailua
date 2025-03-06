@@ -139,19 +139,26 @@ pub async fn compute_fpvm_proof(
             stitched_boot_info.clone(),
             stitched_proofs.clone(),
             false,
-            true,
+            false,
             false,
             task_sender.clone(),
         )
         .await;
         // propagate unexpected error up on failure to trigger higher-level division
-        let Err(ProvingError::SeekProofError(..)) = derivation_only_result else {
+        let Err(ProvingError::SeekProofError(witness_size, _)) = derivation_only_result else {
             warn!(
                 "Unexpected derivation-only result (is_ok={}).",
                 derivation_only_result.is_ok()
             );
             return Ok(Some(derivation_only_result?));
         };
+        // abort if pure derivation may OOM
+        if witness_size > args.proving.max_witness_size {
+            warn!(
+                "Derivation-only witness size {} exceeds limit {}.",
+                witness_size, args.proving.max_witness_size
+            );
+        }
     }
 
     // create proofs channel
@@ -176,11 +183,7 @@ pub async fn compute_fpvm_proof(
         .expect("task_channel should not be closed");
     // divide and conquer executions
     let mut num_proofs = 1;
-    loop {
-        // Break if we've received all proofs
-        if result_pq.len() == num_proofs {
-            break;
-        }
+    while result_pq.len() < num_proofs {
         // Wait for more proving results
         let oneshot_result = result_channel
             .1
@@ -272,6 +275,7 @@ pub async fn compute_fpvm_proof(
                 r.cached.stitched_executions.pop().unwrap(),
             )
         })
+        .rev()
         .unzip();
 
     // Return no proof if derivation is not required
