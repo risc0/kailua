@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::args::KailuaHostArgs;
-use crate::server::create_disk_kv_store;
+use crate::kv::RWLKeyValueStore;
 use alloy::consensus::Transaction;
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::providers::{Provider, RootProvider};
@@ -23,6 +23,7 @@ use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::{keccak256, B256};
 use anyhow::bail;
 use kailua_client::provider::OpNodeProvider;
+use kailua_client::proving::ProvingError;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
 use kona_genesis::RollupConfig;
@@ -255,6 +256,7 @@ pub async fn concurrent_execution_preflight(
     args: &KailuaHostArgs,
     rollup_config: RollupConfig,
     op_node_provider: &OpNodeProvider,
+    disk_kv_store: Option<RWLKeyValueStore>,
 ) -> anyhow::Result<()> {
     let l2_provider = args.kona.create_providers().await?.l2;
     let starting_block = l2_provider
@@ -271,7 +273,6 @@ pub async fn concurrent_execution_preflight(
     let mut extra_blocks = num_blocks % args.num_preflight_threads;
     let mut jobs = vec![];
     let mut args = args.clone();
-    let disk_kv_store = create_disk_kv_store(&args.kona);
     while num_blocks > 0 {
         let processed_blocks = if extra_blocks > 0 {
             extra_blocks -= 1;
@@ -325,7 +326,9 @@ pub async fn concurrent_execution_preflight(
     for job in jobs {
         let result = job.await?;
         if let Err(e) = result {
-            error!("Error during preflight execution: {e:?}");
+            if !matches!(e, ProvingError::SeekProofError(..)) {
+                error!("Error during preflight execution: {e:?}");
+            }
         }
     }
 

@@ -22,10 +22,13 @@ use kailua_client::provider::OpNodeProvider;
 use kailua_client::proving::ProvingError;
 use kailua_common::witness::StitchedBootInfo;
 use kailua_host::args::KailuaHostArgs;
+use kailua_host::channel::AsyncChannel;
 use kailua_host::config::generate_rollup_config;
 use kailua_host::preflight::{
     concurrent_execution_preflight, fetch_precondition_data, zeth_execution_preflight,
 };
+use kailua_host::server::create_disk_kv_store;
+use kailua_host::tasks::{handle_oneshot_tasks, Oneshot};
 use std::collections::BinaryHeap;
 use std::env::set_var;
 use tempfile::tempdir;
@@ -77,6 +80,9 @@ async fn main() -> anyhow::Result<()> {
             }
             None => (B256::ZERO, B256::ZERO),
         };
+    // create concurrent db
+    let disk_kv_store = create_disk_kv_store(&args.kona);
+    // perform preflight to fetch data
     if args.num_preflight_threads > 1 {
         // run parallelized preflight instances to populate kv store
         info!(
@@ -87,6 +93,7 @@ async fn main() -> anyhow::Result<()> {
             &args,
             rollup_config.clone(),
             op_node_provider.as_ref().expect("Missing op_node_provider"),
+            disk_kv_store.clone(),
         )
         .await
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
@@ -95,6 +102,13 @@ async fn main() -> anyhow::Result<()> {
         zeth_execution_preflight(&args, rollup_config.clone())
             .await
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+    }
+
+    // spin up proving workers
+    let task_channel: AsyncChannel<Oneshot> = async_channel::unbounded();
+    let mut proving_handlers = vec![];
+    for _ in 0..args.num_proving_threads {
+        proving_handlers.push(tokio::spawn(handle_oneshot_tasks(task_channel.1.clone())));
     }
 
     // compute individual proofs
@@ -130,12 +144,13 @@ async fn main() -> anyhow::Result<()> {
         match kailua_host::prove::compute_fpvm_proof(
             job_args.clone(),
             rollup_config.clone(),
-            None,
+            disk_kv_store.clone(),
             precondition_hash,
             precondition_validation_data_hash,
             vec![],
             vec![],
             !have_split,
+            task_channel.0.clone(),
         )
         .await
         {
@@ -230,12 +245,13 @@ async fn main() -> anyhow::Result<()> {
         kailua_host::prove::compute_fpvm_proof(
             base_args,
             rollup_config.clone(),
-            None,
+            disk_kv_store.clone(),
             precondition_hash,
             precondition_validation_data_hash,
             stitched_boot_info,
             proofs,
             true,
+            task_channel.0.clone(),
         )
         .await
         .context("Failed to compute FPVM proof.")?;

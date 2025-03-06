@@ -14,7 +14,7 @@
 
 pub mod proving;
 
-use crate::channel::{AsyncChannel, DuplexChannel};
+use crate::channel::DuplexChannel;
 use crate::db::config::Config;
 use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
@@ -43,6 +43,7 @@ use kailua_common::journal::ProofJournal;
 use kailua_common::precondition::{equivalence_precondition_hash, PreconditionValidationData};
 use kailua_common::proof::Proof;
 use kailua_contracts::*;
+use kailua_host::channel::AsyncChannel;
 use kailua_host::config::fetch_rollup_config;
 use kona_protocol::BlockInfo;
 use opentelemetry::global::tracer;
@@ -1200,24 +1201,13 @@ pub async fn handle_proving_tasks(
         ) {
             Ok(proving_task) => {
                 if !proving_task.success() {
-                    error!("Proving task failure.");
+                    error!("Proving task failure. Exit code: {proving_task}");
                 } else {
                     info!("Proving task successful.");
                 }
             }
             Err(e) => {
                 error!("Failed to invoke kailua-host: {e:?}");
-                // retry proving task
-                task_channel
-                    .0
-                    .send(Task {
-                        proposal_index,
-                        proving_args,
-                        proof_file_name,
-                    })
-                    .await
-                    .context("task channel closed")?;
-                continue;
             }
         }
         // wait for io then read computed proof from disk
@@ -1232,6 +1222,16 @@ pub async fn handle_proving_tasks(
             }
             Err(e) => {
                 error!("Failed to read proof file: {e:?}");
+                // retry proving task
+                task_channel
+                    .0
+                    .send(Task {
+                        proposal_index,
+                        proving_args,
+                        proof_file_name,
+                    })
+                    .await
+                    .context("task channel closed")?;
             }
         }
     }

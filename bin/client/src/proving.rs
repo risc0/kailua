@@ -57,7 +57,7 @@ impl ProvingArgs {
     }
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum ProvingError {
     #[error("DerivationProofError error: execution proofs {0}")]
     DerivationProofError(usize),

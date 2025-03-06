@@ -14,8 +14,6 @@
 
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
-pub type AsyncChannel<T> = (async_channel::Sender<T>, async_channel::Receiver<T>);
-
 /// A channel for two-way communication
 #[derive(Debug)]
 pub struct DuplexChannel<T> {
