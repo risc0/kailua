@@ -281,7 +281,9 @@ async fn main() -> anyhow::Result<()> {
     }
     // gather sorted proofs into vec
     let proofs = result_pq
+        .into_sorted_vec()
         .into_iter()
+        .rev()
         .map(|r| r.result.expect("Failed to get result"))
         .collect::<Vec<_>>();
 
@@ -312,6 +314,7 @@ async fn main() -> anyhow::Result<()> {
             .iter()
             .map(StitchedBootInfo::from)
             .collect::<Vec<_>>();
+
         kailua_host::prove::compute_fpvm_proof(
             base_args,
             rollup_config.clone(),

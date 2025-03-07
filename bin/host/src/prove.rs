@@ -16,9 +16,6 @@ use crate::args::KailuaHostArgs;
 use crate::kv::RWLKeyValueStore;
 use crate::tasks;
 use crate::tasks::{Cached, Oneshot};
-use alloy::network::primitives::BlockTransactionsKind;
-use alloy::providers::Provider;
-use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
 use async_channel::Sender;
@@ -52,38 +49,6 @@ pub async fn compute_fpvm_proof(
     // report transaction count
     if !stitched_boot_info.is_empty() {
         info!("Stitching {} sub-proofs", stitched_boot_info.len());
-    }
-    if !args.kona.is_offline() {
-        let providers = args
-            .kona
-            .create_providers()
-            .await
-            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-        let mut transactions = 0;
-        let mut gas = 0;
-        let starting_block = providers
-            .l2
-            .get_block_by_hash(args.kona.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
-            .await
-            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
-            .unwrap()
-            .header
-            .number;
-        let block_count = args.kona.claimed_l2_block_number - starting_block;
-        for i in 0..block_count {
-            let block = providers
-                .l2
-                .get_block_by_number(
-                    BlockNumberOrTag::Number(starting_block + i + 1),
-                    BlockTransactionsKind::Hashes,
-                )
-                .await
-                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
-                .expect("Failed to get transaction count for block {i}");
-            transactions += block.transactions.len();
-            gas += block.header.gas_used;
-        }
-        info!("Proving {transactions} transactions for {gas} gas over {block_count} blocks.");
     }
 
     //  1. try entire proof
@@ -268,6 +233,7 @@ pub async fn compute_fpvm_proof(
     }
     // Read result_pq for stitched executions and proofs
     let (proofs, stitched_executions): (Vec<_>, Vec<_>) = result_pq
+        .into_sorted_vec()
         .into_iter()
         .map(|mut r| {
             (
@@ -275,7 +241,6 @@ pub async fn compute_fpvm_proof(
                 r.cached.stitched_executions.pop().unwrap(),
             )
         })
-        .rev()
         .unzip();
 
     // Return no proof if derivation is not required
