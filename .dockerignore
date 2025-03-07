@@ -1,0 +1,20 @@
+# Rust build artifacts
+target/
+**/*.rs.bk
+
+# Git directory
+.git/
+
+# IDE directories
+.idea/
+.vscode/
+
+# Dependencies
+node_modules/
+
+# Debug files
+**/*.pdb
+
+# Temporary files
+**/*.tmp
+**/*.temp 
