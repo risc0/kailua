@@ -269,8 +269,8 @@ pub async fn concurrent_execution_preflight(
     if num_blocks == 0 {
         return Ok(());
     }
-    let blocks_per_thread = num_blocks / args.num_preflight_threads;
-    let mut extra_blocks = num_blocks % args.num_preflight_threads;
+    let blocks_per_thread = num_blocks / args.num_concurrent_preflights;
+    let mut extra_blocks = num_blocks % args.num_concurrent_preflights;
     let mut jobs = vec![];
     let mut args = args.clone();
     while num_blocks > 0 {

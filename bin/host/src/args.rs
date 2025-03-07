@@ -33,10 +33,10 @@ pub struct KailuaHostArgs {
     pub skip_zeth_preflight: bool,
     /// How many threads to use for fetching preflight data
     #[clap(long, env, default_value_t = 4)]
-    pub num_preflight_threads: u64,
+    pub num_concurrent_preflights: u64,
     /// How many threads to use for computing proofs
     #[clap(long, env, default_value_t = 1)]
-    pub num_proving_threads: u64,
+    pub num_concurrent_proofs: u64,
 
     #[clap(flatten)]
     pub proving: ProvingArgs,

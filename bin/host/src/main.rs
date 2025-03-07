@@ -83,11 +83,11 @@ async fn main() -> anyhow::Result<()> {
     // create concurrent db
     let disk_kv_store = create_disk_kv_store(&args.kona);
     // perform preflight to fetch data
-    if args.num_preflight_threads > 1 {
+    if args.num_concurrent_preflights > 1 {
         // run parallelized preflight instances to populate kv store
         info!(
             "Running concurrent preflights with {} threads",
-            args.num_preflight_threads
+            args.num_concurrent_preflights
         );
         concurrent_execution_preflight(
             &args,
@@ -107,7 +107,7 @@ async fn main() -> anyhow::Result<()> {
     // spin up proving workers
     let task_channel: AsyncChannel<Oneshot> = async_channel::unbounded();
     let mut proving_handlers = vec![];
-    for _ in 0..args.num_proving_threads {
+    for _ in 0..args.num_concurrent_proofs {
         proving_handlers.push(tokio::spawn(handle_oneshot_tasks(task_channel.1.clone())));
     }
 

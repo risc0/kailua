@@ -72,7 +72,7 @@ pub struct ValidateArgs {
     pub fast_forward_target: u64,
     /// How many proofs to compute simultaneously
     #[clap(long, env, default_value_t = 1)]
-    pub num_concurrent_proofs: u64,
+    pub num_concurrent_hosts: u64,
 
     /// Secret key of L1 wallet to use for challenging and proving outputs
     #[clap(flatten)]
@@ -1090,7 +1090,7 @@ pub async fn handle_proof_requests(
     let task_channel: AsyncChannel<Task> = async_channel::unbounded();
     let mut proving_handlers = vec![];
     // instantiate worker pool
-    for _ in 0..args.num_concurrent_proofs {
+    for _ in 0..args.num_concurrent_hosts {
         proving_handlers.push(spawn(handle_proving_tasks(
             args.kailua_host.clone(),
             task_channel.clone(),
