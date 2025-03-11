@@ -1,10 +1,7 @@
 # TODO alpine is smaller
 FROM --platform=arm64 rust:1.81
 
-# Install build dependencies with fixed GPG keys
-RUN apt-get update -y && apt-get install -y --no-install-recommends gnupg && \
-    apt-key update && \
-    apt-get update -y && apt-get install -y \
+RUN apt-get update -y && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
     libclang-dev \
