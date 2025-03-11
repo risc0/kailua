@@ -17,140 +17,20 @@ use crate::kv::RWLKeyValueStore;
 use alloy::consensus::Transaction;
 use alloy::network::primitives::BlockTransactionsKind;
 use alloy::providers::{Provider, RootProvider};
-use alloy_chains::NamedChain;
 use alloy_eips::eip4844::IndexedBlobHash;
 use alloy_eips::BlockNumberOrTag;
-use alloy_primitives::{keccak256, B256};
+use alloy_primitives::B256;
 use anyhow::bail;
 use kailua_client::provider::OpNodeProvider;
 use kailua_client::proving::ProvingError;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
 use kona_genesis::RollupConfig;
-use kona_host::SharedKeyValueStore;
 use kona_preimage::{PreimageKey, PreimageKeyType};
 use kona_protocol::BlockInfo;
 use std::env::set_var;
 use std::iter::zip;
 use tracing::{error, info, warn};
-use zeth_core::driver::CoreDriver;
-use zeth_core::mpt::{MptNode, MptNodeData};
-use zeth_core::stateless::data::StatelessClientData;
-use zeth_core_optimism::OpRethCoreDriver;
-use zeth_preflight::client::PreflightClient;
-use zeth_preflight_optimism::OpRethPreflightClient;
-
-pub fn mpt_to_vec(node: &MptNode) -> Vec<(B256, Vec<u8>)> {
-    if node.is_digest() {
-        return vec![];
-    }
-    let mut res = vec![(node.hash(), alloy::rlp::encode(node))];
-    match node.as_data() {
-        MptNodeData::Branch(children) => {
-            children
-                .iter()
-                .flatten()
-                .for_each(|n| res.append(&mut mpt_to_vec(n)));
-        }
-        MptNodeData::Extension(_, target) => {
-            res.append(&mut mpt_to_vec(target));
-        }
-        _ => {}
-    };
-    res
-}
-
-pub async fn dump_mpt_to_kv_store(kv_store: &mut SharedKeyValueStore, mpt: &MptNode) {
-    let mut store = kv_store.write().await;
-    mpt_to_vec(mpt).into_iter().for_each(|(hash, data)| {
-        store
-            .set(
-                PreimageKey::new(*hash, PreimageKeyType::Keccak256).into(),
-                data,
-            )
-            .expect("Failed to dump node to kv_store");
-    });
-}
-
-pub async fn dump_data_to_kv_store<B, H>(
-    kv_store: &mut SharedKeyValueStore,
-    data: &StatelessClientData<B, H>,
-) {
-    // State trie
-    dump_mpt_to_kv_store(kv_store, &data.state_trie).await;
-    // Storage tries
-    for (mpt, _) in data.storage_tries.values() {
-        dump_mpt_to_kv_store(kv_store, mpt).await;
-    }
-    // Contracts
-    let mut store = kv_store.write().await;
-    for contract in data.contracts.values() {
-        let hash = keccak256(contract);
-        store
-            .set(
-                PreimageKey::new(*hash, PreimageKeyType::Keccak256).into(),
-                contract.to_vec(),
-            )
-            .expect("Failed to dump contract to kv_store");
-    }
-}
-
-pub async fn zeth_execution_preflight(
-    cfg: &KailuaHostArgs,
-    rollup_config: RollupConfig,
-) -> anyhow::Result<()> {
-    if let Ok(named_chain) = NamedChain::try_from(rollup_config.l2_chain_id) {
-        // Limitation: Only works when disk caching is enabled under a known "NamedChain"
-        if !cfg.kona.is_offline()
-            && cfg.kona.data_dir.is_some()
-            && OpRethCoreDriver::chain_spec(&named_chain).is_some()
-        {
-            // Fetch all the initial data
-            let preflight_data: StatelessClientData<
-                <OpRethCoreDriver as CoreDriver>::Block,
-                <OpRethCoreDriver as CoreDriver>::Header,
-            > = {
-                info!("Performing zeth-optimism preflight.");
-                let providers = cfg.kona.create_providers().await?;
-                let preflight_start = providers
-                    .l2
-                    .get_block_by_hash(cfg.kona.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
-                    .await?
-                    .unwrap()
-                    .header
-                    .number;
-                let block_count = cfg.kona.claimed_l2_block_number - preflight_start;
-
-                let data_dir = cfg.kona.data_dir.clone();
-                let l2_node_address = cfg.kona.l2_node_address.clone();
-                tokio::task::spawn_blocking(move || {
-                    // Prepare the cache directory
-                    let cache_dir = data_dir.clone().map(|dir| dir.join("optimism"));
-                    if let Some(dir) = cache_dir.as_ref() {
-                        std::fs::create_dir_all(dir).expect("Could not create directory");
-                    };
-                    OpRethPreflightClient::preflight(
-                        Some(rollup_config.l2_chain_id),
-                        cache_dir,
-                        l2_node_address.clone(),
-                        preflight_start,
-                        block_count,
-                    )
-                })
-                .await??
-            };
-            // Write data to the cached Kona kv-store
-            let mut kv_store = cfg.kona.create_key_value_store()?;
-            dump_data_to_kv_store(&mut kv_store, &preflight_data).await;
-        }
-    } else {
-        warn!(
-            "Unknown chain-id {}. Skipping zeth-preflight.",
-            rollup_config.l2_chain_id
-        );
-    }
-    Ok(())
-}
 
 pub async fn get_blob_fetch_request(
     l1_provider: &RootProvider,

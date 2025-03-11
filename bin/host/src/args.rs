@@ -28,9 +28,6 @@ pub struct KailuaHostArgs {
     /// Address of OP-NODE endpoint to use
     #[clap(long, env)]
     pub op_node_address: Option<String>,
-    /// Whether to skip running the zeth preflight engine
-    #[clap(long, env, default_value_t = true)]
-    pub skip_zeth_preflight: bool,
     /// How many threads to use for fetching preflight data
     #[clap(long, env, default_value_t = 4)]
     pub num_concurrent_preflights: u64,

@@ -24,9 +24,7 @@ use kailua_common::witness::StitchedBootInfo;
 use kailua_host::args::KailuaHostArgs;
 use kailua_host::channel::AsyncChannel;
 use kailua_host::config::generate_rollup_config;
-use kailua_host::preflight::{
-    concurrent_execution_preflight, fetch_precondition_data, zeth_execution_preflight,
-};
+use kailua_host::preflight::{concurrent_execution_preflight, fetch_precondition_data};
 use kailua_host::server::create_disk_kv_store;
 use kailua_host::tasks::{handle_oneshot_tasks, Cached, Oneshot, OneshotResult};
 use std::collections::BinaryHeap;
@@ -97,11 +95,6 @@ async fn main() -> anyhow::Result<()> {
         )
         .await
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-    } else if !args.skip_zeth_preflight {
-        // run zeth preflight to fetch all the necessary preimages
-        zeth_execution_preflight(&args, rollup_config.clone())
-            .await
-            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     }
 
     // spin up proving workers

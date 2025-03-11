@@ -137,7 +137,6 @@ Fault/Validity proof generation can be fine-tuned via the two following environm
 * `NUM_CONCURRENT_PROOFS`: (default 1) Sets the number of concurrent proofs to seek per proving task.
 * `SEGMENT_LIMIT`: The [segment size limit](https://docs.rs/risc0-zkvm/1.2.3/risc0_zkvm/struct.ExecutorEnvBuilder.html#method.segment_limit_po2) used for local proving (Default 21).
 * `MAX_WITNESS_SIZE`: The maximum input size per single proof (Default 100MB).
-* `SKIP_ZETH_PREFLIGHT`: If set to false (defaults to true), performs a preflight to fetch witness data using zeth.
 
 When manually computing individual proofs, the following parameters (or equiv. env. vars) take effect:
 * `SKIP_DERIVATION_PROOF`: Skips provably deriving L2 transactions using L1 data.

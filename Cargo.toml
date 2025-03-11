@@ -111,12 +111,6 @@ risc0-groth16 = { version = "1.2.4", default-features = false }
 risc0-zkvm = { version = "1.2.4", features = ["heap-embedded-alloc", "unstable"] }
 risc0-zkvm-platform = { version = "1.2.4", features = ["heap-embedded-alloc"] }
 
-# RISC Zero Zeth
-zeth-core = { git = "https://github.com/risc0/zeth", rev = "cecf5ec" }
-zeth-core-optimism = { git = "https://github.com/risc0/zeth", rev = "cecf5ec" }
-zeth-preflight = { git = "https://github.com/risc0/zeth", rev = "cecf5ec" }
-zeth-preflight-optimism = { git = "https://github.com/risc0/zeth", rev = "cecf5ec" }
-
 [profile.dev]
 opt-level = 3
 

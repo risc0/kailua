@@ -79,8 +79,7 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
         "FPVM_IMAGE_ID: 0x{}",
         hex::encode_upper(stored_image_id.as_bytes())
     );
-    let computed_image_id = compute_image_id(KAILUA_FPVM_ELF)
-        .context("compute_image_id")?;
+    let computed_image_id = compute_image_id(KAILUA_FPVM_ELF).context("compute_image_id")?;
     assert_eq!(computed_image_id, stored_image_id);
     // report elf size
     println!("FPVM_ELF_SIZE: {}", KAILUA_FPVM_ELF.len());

@@ -52,12 +52,6 @@ kona-registry.workspace = true
 bonsai-sdk.workspace = true
 risc0-zkvm.workspace = true
 
-# Zeth
-zeth-core.workspace = true
-zeth-core-optimism.workspace = true
-zeth-preflight.workspace = true
-zeth-preflight-optimism.workspace = true
-
 [features]
 prove = [
     "risc0-zkvm/prove"
