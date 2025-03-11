@@ -13,7 +13,7 @@ clippy:
 devnet-fetch:
   git clone --depth 1 --branch v1.9.1 --recursive https://github.com/ethereum-optimism/optimism.git
 
-devnet-build +ARGS="-F devnet -F prove": (build ARGS)
+devnet-build +ARGS="-F devnet -F prove -F rebuild-fpvm": (build ARGS)
 
 devnet-up:
   make -C optimism devnet-up > devnet.log
@@ -100,7 +100,7 @@ bench l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data start length range count 
           {{verbosity}}
 
 # Run the client program natively with the host program attached.
-prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data target="release" verbosity="":
+prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data target="release" seq_window="50" verbosity="":
   #!/usr/bin/env bash
 
   L1_NODE_ADDRESS="{{l1_rpc}}"
@@ -120,7 +120,7 @@ prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data 
   CLAIMED_L2_OUTPUT_ROOT=$(cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $CLAIMED_L2_BLOCK_NUMBER) | jq -r .outputRoot)
   # Get the info for the origin l1 block
   L1_ORIGIN_NUM=$(cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $CLAIMED_L2_BLOCK_NUMBER) | jq -r .blockRef.l1origin.number)
-  L1_HEAD=$(cast block --rpc-url $L1_NODE_ADDRESS $((L1_ORIGIN_NUM + 50)) --json | jq -r .hash)
+  L1_HEAD=$(cast block --rpc-url $L1_NODE_ADDRESS $((L1_ORIGIN_NUM + {{seq_window}})) --json | jq -r .hash)
 
   # Get the info for the parent l2 block
   echo "Fetching data for parent of block #$L2_BLOCK_NUMBER..."

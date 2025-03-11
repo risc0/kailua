@@ -56,6 +56,7 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
         fetch_rollup_config(&args.op_node_url, &args.op_geth_url, None)
     )
     .context("fetch_rollup_config")?;
+    let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
 
     let eth_rpc_provider = ProviderBuilder::new().on_http(args.eth_rpc_url.as_str().try_into()?);
     // load system config
@@ -133,7 +134,6 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
     // report inter-block time
     println!("BLOCK_TIME: {}", config.block_time);
     // report rollup config hash
-    let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
     println!(
         "ROLLUP_CONFIG_HASH: 0x{}",
         hex::encode_upper(rollup_config_hash)

@@ -36,11 +36,13 @@ pub async fn generate_rollup_config(
         None => {
             let registry = Registry::from_chain_list();
             let tmp_cfg_file = tmp_dir.path().join("rollup-config.json");
-            if let Some(rollup_config) = cfg
-                .kona
-                .l2_chain_id
-                .and_then(|chain_id| registry.rollup_configs.get(&chain_id))
-            {
+            if let Some(rollup_config) = cfg.kona.l2_chain_id.and_then(|chain_id| {
+                if cfg.bypass_chain_registry {
+                    None
+                } else {
+                    registry.rollup_configs.get(&chain_id)
+                }
+            }) {
                 info!(
                     "Loading config for rollup with chain id {} from registry",
                     cfg.kona.l2_chain_id.unwrap()

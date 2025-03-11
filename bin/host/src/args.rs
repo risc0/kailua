@@ -37,6 +37,8 @@ pub struct KailuaHostArgs {
 
     #[clap(flatten)]
     pub proving: ProvingArgs,
+    #[clap(long, env, default_value_t = false)]
+    pub bypass_chain_registry: bool,
 
     #[clap(long, env, value_delimiter = ',')]
     pub precondition_params: Vec<u64>,
