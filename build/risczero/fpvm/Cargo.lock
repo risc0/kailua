@@ -861,7 +861,7 @@ dependencies = [
 [[package]]
 name = "c-kzg"
 version = "1.0.3"
-source = "git+https://github.com/risc0/c-kzg-4844.git?branch=p1.0.3#a42f908740c7e7d66b2d8b9846eeab67cf5fb76c"
+source = "git+https://github.com/risc0/c-kzg-4844.git?tag=c-kzg%2Fv1.0.3-risczero.0#6d0a1e2f6968814b12fff78f2198d585250cd806"
 dependencies = [
  "blst",
  "cc",
@@ -2031,7 +2031,7 @@ dependencies = [
 
 [[package]]
 name = "kailua-common"
-version = "0.3.0-alpha.0"
+version = "0.3.3"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -2071,7 +2071,7 @@ dependencies = [
 
 [[package]]
 name = "kailua-fpvm"
-version = "0.3.0-alpha.0"
+version = "0.3.3"
 dependencies = [
  "c-kzg",
  "kailua-common",
