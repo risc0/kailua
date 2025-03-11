@@ -23,7 +23,7 @@ Kailua enables rollup operators to add a new fault proof contract, compatible wi
 1. [rust](https://www.rust-lang.org/tools/install)
 2. [just](https://just.systems/man/en/)
 3. [docker](https://www.docker.com/)
-4. [solc](https://docs.soliditylang.org/en/latest/installing-solidity.html)
+4. [svm](https://github.com/alloy-rs/svm-rs)
 5. [foundry](https://book.getfoundry.sh/getting-started/installation)
 
 ## Devnet Usage
