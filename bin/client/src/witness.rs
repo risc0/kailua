@@ -24,7 +24,6 @@ use kona_proof::FlushableCache;
 use kona_protocol::BlockInfo;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
-use tracing::debug;
 use tracing::log::error;
 
 #[derive(Clone, Debug)]
@@ -93,7 +92,6 @@ where
     O: WitnessOracle,
 {
     async fn get(&self, key: PreimageKey) -> PreimageOracleResult<Vec<u8>> {
-        debug!("GET: {:?}/{}", key.key_type(), key.key_value());
         match self.oracle.get(key).await {
             Ok(value) => {
                 self.save(key, &value);
@@ -112,7 +110,6 @@ where
     }
 
     async fn get_exact(&self, key: PreimageKey, buf: &mut [u8]) -> PreimageOracleResult<()> {
-        debug!("GET EXACT: {:?}/{}", key.key_type(), key.key_value());
         match self.oracle.get_exact(key, buf).await {
             Ok(_) => {
                 self.save(key, buf);

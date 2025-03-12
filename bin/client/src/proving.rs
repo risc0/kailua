@@ -21,7 +21,7 @@ use clap::Parser;
 use kailua_common::client::stitching::split_executions;
 use kailua_common::executor::Execution;
 use kailua_common::journal::ProofJournal;
-use kailua_common::oracle::vec::VecOracle;
+use kailua_common::oracle::vec::{PreimageVecEntry, VecOracle};
 use kailua_common::proof::Proof;
 use kailua_common::witness::{StitchedBootInfo, Witness};
 use kona_preimage::{HintWriterClient, PreimageOracleClient};
@@ -50,7 +50,7 @@ pub struct ProvingArgs {
 
 impl ProvingArgs {
     pub fn can_fit_witness(&self, witness: &Witness<VecOracle>) -> bool {
-        let witness_frames =
+        let (witness_frames, _) =
             encode_witness_frames(witness.deep_clone()).expect("Failed to encode VecOracle");
         let witness_size = witness_frames.iter().map(|f| f.len()).sum::<usize>();
         witness_size < self.max_witness_size
@@ -148,22 +148,44 @@ where
         return Err(ProvingError::SeekProofError(witness_size, execution_trace));
     }
 
+    let (preloaded_frames, streamed_frames) =
+        encode_witness_frames(witness_vec).expect("Failed to encode VecOracle");
     seek_fpvm_proof(
         &proving,
         boundless.clone(),
         journal,
-        encode_witness_frames(witness_vec).expect("Failed to encode VecOracle"),
+        [preloaded_frames, streamed_frames].concat(),
         stitched_proofs,
         prove_snark,
     )
     .await
 }
 
-pub fn encode_witness_frames(witness_vec: Witness<VecOracle>) -> anyhow::Result<Vec<Vec<u8>>> {
-    let mut preimages = witness_vec.oracle_witness.preimages.lock().unwrap();
-    // serialize shards
+pub fn encode_witness_frames(
+    witness_vec: Witness<VecOracle>,
+) -> anyhow::Result<(Vec<Vec<u8>>, Vec<Vec<u8>>)> {
+    // serialize preloaded shards
+    let mut preloaded_data = witness_vec.oracle_witness.preimages.lock().unwrap();
+    let shards = shard_witness_data(&mut preloaded_data[1..])?;
+    drop(preloaded_data);
+    // serialize streamed data
+    let mut streamed_data = witness_vec.stream_witness.preimages.lock().unwrap();
+    let mut streams = shard_witness_data(&mut streamed_data)?;
+    streams.reverse();
+    streamed_data.clear();
+    drop(streamed_data);
+    // serialize main witness object
+    let main_frame = rkyv::to_bytes::<rkyv::rancor::Error>(&witness_vec)
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
+        .to_vec();
+    let preloaded_data = [vec![main_frame], shards].concat();
+
+    Ok((preloaded_data, streams))
+}
+
+pub fn shard_witness_data(data: &mut [PreimageVecEntry]) -> anyhow::Result<Vec<Vec<u8>>> {
     let mut shards = vec![];
-    for entry in preimages.iter_mut().skip(1) {
+    for entry in data {
         let shard = core::mem::take(entry);
         shards.push(
             rkyv::to_bytes::<rkyv::rancor::Error>(&shard)
@@ -171,17 +193,11 @@ pub fn encode_witness_frames(witness_vec: Witness<VecOracle>) -> anyhow::Result<
                 .to_vec(),
         )
     }
-    drop(preimages);
-    // serialize main witness object
-    let main_frame = rkyv::to_bytes::<rkyv::rancor::Error>(&witness_vec)
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
-        .to_vec();
-
-    Ok([vec![main_frame], shards].concat())
+    Ok(shards)
 }
 
 pub fn sum_witness_size(witness: &Witness<VecOracle>) -> (usize, usize) {
-    let witness_frames =
+    let (witness_frames, _) =
         encode_witness_frames(witness.deep_clone()).expect("Failed to encode VecOracle");
     (
         witness_frames.first().map(|f| f.len()).unwrap(),

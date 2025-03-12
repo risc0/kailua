@@ -43,11 +43,16 @@ where
     O: WitnessOracle + Send + Sync + Debug + Clone + Default,
 {
     let oracle_witness = Arc::new(Mutex::new(O::default()));
+    let stream_witness = Arc::new(Mutex::new(O::default()));
     let blobs_witness = Arc::new(Mutex::new(BlobWitnessData::default()));
     info!("Preamble");
     let oracle = Arc::new(OracleWitnessProvider {
-        oracle: preimage_oracle,
+        oracle: preimage_oracle.clone(),
         witness: oracle_witness.clone(),
+    });
+    let stream = Arc::new(OracleWitnessProvider {
+        oracle: preimage_oracle,
+        witness: stream_witness.clone(),
     });
     let beacon = BlobWitnessProvider {
         provider: blob_provider,
@@ -58,6 +63,7 @@ where
     let (boot, precondition_hash) = kailua_common::client::run_kailua_client(
         precondition_validation_data_hash,
         oracle,
+        stream,
         beacon,
         execution_cache,
         Some(collection_target.clone()),
@@ -75,6 +81,7 @@ where
     let fpvm_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(KAILUA_FPVM_ID));
     let mut witness = Witness {
         oracle_witness: core::mem::take(oracle_witness.lock().unwrap().deref_mut()),
+        stream_witness: core::mem::take(stream_witness.lock().unwrap().deref_mut()),
         blobs_witness: core::mem::take(blobs_witness.lock().unwrap().deref_mut()),
         payout_recipient_address: payout_recipient,
         precondition_validation_data_hash,
@@ -84,7 +91,10 @@ where
     };
     witness
         .oracle_witness
-        .finalize_preimages(preimage_oracle_shard_size);
+        .finalize_preimages(preimage_oracle_shard_size, true);
+    witness
+        .stream_witness
+        .finalize_preimages(preimage_oracle_shard_size, false);
     let journal_output =
         ProofJournal::new(fpvm_image_id, payout_recipient, precondition_hash, &boot);
     Ok((journal_output, witness))

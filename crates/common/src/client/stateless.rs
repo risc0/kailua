@@ -29,6 +29,8 @@ pub fn run_stateless_client<O: WitnessOracle>(witness: Witness<O>) -> ProofJourn
         .validate_preimages()
         .expect("Failed to validate preimages");
     let oracle = Arc::new(witness.oracle_witness);
+    // ignore the provided stream witness if any
+    let stream = Arc::new(O::default());
     log(&format!(
         "BEACON: {} BLOBS",
         witness.blobs_witness.blobs.len()
@@ -38,6 +40,7 @@ pub fn run_stateless_client<O: WitnessOracle>(witness: Witness<O>) -> ProofJourn
     let proof_journal = crate::client::stitching::run_stitching_client(
         witness.precondition_validation_data_hash,
         oracle.clone(),
+        stream,
         beacon,
         witness.fpvm_image_id,
         witness.payout_recipient_address,

@@ -22,8 +22,10 @@ use kona_preimage::errors::PreimageOracleResult;
 use kona_preimage::{HintWriterClient, PreimageKey, PreimageOracleClient};
 use kona_proof::FlushableCache;
 use lazy_static::lazy_static;
+use risc0_zkvm::guest::env;
+use rkyv::rancor::Error;
 use std::collections::VecDeque;
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use tracing::{info, warn};
 
@@ -43,15 +45,8 @@ impl VecOracle {
         cloned_with_arc.preimages = Arc::new(Mutex::new(self.preimages.lock().unwrap().clone()));
         cloned_with_arc
     }
-}
 
-impl WitnessOracle for VecOracle {
-    fn preimage_count(&self) -> usize {
-        self.preimages.lock().unwrap().iter().map(Vec::len).sum()
-    }
-
-    fn validate_preimages(&self) -> anyhow::Result<()> {
-        let preimages = self.preimages.lock().unwrap();
+    pub fn validate(preimages: &[PreimageVecEntry]) -> anyhow::Result<()> {
         for (e, entry) in preimages.iter().enumerate() {
             for (p, (key, value, prev)) in entry.iter().enumerate() {
                 if !needs_validation(&key.key_type()) {
@@ -76,6 +71,17 @@ impl WitnessOracle for VecOracle {
         }
         Ok(())
     }
+}
+
+impl WitnessOracle for VecOracle {
+    fn preimage_count(&self) -> usize {
+        self.preimages.lock().unwrap().iter().map(Vec::len).sum()
+    }
+
+    fn validate_preimages(&self) -> anyhow::Result<()> {
+        let preimages = self.preimages.lock().unwrap();
+        Self::validate(preimages.deref())
+    }
 
     fn insert_preimage(&mut self, key: PreimageKey, value: Vec<u8>) {
         validate_preimage(&key, &value).expect("Attempted to save invalid preimage");
@@ -86,8 +92,7 @@ impl WitnessOracle for VecOracle {
         preimages.last_mut().unwrap().push((key, value, None));
     }
 
-    fn finalize_preimages(&mut self, shard_size: usize) {
-        info!("Finalizing preimages with shard size: {shard_size}");
+    fn finalize_preimages(&mut self, shard_size: usize, with_validation_ptrs: bool) {
         self.validate_preimages()
             .expect("Failed to validate preimages during finalization");
         let mut preimages = self.preimages.lock().unwrap();
@@ -96,6 +101,7 @@ impl WitnessOracle for VecOracle {
             .into_iter()
             .flatten()
             .collect::<Vec<_>>();
+        info!("Finalizing {} preimages with shard size {shard_size} and validation ptrs {with_validation_ptrs}", flat_vec.len());
         // sort by expected access
         flat_vec.reverse();
         // shard vectors by size limit
@@ -111,6 +117,9 @@ impl WitnessOracle for VecOracle {
         }
         let _ = core::mem::replace(preimages.deref_mut(), sharded_vec);
         // add validation pointers
+        if !with_validation_ptrs {
+            return;
+        }
         let mut cache: HashMap<PreimageKey, (usize, usize)> =
             HashMap::with_capacity(preimages.len());
         for (i, entry) in preimages.iter_mut().enumerate() {
@@ -142,12 +151,23 @@ impl PreimageOracleClient for VecOracle {
         let mut queue = QUEUE.lock().unwrap();
         // handle variations in memory access operations due to hashmap usages
         loop {
-            let entry = preimages.last_mut().unwrap_or_else(|| {
+            if preimages.is_empty() {
+                #[cfg(target_os = "zkvm")]
+                {
+                    crate::client::log("DESERIALIZE STREAMED SHARD");
+                    preimages.push(read_shard());
+                    Self::validate(preimages.as_ref())
+                        .expect("Failed to validate streamed preimages");
+                    crate::client::log("STREAMED SHARD VALIDATED");
+                }
+                #[cfg(not(target_os = "zkvm"))]
                 panic!(
                     "Exhausted VecOracle seeking {key} ({} queued preimages)",
                     queue.len()
                 )
-            });
+            }
+
+            let entry = preimages.last_mut().unwrap();
             loop {
                 let Some((last_key, value, _)) = entry.pop() else {
                     break;
@@ -158,6 +178,7 @@ impl PreimageOracleClient for VecOracle {
                         warn!("VecOracle temp queue has {} elements", queue.len());
                         entry.extend(core::mem::take(queue.deref_mut()));
                     }
+
                     return Ok(value);
                 }
                 // keep entry in queue for later use, pointer is no longer necessary
@@ -179,4 +200,9 @@ impl HintWriterClient for VecOracle {
     async fn write(&self, _hint: &str) -> PreimageOracleResult<()> {
         Ok(())
     }
+}
+
+pub fn read_shard() -> PreimageVecEntry {
+    let shard_data = env::read_frame();
+    rkyv::from_bytes::<PreimageVecEntry, Error>(&shard_data).expect("Failed to deserialize shard")
 }

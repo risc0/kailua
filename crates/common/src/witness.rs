@@ -25,6 +25,7 @@ use std::fmt::Debug;
 #[derive(Clone, Debug, Default, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Witness<O: WitnessOracle> {
     pub oracle_witness: O,
+    pub stream_witness: O,
     pub blobs_witness: BlobWitnessData,
     #[rkyv(with = AddressDef)]
     pub payout_recipient_address: Address,
@@ -40,15 +41,16 @@ impl Witness<VecOracle> {
     pub fn deep_clone(&self) -> Self {
         let mut cloned_with_arc = self.clone();
         cloned_with_arc.oracle_witness = cloned_with_arc.oracle_witness.deep_clone();
+        cloned_with_arc.stream_witness = cloned_with_arc.stream_witness.deep_clone();
         cloned_with_arc
     }
 }
 
-pub trait WitnessOracle: CommsClient + FlushableCache + Send + Sync + Debug {
+pub trait WitnessOracle: CommsClient + FlushableCache + Send + Sync + Debug + Default {
     fn preimage_count(&self) -> usize;
     fn validate_preimages(&self) -> anyhow::Result<()>;
     fn insert_preimage(&mut self, key: PreimageKey, value: Vec<u8>);
-    fn finalize_preimages(&mut self, shard_size: usize);
+    fn finalize_preimages(&mut self, shard_size: usize, with_validation_cache: bool);
 }
 
 #[derive(

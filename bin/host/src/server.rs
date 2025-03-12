@@ -70,11 +70,6 @@ pub async fn start_server_and_native_client(
     let server_task = start_server(&args.kona, kv_store, hint.host, preimage.host)
         .await
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-    // let server_task = args
-    //     .kona
-    //     .start_server(hint.host, preimage.host)
-    //     .await
-    //     .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     // Start the client program in a separate child process.
     let program_task = tokio::spawn(kailua_client::proving::run_proving_client(
         args.proving,

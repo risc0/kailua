@@ -41,6 +41,7 @@ pub fn run_kailua_client<
 >(
     precondition_validation_data_hash: B256,
     oracle: Arc<O>,
+    stream: Arc<O>,
     mut beacon: B,
     execution_cache: Vec<Arc<Execution>>,
     collection_target: Option<Arc<Mutex<Vec<Execution>>>>,
@@ -62,7 +63,7 @@ where
         let safe_head_hash =
             fetch_safe_head_hash(oracle.as_ref(), boot.agreed_l2_output_root).await?;
 
-        let mut l1_provider = OracleL1ChainProvider::new(boot.l1_head, oracle.clone()).await?;
+        let mut l1_provider = OracleL1ChainProvider::new(boot.l1_head, stream).await?;
         let mut l2_provider =
             OracleL2ChainProvider::new(safe_head_hash, rollup_config.clone(), oracle.clone());
 

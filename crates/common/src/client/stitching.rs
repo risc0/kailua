@@ -38,12 +38,14 @@ pub struct StitchedData {
     pub stitched_proofs: Vec<Proof>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn run_stitching_client<
     O: CommsClient + FlushableCache + Send + Sync + Debug,
     B: BlobProvider + Send + Sync + Debug + Clone,
 >(
     precondition_validation_data_hash: B256,
     oracle: Arc<O>,
+    stream: Arc<O>,
     beacon: B,
     fpvm_image_id: B256,
     payout_recipient_address: Address,
@@ -53,10 +55,6 @@ pub fn run_stitching_client<
 where
     <B as BlobProvider>::Error: Debug,
 {
-    // Verify proofs recursively for boundless composition
-    #[cfg(target_os = "zkvm")]
-    let proven_fpvm_journals = load_stitching_journals(fpvm_image_id);
-
     // Queue up precomputed executions
     let (stitched_executions, execution_cache) = split_executions(stitched_executions);
 
@@ -64,12 +62,17 @@ where
     log("RUN");
     let (boot, precondition_hash) = crate::client::run_kailua_client(
         precondition_validation_data_hash,
-        oracle.clone(),
+        oracle,
+        stream,
         beacon,
         execution_cache,
         None,
     )
     .expect("Failed to compute output hash.");
+
+    // Verify proofs recursively for boundless composition
+    #[cfg(target_os = "zkvm")]
+    let proven_fpvm_journals = load_stitching_journals(fpvm_image_id);
 
     // Stitch recursively composed execution-only proofs
     stitch_executions(

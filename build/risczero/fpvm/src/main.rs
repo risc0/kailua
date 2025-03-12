@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use kailua_common::oracle::vec::{PreimageVecEntry, VecOracle};
+use kailua_common::oracle::vec::{read_shard, VecOracle};
 use kailua_common::{
     client::log,
     witness::Witness,
@@ -42,12 +42,8 @@ fn main() {
         if !entry.is_empty() {
             continue;
         }
-        let shard_data = env::read_frame();
         log(&format!("DESERIALIZE SHARD {i}"));
-        let shard = rkyv::from_bytes::<PreimageVecEntry, Error>(&shard_data)
-            .expect("Failed to deserialize shard");
-
-        let _ = core::mem::replace(entry, shard);
+        let _ = core::mem::replace(entry, read_shard());
     }
 
     // Run client using witness
