@@ -43,22 +43,28 @@ pub struct OracleL1ChainProvider<T: CommsClient> {
 impl<T: CommsClient> OracleL1ChainProvider<T> {
     /// Creates a new [OracleL1ChainProvider] with the given boot information and oracle client.
     pub async fn new(l1_head: B256, oracle: Arc<T>) -> Result<Self, OracleProviderError> {
-        // Fetch the header RLP from the oracle.
-        HintType::L1BlockHeader
-            .with_data(&[l1_head.as_ref()])
-            .send(oracle.as_ref())
-            .await?;
-        let header_rlp = oracle.get(PreimageKey::new_keccak256(*l1_head)).await?;
+        let (headers, headers_map) = if l1_head.is_zero() {
+            Default::default()
+        } else {
+            // Fetch the header RLP from the oracle.
+            HintType::L1BlockHeader
+                .with_data(&[l1_head.as_ref()])
+                .send(oracle.as_ref())
+                .await?;
+            let header_rlp = oracle.get(PreimageKey::new_keccak256(*l1_head)).await?;
 
-        // Decode the header RLP into a Header.
-        let l1_header = Header::decode(&mut header_rlp.as_slice())
-            .map_err(OracleProviderError::Rlp)?
-            .seal(l1_head);
+            // Decode the header RLP into a Header.
+            let l1_header = Header::decode(&mut header_rlp.as_slice())
+                .map_err(OracleProviderError::Rlp)?
+                .seal(l1_head);
+
+            (vec![l1_header], B256Map::from_iter(vec![(l1_head, 0usize)]))
+        };
 
         Ok(Self {
             oracle,
-            headers: vec![l1_header],
-            headers_map: B256Map::from_iter(vec![(l1_head, 0usize)]),
+            headers,
+            headers_map,
         })
     }
 }
