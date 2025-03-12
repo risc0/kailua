@@ -52,18 +52,24 @@ impl WitnessOracle for VecOracle {
 
     fn validate_preimages(&self) -> anyhow::Result<()> {
         let preimages = self.preimages.lock().unwrap();
-        for entry in preimages.iter() {
-            for (key, value, prev) in entry {
+        for (e, entry) in preimages.iter().enumerate() {
+            for (p, (key, value, prev)) in entry.iter().enumerate() {
                 if !needs_validation(&key.key_type()) {
                     continue;
                 } else if let Some((i, j)) = prev {
-                    let expected = &preimages[*i][*j].1;
-                    if expected != value {
-                        bail!("Cached preimage validation failed");
+                    if e < *i {
+                        bail!("Attempted to validate preimage against future vec entry.");
+                    } else if e== *i && p <= *j {
+                        bail!("Attempted to validate preimage against future preimage in vec entry.");
+                    } else if key != &preimages[*i][*j].0 {
+                        bail!("Cached preimage key comparison failed");
+                    } else if value != &preimages[*i][*j].1 {
+                        bail!("Cached preimage value comparison failed");
+                    } else {
+                        continue;
                     }
-                } else {
-                    validate_preimage(key, value)?;
                 }
+                validate_preimage(key, value)?;
             }
         }
         Ok(())
