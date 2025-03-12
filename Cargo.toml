@@ -92,6 +92,7 @@ kona-executor = { git = "https://github.com/op-rs/kona", rev = "d02f6e05149716f4
 kona-genesis = { git = "https://github.com/op-rs/kona", rev = "d02f6e05149716f48586136882bb413846462548" }
 kona-host = { git = "https://github.com/op-rs/kona", rev = "d02f6e05149716f48586136882bb413846462548", default-features = false, features = ["single"] }
 kona-mpt = { git = "https://github.com/op-rs/kona", rev = "d02f6e05149716f48586136882bb413846462548", features = ["serde"] }
+kona-rpc = { git = "https://github.com/op-rs/kona", rev = "d02f6e05149716f48586136882bb413846462548" }
 kona-preimage = { git = "https://github.com/op-rs/kona", rev = "d02f6e05149716f48586136882bb413846462548", features = ["serde", "rkyv", "std"] }
 kona-proof = { git = "https://github.com/op-rs/kona", rev = "d02f6e05149716f48586136882bb413846462548" }
 kona-protocol = { git = "https://github.com/op-rs/kona", rev = "d02f6e05149716f48586136882bb413846462548" }

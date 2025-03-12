@@ -59,8 +59,10 @@ impl WitnessOracle for VecOracle {
                 } else if let Some((i, j)) = prev {
                     if e < *i {
                         bail!("Attempted to validate preimage against future vec entry.");
-                    } else if e== *i && p <= *j {
-                        bail!("Attempted to validate preimage against future preimage in vec entry.");
+                    } else if e == *i && p <= *j {
+                        bail!(
+                            "Attempted to validate preimage against future preimage in vec entry."
+                        );
                     } else if key != &preimages[*i][*j].0 {
                         bail!("Cached preimage key comparison failed");
                     } else if value != &preimages[*i][*j].1 {

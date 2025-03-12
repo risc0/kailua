@@ -13,6 +13,9 @@
 // limitations under the License.
 
 use crate::executor::{exec_precondition_hash, new_execution_cursor, CachedExecutor, Execution};
+use crate::kona::chain::OracleL1ChainProvider;
+use crate::kona::pipeline::OraclePipeline;
+use crate::kona::sync::new_pipeline_cursor;
 use crate::precondition;
 use alloy_primitives::{Sealed, B256};
 use anyhow::{bail, Context};
@@ -22,9 +25,7 @@ use kona_executor::TrieDBProvider;
 use kona_preimage::{CommsClient, PreimageKey};
 use kona_proof::errors::OracleProviderError;
 use kona_proof::executor::KonaExecutor;
-use kona_proof::l1::{OracleL1ChainProvider, OraclePipeline};
 use kona_proof::l2::OracleL2ChainProvider;
-use kona_proof::sync::new_pipeline_cursor;
 use kona_proof::{BootInfo, FlushableCache, HintType};
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
@@ -61,7 +62,7 @@ where
         let safe_head_hash =
             fetch_safe_head_hash(oracle.as_ref(), boot.agreed_l2_output_root).await?;
 
-        let mut l1_provider = OracleL1ChainProvider::new(boot.l1_head, oracle.clone());
+        let mut l1_provider = OracleL1ChainProvider::new(boot.l1_head, oracle.clone()).await?;
         let mut l2_provider =
             OracleL2ChainProvider::new(safe_head_hash, rollup_config.clone(), oracle.clone());
 
