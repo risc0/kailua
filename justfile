@@ -13,7 +13,9 @@ clippy:
 devnet-fetch:
   git clone --depth 1 --branch v1.9.1 --recursive https://github.com/ethereum-optimism/optimism.git
 
-devnet-build +ARGS="-F devnet -F prove -F rebuild-fpvm": (build ARGS)
+devnet-build +ARGS="-F devnet -F prove": (build ARGS)
+
+devnet-build-fpvm +ARGS="-F devnet -F prove -F rebuild-fpvm": (build ARGS)
 
 devnet-up:
   make -C optimism devnet-up > devnet.log

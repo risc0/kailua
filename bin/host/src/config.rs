@@ -132,11 +132,23 @@ pub async fn fetch_rollup_config(
             rollup_config[fork] = json!(value);
         }
     }
-    // remove unused fields
+    // remove unused fields (todo: reintegrate on Kona update)
     {
         let rollup_config_map = rollup_config.as_object_mut().unwrap();
         rollup_config_map.remove("chain_op_config");
         rollup_config_map.remove("alt_da_config");
+        rollup_config_map.remove("pectra_blob_schedule_time");
+        let genesis_config_map = rollup_config_map
+            .get_mut("genesis")
+            .unwrap()
+            .as_object_mut()
+            .unwrap();
+        let system_config_map = genesis_config_map
+            .get_mut("system_config")
+            .unwrap()
+            .as_object_mut()
+            .unwrap();
+        system_config_map.remove("operatorFeeParams");
     }
     // export
     let ser_config = serde_json::to_string(&rollup_config)?;
