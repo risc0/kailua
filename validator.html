@@ -24,9 +24,9 @@
         <link rel="stylesheet" href="fonts/fonts.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" href="highlight.css">
-        <link rel="stylesheet" href="tomorrow-night.css">
-        <link rel="stylesheet" href="ayu-highlight.css">
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
         <link rel="stylesheet" href="./mdbook-admonish.css">
@@ -367,7 +367,6 @@ These parameters can be passed in as CLI arguments or set as environment variabl
 <li><code>NUM_CONCURRENT_PROOFS</code>: (default 1) Sets the number of concurrent proofs to seek per proving task.</li>
 <li><code>SEGMENT_LIMIT</code>: The <a href="https://docs.rs/risc0-zkvm/1.2.3/risc0_zkvm/struct.ExecutorEnvBuilder.html#method.segment_limit_po2">segment size limit</a> used for local proving (Default 21).</li>
 <li><code>MAX_WITNESS_SIZE</code>: The maximum input size per single proof (Default 100MB).</li>
-<li><code>SKIP_ZETH_PREFLIGHT</code>: If set to false (defaults to true), performs a preflight to fetch witness data using zeth.</li>
 </ul>
 <p>When manually computing individual proofs, the following parameters (or equiv. env. vars) take effect:</p>
 <ul>
