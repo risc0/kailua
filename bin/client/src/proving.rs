@@ -161,6 +161,7 @@ where
     .await
 }
 
+#[allow(clippy::type_complexity)]
 pub fn encode_witness_frames(
     witness_vec: Witness<VecOracle>,
 ) -> anyhow::Result<(Vec<Vec<u8>>, Vec<Vec<u8>>)> {
