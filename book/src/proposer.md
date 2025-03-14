@@ -47,6 +47,19 @@ The Kailua proposer wallet is critical for security.
 You must keep your proposer's wallet well funded to guarantee the safety and liveness of your rollup.
 ```
 
+### Upgrades
+If you re-deploy the KailuaTreasury/KailuaGame contracts to upgrade your fault proof system, you will need to restart
+your proposer (and validator).
+By default, the proposer (and validator) will use the latest contract deployment available upon start up, and ignore any
+proposals not made using them.
+If you wish to start a proposer for a past deployment, you can explicitly specify the deployed KailuaGame contract
+address using the optional `kailua-game-implementation` parameter.
+```admonish note
+When running on an older deployment, the proposer will not create any new proposals, but will finalize any old ones once
+possible.
+```
+
+
 ## Proposal Data Availability
 
 By default, Kailua uses the beacon chain to publish blobs that contain the extra data required for proposals.

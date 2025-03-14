@@ -23,6 +23,14 @@ First, change your working directory to `crates/contracts/foundry` for `forge` t
 cd crates/contracts/foundry
 ```
 
+```admonish warning
+The parameters used to deploy the contracts below are immutable.
+Any changes will require redeployment of both the `KailuaGame` and `KailuaTreasury` contracts, along with a repetition of
+the steps in the latter sections.
+The same `KailuaTreasury` deployment **should NOT** be reused with multiple `KailuaGame` deployments, unless they were
+**never** used to publish a proposal (except for the last `KailuaGame` deployment used).
+```
+
 ## KailuaTreasury
 ```solidity
 constructor(
@@ -32,7 +40,9 @@ constructor(
   uint256 _proposalOutputCount,
   uint256 _outputBlockSpan,
   GameType _gameType,
-  IDisputeGameFactory _disputeGameFactory
+  IDisputeGameFactory _disputeGameFactory,
+  Claim _rootClaim,
+  uint64 _l2BlockNumber
 )
 ```
 
@@ -44,6 +54,19 @@ Each published proposal on the L1 will cover `proposalOutputCount × outputBlock
 publication of `proposalOutputCount` 32-byte commitments on the DA layer.
 ```
 
+## Anchor Point
+
+First, you will need to choose the rollup block number from which Kailua sequencing should start.
+Then, you need to query your `op-node` for the `outputRoot` at that block number as follows:
+```shell
+cast rpc --rpc-url [YOUR_OP_NODE_ADDRESS] \
+  "optimism_outputAtBlock" \
+  $(cast 2h [YOUR_STARTING_L2_BLOCK_NUMBER])
+```
+
+```admonish tip
+You can quickly filter through the response for `outputRoot` by piping it to `jq -r .outputRoot`
+```
 
 ### Deployment
 
@@ -56,7 +79,9 @@ forge create KailuaTreasury --constructor-args \
   [YOUR_PROPOSAL_OUTPUT_COUNT] \
   [YOUR_OUTPUT_BLOCK_SPAN] \
   [YOUR_KAILUA_GAME_TYPE] \
-  [YOUR_DISPUTE_GAME_FACTORY]
+  [YOUR_DISPUTE_GAME_FACTORY] \
+  [YOUR_OUTPUT_ROOT_CLAIM] \
+  [YOUR_L2_BLOCK_NUMBER]
 ```
 
 Deploying the contract successfully should yield similar output to the following:
@@ -67,26 +92,6 @@ Transaction hash: [YOUR_DEPLOYMENT_TRANSACTION_HASH]
 ```
 Take note of the contract address since we'll need it later.
 
-### Configuration
-
-Once deployed, you'll need to set the bond value (in wei) required for sequencers.
-This is done by calling the `setParticipationBond` function on the treasury contract using the `owner` wallet for your
-rollup.
-
-For example, if your bond value is 12 eth, first convert this to wei using `cast`:
-```shell
-cast to-wei 12
-```
-```
-12000000000000000000
-```
-Then, configure the bond as follows using the rollup `owner` wallet:
-```shell
-cast send \
-  [YOUR_DEPLOYED_TREASURY_CONTRACT] \
-  "setParticipationBond(uint256 amount)" \
-  12000000000000000000
-```
 
 ```admonish tip
 If your rollup `owner` account is controlled by a `Safe` contract, or some other multi-sig contract, you can use

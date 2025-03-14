@@ -56,6 +56,18 @@ from delaying the finality of honest sequencing proposals.
 Running `kailua-cli validate` should monitor your rollup for any disputes and generate the required proofs!
 ```
 
+### Upgrades
+If you re-deploy the KailuaTreasury/KailuaGame contracts to upgrade your fault proof system, you will need to restart
+your validator (and proposer).
+By default, the validator (and proposer) will use the latest contract deployment available upon start up, and ignore any
+proposals not made using them.
+If you wish to start a validator for a past deployment, you can explicitly specify the deployed KailuaGame contract
+address using the optional `kailua-game-implementation` parameter.
+```admonish note
+The validator will not generate any proofs for proposals made using a different deployment than the one used at start up.
+```
+
+
 ## Validity Proof Generation
 Instead of only generating fault proofs, the validator can be instructed to generate a validity proof for every correct
 canonical proposal it encounters to fast-forward finality until a specified block height.
