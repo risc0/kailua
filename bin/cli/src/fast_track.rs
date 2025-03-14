@@ -194,6 +194,12 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     };
 
     // Deploy KailuaTreasury contract
+    let root_claim = await_tel_res!(
+        context,
+        tracer,
+        "root_claim",
+        retry_with_context!(op_node_provider.output_at_block(args.starting_block_number))
+    )?;
     info!("Deploying KailuaTreasury contract to L1 rpc.");
     let receipt = KailuaTreasury::deploy_builder(
         &deployer_provider,
@@ -204,68 +210,28 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         Uint::from(args.output_block_span),
         KAILUA_GAME_TYPE,
         dgf_address,
+        root_claim,
+        args.starting_block_number,
     )
     .transact_with_context(context.clone(), "KailuaTreasury::deploy")
     .await
     .context("KailuaTreasury::deploy")?;
     info!("KailuaTreasury::deploy: {} gas", receipt.gas_used);
-    let kailua_treasury_implementation = KailuaTreasury::new(
-        receipt
-            .contract_address
-            .ok_or_else(|| anyhow!("KailuaTreasury not deployed"))?,
-        &deployer_provider,
-    );
+    let kailua_treasury_impl_addr = receipt
+        .contract_address
+        .ok_or_else(|| anyhow!("KailuaTreasury not deployed"))?;
+    let kailua_treasury_implementation =
+        KailuaTreasury::new(kailua_treasury_impl_addr, &deployer_provider);
     info!("{:?}", &kailua_treasury_implementation);
 
-    // Update dispute factory implementation to KailuaTreasury
-    info!("Setting KailuaTreasury initialization bond value in DisputeGameFactory to zero.");
-    await_tel_res!(
-        context,
-        tracer,
-        "DisputeGameFactory::setInitBond",
-        crate::exec_safe_txn(
-            dispute_game_factory.setInitBond(KAILUA_GAME_TYPE, U256::ZERO),
-            &factory_owner_safe,
-            owner_address,
-        )
-    )?;
-    assert_eq!(
-        dispute_game_factory
-            .initBonds(KAILUA_GAME_TYPE)
-            .stall_with_context(context.clone(), "DisputeGameFactory::initBonds")
-            .await
-            .bond_,
-        U256::ZERO
-    );
-    info!("Setting KailuaTreasury participation bond value to 1 wei.");
-    let bond_value = U256::from(1);
-    await_tel_res!(
-        context,
-        tracer,
-        "KailuaTreasury::setParticipationBond",
-        crate::exec_safe_txn(
-            kailua_treasury_implementation.setParticipationBond(bond_value),
-            &factory_owner_safe,
-            owner_address,
-        )
-    )?;
-    assert_eq!(
-        kailua_treasury_implementation
-            .participationBond()
-            .stall_with_context(context.clone(), "KailuaTreasury::participationBond")
-            .await
-            ._0,
-        bond_value
-    );
-
+    // Update dispute factory implementation to new KailuaTreasury deployment
     info!("Setting KailuaTreasury implementation address in DisputeGameFactory.");
     await_tel_res!(
         context,
         tracer,
         "DisputeGameFactory::setImplementation",
         crate::exec_safe_txn(
-            dispute_game_factory
-                .setImplementation(KAILUA_GAME_TYPE, *kailua_treasury_implementation.address()),
+            dispute_game_factory.setImplementation(KAILUA_GAME_TYPE, kailua_treasury_impl_addr),
             &factory_owner_safe,
             owner_address,
         )
@@ -276,31 +242,55 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
             .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
             .await
             .impl_,
-        *kailua_treasury_implementation.address()
+        kailua_treasury_impl_addr
     );
 
+    if !dispute_game_factory
+        .initBonds(KAILUA_GAME_TYPE)
+        .stall_with_context(context.clone(), "DisputeGameFactory::initBonds")
+        .await
+        .bond_
+        .is_zero()
+    {
+        info!("Setting KailuaTreasury initialization bond value in DisputeGameFactory to zero.");
+        await_tel_res!(
+            context,
+            tracer,
+            "DisputeGameFactory::setInitBond",
+            crate::exec_safe_txn(
+                dispute_game_factory.setInitBond(KAILUA_GAME_TYPE, U256::ZERO),
+                &factory_owner_safe,
+                owner_address,
+            )
+        )?;
+        assert_eq!(
+            dispute_game_factory
+                .initBonds(KAILUA_GAME_TYPE)
+                .stall_with_context(context.clone(), "DisputeGameFactory::initBonds")
+                .await
+                .bond_,
+            U256::ZERO
+        );
+    }
+
     // Create new treasury instance from target block number
-    let root_claim = await_tel_res!(
-        context,
-        tracer,
-        "root_claim",
-        retry_with_context!(op_node_provider.output_at_block(args.starting_block_number))
-    )?;
-    let extra_data = Bytes::from(args.starting_block_number.abi_encode_packed());
+    let extra_data = Bytes::from(
+        [
+            args.starting_block_number.abi_encode_packed(),
+            kailua_treasury_impl_addr.abi_encode_packed(),
+        ]
+        .concat(),
+    );
     info!(
         "Creating new KailuaTreasury game instance from {} ({}).",
         args.starting_block_number, root_claim
     );
-    await_tel_res!(
-        context,
-        tracer,
-        "DisputeGameFactory::create(KailuaTreasury)",
-        crate::exec_safe_txn(
-            dispute_game_factory.create(KAILUA_GAME_TYPE, root_claim, extra_data.clone()),
-            &factory_owner_safe,
-            owner_address,
-        )
-    )?;
+
+    kailua_treasury_implementation
+        .propose(root_claim, extra_data.clone())
+        .transact_with_context(context.clone(), "KailuaTreasury::propose")
+        .await
+        .context("KailuaTreasury::propose")?;
     let kailua_treasury_instance_address = dispute_game_factory
         .games(KAILUA_GAME_TYPE, root_claim, extra_data)
         .stall_with_context(context.clone(), "DisputeGameFactory::games")
@@ -329,6 +319,28 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     } else {
         info!("Game instance is not ongoing ({status})");
     }
+
+    // Update participation bond value
+    info!("Setting KailuaTreasury participation bond value to {} wei.", args.collateral_amount);
+    let bond_value = U256::from(args.collateral_amount);
+    await_tel_res!(
+        context,
+        tracer,
+        "KailuaTreasury::setParticipationBond",
+        crate::exec_safe_txn(
+            kailua_treasury_implementation.setParticipationBond(bond_value),
+            &factory_owner_safe,
+            owner_address,
+        )
+    )?;
+    assert_eq!(
+        kailua_treasury_implementation
+            .participationBond()
+            .stall_with_context(context.clone(), "KailuaTreasury::participationBond")
+            .await
+            ._0,
+        bond_value
+    );
 
     // Deploy KailuaGame contract
     info!("Deploying KailuaGame contract to L1 rpc.");
