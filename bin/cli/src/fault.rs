@@ -168,7 +168,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
 
         let output_hash = if io_block_number == normalized_fault_block_number {
             faulty_root_claim
-        } else if io_block_number < proposal_block_count {
+        } else if io_block_number < proposed_block_number {
             await_tel_res!(
                 context,
                 tracer,
