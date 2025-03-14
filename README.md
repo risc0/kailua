@@ -1,5 +1,8 @@
 # Kailua
 
+> [!NOTE]
+> Documentation: https://risc0.github.io/kailua/
+
 Kailua uses the RISC-Zero zkVM to verifiably run Optimism's [Kona][kona] and secure rollups with cryptographic proofs enabling faster finality and reduced operational costs.
 
 Kailua's Fault Proving Game is designed to require constant collateral lockups from both proposers and validators (challengers), whereas the Bisection-based fault dispute game backed by Cannon requires a linear number of deposits proportional to the number of proposals/challenges.
