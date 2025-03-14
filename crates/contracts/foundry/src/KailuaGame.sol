@@ -71,6 +71,16 @@ contract KailuaGame is KailuaTournament {
         GENESIS_TIME_STAMP = _genesisTimeStamp;
         L2_BLOCK_TIME = _l2BlockTime;
         PROPOSAL_TIME_GAP = _proposalTimeGap;
+        // Require KailuaTreasury tournament config to match KailuaGame tournament config
+        KailuaTreasury treasury = KailuaTreasury(address(_kailuaTreasury));
+        require(treasury.RISC_ZERO_VERIFIER() == RISC_ZERO_VERIFIER);
+        require(treasury.FPVM_IMAGE_ID() == FPVM_IMAGE_ID);
+        require(treasury.ROLLUP_CONFIG_HASH() == ROLLUP_CONFIG_HASH);
+        require(treasury.PROPOSAL_OUTPUT_COUNT() == PROPOSAL_OUTPUT_COUNT);
+        require(treasury.OUTPUT_BLOCK_SPAN() == OUTPUT_BLOCK_SPAN);
+        require(treasury.PROPOSAL_BLOBS() == PROPOSAL_BLOBS);
+        require(treasury.GAME_TYPE().raw() == GAME_TYPE.raw());
+        require(treasury.DISPUTE_GAME_FACTORY() == DISPUTE_GAME_FACTORY);
     }
 
     // ------------------------------
