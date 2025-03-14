@@ -86,12 +86,12 @@ pub fn build_zkvm_env<'a>(
             continue;
         }
 
-        if let Proof::ZKVMReceipt(receipt) = proof {
+        let Proof::ZKVMReceipt(receipt) = proof;// {
             builder.add_assumption(*receipt);
-        } else {
-            // todo: convert boundless seals to groth16 receipts
-            builder.write(&proof)?;
-        }
+        // } else {
+        //     // todo: convert boundless seals to groth16 receipts
+        //     builder.write(&proof)?;
+        // }
     }
     builder.build()
 }

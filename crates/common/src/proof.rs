@@ -14,32 +14,32 @@
 
 use crate::journal::ProofJournal;
 use crate::witness::StitchedBootInfo;
-use risc0_aggregation::merkle_path_root;
+// use risc0_aggregation::merkle_path_root;
 use risc0_zkvm::sha::Digest;
-use risc0_zkvm::{Groth16Receipt, Journal, Receipt, ReceiptClaim};
+use risc0_zkvm::{Journal, Receipt};
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Proof {
     ZKVMReceipt(Box<Receipt>),
-    BoundlessSeal(Vec<u8>, Journal),
-    SetBuilderReceipt(Box<Groth16Receipt<ReceiptClaim>>, Vec<Digest>, Journal),
+    // BoundlessSeal(Vec<u8>, Journal),
+    // SetBuilderReceipt(Box<Groth16Receipt<ReceiptClaim>>, Vec<Digest>, Journal),
 }
 
 impl Proof {
     pub fn journal(&self) -> &Journal {
         match self {
             Proof::ZKVMReceipt(receipt) => &receipt.journal,
-            Proof::BoundlessSeal(_, journal) => journal,
-            Proof::SetBuilderReceipt(_, _, journal) => journal,
+            // Proof::BoundlessSeal(_, journal) => journal,
+            // Proof::SetBuilderReceipt(_, _, journal) => journal,
         }
     }
 
     pub fn as_zkvm_receipt(&self) -> Option<&Receipt> {
         match self {
             Proof::ZKVMReceipt(receipt) => Some(receipt),
-            _ => None,
+            // _ => None,
         }
     }
 }
@@ -57,12 +57,12 @@ impl From<&Proof> for StitchedBootInfo {
 }
 
 pub fn encoded_set_builder_journal(
-    fpvm_claim_digest: &Digest,
-    set_builder_siblings: impl IntoIterator<Item = impl Borrow<Digest>>,
+    _fpvm_claim_digest: &Digest,
+    _set_builder_siblings: impl IntoIterator<Item = impl Borrow<Digest>>,
     _set_builder_id: Digest,
 ) -> Vec<u8> {
     // derive the root of the set of aggregated claims
-    let _set_builder_root = merkle_path_root(fpvm_claim_digest, set_builder_siblings);
+    // let _set_builder_root = merkle_path_root(fpvm_claim_digest, set_builder_siblings);
     // construct set builder root from merkle proof
     // GuestOutput::new(set_builder_id, set_builder_root).abi_encode()
     todo!()

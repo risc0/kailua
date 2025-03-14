@@ -101,11 +101,11 @@ kona-registry = { git = "https://github.com/op-rs/kona", rev = "d02f6e05149716f4
 kona-std-fpvm = { git = "https://github.com/op-rs/kona", rev = "d02f6e05149716f48586136882bb413846462548" }
 
 # Boundless
-bonsai-sdk = { version = "1.2.1", features = ["non_blocking"] }
-boundless-market = "0.6.0"
+#boundless-market = "0.6.0"
+#risc0-aggregation = "0.2.2"
 
 # RISC Zero
-risc0-aggregation = "0.2.2"
+bonsai-sdk = { version = "1.2.1", features = ["non_blocking"] }
 risc0-build = { version = "1.2.4", features = ["unstable"] }
 risc0-ethereum-contracts = { version = "1.3.2", features = ["unstable"] }
 risc0-groth16 = { version = "1.2.4", default-features = false }

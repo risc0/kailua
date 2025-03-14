@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::boundless::BoundlessArgs;
+// use crate::boundless::BoundlessArgs;
 use crate::proving::ProvingArgs;
 use alloy_primitives::{Address, B256};
 use clap::Parser;
@@ -30,8 +30,8 @@ pub struct KailuaClientArgs {
     #[clap(flatten)]
     pub proving: ProvingArgs,
 
-    #[clap(flatten)]
-    pub boundless: BoundlessArgs,
+    // #[clap(flatten)]
+    // pub boundless: BoundlessArgs,
 }
 
 pub fn parse_b256(s: &str) -> Result<B256, String> {

@@ -23,15 +23,15 @@ use tokio::io::AsyncReadExt;
 pub fn encode_seal(proof: &Proof) -> anyhow::Result<Vec<u8>> {
     match proof {
         Proof::ZKVMReceipt(receipt) => risc0_ethereum_contracts::encode_seal(receipt),
-        Proof::BoundlessSeal(seal, _) => Ok(seal.clone()),
-        Proof::SetBuilderReceipt(..) => unimplemented!(),
+        // Proof::BoundlessSeal(seal, _) => Ok(seal.clone()),
+        // Proof::SetBuilderReceipt(..) => unimplemented!(),
     }
 }
 
-pub fn derive_set_builder_receipt(proof: &Proof) -> anyhow::Result<Proof> {
-    let Proof::BoundlessSeal(_seal, _journal) = proof else {
-        bail!("Expected Proof::BoundlessSeal instance");
-    };
+pub fn derive_set_builder_receipt(_proof: &Proof) -> anyhow::Result<Proof> {
+    // let Proof::BoundlessSeal(_seal, _journal) = proof else {
+    //     bail!("Expected Proof::BoundlessSeal instance");
+    // };
 
     // todo: wait for spec on how boundless will provide the seal
     todo!()

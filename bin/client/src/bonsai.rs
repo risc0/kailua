@@ -53,7 +53,7 @@ pub async fn run_bonsai_client(
             continue;
         }
 
-        if let Proof::ZKVMReceipt(receipt) = proof {
+        let Proof::ZKVMReceipt(receipt) = proof;// {
             let inner_receipt = *receipt;
             let serialized_receipt = bincode::serialize(&inner_receipt)
                 .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
@@ -62,12 +62,12 @@ pub async fn run_bonsai_client(
                 .await
                 .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
             assumption_receipt_ids.push(receipt_id);
-        } else {
-            // todo: convert boundless seals to groth16 receipts
-            input.extend_from_slice(bytemuck::cast_slice(
-                &to_vec(&proof).map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
-            ));
-        }
+        //} else {
+        //     // todo: convert boundless seals to groth16 receipts
+        //     input.extend_from_slice(bytemuck::cast_slice(
+        //         &to_vec(&proof).map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
+        //     ));
+        // }
     }
 
     // Upload the ELF with the image_id as its key.

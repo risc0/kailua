@@ -44,7 +44,7 @@ kona-preimage.workspace = true
 kona-proof.workspace = true
 kona-protocol.workspace = true
 
-risc0-aggregation.workspace = true
+#risc0-aggregation.workspace = true
 risc0-groth16.workspace = true
 risc0-zkvm.workspace = true
 risc0-zkvm-platform.workspace = true

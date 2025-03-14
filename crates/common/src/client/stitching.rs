@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::client::log;
-use crate::config::SET_BUILDER_ID;
+// use crate::config::SET_BUILDER_ID;
 use crate::executor::Execution;
 use crate::journal::ProofJournal;
 use crate::proof::Proof;
@@ -25,7 +25,7 @@ use kona_preimage::CommsClient;
 use kona_proof::{BootInfo, FlushableCache};
 use risc0_zkvm::serde::Deserializer;
 use risc0_zkvm::sha::{Digest, Digestible};
-use risc0_zkvm::{Groth16ReceiptVerifierParameters, MaybePruned, ReceiptClaim};
+// use risc0_zkvm::{Groth16ReceiptVerifierParameters, MaybePruned, ReceiptClaim};
 use serde::Deserialize;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -101,7 +101,7 @@ pub fn load_stitching_journals(fpvm_image_id: B256) -> HashSet<Digest> {
 
     let fpvm_image_id = Digest::from(fpvm_image_id.0);
     let mut proven_fpvm_journals = HashSet::new();
-    let mut verifying_params: Option<Digest> = None;
+    // let mut verifying_params: Option<Digest> = None;
 
     loop {
         let Ok(proof) = Proof::deserialize(&mut Deserializer::new(risc0_zkvm::guest::env::stdin()))
@@ -120,40 +120,40 @@ pub fn load_stitching_journals(fpvm_image_id: B256) -> HashSet<Digest> {
                     .verify(fpvm_image_id)
                     .expect("Failed to verify receipt for {journal_digest}.");
             }
-            Proof::BoundlessSeal(..) => {
-                unimplemented!("Convert BoundlessSeal to SetBuilderReceipt");
-            }
-            Proof::SetBuilderReceipt(receipt, set_builder_siblings, journal) => {
-                // Support only proofs with default verifier params
-                assert_eq!(
-                    &receipt.verifier_parameters,
-                    verifying_params.get_or_insert_with(|| {
-                        Groth16ReceiptVerifierParameters::default().digest()
-                    })
-                );
-                // build the claim for the fpvm
-                let fpvm_claim_digest =
-                    ReceiptClaim::ok(fpvm_image_id, MaybePruned::Pruned(journal.digest())).digest();
-                // construct set builder root from merkle proof
-                let set_builder_journal = crate::proof::encoded_set_builder_journal(
-                    &fpvm_claim_digest,
-                    set_builder_siblings,
-                    fpvm_image_id,
-                );
-                // Verify set builder claim digest equivalence
-                assert_eq!(
-                    receipt.claim.digest(),
-                    ReceiptClaim::ok(
-                        SET_BUILDER_ID.0,
-                        MaybePruned::Pruned(set_builder_journal.digest()),
-                    )
-                    .digest()
-                );
-                // Verify set builder receipt validity
-                receipt.verify_integrity().unwrap_or_else(|e| {
-                    panic!("Failed to verify Groth16Receipt for {journal_digest}: {e:?}")
-                });
-            }
+            // Proof::BoundlessSeal(..) => {
+            //     unimplemented!("Convert BoundlessSeal to SetBuilderReceipt");
+            // }
+            // Proof::SetBuilderReceipt(receipt, set_builder_siblings, journal) => {
+            //     // Support only proofs with default verifier params
+            //     assert_eq!(
+            //         &receipt.verifier_parameters,
+            //         verifying_params.get_or_insert_with(|| {
+            //             Groth16ReceiptVerifierParameters::default().digest()
+            //         })
+            //     );
+            //     // build the claim for the fpvm
+            //     let fpvm_claim_digest =
+            //         ReceiptClaim::ok(fpvm_image_id, MaybePruned::Pruned(journal.digest())).digest();
+            //     // construct set builder root from merkle proof
+            //     let set_builder_journal = crate::proof::encoded_set_builder_journal(
+            //         &fpvm_claim_digest,
+            //         set_builder_siblings,
+            //         fpvm_image_id,
+            //     );
+            //     // Verify set builder claim digest equivalence
+            //     assert_eq!(
+            //         receipt.claim.digest(),
+            //         ReceiptClaim::ok(
+            //             SET_BUILDER_ID.0,
+            //             MaybePruned::Pruned(set_builder_journal.digest()),
+            //         )
+            //         .digest()
+            //     );
+            //     // Verify set builder receipt validity
+            //     receipt.verify_integrity().unwrap_or_else(|e| {
+            //         panic!("Failed to verify Groth16Receipt for {journal_digest}: {e:?}")
+            //     });
+            // }
         }
 
         proven_fpvm_journals.insert(journal_digest);
