@@ -201,6 +201,21 @@ For more information, refer to <code>cast call --help</code>, and <code>cast sen
 <code>cast calldata</code> to get the necessary input that your wallet contract should forward.</p>
 </div>
 </div>
+<h2 id="set-collateral-requirement"><a class="header" href="#set-collateral-requirement">Set Collateral Requirement</a></h2>
+<p>Before allowing sequencing proposals past the anchor state, you'll need to set the bond value (in wei) required for sequencers.
+This is done by calling the <code>setParticipationBond</code> function on the treasury contract using the <code>owner</code> wallet for your
+rollup.</p>
+<p>For example, if your bond value is 12 eth, first convert this to wei using <code>cast</code>:</p>
+<pre><code class="language-shell">cast to-wei 12
+</code></pre>
+<pre><code>12000000000000000000
+</code></pre>
+<p>Then, configure the bond as follows using the rollup <code>owner</code> wallet:</p>
+<pre><code class="language-shell">cast send \
+  [YOUR_DEPLOYED_TREASURY_CONTRACT] \
+  "setParticipationBond(uint256 amount)" \
+  12000000000000000000
+</code></pre>
 <h2 id="set-kailuagame-implementation"><a class="header" href="#set-kailuagame-implementation">Set KailuaGame Implementation</a></h2>
 <p>The next step is to update the implementation for the Kailua game type stored in the <code>DisputeGameFactory</code> contract to
 point towards the <code>KailuaGame</code> contract deployed previously.

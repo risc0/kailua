@@ -250,6 +250,24 @@ from delaying the finality of honest sequencing proposals.</p>
 <p>Running <code>kailua-cli validate</code> should monitor your rollup for any disputes and generate the required proofs!</p>
 </div>
 </div>
+<h3 id="upgrades"><a class="header" href="#upgrades">Upgrades</a></h3>
+<p>If you re-deploy the KailuaTreasury/KailuaGame contracts to upgrade your fault proof system, you will need to restart
+your validator (and proposer).
+By default, the validator (and proposer) will use the latest contract deployment available upon start up, and ignore any
+proposals not made using them.
+If you wish to start a validator for a past deployment, you can explicitly specify the deployed KailuaGame contract
+address using the optional <code>kailua-game-implementation</code> parameter.</p>
+<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
+<div class="admonition-title">
+<div id="admonition-note-1-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-note-1"></a>
+</div>
+<div>
+<p>The validator will not generate any proofs for proposals made using a different deployment than the one used at start up.</p>
+</div>
+</div>
 <h2 id="validity-proof-generation"><a class="header" href="#validity-proof-generation">Validity Proof Generation</a></h2>
 <p>Instead of only generating fault proofs, the validator can be instructed to generate a validity proof for every correct
 canonical proposal it encounters to fast-forward finality until a specified block height.
@@ -257,12 +275,12 @@ This is configured using the below parameter:</p>
 <ul>
 <li><code>fast-forward-target</code>: The L2 block height until which validity proofs should be computed.</li>
 </ul>
-<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
+<div id="admonition-note-2" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-2-title">
 <div class="admonition-title">
-<div id="admonition-note-1-title">
+<div id="admonition-note-2-title">
 <p>Note</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-note-1"></a>
+<a class="admonition-anchor-link" href="#admonition-note-2"></a>
 </div>
 <div>
 <p>To indefinitely power a validity-proof only rollup, this value can be specified to the maximum 64-bit value of
@@ -287,12 +305,12 @@ generation takes place.
 Running using only the parameters above will generate proofs using the local RISC Zero prover available to the validator.
 Alternatively, proof generation can be delegated to an external service such as <a href="https://risczero.com/bonsai">Bonsai</a>,
 or to the decentralized <a href="https://docs.beboundless.xyz/">Boundless proving network</a>.</p>
-<div id="admonition-note-2" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-2-title">
+<div id="admonition-note-3" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-3-title">
 <div class="admonition-title">
-<div id="admonition-note-2-title">
+<div id="admonition-note-3-title">
 <p>Note</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-note-2"></a>
+<a class="admonition-anchor-link" href="#admonition-note-3"></a>
 </div>
 <div>
 <p>All data required to generate the proof can be publicly derived from the public chain data available for your rollup,

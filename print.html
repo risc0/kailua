@@ -790,9 +790,9 @@ If the command does not yet support your configuration, you'll need to follow th
 <tr><td style="text-align: left">RiscZeroGroth16Verifier</td><td style="text-align: left">deploy</td><td style="text-align: right">1,300K</td><td></td></tr>
 <tr><td style="text-align: left">RiscZeroSetVerifier</td><td style="text-align: left">deploy</td><td style="text-align: right">1,060K</td><td></td></tr>
 <tr><td style="text-align: left">RiscZeroMockVerifier</td><td style="text-align: left">deploy</td><td style="text-align: right">615K</td><td></td></tr>
-<tr><td style="text-align: left">KailuaTreasury</td><td style="text-align: left">deploy</td><td style="text-align: right">4,900K</td><td></td></tr>
+<tr><td style="text-align: left">KailuaTreasury</td><td style="text-align: left">deploy</td><td style="text-align: right">5,050K</td><td></td></tr>
 <tr><td style="text-align: left">KailuaTreasury</td><td style="text-align: left">propose</td><td style="text-align: right">380K</td><td></td></tr>
-<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">deploy</td><td style="text-align: right">4,725K</td><td></td></tr>
+<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">deploy</td><td style="text-align: right">4,800K</td><td></td></tr>
 <tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">proveValidity</td><td style="text-align: right">375K</td><td>Groth16 proof</td></tr>
 <tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">proveOutputFault</td><td style="text-align: right">415K</td><td>Groth16 + 1 KZG proofs</td></tr>
 <tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">proveOutputFault</td><td style="text-align: right">470K</td><td>Groth16 + 2 KZG proofs</td></tr>
@@ -1238,6 +1238,21 @@ For more information, refer to <code>forge create --help</code>, <code>cast call
 <p>First, change your working directory to <code>crates/contracts/foundry</code> for <code>forge</code> to work:</p>
 <pre><code class="language-shell">cd crates/contracts/foundry
 </code></pre>
+<div id="admonition-warning" class="admonition admonish-warning" role="note" aria-labelledby="admonition-warning-title">
+<div class="admonition-title">
+<div id="admonition-warning-title">
+<p>Warning</p>
+</div>
+<a class="admonition-anchor-link" href="dispute.html#admonition-warning"></a>
+</div>
+<div>
+<p>The parameters used to deploy the contracts below are immutable.
+Any changes will require redeployment of both the <code>KailuaGame</code> and <code>KailuaTreasury</code> contracts, along with a repetition of
+the steps in the latter sections.
+The same <code>KailuaTreasury</code> deployment <strong>should NOT</strong> be reused with multiple <code>KailuaGame</code> deployments, unless they were
+<strong>never</strong> used to publish a proposal (except for the last <code>KailuaGame</code> deployment used).</p>
+</div>
+</div>
 <h2 id="kailuatreasury"><a class="header" href="#kailuatreasury">KailuaTreasury</a></h2>
 <pre><code class="language-solidity">constructor(
   IRiscZeroVerifier _verifierContract,
@@ -1246,7 +1261,9 @@ For more information, refer to <code>forge create --help</code>, <code>cast call
   uint256 _proposalOutputCount,
   uint256 _outputBlockSpan,
   GameType _gameType,
-  IDisputeGameFactory _disputeGameFactory
+  IDisputeGameFactory _disputeGameFactory,
+  Claim _rootClaim,
+  uint64 _l2BlockNumber
 )
 </code></pre>
 <p>This contract stores the collateral bonds required for sequencers to publish their proposal, and also stores the first
@@ -1263,6 +1280,24 @@ sequencing proposal for Kailua as a fault dispute game in your rollup.</p>
 publication of <code>proposalOutputCount</code> 32-byte commitments on the DA layer.</p>
 </div>
 </div>
+<h2 id="anchor-point"><a class="header" href="#anchor-point">Anchor Point</a></h2>
+<p>First, you will need to choose the rollup block number from which Kailua sequencing should start.
+Then, you need to query your <code>op-node</code> for the <code>outputRoot</code> at that block number as follows:</p>
+<pre><code class="language-shell">cast rpc --rpc-url [YOUR_OP_NODE_ADDRESS] \
+  "optimism_outputAtBlock" \
+  $(cast 2h [YOUR_STARTING_L2_BLOCK_NUMBER])
+</code></pre>
+<div id="admonition-tip" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-title">
+<div class="admonition-title">
+<div id="admonition-tip-title">
+<p>Tip</p>
+</div>
+<a class="admonition-anchor-link" href="dispute.html#admonition-tip"></a>
+</div>
+<div>
+<p>You can quickly filter through the response for <code>outputRoot</code> by piping it to <code>jq -r .outputRoot</code></p>
+</div>
+</div>
 <h3 id="deployment-1"><a class="header" href="#deployment-1">Deployment</a></h3>
 <p>Deployment of this contract is via the command below:</p>
 <pre><code class="language-shell">forge create KailuaTreasury --constructor-args \
@@ -1272,7 +1307,9 @@ publication of <code>proposalOutputCount</code> 32-byte commitments on the DA la
   [YOUR_PROPOSAL_OUTPUT_COUNT] \
   [YOUR_OUTPUT_BLOCK_SPAN] \
   [YOUR_KAILUA_GAME_TYPE] \
-  [YOUR_DISPUTE_GAME_FACTORY]
+  [YOUR_DISPUTE_GAME_FACTORY] \
+  [YOUR_OUTPUT_ROOT_CLAIM] \
+  [YOUR_L2_BLOCK_NUMBER]
 </code></pre>
 <p>Deploying the contract successfully should yield similar output to the following:</p>
 <pre><code>Deployer: [YOUR_DEPLOYER_WALLET_ADDRESS]
@@ -1280,27 +1317,12 @@ Deployed to: [YOUR_DEPLOYED_TREASURY_CONTRACT]
 Transaction hash: [YOUR_DEPLOYMENT_TRANSACTION_HASH]
 </code></pre>
 <p>Take note of the contract address since we'll need it later.</p>
-<h3 id="configuration-1"><a class="header" href="#configuration-1">Configuration</a></h3>
-<p>Once deployed, you'll need to set the bond value (in wei) required for sequencers.
-This is done by calling the <code>setParticipationBond</code> function on the treasury contract using the <code>owner</code> wallet for your
-rollup.</p>
-<p>For example, if your bond value is 12 eth, first convert this to wei using <code>cast</code>:</p>
-<pre><code class="language-shell">cast to-wei 12
-</code></pre>
-<pre><code>12000000000000000000
-</code></pre>
-<p>Then, configure the bond as follows using the rollup <code>owner</code> wallet:</p>
-<pre><code class="language-shell">cast send \
-  [YOUR_DEPLOYED_TREASURY_CONTRACT] \
-  "setParticipationBond(uint256 amount)" \
-  12000000000000000000
-</code></pre>
-<div id="admonition-tip" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-title">
+<div id="admonition-tip-1" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-1-title">
 <div class="admonition-title">
-<div id="admonition-tip-title">
+<div id="admonition-tip-1-title">
 <p>Tip</p>
 </div>
-<a class="admonition-anchor-link" href="dispute.html#admonition-tip"></a>
+<a class="admonition-anchor-link" href="dispute.html#admonition-tip-1"></a>
 </div>
 <div>
 <p>If your rollup <code>owner</code> account is controlled by a <code>Safe</code> contract, or some other multi-sig contract, you can use
@@ -1454,8 +1476,7 @@ This step is only to be done once in order to create a starting point for sequen
 <p>This step will publish and immediately resolve (finalize) a single sequencing proposal with no chance for dispute.</p>
 </div>
 </div>
-<p>First, you will need to choose the rollup block number from which Kailua sequencing should start.
-Then, you need to query your <code>op-node</code> for the <code>outputRoot</code> at that block number as follows:</p>
+<p>Recall the rollup block number and its output root from the deployment in the previous section.</p>
 <pre><code class="language-shell">cast rpc --rpc-url [YOUR_OP_NODE_ADDRESS] \
   "optimism_outputAtBlock" \
   $(cast 2h [YOUR_STARTING_L2_BLOCK_NUMBER])
@@ -1471,12 +1492,11 @@ Then, you need to query your <code>op-node</code> for the <code>outputRoot</code
 <p>You can quickly filter through the response for <code>outputRoot</code> by piping it to <code>jq -r .outputRoot</code></p>
 </div>
 </div>
-<p>Once you have the <code>outputRoot</code> value you wish to start sequencing from, the next step is to call <code>create</code> on <code>DisputeGameFactory</code> using the <code>owner</code> wallet:</p>
-<pre><code class="language-shell">cast send [YOUR_DISPUTE_GAME_FACTORY] \
-  "create(uint32, bytes32, bytes)" \
-  [YOUR_KAILUA_GAME_TYPE] \
+<p>Once you have the <code>outputRoot</code> value you wish to start sequencing from, the next step is to call <code>propose</code> on <code>KailuaTreasury</code> using the <code>owner</code> wallet:</p>
+<pre><code class="language-shell">cast send [YOUR_DEPLOYED_TREASURY_CONTRACT] \
+  "propose(bytes32, bytes)" \
   [YOUR_OUTPUT_ROOT] \
-  $(cast abi-encode --packed "f(uint64)" [YOUR_STARTING_L2_BLOCK_NUMBER])
+  $(cast abi-encode --packed "f(uint64,address)" [YOUR_STARTING_L2_BLOCK_NUMBER] [YOUR_DEPLOYED_TREASURY_CONTRACT])
 </code></pre>
 <div id="admonition-note-2" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-2-title">
 <div class="admonition-title">
@@ -1494,7 +1514,7 @@ Then, you need to query your <code>op-node</code> for the <code>outputRoot</code
   "games(uint32, bytes32, bytes) returns (address, uint64)" \
   [YOUR_KAILUA_GAME_TYPE] \
   [YOUR_OUTPUT_ROOT] \
-  $(cast abi-encode --packed "f(uint64)" [YOUR_STARTING_L2_BLOCK_NUMBER])
+  $(cast abi-encode --packed "f(uint64,address)" [YOUR_STARTING_L2_BLOCK_NUMBER] [YOUR_DEPLOYED_TREASURY_CONTRACT])
 </code></pre>
 <p>With this instance address, the last step is to call <code>resolve()</code> on it using the <code>owner</code> wallet:</p>
 <pre><code class="language-shell">cast send [YOUR_GAME_INSTANCE_ADDRESS] \
@@ -1552,6 +1572,21 @@ For more information, refer to <code>cast call --help</code>, and <code>cast sen
 <code>cast calldata</code> to get the necessary input that your wallet contract should forward.</p>
 </div>
 </div>
+<h2 id="set-collateral-requirement"><a class="header" href="#set-collateral-requirement">Set Collateral Requirement</a></h2>
+<p>Before allowing sequencing proposals past the anchor state, you'll need to set the bond value (in wei) required for sequencers.
+This is done by calling the <code>setParticipationBond</code> function on the treasury contract using the <code>owner</code> wallet for your
+rollup.</p>
+<p>For example, if your bond value is 12 eth, first convert this to wei using <code>cast</code>:</p>
+<pre><code class="language-shell">cast to-wei 12
+</code></pre>
+<pre><code>12000000000000000000
+</code></pre>
+<p>Then, configure the bond as follows using the rollup <code>owner</code> wallet:</p>
+<pre><code class="language-shell">cast send \
+  [YOUR_DEPLOYED_TREASURY_CONTRACT] \
+  "setParticipationBond(uint256 amount)" \
+  12000000000000000000
+</code></pre>
 <h2 id="set-kailuagame-implementation"><a class="header" href="#set-kailuagame-implementation">Set KailuaGame Implementation</a></h2>
 <p>The next step is to update the implementation for the Kailua game type stored in the <code>DisputeGameFactory</code> contract to
 point towards the <code>KailuaGame</code> contract deployed previously.
@@ -1732,6 +1767,25 @@ This allows it to restart quickly without requesting a lot of old on-chain data 
 You must keep your proposer's wallet well funded to guarantee the safety and liveness of your rollup.</p>
 </div>
 </div>
+<h3 id="upgrades"><a class="header" href="#upgrades">Upgrades</a></h3>
+<p>If you re-deploy the KailuaTreasury/KailuaGame contracts to upgrade your fault proof system, you will need to restart
+your proposer (and validator).
+By default, the proposer (and validator) will use the latest contract deployment available upon start up, and ignore any
+proposals not made using them.
+If you wish to start a proposer for a past deployment, you can explicitly specify the deployed KailuaGame contract
+address using the optional <code>kailua-game-implementation</code> parameter.</p>
+<div id="admonition-note" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-title">
+<div class="admonition-title">
+<div id="admonition-note-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="proposer.html#admonition-note"></a>
+</div>
+<div>
+<p>When running on an older deployment, the proposer will not create any new proposals, but will finalize any old ones once
+possible.</p>
+</div>
+</div>
 <h2 id="proposal-data-availability"><a class="header" href="#proposal-data-availability">Proposal Data Availability</a></h2>
 <p>By default, Kailua uses the beacon chain to publish blobs that contain the extra data required for proposals.</p>
 <div id="admonition-info" class="admonition admonish-info" role="note" aria-labelledby="admonition-info-title">
@@ -1847,6 +1901,24 @@ from delaying the finality of honest sequencing proposals.</p>
 <p>Running <code>kailua-cli validate</code> should monitor your rollup for any disputes and generate the required proofs!</p>
 </div>
 </div>
+<h3 id="upgrades-1"><a class="header" href="#upgrades-1">Upgrades</a></h3>
+<p>If you re-deploy the KailuaTreasury/KailuaGame contracts to upgrade your fault proof system, you will need to restart
+your validator (and proposer).
+By default, the validator (and proposer) will use the latest contract deployment available upon start up, and ignore any
+proposals not made using them.
+If you wish to start a validator for a past deployment, you can explicitly specify the deployed KailuaGame contract
+address using the optional <code>kailua-game-implementation</code> parameter.</p>
+<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
+<div class="admonition-title">
+<div id="admonition-note-1-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="validator.html#admonition-note-1"></a>
+</div>
+<div>
+<p>The validator will not generate any proofs for proposals made using a different deployment than the one used at start up.</p>
+</div>
+</div>
 <h2 id="validity-proof-generation"><a class="header" href="#validity-proof-generation">Validity Proof Generation</a></h2>
 <p>Instead of only generating fault proofs, the validator can be instructed to generate a validity proof for every correct
 canonical proposal it encounters to fast-forward finality until a specified block height.
@@ -1854,12 +1926,12 @@ This is configured using the below parameter:</p>
 <ul>
 <li><code>fast-forward-target</code>: The L2 block height until which validity proofs should be computed.</li>
 </ul>
-<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
+<div id="admonition-note-2" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-2-title">
 <div class="admonition-title">
-<div id="admonition-note-1-title">
+<div id="admonition-note-2-title">
 <p>Note</p>
 </div>
-<a class="admonition-anchor-link" href="validator.html#admonition-note-1"></a>
+<a class="admonition-anchor-link" href="validator.html#admonition-note-2"></a>
 </div>
 <div>
 <p>To indefinitely power a validity-proof only rollup, this value can be specified to the maximum 64-bit value of
@@ -1884,12 +1956,12 @@ generation takes place.
 Running using only the parameters above will generate proofs using the local RISC Zero prover available to the validator.
 Alternatively, proof generation can be delegated to an external service such as <a href="https://risczero.com/bonsai">Bonsai</a>,
 or to the decentralized <a href="https://docs.beboundless.xyz/">Boundless proving network</a>.</p>
-<div id="admonition-note-2" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-2-title">
+<div id="admonition-note-3" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-3-title">
 <div class="admonition-title">
-<div id="admonition-note-2-title">
+<div id="admonition-note-3-title">
 <p>Note</p>
 </div>
-<a class="admonition-anchor-link" href="validator.html#admonition-note-2"></a>
+<a class="admonition-anchor-link" href="validator.html#admonition-note-3"></a>
 </div>
 <div>
 <p>All data required to generate the proof can be publicly derived from the public chain data available for your rollup,

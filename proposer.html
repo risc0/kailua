@@ -230,6 +230,25 @@ This allows it to restart quickly without requesting a lot of old on-chain data 
 You must keep your proposer's wallet well funded to guarantee the safety and liveness of your rollup.</p>
 </div>
 </div>
+<h3 id="upgrades"><a class="header" href="#upgrades">Upgrades</a></h3>
+<p>If you re-deploy the KailuaTreasury/KailuaGame contracts to upgrade your fault proof system, you will need to restart
+your proposer (and validator).
+By default, the proposer (and validator) will use the latest contract deployment available upon start up, and ignore any
+proposals not made using them.
+If you wish to start a proposer for a past deployment, you can explicitly specify the deployed KailuaGame contract
+address using the optional <code>kailua-game-implementation</code> parameter.</p>
+<div id="admonition-note" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-title">
+<div class="admonition-title">
+<div id="admonition-note-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-note"></a>
+</div>
+<div>
+<p>When running on an older deployment, the proposer will not create any new proposals, but will finalize any old ones once
+possible.</p>
+</div>
+</div>
 <h2 id="proposal-data-availability"><a class="header" href="#proposal-data-availability">Proposal Data Availability</a></h2>
 <p>By default, Kailua uses the beacon chain to publish blobs that contain the extra data required for proposals.</p>
 <div id="admonition-info" class="admonition admonish-info" role="note" aria-labelledby="admonition-info-title">

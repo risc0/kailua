@@ -193,6 +193,21 @@ For more information, refer to <code>forge create --help</code>, <code>cast call
 <p>First, change your working directory to <code>crates/contracts/foundry</code> for <code>forge</code> to work:</p>
 <pre><code class="language-shell">cd crates/contracts/foundry
 </code></pre>
+<div id="admonition-warning" class="admonition admonish-warning" role="note" aria-labelledby="admonition-warning-title">
+<div class="admonition-title">
+<div id="admonition-warning-title">
+<p>Warning</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-warning"></a>
+</div>
+<div>
+<p>The parameters used to deploy the contracts below are immutable.
+Any changes will require redeployment of both the <code>KailuaGame</code> and <code>KailuaTreasury</code> contracts, along with a repetition of
+the steps in the latter sections.
+The same <code>KailuaTreasury</code> deployment <strong>should NOT</strong> be reused with multiple <code>KailuaGame</code> deployments, unless they were
+<strong>never</strong> used to publish a proposal (except for the last <code>KailuaGame</code> deployment used).</p>
+</div>
+</div>
 <h2 id="kailuatreasury"><a class="header" href="#kailuatreasury">KailuaTreasury</a></h2>
 <pre><code class="language-solidity">constructor(
   IRiscZeroVerifier _verifierContract,
@@ -201,7 +216,9 @@ For more information, refer to <code>forge create --help</code>, <code>cast call
   uint256 _proposalOutputCount,
   uint256 _outputBlockSpan,
   GameType _gameType,
-  IDisputeGameFactory _disputeGameFactory
+  IDisputeGameFactory _disputeGameFactory,
+  Claim _rootClaim,
+  uint64 _l2BlockNumber
 )
 </code></pre>
 <p>This contract stores the collateral bonds required for sequencers to publish their proposal, and also stores the first
@@ -218,6 +235,24 @@ sequencing proposal for Kailua as a fault dispute game in your rollup.</p>
 publication of <code>proposalOutputCount</code> 32-byte commitments on the DA layer.</p>
 </div>
 </div>
+<h2 id="anchor-point"><a class="header" href="#anchor-point">Anchor Point</a></h2>
+<p>First, you will need to choose the rollup block number from which Kailua sequencing should start.
+Then, you need to query your <code>op-node</code> for the <code>outputRoot</code> at that block number as follows:</p>
+<pre><code class="language-shell">cast rpc --rpc-url [YOUR_OP_NODE_ADDRESS] \
+  "optimism_outputAtBlock" \
+  $(cast 2h [YOUR_STARTING_L2_BLOCK_NUMBER])
+</code></pre>
+<div id="admonition-tip" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-title">
+<div class="admonition-title">
+<div id="admonition-tip-title">
+<p>Tip</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-tip"></a>
+</div>
+<div>
+<p>You can quickly filter through the response for <code>outputRoot</code> by piping it to <code>jq -r .outputRoot</code></p>
+</div>
+</div>
 <h3 id="deployment"><a class="header" href="#deployment">Deployment</a></h3>
 <p>Deployment of this contract is via the command below:</p>
 <pre><code class="language-shell">forge create KailuaTreasury --constructor-args \
@@ -227,7 +262,9 @@ publication of <code>proposalOutputCount</code> 32-byte commitments on the DA la
   [YOUR_PROPOSAL_OUTPUT_COUNT] \
   [YOUR_OUTPUT_BLOCK_SPAN] \
   [YOUR_KAILUA_GAME_TYPE] \
-  [YOUR_DISPUTE_GAME_FACTORY]
+  [YOUR_DISPUTE_GAME_FACTORY] \
+  [YOUR_OUTPUT_ROOT_CLAIM] \
+  [YOUR_L2_BLOCK_NUMBER]
 </code></pre>
 <p>Deploying the contract successfully should yield similar output to the following:</p>
 <pre><code>Deployer: [YOUR_DEPLOYER_WALLET_ADDRESS]
@@ -235,27 +272,12 @@ Deployed to: [YOUR_DEPLOYED_TREASURY_CONTRACT]
 Transaction hash: [YOUR_DEPLOYMENT_TRANSACTION_HASH]
 </code></pre>
 <p>Take note of the contract address since we'll need it later.</p>
-<h3 id="configuration"><a class="header" href="#configuration">Configuration</a></h3>
-<p>Once deployed, you'll need to set the bond value (in wei) required for sequencers.
-This is done by calling the <code>setParticipationBond</code> function on the treasury contract using the <code>owner</code> wallet for your
-rollup.</p>
-<p>For example, if your bond value is 12 eth, first convert this to wei using <code>cast</code>:</p>
-<pre><code class="language-shell">cast to-wei 12
-</code></pre>
-<pre><code>12000000000000000000
-</code></pre>
-<p>Then, configure the bond as follows using the rollup <code>owner</code> wallet:</p>
-<pre><code class="language-shell">cast send \
-  [YOUR_DEPLOYED_TREASURY_CONTRACT] \
-  "setParticipationBond(uint256 amount)" \
-  12000000000000000000
-</code></pre>
-<div id="admonition-tip" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-title">
+<div id="admonition-tip-1" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-1-title">
 <div class="admonition-title">
-<div id="admonition-tip-title">
+<div id="admonition-tip-1-title">
 <p>Tip</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-tip"></a>
+<a class="admonition-anchor-link" href="#admonition-tip-1"></a>
 </div>
 <div>
 <p>If your rollup <code>owner</code> account is controlled by a <code>Safe</code> contract, or some other multi-sig contract, you can use
