@@ -22,19 +22,22 @@ fn main() {
             };
             std::collections::HashMap::from([(
                 "kailua-fpvm",
-                risc0_build::GuestOptions {
+                {
+                    let opts = risc0_build::GuestOptions::default();
                     // Build a reproducible ELF file using docker under the release profile
                     #[cfg(not(any(feature = "debug-guest-build", debug_assertions)))]
-                    use_docker: Some(risc0_build::DockerOptions { root_dir }),
+                    {
+                        opts.use_docker = Some(risc0_build::DockerOptions { root_dir });
+                    }
                     // Disable dev-mode receipts from being validated inside the guest
-                    features: vec![
-                        #[cfg(any(
-                            feature = "disable-dev-mode",
-                            not(any(feature = "debug-guest-build", debug_assertions))
-                        ))]
-                        String::from("disable-dev-mode"),
-                    ],
-                    ..Default::default()
+                    #[cfg(any(
+                        feature = "disable-dev-mode",
+                        not(any(feature = "debug-guest-build", debug_assertions))
+                    ))]
+                    {
+                        opts.features.push(String::from("disable-dev-mode"));
+                    }
+                    opts
                 },
             )])
         };
