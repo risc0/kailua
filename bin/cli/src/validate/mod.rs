@@ -80,6 +80,9 @@ pub struct ValidateArgs {
     /// Address of the recipient account to use for bond payouts
     #[clap(long, env, value_parser = parse_address)]
     pub payout_recipient_address: Option<Address>,
+    /// Address of the KailuaGame implementation to use
+    #[clap(long, env, value_parser = parse_address)]
+    pub kailua_game_implementation: Option<Address>,
 
     #[clap(flatten)]
     pub boundless: BoundlessArgs,
@@ -186,14 +189,24 @@ pub async fn handle_proposals(
         .gameCount_
         .to();
     info!("There have been {game_count} games created using DisputeGameFactory");
-    let kailua_game_implementation = KailuaGame::new(
-        dispute_game_factory
-            .gameImpls(KAILUA_GAME_TYPE)
-            .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
-            .await
-            .impl_,
-        &validator_provider,
-    );
+
+    // Look up deployment to target
+    let latest_game_impl_addr = dispute_game_factory
+        .gameImpls(KAILUA_GAME_TYPE)
+        .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
+        .await
+        .impl_;
+    let kailua_game_implementation_address = args
+        .kailua_game_implementation
+        .unwrap_or(latest_game_impl_addr);
+    if args.kailua_game_implementation.is_some() {
+        warn!("Using provided KailuaGame implementation {kailua_game_implementation_address}.");
+    } else {
+        info!("Using latest KailuaGame implementation {kailua_game_implementation_address} from DisputeGameFactory.");
+    }
+
+    let kailua_game_implementation =
+        KailuaGame::new(kailua_game_implementation_address, &validator_provider);
     info!("KailuaGame({:?})", kailua_game_implementation.address());
     if kailua_game_implementation.address().is_zero() {
         error!("Fault proof game is not installed!");
@@ -201,8 +214,15 @@ pub async fn handle_proposals(
     }
     // Initialize empty DB
     info!("Initializing..");
-    let mut kailua_db = await_tel!(context, KailuaDB::init(data_dir, &dispute_game_factory))
-        .context("KailuaDB::init")?;
+    let mut kailua_db = await_tel!(
+        context,
+        KailuaDB::init(
+            data_dir,
+            &dispute_game_factory,
+            kailua_game_implementation_address
+        )
+    )
+    .context("KailuaDB::init")?;
     info!("KailuaTreasury({:?})", kailua_db.treasury.address);
     // Run the validator loop
     info!(

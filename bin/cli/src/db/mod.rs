@@ -21,7 +21,7 @@ use crate::provider::BlobProvider;
 use crate::stall::Stall;
 use crate::KAILUA_GAME_TYPE;
 use alloy::network::Network;
-use alloy::primitives::U256;
+use alloy::primitives::{Address, U256};
 use alloy::providers::Provider;
 use anyhow::{anyhow, bail, Context};
 use config::Config;
@@ -63,18 +63,13 @@ impl KailuaDB {
     pub async fn init<P: Provider<N>, N: Network>(
         mut data_dir: PathBuf,
         dispute_game_factory: &IDisputeGameFactoryInstance<(), P, N>,
+        game_implementation_address: Address,
     ) -> anyhow::Result<Self> {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("KailuaDB::init"));
 
-        let game_implementation = KailuaGame::new(
-            dispute_game_factory
-                .gameImpls(KAILUA_GAME_TYPE)
-                .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
-                .await
-                .impl_,
-            dispute_game_factory.provider(),
-        );
+        let game_implementation =
+            KailuaGame::new(game_implementation_address, dispute_game_factory.provider());
         let config = Config::load(&game_implementation)
             .with_context(context.clone())
             .await
@@ -117,7 +112,15 @@ impl KailuaDB {
             Vec::with_capacity((game_count - self.state.next_factory_index) as usize);
         while self.state.next_factory_index < game_count {
             let proposal = match self.get_local_proposal(&self.state.next_factory_index) {
-                Some(proposal) => Some(proposal),
+                Some(proposal) => {
+                    // Skip cached proposals from other deployments
+                    if proposal.treasury != self.treasury.address {
+                        info!("Skipping cached proposal for different deployment.");
+                        None
+                    } else {
+                        Some(proposal)
+                    }
+                }
                 None => {
                     match self
                         .load_game_at_index(
@@ -211,6 +214,12 @@ impl KailuaDB {
         let mut proposal = Proposal::load(&self.config, blob_provider, &tournament_instance)
             .with_context(context.clone())
             .await?;
+
+        // Skip proposals unrelated to current run
+        if proposal.treasury != self.treasury.address {
+            info!("Skipping proposal for different deployment.");
+            return Ok(false);
+        }
 
         // Determine inherited correctness
         self.determine_correctness(&mut proposal, op_node_provider)

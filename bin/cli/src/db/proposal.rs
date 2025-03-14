@@ -34,6 +34,8 @@ pub struct Proposal {
     // pointers
     /// Address of the contract instance
     pub contract: Address,
+    /// Address of the tied treasury
+    pub treasury: Address,
     /// DGF Index of the game
     pub index: u64,
     /// DGF Index of the game's parent
@@ -120,6 +122,11 @@ impl Proposal {
         let context =
             opentelemetry::Context::current_with_span(tracer.start("Proposal::load_treasury"));
 
+        let treasury = treasury_instance
+            .KAILUA_TREASURY()
+            .stall_with_context(context.clone(), "KailuaGame::KAILUA_TREASURY")
+            .await
+            ._0;
         let index = treasury_instance
             .gameIndex()
             .stall_with_context(context.clone(), "KailuaTreasury::gameIndex")
@@ -161,6 +168,7 @@ impl Proposal {
             .into();
         Ok(Self {
             contract: *treasury_instance.address(),
+            treasury,
             index,
             parent: index,
             proposer: *treasury_instance.address(),
@@ -191,6 +199,11 @@ impl Proposal {
         let context =
             opentelemetry::Context::current_with_span(tracer.start("Proposal::load_game"));
 
+        let treasury = game_instance
+            .KAILUA_TREASURY()
+            .stall_with_context(context.clone(), "KailuaGame::KAILUA_TREASURY")
+            .await
+            ._0;
         let index = game_instance
             .gameIndex()
             .stall_with_context(context.clone(), "KailuaGame::gameIndex")
@@ -262,6 +275,7 @@ impl Proposal {
         let trail_len = trail_field_elements.len();
         Ok(Self {
             contract: *game_instance.address(),
+            treasury,
             index,
             parent,
             proposer,

@@ -321,7 +321,10 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     }
 
     // Update participation bond value
-    info!("Setting KailuaTreasury participation bond value to {} wei.", args.collateral_amount);
+    info!(
+        "Setting KailuaTreasury participation bond value to {} wei.",
+        args.collateral_amount
+    );
     let bond_value = U256::from(args.collateral_amount);
     await_tel_res!(
         context,
