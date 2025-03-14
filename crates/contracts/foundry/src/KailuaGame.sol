@@ -101,7 +101,7 @@ contract KailuaGame is KailuaTournament {
             revert BadExtraData();
         }
 
-        // Do only allow monotonic duplication counter
+        // Only allow monotonic duplication counter
         uint256 duplicationCounter_ = duplicationCounter();
         if (duplicationCounter_ > 0) {
             bytes memory extra = abi.encodePacked(msg.data[0x58:0x68], uint64(duplicationCounter_ - 1));
@@ -133,8 +133,13 @@ contract KailuaGame is KailuaTournament {
             proposalBlobHashes.push(Hash.wrap(hash));
         }
 
-        // If a proof was submitted, do not allow bad proposals to be created
+        // Verify that parent game is known by the treasury
         KailuaTournament parentGame_ = parentGame();
+        if (KAILUA_TREASURY.proposerOf(address(parentGame_)) == address(0x0)) {
+            revert InvalidParent();
+        }
+
+        // If a proof was submitted, do not allow bad proposals to be created
         if (!parentGame_.isViableSignature(signature())) {
             revert ProvenFaulty();
         }

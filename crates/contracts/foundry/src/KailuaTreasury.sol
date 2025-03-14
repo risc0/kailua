@@ -29,6 +29,12 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     // Immutable configuration
     // ------------------------------
 
+    /// @notice The initial root claim for the deployment
+    Claim public immutable ROOT_CLAIM;
+
+    /// @notice The initial root claim for the deployment
+    uint64 public immutable L2_BLOCK_NUMBER;
+
     constructor(
         IRiscZeroVerifier _verifierContract,
         bytes32 _imageId,
@@ -36,7 +42,9 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         uint256 _proposalOutputCount,
         uint256 _outputBlockSpan,
         GameType _gameType,
-        IDisputeGameFactory _disputeGameFactory
+        IDisputeGameFactory _disputeGameFactory,
+        Claim _rootClaim,
+        uint64 _l2BlockNumber
     )
         KailuaTournament(
             KailuaTreasury(this),
@@ -49,7 +57,8 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
             _disputeGameFactory
         )
     {
-        proposerOf[address(this)] = address(this);
+        ROOT_CLAIM = _rootClaim;
+        L2_BLOCK_NUMBER = _l2BlockNumber;
     }
 
     // ------------------------------
@@ -60,10 +69,49 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     function initialize() external payable override {
         super.initializeInternal();
 
-        OwnableUpgradeable factoryContract = OwnableUpgradeable(address(DISPUTE_GAME_FACTORY));
-        if (gameCreator() != factoryContract.owner()) {
-            revert BadAuth();
+        // Revert if the calldata size is not the expected length.
+        //
+        // This is to prevent adding extra or omitting bytes from to `extraData` that result in a different game UUID
+        // in the factory, but are not used by the game, which would allow for multiple dispute games for the same
+        // output proposal to be created.
+        //
+        // Expected length: 0x76
+        // - 0x04 selector                      0x00 0x04
+        // - 0x14 creator address               0x04 0x18
+        // - 0x20 root claim                    0x18 0x38
+        // - 0x20 l1 head                       0x38 0x58
+        // - 0x18 extraData:                    0x58 0x70
+        //      + 0x08 l2BlockNumber            0x58 0x60
+        //      + 0x14 kailuaTreasuryAddress    0x60 0x74
+        // - 0x02 CWIA bytes                    0x74 0x76
+        if (msg.data.length != 0x76) {
+            revert BadExtraData();
         }
+
+        // Accept only the initialized root claim
+        if (rootClaim().raw() != ROOT_CLAIM.raw()) {
+            revert UnexpectedRootClaim(rootClaim());
+        }
+
+        // Accept only the initialized l2 block number
+        if (l2BlockNumber() != L2_BLOCK_NUMBER) {
+            revert BlockNumberMismatch(l2BlockNumber(), L2_BLOCK_NUMBER);
+        }
+
+        // Accept only the address of the deployment treasury
+        if (treasuryAddress() != address(KAILUA_TREASURY)) {
+            revert BadExtraData();
+        }
+
+        // Allow only the treasury to create new games
+        if (gameCreator() != address(KAILUA_TREASURY)) {
+            revert Blacklisted(gameCreator(), address(KAILUA_TREASURY));
+        }
+    }
+
+    /// @notice Returns the treasury address used in initialization
+    function treasuryAddress() public pure returns (address treasuryAddress_) {
+        treasuryAddress_ = _getArgAddress(0x5c);
     }
 
     // ------------------------------
@@ -271,7 +319,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     function propose(Claim _rootClaim, bytes calldata _extraData)
         external
         payable
-        returns (KailuaTournament gameContract)
+        returns (KailuaTournament tournament)
     {
         // Check proposer honesty
         if (eliminationRound[msg.sender] > 0) {
@@ -287,31 +335,31 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         }
         // Create proposal
         isProposing = true;
-        gameContract = KailuaTournament(address(DISPUTE_GAME_FACTORY.create(GAME_TYPE, _rootClaim, _extraData)));
+        tournament = KailuaTournament(address(DISPUTE_GAME_FACTORY.create(GAME_TYPE, _rootClaim, _extraData)));
         isProposing = false;
         // Check proposal progression
         KailuaTournament previousGame = lastProposal[msg.sender];
         if (address(previousGame) != address(0x0)) {
             // INVARIANT: Proposers may only extend the proposal set incrementally
-            if (previousGame.l2BlockNumber() >= gameContract.l2BlockNumber()) {
-                revert BlockNumberMismatch(previousGame.l2BlockNumber(), gameContract.l2BlockNumber());
+            if (previousGame.l2BlockNumber() >= tournament.l2BlockNumber()) {
+                revert BlockNumberMismatch(previousGame.l2BlockNumber(), tournament.l2BlockNumber());
             }
         }
         // Check whether the proposer must follow a vanguard if one is set
         if (vanguard != address(0x0) && vanguard != msg.sender) {
             // The proposer may only counter the vanguard during the advantage time
-            KailuaTournament proposalParent = gameContract.parentGame();
+            KailuaTournament proposalParent = tournament.parentGame();
             if (proposalParent.childCount() == 0) {
                 // Count the advantage clock since proposal was possible
-                uint64 elapsedAdvantage = uint64(block.timestamp - gameContract.minCreationTime().raw());
+                uint64 elapsedAdvantage = uint64(block.timestamp - tournament.minCreationTime().raw());
                 if (elapsedAdvantage < vanguardAdvantage.raw()) {
                     revert VanguardError(address(proposalParent));
                 }
             }
         }
         // Record proposer
-        proposerOf[address(gameContract)] = msg.sender;
+        proposerOf[address(tournament)] = msg.sender;
         // Record proposal
-        lastProposal[msg.sender] = gameContract;
+        lastProposal[msg.sender] = tournament;
     }
 }
