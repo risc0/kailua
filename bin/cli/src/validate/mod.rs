@@ -31,7 +31,6 @@ use alloy::providers::{ProviderBuilder, RootProvider};
 use anyhow::{anyhow, bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_client::args::parse_address;
-use kailua_client::boundless::BoundlessArgs;
 use kailua_client::proof::{encode_seal, proof_file_name, read_proof_file};
 use kailua_client::provider::OpNodeProvider;
 use kailua_client::telemetry::TelemetryArgs;
@@ -80,9 +79,6 @@ pub struct ValidateArgs {
     /// Address of the recipient account to use for bond payouts
     #[clap(long, env, value_parser = parse_address)]
     pub payout_recipient_address: Option<Address>,
-
-    #[clap(flatten)]
-    pub boundless: BoundlessArgs,
 
     #[clap(flatten)]
     pub telemetry: TelemetryArgs,

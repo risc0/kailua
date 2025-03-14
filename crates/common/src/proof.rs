@@ -23,7 +23,6 @@ use std::borrow::Borrow;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Proof {
     ZKVMReceipt(Box<Receipt>),
-    BoundlessSeal(Vec<u8>, Journal),
     SetBuilderReceipt(Box<Groth16Receipt<ReceiptClaim>>, Vec<Digest>, Journal),
 }
 
@@ -31,7 +30,6 @@ impl Proof {
     pub fn journal(&self) -> &Journal {
         match self {
             Proof::ZKVMReceipt(receipt) => &receipt.journal,
-            Proof::BoundlessSeal(_, journal) => journal,
             Proof::SetBuilderReceipt(_, _, journal) => journal,
         }
     }

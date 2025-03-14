@@ -73,7 +73,6 @@ pub async fn start_server_and_native_client(
     // Start the client program in a separate child process.
     let program_task = tokio::spawn(kailua_client::proving::run_proving_client(
         args.proving,
-        args.boundless,
         OracleReader::new(preimage.client),
         HintWriter::new(hint.client),
         precondition_validation_data_hash,

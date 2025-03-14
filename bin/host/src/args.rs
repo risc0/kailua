@@ -16,7 +16,7 @@ use alloy_primitives::B256;
 use clap::{ArgAction, Parser};
 use kailua_client::proving::ProvingArgs;
 use kailua_client::telemetry::TelemetryArgs;
-use kailua_client::{args::parse_b256, boundless::BoundlessArgs};
+use kailua_client::args::parse_b256;
 use std::cmp::Ordering;
 
 /// The host binary CLI application arguments.
@@ -47,8 +47,6 @@ pub struct KailuaHostArgs {
     #[clap(long, env, value_parser = parse_b256, value_delimiter = ',')]
     pub precondition_blob_hashes: Vec<B256>,
 
-    #[clap(flatten)]
-    pub boundless: BoundlessArgs,
     #[clap(flatten)]
     pub telemetry: TelemetryArgs,
 

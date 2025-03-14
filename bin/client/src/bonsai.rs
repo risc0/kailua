@@ -46,7 +46,6 @@ pub async fn run_bonsai_client(
     for proof in stitched_proofs {
         if std::env::var("KAILUA_FORCE_RECURSION").is_ok() {
             warn!("(KAILUA_FORCE_RECURSION) Forcibly loading receipt as guest input.");
-            // todo: convert boundless seals to groth16 receipts
             input.extend_from_slice(bytemuck::cast_slice(
                 &to_vec(&proof).map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
             ));
@@ -63,7 +62,6 @@ pub async fn run_bonsai_client(
                 .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
             assumption_receipt_ids.push(receipt_id);
         } else {
-            // todo: convert boundless seals to groth16 receipts
             input.extend_from_slice(bytemuck::cast_slice(
                 &to_vec(&proof).map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
             ));

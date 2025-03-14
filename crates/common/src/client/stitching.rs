@@ -120,9 +120,6 @@ pub fn load_stitching_journals(fpvm_image_id: B256) -> HashSet<Digest> {
                     .verify(fpvm_image_id)
                     .expect("Failed to verify receipt for {journal_digest}.");
             }
-            Proof::BoundlessSeal(..) => {
-                unimplemented!("Convert BoundlessSeal to SetBuilderReceipt");
-            }
             Proof::SetBuilderReceipt(receipt, set_builder_siblings, journal) => {
                 // Support only proofs with default verifier params
                 assert_eq!(

@@ -25,7 +25,6 @@ async fn main() -> anyhow::Result<()> {
 
     kailua_client::proving::run_proving_client(
         args.proving,
-        args.boundless,
         ORACLE_READER,
         HINT_WRITER,
         precondition_validation_data_hash,

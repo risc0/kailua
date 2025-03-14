@@ -93,7 +93,6 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
         "CONTROL_ID: 0x{}",
         hex::encode_upper(BN254_CONTROL_ID.as_slice()),
     );
-    // Report expected Boundless verifier parameters
     println!(
         "SET_BUILDER_ID: 0x{}",
         hex::encode_upper(SET_BUILDER_ID.as_slice())

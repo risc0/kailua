@@ -102,7 +102,6 @@ kona-std-fpvm = { git = "https://github.com/op-rs/kona", rev = "d02f6e05149716f4
 
 # Boundless
 bonsai-sdk = { version = "1.2.1", features = ["non_blocking"] }
-boundless-market = "0.6.0"
 
 # RISC Zero
 risc0-aggregation = "0.2.2"

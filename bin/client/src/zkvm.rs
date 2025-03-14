@@ -81,7 +81,6 @@ pub fn build_zkvm_env<'a>(
         // Force in-guest verification (should be used for testing only)
         if std::env::var("KAILUA_FORCE_RECURSION").is_ok() {
             warn!("(KAILUA_FORCE_RECURSION) Forcibly loading receipt as guest input.");
-            // todo: convert boundless seals to groth16 receipts
             builder.write(&proof)?;
             continue;
         }
@@ -89,7 +88,6 @@ pub fn build_zkvm_env<'a>(
         if let Proof::ZKVMReceipt(receipt) = proof {
             builder.add_assumption(*receipt);
         } else {
-            // todo: convert boundless seals to groth16 receipts
             builder.write(&proof)?;
         }
     }

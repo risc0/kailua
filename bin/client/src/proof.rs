@@ -23,39 +23,8 @@ use tokio::io::AsyncReadExt;
 pub fn encode_seal(proof: &Proof) -> anyhow::Result<Vec<u8>> {
     match proof {
         Proof::ZKVMReceipt(receipt) => risc0_ethereum_contracts::encode_seal(receipt),
-        Proof::BoundlessSeal(seal, _) => Ok(seal.clone()),
         Proof::SetBuilderReceipt(..) => unimplemented!(),
     }
-}
-
-pub fn derive_set_builder_receipt(proof: &Proof) -> anyhow::Result<Proof> {
-    let Proof::BoundlessSeal(_seal, _journal) = proof else {
-        bail!("Expected Proof::BoundlessSeal instance");
-    };
-
-    // todo: wait for spec on how boundless will provide the seal
-    todo!()
-    // let seal = if let Ok(seal) = risc0_groth16::Seal::from_vec(&encoded_seal) {
-    //     seal
-    // } else {
-    //     // todo: verify inclusion proof
-    //     // todo: extract groth16 seal
-    //     todo!()
-    // };
-    // // todo: create claim digest
-    // // todo: get verifier parameters
-    // // todo: create and verify groth16 receipt
-    //
-    // let n = encoded_seal.len() - 256;
-    // Groth16Receipt::new(
-    //     encoded_seal[n..].to_vec(),
-    //     MaybePruned::Pruned(journal_digest),
-    //     *verifying_params.get_or_insert_with(|| {
-    //         Groth16ReceiptVerifierParameters::default().digest()
-    //     }),
-    // )
-    // .verify_integrity()
-    // .expect("Failed to verify Groth16Receipt for {journal_digest}.");
 }
 
 pub fn proof_file_name(proof_journal: &ProofJournal) -> String {

@@ -13,8 +13,7 @@
 // limitations under the License.
 
 use crate::args::parse_address;
-use crate::boundless::BoundlessArgs;
-use crate::{bonsai, boundless, proof, witgen, zkvm};
+use crate::{bonsai, proof, witgen, zkvm};
 use alloy_primitives::{Address, B256};
 use anyhow::anyhow;
 use clap::Parser;
@@ -78,7 +77,6 @@ pub enum ProvingError {
 #[allow(clippy::too_many_arguments)]
 pub async fn run_proving_client<P, H>(
     proving: ProvingArgs,
-    boundless: BoundlessArgs,
     oracle_client: P,
     hint_client: H,
     precondition_validation_data_hash: B256,
@@ -152,7 +150,6 @@ where
         encode_witness_frames(witness_vec).expect("Failed to encode VecOracle");
     seek_fpvm_proof(
         &proving,
-        boundless.clone(),
         journal,
         [preloaded_frames, streamed_frames].concat(),
         stitched_proofs,
@@ -207,38 +204,22 @@ pub fn sum_witness_size(witness: &Witness<VecOracle>) -> (usize, usize) {
 }
 pub async fn seek_fpvm_proof(
     proving: &ProvingArgs,
-    boundless: BoundlessArgs,
     journal: ProofJournal,
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Proof>,
     prove_snark: bool,
 ) -> Result<(), ProvingError> {
     // compute the zkvm proof
-    let proof = match boundless.market {
-        Some(marked_provider_config) => {
-            boundless::run_boundless_client(
-                marked_provider_config,
-                boundless.storage,
-                journal,
-                witness_frames,
-                stitched_proofs,
-                proving.segment_limit,
-            )
-            .await?
-        }
-        None => {
-            if bonsai::should_use_bonsai() {
-                bonsai::run_bonsai_client(witness_frames, stitched_proofs, prove_snark).await?
-            } else {
-                zkvm::run_zkvm_client(
-                    witness_frames,
-                    stitched_proofs,
-                    prove_snark,
-                    proving.segment_limit,
-                )
-                .await?
-            }
-        }
+    let proof = if bonsai::should_use_bonsai() {
+        bonsai::run_bonsai_client(witness_frames, stitched_proofs, prove_snark).await?
+    } else {
+        zkvm::run_zkvm_client(
+            witness_frames,
+            stitched_proofs,
+            prove_snark,
+            proving.segment_limit,
+        )
+        .await?
     };
 
     // Save proof file to disk
