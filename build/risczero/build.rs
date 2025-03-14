@@ -12,30 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use risc0_build::GuestOptions;
+
 fn main() {
     if cfg!(feature = "rebuild-fpvm") {
         let build_opts = {
             #[cfg(not(any(feature = "debug-guest-build", debug_assertions)))]
-            let root_dir = {
-                let cwd = std::env::current_dir().unwrap();
-                cwd.parent().unwrap().parent().map(|d| d.to_path_buf())
+            let docker_opts = {
+                let root_dir = {
+                    let cwd = std::env::current_dir().unwrap();
+                    cwd.parent().unwrap().parent().map(|d| d.to_path_buf())
+                };
+
+                risc0_build::DockerBuilderBuilder::default()
+                    .root_dir(root_dir)
+                    .build()
+                    .unwrap()
             };
+
+            let mut guest_opts_builder = risc0_build::GuestOptionsBuilder::default();
+
+            // Disable dev-mode receipts from being validated inside the guest
+            #[cfg(any(
+                feature = "disable-dev-mode",
+                not(any(feature = "debug-guest-build", debug_assertions))
+            ))]
+            guest_opts_builder.features(vec![String::from("disable-dev-mode")]);
+            #[cfg(not(any(feature = "debug-guest-build", debug_assertions)))]
+            guest_opts_builder.use_docker(docker_opts);
+
             std::collections::HashMap::from([(
                 "kailua-fpvm",
-                risc0_build::GuestOptions {
-                    // Build a reproducible ELF file using docker under the release profile
-                    #[cfg(not(any(feature = "debug-guest-build", debug_assertions)))]
-                    use_docker: Some(risc0_build::DockerOptions { root_dir }),
-                    // Disable dev-mode receipts from being validated inside the guest
-                    features: vec![
-                        #[cfg(any(
-                            feature = "disable-dev-mode",
-                            not(any(feature = "debug-guest-build", debug_assertions))
-                        ))]
-                        String::from("disable-dev-mode"),
-                    ],
-                    ..Default::default()
-                },
+                guest_opts_builder.build().unwrap(),
             )])
         };
 
