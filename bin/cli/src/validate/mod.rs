@@ -291,8 +291,12 @@ pub async fn handle_proposals(
                             error!("Proposal {p} missing from database.");
                             return false;
                         };
-
-                        predecessor.signature == proposal.signature
+                        let valid_pre = predecessor.index != proposal.index
+                            && predecessor.signature == proposal.signature;
+                        if valid_pre {
+                            info!("Found predecessor proposal {p}");
+                        }
+                        valid_pre
                     });
             if is_repeat_signature {
                 info!(
@@ -811,18 +815,18 @@ pub async fn handle_proposals(
         // publish trail proofs
         let trail_proofs = trail_buffer.len();
         for _ in 0..trail_proofs {
-            let proposal_index = fault_buffer.pop_front().unwrap();
+            let proposal_index = trail_buffer.pop_front().unwrap();
             // Fetch proposal from db
             let Some(proposal) = kailua_db.get_local_proposal(&proposal_index) else {
                 error!("Proposal {proposal_index} missing from database.");
-                fault_buffer.push_back(proposal_index);
+                trail_buffer.push_back(proposal_index);
                 continue;
             };
             let proposal_contract = proposal.tournament_contract_instance(&validator_provider);
             // Fetch proposal parent from db
             let Some(parent) = kailua_db.get_local_proposal(&proposal.parent) else {
                 error!("Parent proposal {} missing from database.", proposal.parent);
-                fault_buffer.push_back(proposal_index);
+                trail_buffer.push_back(proposal_index);
                 continue;
             };
             let parent_contract = parent.tournament_contract_instance(&validator_provider);
