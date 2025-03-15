@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use risc0_build::GuestOptions;
-
 fn main() {
     if cfg!(feature = "rebuild-fpvm") {
         let build_opts = {
