@@ -3,7 +3,7 @@ name = "kailua-common"
 version = "0.3.3"
 edition.workspace = true
 license.workspace = true
-rust-version.workspace = true
+rust-version = "1.81"
 authors.workspace = true
 homepage.workspace = true
 repository.workspace = true
@@ -44,7 +44,6 @@ kona-preimage.workspace = true
 kona-proof.workspace = true
 kona-protocol.workspace = true
 
-risc0-aggregation.workspace = true
 risc0-groth16.workspace = true
 risc0-zkvm.workspace = true
 risc0-zkvm-platform.workspace = true

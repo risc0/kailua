@@ -14,7 +14,7 @@
 
 use crate::journal::ProofJournal;
 use crate::witness::StitchedBootInfo;
-use risc0_aggregation::merkle_path_root;
+// use risc0_aggregation::merkle_path_root;
 use risc0_zkvm::sha::Digest;
 use risc0_zkvm::{Groth16Receipt, Journal, Receipt, ReceiptClaim};
 use serde::{Deserialize, Serialize};
@@ -60,7 +60,7 @@ pub fn encoded_set_builder_journal(
     _set_builder_id: Digest,
 ) -> Vec<u8> {
     // derive the root of the set of aggregated claims
-    let _set_builder_root = merkle_path_root(fpvm_claim_digest, set_builder_siblings);
+    // let _set_builder_root = merkle_path_root(fpvm_claim_digest, set_builder_siblings);
     // construct set builder root from merkle proof
     // GuestOutput::new(set_builder_id, set_builder_root).abi_encode()
     todo!()
