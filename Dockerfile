@@ -1,5 +1,5 @@
 # TODO alpine is smaller
-FROM --platform=arm64 rust:1.81
+FROM rust:1.81
 
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     build-essential \
@@ -11,10 +11,6 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
 
 WORKDIR /kailua
 
-# Set environment variables for faster builds
-ENV CARGO_BUILD_JOBS=4
-ENV CARGO_NET_RETRY=5
-
 COPY . .
 
 RUN cargo install svm-rs && \
@@ -22,6 +18,6 @@ RUN cargo install svm-rs && \
 
 RUN --mount=type=cache,target=/root/.cargo/registry \
     --mount=type=cache,target=/kailua/target \
-    cargo install -F prove --locked --path bin/cli --jobs $(nproc)
+    cargo install -F prove --locked --path bin/cli --jobs 1
 
 ENTRYPOINT ["kailua-cli"]
