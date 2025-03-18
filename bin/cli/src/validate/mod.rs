@@ -293,43 +293,101 @@ pub async fn handle_proposals(
                 // skip fault proving if a validity proof is en-route
                 if let Some(successor) = parent.successor {
                     info!(
-                        "Skipping fault proving for proposal {proposal_index} assuming ongoing \
+                        "Skipping proving for proposal {proposal_index} assuming ongoing \
                         validity proof generation for proposal {successor}."
                     );
                     continue;
                 }
             }
-            // Skip attempting to fault prove correct proposals
-            if let Some(true) = proposal.is_correct() {
-                info!(
-                    "Skipping fault proving for proposal {proposal_index} with valid signature {}",
-                    proposal.signature
-                );
+
+            // Switch to validity proving if only one output is admissible
+            if kailua_db.config.proposal_output_count == 1 {
+                // Check if there is a faulty predecessor
+                let is_prior_fault =
+                    parent
+                        .children
+                        .iter()
+                        .filter(|p| **p < proposal_index)
+                        .any(|p| {
+                            // Fetch predecessor from db
+                            let Some(predecessor) = kailua_db.get_local_proposal(p) else {
+                                error!("Proposal {p} missing from database.");
+                                return false;
+                            };
+                            let invalid_predecessor = predecessor.is_correct() == Some(false);
+                            if invalid_predecessor {
+                                info!("Found invalid predecessor proposal {p}");
+                            }
+                            invalid_predecessor
+                        });
+                // Check canonical proposal status
+                match parent.successor {
+                    Some(p) if p == proposal.index && is_prior_fault => {
+                        // Compute validity proof on arrival of correct proposal after faulty proposal
+                        info!(
+                            "Computing validity proof for {proposal_index} to discard invalid predecessors."
+                        );
+                        valid_buffer.push_back(p);
+                    }
+                    Some(p) if p == proposal.index => {
+                        // Skip proving as no conflicts exist
+                        info!("Skipping proving for proposal {proposal_index} with invalid predecessors.");
+                    }
+                    Some(p) if proposal.is_correct() == Some(false) && !is_prior_fault => {
+                        // Compute validity proof on arrival of faulty proposal after correct proposal
+                        info!("Computing validity proof for {p} to discard invalid successor.");
+                        valid_buffer.push_back(p);
+                    }
+                    Some(p) if proposal.is_correct() == Some(false) => {
+                        // is_prior_fault is true and a successor exists, so some proof must be queued
+                        info!(
+                            "Skipping proving for proposal {proposal_index} assuming ongoing validity proof for proposal {p}."
+                        );
+                    }
+                    Some(p) => {
+                        info!(
+                            "Skipping proving for correct proposal {proposal_index} replicating {p}."
+                        );
+                    }
+                    None => {
+                        info!(
+                            "Skipping fault proving for proposal {proposal_index} with no valid sibling."
+                        );
+                    }
+                }
                 continue;
             }
-            // Skip fault proving if fault with same signature already being proven
+
+            // Skip proving on repeat signature
             let is_repeat_signature =
                 parent
                     .children
                     .iter()
                     .filter(|p| **p < proposal_index)
                     .any(|p| {
-                        // Fetch prior predecessor from db
+                        // Fetch predecessor from db
                         let Some(predecessor) = kailua_db.get_local_proposal(p) else {
                             error!("Proposal {p} missing from database.");
                             return false;
                         };
-                        let valid_pre = predecessor.index != proposal.index
-                            && predecessor.signature == proposal.signature;
-                        if valid_pre {
-                            info!("Found predecessor proposal {p}");
+                        let duplicate_predecessor = predecessor.signature == proposal.signature;
+                        if duplicate_predecessor {
+                            info!("Found duplicate predecessor proposal {p}");
                         }
-                        valid_pre
+                        duplicate_predecessor
                     });
             if is_repeat_signature {
                 info!(
-                    "Skipping fault proving for proposal {proposal_index} assuming ongoing \
-                fault proof generation for signature {}",
+                    "Skipping fault proving for proposal {proposal_index} with repeat signature {}",
+                    proposal.signature
+                );
+                continue;
+            }
+
+            // Skip attempting to fault prove correct proposals
+            if let Some(true) = proposal.is_correct() {
+                info!(
+                    "Skipping fault proving for proposal {proposal_index} with valid signature {}",
                     proposal.signature
                 );
                 continue;
@@ -416,6 +474,22 @@ pub async fn handle_proposals(
                 valid_buffer.push_front(proposal_index);
                 continue;
             };
+
+            let parent_contract = parent.tournament_contract_instance(&validator_provider);
+            // Check that a validity proof had not already been posted
+            let proof_status = parent_contract
+                .proofStatus(proposal.signature)
+                .stall_with_context(context.clone(), "KailuaTournament::proofStatus")
+                .await
+                ._0;
+            if proof_status != 0 {
+                info!(
+                    "Proposal {} signature {} already proven {proof_status}",
+                    proposal.index, proposal.signature
+                );
+                continue;
+            }
+
             if let Err(err) = await_tel!(
                 context,
                 request_validity_proof(
