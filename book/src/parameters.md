@@ -35,19 +35,33 @@ per 2 hours and 15 minutes.
 
 ## Proposal Time Gap
 
+```admonish tip
+This value can be safely set to zero when relying only on validity proving using a very large dispute timeout.
+```
+
 Because Kailua is designed for permissionless sequencing, it has an extra safety mechanism that can prevent sequencing 
 proposals from being made eagerly before the parent chain data supporting that state is finalized.
 
 This mechanism comes in the form of a forced delay between the timestamp of the L2 block being proposed, and the current
 timestamp on the parent chain (ethereum).
 
-At the time of writing, Ethereum finalizes each block in [approximately 15 minutes](https://ethereum.org/en/roadmap/single-slot-finality/#:~:text=It%20takes%20about%2015%20minutes%20for%20an%20Ethereum%20block%20to%20finalize).
-Consequently, we recommend you set this parameter to `15 × 60 = 900` seconds to match.
+While the Kailua proposer agent won't publish a sequencing proposal until it is considered safe by op-node, the Kailua contracts
+allow you to enforce this requirement so that even an eager (potentially dishonest) proposer cannot have a head start!
+
+The minimum value for the time gap is equal to the length of your rollup's sequencing window.
+
+```admonish example
+Consider a Rollup on Ethereum with a 50 block sequencing window.
+At the time of writing, the Ethereum block time is 12 seconds.
+Consequently, the minimum proposal time gap value should be `50 × 12 = 600` seconds (10 minutes).
+```
 
 ```admonish note
-While the Kailua proposer agent won't publish a sequencing proposal until it is considered safe, the Kailua contracts
-allow you to enforce this requirement so that even an eager (potentially dishonest) proposer cannot have a head start!
+At the time of writing, Ethereum finalizes each block in [approximately 15 minutes](https://ethereum.org/en/roadmap/single-slot-finality/#:~:text=It%20takes%20about%2015%20minutes%20for%20an%20Ethereum%20block%20to%20finalize).
+Consequently, we recommend you add an extra `15 × 60 = 900` seconds to your gap to match.
 ```
+
+
 
 ## Collateral Amount
 
