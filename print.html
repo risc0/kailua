@@ -621,12 +621,37 @@ per 2 hours and 15 minutes.</p>
 </div>
 </div>
 <h2 id="proposal-time-gap"><a class="header" href="#proposal-time-gap">Proposal Time Gap</a></h2>
+<div id="admonition-tip-1" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-1-title">
+<div class="admonition-title">
+<div id="admonition-tip-1-title">
+<p>Tip</p>
+</div>
+<a class="admonition-anchor-link" href="parameters.html#admonition-tip-1"></a>
+</div>
+<div>
+<p>This value can be safely set to zero when relying only on validity proving using a very large dispute timeout.</p>
+</div>
+</div>
 <p>Because Kailua is designed for permissionless sequencing, it has an extra safety mechanism that can prevent sequencing
 proposals from being made eagerly before the parent chain data supporting that state is finalized.</p>
 <p>This mechanism comes in the form of a forced delay between the timestamp of the L2 block being proposed, and the current
 timestamp on the parent chain (ethereum).</p>
-<p>At the time of writing, Ethereum finalizes each block in <a href="https://ethereum.org/en/roadmap/single-slot-finality/#:~:text=It%20takes%20about%2015%20minutes%20for%20an%20Ethereum%20block%20to%20finalize">approximately 15 minutes</a>.
-Consequently, we recommend you set this parameter to <code>15 × 60 = 900</code> seconds to match.</p>
+<p>While the Kailua proposer agent won't publish a sequencing proposal until it is considered safe by op-node, the Kailua contracts
+allow you to enforce this requirement so that even an eager (potentially dishonest) proposer cannot have a head start!</p>
+<p>The minimum value for the time gap is equal to the length of your rollup's sequencing window.</p>
+<div id="admonition-example-1" class="admonition admonish-example" role="note" aria-labelledby="admonition-example-1-title">
+<div class="admonition-title">
+<div id="admonition-example-1-title">
+<p>Example</p>
+</div>
+<a class="admonition-anchor-link" href="parameters.html#admonition-example-1"></a>
+</div>
+<div>
+<p>Consider a Rollup on Ethereum with a 50 block sequencing window.
+At the time of writing, the Ethereum block time is 12 seconds.
+Consequently, the minimum proposal time gap value should be <code>50 × 12 = 600</code> seconds (10 minutes).</p>
+</div>
+</div>
 <div id="admonition-note" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-title">
 <div class="admonition-title">
 <div id="admonition-note-title">
@@ -635,8 +660,8 @@ Consequently, we recommend you set this parameter to <code>15 × 60 = 900</code>
 <a class="admonition-anchor-link" href="parameters.html#admonition-note"></a>
 </div>
 <div>
-<p>While the Kailua proposer agent won't publish a sequencing proposal until it is considered safe, the Kailua contracts
-allow you to enforce this requirement so that even an eager (potentially dishonest) proposer cannot have a head start!</p>
+<p>At the time of writing, Ethereum finalizes each block in <a href="https://ethereum.org/en/roadmap/single-slot-finality/#:~:text=It%20takes%20about%2015%20minutes%20for%20an%20Ethereum%20block%20to%20finalize">approximately 15 minutes</a>.
+Consequently, we recommend you add an extra <code>15 × 60 = 900</code> seconds to your gap to match.</p>
 </div>
 </div>
 <h2 id="collateral-amount"><a class="header" href="#collateral-amount">Collateral Amount</a></h2>
@@ -648,12 +673,12 @@ only a single fault proof.</p>
 This collateral should at least cover the proving cost, but should also include a sizeable tip for the prover to
 incentivize proving priority.
 Our estimates put a worst-case proving cost using Bonsai for a single (OP Mainnet) block at $100 USD.</p>
-<div id="admonition-example-1" class="admonition admonish-example" role="note" aria-labelledby="admonition-example-1-title">
+<div id="admonition-example-2" class="admonition admonish-example" role="note" aria-labelledby="admonition-example-2-title">
 <div class="admonition-title">
-<div id="admonition-example-1-title">
+<div id="admonition-example-2-title">
 <p>Example</p>
 </div>
-<a class="admonition-anchor-link" href="parameters.html#admonition-example-1"></a>
+<a class="admonition-anchor-link" href="parameters.html#admonition-example-2"></a>
 </div>
 <div>
 <p>Currently, OP Mainnet requires 0.08 ETH (~$300) of collateral per proposal, and finalizes a proposal after at least 3.5
