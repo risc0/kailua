@@ -490,12 +490,19 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         }
         // Submit proposal
         info!("Proposing output {proposed_output_root} at l2 block number {proposed_block_number} with {owed_collateral} additional collateral and duplication counter {dupe_counter}.");
-        match kailua_db
+
+        let treasury_contract_instance = kailua_db
             .treasury
-            .treasury_contract_instance(&proposer_provider)
-            .propose(proposed_output_root, Bytes::from(extra_data))
-            .value(owed_collateral)
-            .sidecar(sidecar)
+            .treasury_contract_instance(&proposer_provider);
+        let mut transaction =
+            treasury_contract_instance.propose(proposed_output_root, Bytes::from(extra_data));
+        if !owed_collateral.is_zero() {
+            transaction = transaction.value(owed_collateral);
+        }
+        if !sidecar.blobs.is_empty() {
+            transaction = transaction.sidecar(sidecar);
+        }
+        match transaction
             .transact_with_context(context.clone(), "KailuaTreasury::propose")
             .await
             .context("KailuaTreasury::propose")
