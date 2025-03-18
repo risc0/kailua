@@ -82,6 +82,7 @@ impl KailuaDB {
             .context("Treasury::init")?;
 
         data_dir.push(config.cfg_hash.to_string());
+        data_dir.push(game_implementation_address.to_string());
         let db = rocksdb::DB::open(&Self::options(), &data_dir).context("rocksdb::DB::open")?;
         Ok(Self {
             config,
@@ -211,7 +212,7 @@ impl KailuaDB {
         info!("Processing tournament {index} at {game_address}");
         let tournament_instance =
             KailuaTournament::new(game_address, dispute_game_factory.provider());
-        let mut proposal = Proposal::load(&self.config, blob_provider, &tournament_instance)
+        let mut proposal = Proposal::load(blob_provider, &tournament_instance)
             .with_context(context.clone())
             .await?;
 

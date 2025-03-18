@@ -331,7 +331,7 @@ pub async fn handle_proposals(
                     }
                     Some(p) if p == proposal.index => {
                         // Skip proving as no conflicts exist
-                        info!("Skipping proving for proposal {proposal_index} with invalid predecessors.");
+                        info!("Skipping proving for proposal {proposal_index} with no invalid predecessors.");
                     }
                     Some(p) if proposal.is_correct() == Some(false) && !is_prior_fault => {
                         // Compute validity proof on arrival of faulty proposal after correct proposal

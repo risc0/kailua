@@ -275,7 +275,10 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             .unwrap_or_default()
             .unwrap_or_default()
             {
-                error!("Failed to determine proposal as next survivor.");
+                error!(
+                    "Failed to determine proposal at {} as successor of proposal at {}.",
+                    proposal.contract, parent.contract
+                );
                 break;
             }
 
