@@ -307,6 +307,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             return KailuaTournament(address(0x0));
         }
 
+        // Advance v if needed
+        if (v < u) {
+            v = u + 1;
+        }
+
         // Note: u < children.length
         // Fetch contender details
         KailuaTournament contender = children[u];
