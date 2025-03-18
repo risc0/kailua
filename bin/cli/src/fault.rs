@@ -222,10 +222,15 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         ._0;
     let owed_collateral = bond_value.saturating_sub(paid_in);
 
-    match kailua_treasury_instance
-        .propose(proposed_output_root, Bytes::from(extra_data))
-        .value(owed_collateral)
-        .sidecar(sidecar)
+    let mut transaction =
+        kailua_treasury_instance.propose(proposed_output_root, Bytes::from(extra_data));
+    if !owed_collateral.is_zero() {
+        transaction = transaction.value(owed_collateral);
+    }
+    if !sidecar.blobs.is_empty() {
+        transaction = transaction.sidecar(sidecar);
+    }
+    match transaction
         .transact_with_context(context.clone(), "KailuaTreasury::propose")
         .await
         .context("KailuaTreasury::propose")

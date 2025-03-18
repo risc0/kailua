@@ -80,7 +80,6 @@ pub struct Proposal {
 
 impl Proposal {
     pub async fn load<P: Provider<N>, N: Network>(
-        config: &Config,
         blob_provider: &BlobProvider,
         tournament_instance: &KailuaTournamentInstance<(), P, N>,
     ) -> anyhow::Result<Self> {
@@ -107,7 +106,6 @@ impl Proposal {
             await_tel!(
                 context,
                 Self::load_game(
-                    config,
                     blob_provider,
                     &KailuaGame::new(instance_address, tournament_instance.provider()),
                 )
@@ -191,7 +189,6 @@ impl Proposal {
     }
 
     async fn load_game<P: Provider<N>, N: Network>(
-        config: &Config,
         blob_provider: &BlobProvider,
         game_instance: &KailuaGameInstance<(), P, N>,
     ) -> anyhow::Result<Self> {
@@ -229,7 +226,19 @@ impl Proposal {
         let mut io_blobs = Vec::new();
         let mut io_field_elements = Vec::new();
         let mut trail_field_elements = Vec::new();
-        for _ in 0..config.proposal_blobs {
+        let proposal_blobs: u64 = game_instance
+            .PROPOSAL_BLOBS()
+            .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_BLOBS")
+            .await
+            ._0
+            .to();
+        let proposal_output_count: u64 = game_instance
+            .PROPOSAL_OUTPUT_COUNT()
+            .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_OUTPUT_COUNT")
+            .await
+            ._0
+            .to();
+        for _ in 0..proposal_blobs {
             let blob_kzg_hash = game_instance
                 .proposalBlobHashes(U256::from(io_blobs.len()))
                 .stall_with_context(context.clone(), "KailuaGame::proposalBlobHashes")
@@ -238,7 +247,7 @@ impl Proposal {
             let blob_data = await_tel!(context, blob_provider.get_blob(created_at, blob_kzg_hash))
                 .context("get_blob")?;
             // save data
-            let io_remaining = config.proposal_output_count - (io_field_elements.len() as u64) - 1;
+            let io_remaining = proposal_output_count - (io_field_elements.len() as u64) - 1;
             let io_in_blob = io_remaining.min(FIELD_ELEMENTS_PER_BLOB) as usize;
             io_field_elements.extend(intermediate_outputs(&blob_data, io_in_blob)?);
             trail_field_elements.extend(trail_data(&blob_data, io_in_blob)?);
@@ -290,7 +299,7 @@ impl Proposal {
             children: Default::default(),
             successor: None,
             correct_io: repeat(None)
-                .take((config.proposal_output_count - 1) as usize)
+                .take((proposal_output_count - 1) as usize)
                 .collect(),
             correct_trail: repeat(None).take(trail_len).collect(),
             correct_claim: None,
@@ -328,7 +337,7 @@ impl Proposal {
             tracer,
             "KailuaTournament::pruneChildren",
             parent_tournament_instance
-                .pruneChildren(children)
+                .pruneChildren(children * U256::from(2))
                 .call()
                 .into_future()
         )?

@@ -68,6 +68,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         ROLLUP_CONFIG_HASH = _configHash;
         PROPOSAL_OUTPUT_COUNT = _proposalOutputCount;
         OUTPUT_BLOCK_SPAN = _outputBlockSpan;
+        // discard published root commitment in calldata
+        _proposalOutputCount--;
         PROPOSAL_BLOBS = (_proposalOutputCount / KailuaKZGLib.FIELD_ELEMENTS_PER_BLOB)
             + ((_proposalOutputCount % KailuaKZGLib.FIELD_ELEMENTS_PER_BLOB) == 0 ? 0 : 1);
         GAME_TYPE = _gameType;
@@ -303,6 +305,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         // Abort if out of bounds
         if (u == children.length) {
             return KailuaTournament(address(0x0));
+        }
+
+        // Advance v if needed
+        if (v < u) {
+            v = u + 1;
         }
 
         // Note: u < children.length
