@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::proof;
 use crate::proving::ProvingError;
 use anyhow::{anyhow, Context};
 use bonsai_sdk::non_blocking::Client;
@@ -21,6 +22,8 @@ use risc0_zkvm::serde::to_vec;
 use risc0_zkvm::sha::Digest;
 use risc0_zkvm::{is_dev_mode, ProveInfo, Receipt, SessionStats};
 use std::time::Duration;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use tracing::info;
 use tracing::log::warn;
 
@@ -53,15 +56,15 @@ pub async fn run_bonsai_client(
             continue;
         }
 
-        let Proof::ZKVMReceipt(receipt) = proof;// {
-            let inner_receipt = *receipt;
-            let serialized_receipt = bincode::serialize(&inner_receipt)
-                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-            let receipt_id = client
-                .upload_receipt(serialized_receipt)
-                .await
-                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-            assumption_receipt_ids.push(receipt_id);
+        let Proof::ZKVMReceipt(receipt) = proof; // {
+        let inner_receipt = *receipt;
+        let serialized_receipt =
+            bincode::serialize(&inner_receipt).map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+        let receipt_id = client
+            .upload_receipt(serialized_receipt)
+            .await
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+        assumption_receipt_ids.push(receipt_id);
         //} else {
         //     // todo: convert boundless seals to groth16 receipts
         //     input.extend_from_slice(bytemuck::cast_slice(
@@ -69,6 +72,32 @@ pub async fn run_bonsai_client(
         //     ));
         // }
     }
+
+    // // Save to disk
+    // let mut output_file = File::create("kailua-elf")
+    //     .await
+    //     .expect("Failed to create elf file");
+    // // Write proof data to file
+    // output_file
+    //     .write_all(KAILUA_FPVM_ELF)
+    //     .await
+    //     .expect("Failed to write elf to file");
+    // output_file
+    //     .flush()
+    //     .await
+    //     .expect("Failed to flush elf output file data.");
+    // let mut output_file = File::create("kailua-input")
+    //     .await
+    //     .expect("Failed to create input file");
+    // // Write proof data to file
+    // output_file
+    //     .write_all(input.as_slice())
+    //     .await
+    //     .expect("Failed to write input to file");
+    // output_file
+    //     .flush()
+    //     .await
+    //     .expect("Failed to flush input output file data.");
 
     // Upload the ELF with the image_id as its key.
     info!("Uploading Kailua ELF to Bonsai.");

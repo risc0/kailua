@@ -86,8 +86,8 @@ pub fn build_zkvm_env<'a>(
             continue;
         }
 
-        let Proof::ZKVMReceipt(receipt) = proof;// {
-            builder.add_assumption(*receipt);
+        let Proof::ZKVMReceipt(receipt) = proof; // {
+        builder.add_assumption(*receipt);
         // } else {
         //     // todo: convert boundless seals to groth16 receipts
         //     builder.write(&proof)?;

@@ -29,7 +29,6 @@ pub struct KailuaClientArgs {
 
     #[clap(flatten)]
     pub proving: ProvingArgs,
-
     // #[clap(flatten)]
     // pub boundless: BoundlessArgs,
 }

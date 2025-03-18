@@ -39,10 +39,7 @@ fn main() {
             #[cfg(not(any(feature = "debug-guest-build", debug_assertions)))]
             guest_opts_builder.use_docker(docker_opts);
 
-            std::collections::HashMap::from([(
-                "kailua-fpvm",
-                guest_opts_builder.build().unwrap(),
-            )])
+            std::collections::HashMap::from([("kailua-fpvm", guest_opts_builder.build().unwrap())])
         };
 
         risc0_build::embed_methods_with_options(build_opts);

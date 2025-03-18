@@ -86,7 +86,6 @@ pub struct ValidateArgs {
 
     // #[clap(flatten)]
     // pub boundless: BoundlessArgs,
-
     #[clap(flatten)]
     pub telemetry: TelemetryArgs,
 }
