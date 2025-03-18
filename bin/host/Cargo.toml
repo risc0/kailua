@@ -1,6 +1,6 @@
 [package]
 name = "kailua-host"
-version = "0.3.4"
+version = "0.3.5"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
