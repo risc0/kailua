@@ -299,6 +299,14 @@ pub async fn handle_proposals(
                     continue;
                 }
             }
+            // Skip attempting to fault prove correct proposals
+            if let Some(true) = proposal.is_correct() {
+                info!(
+                    "Skipping fault proving for proposal {proposal_index} with valid signature {}",
+                    proposal.signature
+                );
+                continue;
+            }
             // Skip fault proving if fault with same signature already being proven
             let is_repeat_signature =
                 parent
@@ -324,10 +332,6 @@ pub async fn handle_proposals(
                 fault proof generation for signature {}",
                     proposal.signature
                 );
-                continue;
-            }
-            // Skip attempting to fault prove correct proposals
-            if let Some(true) = proposal.is_correct() {
                 continue;
             }
 
