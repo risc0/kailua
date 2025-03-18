@@ -202,7 +202,7 @@ contract KailuaGame is KailuaTournament {
         }
 
         // INVARIANT: Can only resolve the last remaining child
-        if (parentGame_.pruneChildren(parentGame_.childCount()) != this) {
+        if (parentGame_.pruneChildren(parentGame_.childCount() * 2) != this) {
             revert NotProven();
         }
 
