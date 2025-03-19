@@ -1,24 +1,49 @@
-# Kailua
+# OP KAILUA
+<img width="1280" alt="Github_cover page (3)" src="https://github.com/user-attachments/assets/c71a1018-d970-49c0-af37-ba8a66d00bea" />
 
 > [!NOTE]
 > Documentation: https://risc0.github.io/kailua/
 
-Kailua uses the RISC-Zero zkVM to verifiably run Optimism's [Kona][kona] and secure rollups with cryptographic proofs enabling faster finality and reduced operational costs.
+## Introduction
+OP Kailua lets OP chains upgrade to ZK with minimal friction, unlocking faster finality and enhanced security. With two configurable modes, rollups can adopt ZK at their own pace while meeting the proving requirements for stage 2 decentralization. 
 
-Kailua's Fault Proving Game is designed to require constant collateral lockups from both proposers and validators (challengers), whereas the Bisection-based fault dispute game backed by Cannon requires a linear number of deposits proportional to the number of proposals/challenges.
+Hybrid Mode → Uses ZK Fraud Proofs for faster finality and lower operational costs. 
 
-The fault proofs are estimated to require on the order of 100 billion cycles to prove in the worst case, which, on Bonsai, would cost on the order of 100 USD and take around an hour to prove.
-All proving costs are borne by the dishonest party in the protocol, whether that is the proposer or validator.
+Validity Mode → Uses ZK Validity Proofs for 1-Hour finality and maximum security. 
+
+## Why OP Kailua?
+✅ **Pick Your Security Model**: Start with Hybrid Mode, upgrade to Validity Mode when ready. \
+✅ **Fast & Easy Integration**: Works with Optimism’s Bedrock contracts (v1.4.0+).\
+✅ **Stage 2 Ready**: Future-proof your rollup and accelerate your track to Stage 2 Decentralization
+
+
+## How does OP Kailua Work? 
+**Hybrid Mode**: ZK Fraud Proofs for Faster Dispute Resolution
+
+OP Kailua Hybrid Mode replaces traditional fault-proof mechanisms with ZK Fraud proofs, improving security without requiring rollups to immediately switch to full validity proofs.
+
+- Uses the RISC-Zero zkVM to verifiably run Optimism's [Kona][kona] and secure rollups with cryptographic proofs enabling faster finality and reduced operational costs.
+- Designed to require constant collateral lockups from both proposers and validators (challengers), whereas the Bisection-based fault dispute game backed by Cannon requires a linear number of deposits proportional to the number of proposals/challenges.
+- The fault proofs are estimated to require on the order of 100 billion cycles to prove in the worst case, which, on Bonsai, would cost on the order of 100 USD and take around an hour to prove.
+- All proving costs are borne by the dishonest party in the protocol, whether that is the proposer or validator.
+
+
+**Validity Mode**: ZK Validity Proofs for 1-Hour Finality
+
+Validity Mode turns OP chains into a ZK Rollup, eliminating disputes entirely since every transaction is validity proven.
+
+- Unlocks 1-hour finality
+- No challenges, no disputes—ZK Validity Proofs replace interactive fault proofs.
 
 ## Development Status
 
 > [!CAUTION]
 > 
-> `Kailua` as well as `kona` are still in active development and are NOT recommended for production usage.
+> `OP Kailua` as well as `kona` are still in active development and are NOT recommended for production usage.
 
 ## Fraud/Validity Proofs
 
-Kailua enables rollup operators to add a new fault proof contract, compatible with Bedrock contracts `v1.4.0` and above, using the `DisputeGameFactory` rollup instance to their deployment that relies on RISC-Zero zkVM proofs to finalize/dismiss output proposals.
+OP Kailua enables rollup operators to add a new fault proof contract, compatible with Bedrock contracts `v1.4.0` and above, using the `DisputeGameFactory` rollup instance to their deployment that relies on RISC-Zero zkVM proofs to finalize/dismiss output proposals.
 
 `KailuaGame` optimistically allows outputs to be accepted after a timeout if no fraud proof is published against it, or if the output is challenged, waits for a proof to be submitted to decide whether to dismiss the output.
 
