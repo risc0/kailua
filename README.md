@@ -1,4 +1,5 @@
 # OP KAILUA
+Unlock faster finality and stronger security for your OP chain. 
 <img width="1280" alt="Github_cover page (3)" src="https://github.com/user-attachments/assets/c71a1018-d970-49c0-af37-ba8a66d00bea" />
 
 > [!NOTE]
