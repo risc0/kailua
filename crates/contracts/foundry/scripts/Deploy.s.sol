@@ -8,35 +8,33 @@ import "../src/vendor/FlatR0ImportV1.2.0.sol";
 import {KailuaTreasury} from "../src/KailuaTreasury.sol";
 import {KailuaGame} from "../src/KailuaGame.sol";
 
+// quickly get most of the env variables there
+// kailua-cli config --op-node-url $OP_NODE_URL --op-geth-url $OP_GETH_URL --eth-rpc-url $ETH_RPC_URL | grep -E '^[A-Z_]+:' | sed 's/: /=/; s/^/export /' > .env
+// source .env
+
 contract DeployScript is Script {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        // Router args
-        address deployer = vm.addr(deployerPrivateKey);
+    uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+    address deployer = vm.addr(deployerPrivateKey);
 
-        // Verifer args
-        bytes32 fpvmImageId = vm.envBytes32("FPVM_IMAGE_ID");
-        bytes32 controlRoot = vm.envBytes32("CONTROL_ROOT");
-        bytes32 controlId = vm.envBytes32("CONTROL_ID");
-
-        // Treasury args
-        IRiscZeroVerifier riscZeroVerifier = IRiscZeroVerifier(vm.envAddress("RISC_ZERO_VERIFIER"));
-        bytes32 rollupConfigHash = vm.envBytes32("ROLLUP_CONFIG_HASH");
-        uint256 proposalOutputCount = vm.envUint("PROPOSAL_OUTPUT_COUNT");
-        uint256 outputBlockSpan = vm.envUint("OUTPUT_BLOCK_SPAN");
-        GameType gameType = GameType.wrap(uint32(vm.envUint("GAME_TYPE")));
-        IDisputeGameFactory dgf = IDisputeGameFactory(vm.envAddress("DISPUTE_GAME_FACTORY"));
-        Claim outputRootClaim = Claim.wrap(vm.envBytes32("OUTPUT_ROOT_CLAIM"));
-        uint64 l2BlockNumber = uint64(vm.envUint("L2_BLOCK_NUMBER"));
-        uint256 genesisTimestamp = vm.envUint("GENESIS_TIMESTAMP");
-        uint256 blocktime = vm.envUint("BLOCKTIME");
-        uint256 proposalTimeGap = vm.envUint("PROPOSAL_TIME_GAP");
-        Duration maxClockDuration = Duration.wrap(uint64(vm.envUint("MAX_CLOCK_DURATION")));
-
-        // Sequencing Proposal
-        uint256 participationBond = vm.envUint("PARTICIPATION_BOND");
-        address vanguardAddress = vm.envAddress("VANGUARD_ADDRESS");
-        uint64 vanguardAdvantage = uint64(vm.envUint("VANGUARD_ADVANTAGE"));
-        OptimismPortal2 optimismPortal = OptimismPortal2(payable(vm.envAddress("OPTIMISM_PORTAL")));
+    bytes32 fpvmImageId = vm.envBytes32("FPVM_IMAGE_ID");
+    bytes32 controlRoot = vm.envBytes32("CONTROL_ROOT");
+    bytes32 controlId = vm.envBytes32("CONTROL_ID");
+    IRiscZeroVerifier riscZeroVerifier = IRiscZeroVerifier(vm.envAddress("RISC_ZERO_VERIFIER"));
+    bytes32 rollupConfigHash = vm.envBytes32("ROLLUP_CONFIG_HASH");
+    uint256 proposalOutputCount = vm.envUint("PROPOSAL_OUTPUT_COUNT");
+    uint256 outputBlockSpan = vm.envUint("OUTPUT_BLOCK_SPAN");
+    GameType gameType = GameType.wrap(uint32(vm.envUint("KAILUA_GAME_TYPE")));
+    IDisputeGameFactory dgf = IDisputeGameFactory(vm.envAddress("DISPUTE_GAME_FACTORY"));
+    Claim outputRootClaim = Claim.wrap(vm.envBytes32("OUTPUT_ROOT_CLAIM"));
+    uint64 l2BlockNumber = uint64(vm.envUint("L2_BLOCK_NUMBER"));
+    uint256 genesisTimestamp = vm.envUint("GENESIS_TIMESTAMP");
+    uint256 blocktime = vm.envUint("BLOCK_TIME");
+    uint256 proposalTimeGap = vm.envUint("PROPOSAL_TIME_GAP");
+    Duration maxClockDuration = Duration.wrap(uint64(vm.envUint("MAX_CLOCK_DURATION")));
+    uint256 participationBond = vm.envUint("PARTICIPATION_BOND");
+    address vanguardAddress = vm.envAddress("VANGUARD_ADDRESS");
+    Duration vanguardAdvantage = Duration.wrap(uint64(vm.envUint("VANGUARD_ADVANTAGE"))); // set
+    OptimismPortal2 optimismPortal = OptimismPortal2(payable(vm.envAddress("OPTIMISM_PORTAL")));
 
     function run() public {
         vm.startBroadcast(deployerPrivateKey);
@@ -84,7 +82,7 @@ contract DeployScript is Script {
         treasury.setParticipationBond(participationBond);
         dgf.setImplementation(gameType, game);
         // OPTIONAL
-        // game.assignVanguard(vanguardAddress, vanguardAdvantage);
-        // optimismPortal.setRespectedGameType(gameType);
+        treasury.assignVanguard(vanguardAddress, vanguardAdvantage);
+        optimismPortal.setRespectedGameType(gameType);
     }
 }
