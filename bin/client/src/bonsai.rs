@@ -13,13 +13,14 @@
 // limitations under the License.
 
 use crate::proving::ProvingError;
+use crate::proving::{KailuaProveInfo, KailuaSessionStats};
 use anyhow::{anyhow, Context};
 use bonsai_sdk::non_blocking::Client;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use kailua_common::proof::Proof;
 use risc0_zkvm::serde::to_vec;
 use risc0_zkvm::sha::Digest;
-use risc0_zkvm::{is_dev_mode, ProveInfo, Receipt, SessionStats};
+use risc0_zkvm::{is_dev_mode, Receipt};
 use std::time::Duration;
 use tracing::info;
 use tracing::log::warn;
@@ -140,9 +141,9 @@ pub async fn run_bonsai_client(
                 .verify(KAILUA_FPVM_ID)
                 .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
 
-            break ProveInfo {
+            break KailuaProveInfo {
                 receipt,
-                stats: SessionStats {
+                stats: KailuaSessionStats {
                     segments: stats.segments,
                     total_cycles: stats.total_cycles,
                     user_cycles: stats.cycles,

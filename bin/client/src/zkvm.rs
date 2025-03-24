@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::proving::ProvingError;
+use crate::proving::{KailuaProveInfo, KailuaSessionStats};
 use anyhow::{anyhow, Context};
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use kailua_common::proof::Proof;
@@ -35,10 +36,23 @@ pub async fn run_zkvm_client(
         } else {
             ProverOpts::succinct()
         };
-        let prove_info = prover
+        let risc0_prove_info = prover
             .prove_with_opts(env, KAILUA_FPVM_ELF, &prover_opts)
             .context("prove_with_opts")?;
-        Ok::<_, anyhow::Error>(prove_info)
+        
+        // Convert to our own KailuaProveInfo
+        let kailua_prove_info = KailuaProveInfo {
+            receipt: risc0_prove_info.receipt,
+            stats: KailuaSessionStats {
+                segments: risc0_prove_info.stats.segments,
+                total_cycles: risc0_prove_info.stats.total_cycles,
+                user_cycles: risc0_prove_info.stats.user_cycles,
+                paging_cycles: risc0_prove_info.stats.paging_cycles,
+                reserved_cycles: risc0_prove_info.stats.reserved_cycles,
+            },
+        };
+        
+        Ok::<_, anyhow::Error>(kailua_prove_info)
     })
     .await
     .map_err(|e| ProvingError::OtherError(anyhow!(e)))?

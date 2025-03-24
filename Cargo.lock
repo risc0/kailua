@@ -1384,6 +1384,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "atomic-polyfill"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8cf2bce30dfe09ef0bfaef228b9d414faaf7e563035494d7fe092dba54b300f4"
+dependencies = [
+ "critical-section",
+]
+
+[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1964,9 +1973,9 @@ dependencies = [
 
 [[package]]
 name = "bonsai-sdk"
-version = "1.4.0-rc.1"
+version = "1.4.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4427bb7b14676ede2353e2b76a52f0c42e2373c0c9f41c51319321c55decd35c"
+checksum = "b3862d1135a5948413308f8518286ad9e041026c089c21aaa4a52f696e40de09"
 dependencies = [
  "duplicate",
  "maybe-async",
@@ -2264,6 +2273,12 @@ name = "clap_lex"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
+
+[[package]]
+name = "cobs"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67ba02a97a2bd10f4b59b25c7973101c79642302776489e030cd13cdab09ed15"
 
 [[package]]
 name = "colorchoice"
@@ -2910,6 +2925,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "embedded-io"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef1a6892d9eef45c8fa6b9e0086428a2cca8491aca8f787c534a3d6d0bcb3ced"
+
+[[package]]
+name = "embedded-io"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
+
+[[package]]
 name = "ena"
 version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3550,6 +3577,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hash32"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0c35f58762feb77d74ebe43bdbc3210f09be9fe6742234d573bacc26ed92b67"
+dependencies = [
+ "byteorder",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3584,6 +3620,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ba4ff7128dee98c7dc9794b6a411377e1404dba1c97deb8d1a55297bd25d8af"
 dependencies = [
  "hashbrown 0.14.5",
+]
+
+[[package]]
+name = "heapless"
+version = "0.7.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cdc6457c0eb62c71aac4bc17216026d8410337c4126773b9c5daba343f17964f"
+dependencies = [
+ "atomic-polyfill",
+ "hash32",
+ "rustc_version 0.4.1",
+ "serde",
+ "spin",
+ "stable_deref_trait",
 ]
 
 [[package]]
@@ -5957,6 +6007,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "postcard"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "170a2601f67cc9dba8edd8c4870b15f71a6a2dc196daec8c83f72b59dff628a8"
+dependencies = [
+ "cobs",
+ "embedded-io 0.4.0",
+ "embedded-io 0.6.1",
+ "heapless",
+ "serde",
+]
+
+[[package]]
 name = "pot"
 version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6622,8 +6685,8 @@ dependencies = [
 
 [[package]]
 name = "risc0-aggregation"
-version = "0.4.0-rc.1"
-source = "git+https://github.com/risc0/risc0-ethereum?tag=v2.0.0-rc.1#4567fc13f460de407dd775589256a9970a6674fe"
+version = "0.4.0-rc.2"
+source = "git+https://github.com/risc0/risc0-ethereum?tag=v2.0.0-rc.3#1a586f842763ed729b912e7351d542de797187b9"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -6638,26 +6701,28 @@ dependencies = [
 
 [[package]]
 name = "risc0-binfmt"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41b61998b4f3c439d71a79c5b429df320b582cf499e543865752469faef91569"
+checksum = "58dee2cd047f46e1c5ea784ee14a688b0fba40c6c9413f287198af898de8695e"
 dependencies = [
  "anyhow",
  "borsh",
  "derive_more 2.0.1",
  "elf",
  "lazy_static",
+ "postcard",
  "risc0-zkp",
  "risc0-zkvm-platform",
+ "semver 1.0.25",
  "serde",
  "tracing",
 ]
 
 [[package]]
 name = "risc0-build"
-version = "3.0.0-rc.1"
+version = "2.0.1-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2995d8ecdf070070d708f0738d170ec0d22fcf6778190efb864c3643082a89fc"
+checksum = "b7be0c2fd0e109e26bec08ba32ae4d1cb0bd22ffb4d8215e7f5ac759175b52a0"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -6670,6 +6735,7 @@ dependencies = [
  "risc0-zkp",
  "risc0-zkvm-platform",
  "rzup",
+ "semver 1.0.25",
  "serde",
  "serde_json",
  "stability",
@@ -6678,9 +6744,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-build-kernel"
-version = "1.4.0-rc.1"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50e8d9e541b0c3a2961e6d03c34e8ffd0c4f1d1a60499906afd6eb97c777e8fd"
+checksum = "d2f8aa6f653d102e2bf76de125cdcb1613a3d96d27da95eacc67cf4d8faa842b"
 dependencies = [
  "cc",
  "directories",
@@ -6693,9 +6759,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-circuit-keccak"
-version = "1.4.0-rc.1"
+version = "1.4.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f0f48f023bba4f666b451afd29110e308892fbb8c6fc9fa3a446bc5f0d00e51"
+checksum = "97a3521e3ade5e6966d72947810a55576a6fb2dd5f9e251ed5af7f6fca877af5"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -6715,9 +6781,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-circuit-keccak-sys"
-version = "1.4.0-rc.1"
+version = "1.4.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c304d832e5775e15429e54818480ca9696d9a1d495d5f8ab0a5afe9ba5206db"
+checksum = "1b3d967c1fa04160be0450f18b5f20bcd5d4c12110b441a89c72bcf2c0ecddbd"
 dependencies = [
  "cc",
  "cust",
@@ -6731,9 +6797,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-circuit-recursion"
-version = "1.4.0-rc.1"
+version = "1.4.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21f903ea1d91c17b67b1800ded1f375be042bc329743fa903d334f492aef2503"
+checksum = "1f9b2cfa337f40fb893dac95c02dab76e7d931b11332dd59aeec69aa473b9887"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -6757,9 +6823,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-circuit-recursion-sys"
-version = "1.4.0-rc.1"
+version = "1.4.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1ab67785bc52c6c9af3cb24f49664c6278f1906096e90392fc6da83c083a1b6"
+checksum = "6006a08ee2007358db3ef0d92ddc38b7808be693933dfede5a3c81bb5d66c2b6"
 dependencies = [
  "glob",
  "risc0-build-kernel",
@@ -6770,9 +6836,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-circuit-rv32im"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "513f896607a784c1be9faa6d5b1ca0b79d0f73907949dab9dcbadbb8568fd3b9"
+checksum = "3f280b9c955515897c22aed76f526b6ac143b839002ef07789b22b24b2afde27"
 dependencies = [
  "anyhow",
  "auto_ops",
@@ -6781,10 +6847,12 @@ dependencies = [
  "byteorder",
  "cfg-if",
  "derive_more 2.0.1",
+ "enum-map",
  "malachite",
  "num-derive",
  "num-traits",
  "paste",
+ "postcard",
  "rand 0.8.5",
  "rayon",
  "ringbuffer",
@@ -6800,9 +6868,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-circuit-rv32im-sys"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31193dee48cf1d21721bf3c05c7272ce7cd829fb11153047ce0b28c53b41e6d5"
+checksum = "bf21b743c245991c27b8dc8c9675eb57059e0e9fdef6554781dd6b9c50b2b888"
 dependencies = [
  "cc",
  "cust",
@@ -6816,11 +6884,12 @@ dependencies = [
 
 [[package]]
 name = "risc0-core"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08155c078f2c929d7c27471d9bdcb0538cbe04e599500e2cc3ee19712e331e20"
+checksum = "486e69810d31b544679a8ffd5f825679ad5396d5f141d6ae0a1ef785317cafcd"
 dependencies = [
  "bytemuck",
+ "bytemuck_derive",
  "nvtx",
  "puffin",
  "rand_core 0.6.4",
@@ -6828,8 +6897,8 @@ dependencies = [
 
 [[package]]
 name = "risc0-ethereum-contracts"
-version = "2.0.0-rc.1"
-source = "git+https://github.com/risc0/risc0-ethereum?tag=v2.0.0-rc.1#4567fc13f460de407dd775589256a9970a6674fe"
+version = "2.0.0-rc.3"
+source = "git+https://github.com/risc0/risc0-ethereum?tag=v2.0.0-rc.3#1a586f842763ed729b912e7351d542de797187b9"
 dependencies = [
  "alloy",
  "alloy-primitives",
@@ -6846,9 +6915,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-groth16"
-version = "1.4.0-rc.1"
+version = "1.4.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74e3e70c0ced28dcc71541b163f92fd3f155f882c36a123a9236805bc3172f2f"
+checksum = "465785ff8be35cfea40d6936d9572b5d13f6ac3e38aae3de211dea12e3c7dfca"
 dependencies = [
  "anyhow",
  "ark-bn254",
@@ -6871,9 +6940,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-sys"
-version = "1.4.0-rc.1"
+version = "1.4.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c79a919a82bb8b428a6776b18bd61ccba4bc34c04ecc9603a3e4a68b4e620ef4"
+checksum = "fdc7cca8ad6bd053e63817a01140290ee7a2a58d7cee739a37a592f6014b02bf"
 dependencies = [
  "anyhow",
  "cust",
@@ -6883,9 +6952,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-zkos-v1compat"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c300f3b6e7cee8508c55b805cff712abbac57155153a71422b9bd891e2f30f52"
+checksum = "69fec92316a7ecece43e8f0a0624d033c42c70d7be073d8c4221e9681b6a3e46"
 dependencies = [
  "include_bytes_aligned",
  "no_std_strings",
@@ -6893,9 +6962,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-zkp"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6c988755e7ff45ba5771a33c69388cd7e9910661718316f7331244a4062ceb2"
+checksum = "1fec68c8680968cfaf224e6edea493f84b3fe967ac6a7f3e7de2fdf8a35f7647"
 dependencies = [
  "anyhow",
  "blake2",
@@ -6925,9 +6994,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-zkvm"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5543297bdaf57aceb83d274791fa90679c4d146f5b90b4bcddae69d5e74221cb"
+checksum = "0a7c9fb076fc092f2c1ddf93ef8bba6953044cd411d367b42fbd12cad090df06"
 dependencies = [
  "addr2line 0.22.0",
  "anyhow",
@@ -6972,9 +7041,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-zkvm-platform"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e35d5bbcb2b633431cb793ff46266af411bdd9c9f1a1e19e39538fcc52fd4047"
+checksum = "2642e82799586061d716777bdb1985d814d7dc35cbba9144383edf11c83fdfc0"
 dependencies = [
  "bytemuck",
  "cfg-if",
@@ -7283,9 +7352,9 @@ checksum = "6ea1a2d0a644769cc99faa24c3ad26b379b786fe7c36fd3c546254801650e6dd"
 
 [[package]]
 name = "rzup"
-version = "0.4.0-rc.1"
+version = "0.4.1-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b51129eb09dc916bee4b7c8ea6f7f0858fbfc81969888eae6b93426e2a13b6c6"
+checksum = "bafcea7644d537253ef9386ce212e2b7541da3ea6ef1a8813f56a697cd0229cf"
 dependencies = [
  "semver 1.0.25",
  "serde",

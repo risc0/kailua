@@ -31,6 +31,7 @@ use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tracing::{error, info, warn};
+use risc0_zkvm::Receipt;
 
 /// The size of the LRU cache in the oracle.
 pub const ORACLE_LRU_SIZE: usize = 1024;
@@ -72,6 +73,23 @@ pub enum ProvingError {
 
     #[error("OtherError error: {0:?}")]
     OtherError(anyhow::Error),
+}
+
+/// Use our own version of SessionStats to avoid non-exhaustive issues (risc0_zkvm::SessionStats)
+#[derive(Debug, Clone)]
+pub struct KailuaSessionStats {
+    pub segments: usize,
+    pub total_cycles: u64,
+    pub user_cycles: u64,
+    pub paging_cycles: u64,
+    pub reserved_cycles: u64,
+}
+
+/// Our own version of ProveInfo to avoid non-exhaustive issues (risc0_zkvm::ProveInfo)
+#[derive(Debug)]
+pub struct KailuaProveInfo {
+    pub receipt: Receipt,
+    pub stats: KailuaSessionStats,
 }
 
 #[allow(clippy::too_many_arguments)]
