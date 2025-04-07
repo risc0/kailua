@@ -4493,6 +4493,7 @@ error BondTransferFailed();
 error BadExtraData();
 
 /// @notice Thrown when a defense against the root claim is attempted.
+// 0xa42637bc
 error CannotDefendRootClaim();
 
 /// @notice Thrown when a claim is attempting to be made that already exists.

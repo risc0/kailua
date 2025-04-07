@@ -121,17 +121,9 @@ contract KailuaGame is KailuaTournament {
             }
         }
 
-        // Do not allow the game to be initialized if the root claim corresponds to a block at or before the
-        // starting block number. (0xf40239db)
-        uint256 thisL2BlockNumber = l2BlockNumber();
-        uint256 prevL2BlockNumber = parentGame().l2BlockNumber();
-        if (thisL2BlockNumber <= prevL2BlockNumber) {
-            revert UnexpectedRootClaim(rootClaim());
-        }
-
         // Do not initialize a game that does not cover the required number of l2 blocks
-        if (thisL2BlockNumber - prevL2BlockNumber != PROPOSAL_OUTPUT_COUNT * OUTPUT_BLOCK_SPAN) {
-            revert BlockCountExceeded(thisL2BlockNumber, prevL2BlockNumber);
+        if (l2BlockNumber() != parentGame().l2BlockNumber() + PROPOSAL_OUTPUT_COUNT * OUTPUT_BLOCK_SPAN) {
+            revert BlockNumberMismatch(parentGame().l2BlockNumber(), l2BlockNumber());
         }
 
         // Store the intermediate output blob hashes
@@ -157,6 +149,11 @@ contract KailuaGame is KailuaTournament {
         // Allow only the treasury to create new games
         if (gameCreator() != address(KAILUA_TREASURY)) {
             revert Blacklisted(gameCreator(), address(KAILUA_TREASURY));
+        }
+
+        // Prohibit null claims
+        if (rootClaim().raw() == 0x0) {
+            revert UnexpectedRootClaim(rootClaim());
         }
 
         // Register this new game in the parent game's contract
