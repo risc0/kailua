@@ -986,16 +986,16 @@ pub async fn handle_proposals(
             );
 
             let transaction_dispatch = parent_contract
-                .proveTrailFault(
+                .proveNullFault(
                     validator_address,
                     [child_index, divergence_point],
                     output_fe,
                     blob_commitment,
                     kzg_proof,
                 )
-                .transact_with_context(context.clone(), "KailuaTournament::proveTrailFault")
+                .transact_with_context(context.clone(), "KailuaTournament::proveNullFault")
                 .await
-                .context("KailuaTournament::proveTrailFault");
+                .context("KailuaTournament::proveNullFault");
 
             match transaction_dispatch {
                 Ok(receipt) => {
@@ -1007,10 +1007,7 @@ pub async fn handle_proposals(
                         ._0;
                     info!("Proposal {} proven: {proof_status}", proposal.index);
 
-                    info!(
-                        "KailuaTournament::proveTrailFault: {} gas",
-                        receipt.gas_used
-                    );
+                    info!("KailuaTournament::proveNullFault: {} gas", receipt.gas_used);
                 }
                 Err(e) => {
                     error!("Failed to confirm fault proof txn: {e:?}");

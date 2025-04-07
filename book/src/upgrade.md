@@ -40,7 +40,7 @@ The below table contains rounded-up gas cost estimates of various contract opera
 | KailuaGame              | proveValidity    |   375K | Groth16 proof          |
 | KailuaGame              | proveOutputFault |   415K | Groth16 + 1 KZG proofs |
 | KailuaGame              | proveOutputFault |   470K | Groth16 + 2 KZG proofs |
-| KailuaGame              | proveTrailFault  |   170K | 1 KZG proof            |
+| KailuaGame              | proveNullFault  |   170K | 1 KZG proof            |
 | KailuaGame              | resolve          |   120K | Undisputed             |
 | KailuaGame              | resolve          |   160K | 1 fault                |
 | KailuaGame              | resolve          |   280K | 2 faults               |
