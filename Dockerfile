@@ -16,8 +16,14 @@ COPY . .
 RUN cargo install svm-rs && \
     svm install 0.8.24
 
-RUN --mount=type=cache,target=/root/.cargo/registry \
-    --mount=type=cache,target=/kailua/target \
-    cargo install -F prove --locked --path bin/cli --jobs 1
+RUN --mount=type=cache,target=/root/.cargo/registry --mount=type=cache,target=/root/.cargo/git --mount=type=cache,target=/kailua/target \
+    cargo build --jobs 4 \
+    && mkdir out \
+    && mv target/debug/kailua-host out/ \
+    && mv target/debug/kailua-cli out/ \
+    && mv target/debug/kailua-client out/ \
+    && strip out/kailua-host \
+    && strip out/kailua-cli \
+    && strip out/kailua-client;
 
-ENTRYPOINT ["kailua-cli"]
+ENTRYPOINT ["/bin/sh", "-c"]
