@@ -45,6 +45,10 @@ pub struct FaultArgs {
     /// Index of the parent of the faulty proposal
     #[clap(long, env)]
     pub fault_parent: u64,
+
+    /// Form of fault
+    #[clap(long, env, default_value_t = false)]
+    pub fault_null: bool,
 }
 
 pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
@@ -144,7 +148,11 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .to();
     // Prepare faulty proposal
     let faulty_block_number = parent_block_number + args.fault_offset * output_block_span;
-    let faulty_root_claim = B256::from(games_count.to_be_bytes());
+    let faulty_root_claim = if args.fault_null {
+        B256::ZERO
+    } else {
+        B256::from(games_count.to_be_bytes())
+    };
     // Prepare remainder of proposal
     let proposed_block_number = parent_block_number + proposal_block_count;
     let proposed_output_root = if proposed_block_number == faulty_block_number {
