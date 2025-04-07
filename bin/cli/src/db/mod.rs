@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub mod config;
+pub mod fault;
 pub mod proposal;
 pub mod state;
 pub mod treasury;

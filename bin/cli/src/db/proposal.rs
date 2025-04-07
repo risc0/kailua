@@ -1,4 +1,5 @@
 use crate::db::config::Config;
+use crate::db::fault::Fault;
 use crate::provider::{blob_fe_proof, blob_sidecar, get_block, BlobProvider};
 use crate::retry_with_context;
 use crate::stall::Stall;
@@ -583,22 +584,28 @@ impl Proposal {
         self.index != self.parent
     }
 
-    pub fn divergence_point(&self) -> Option<usize> {
-        // Check divergence in IO
-        for i in 0..self.correct_io.len() {
-            if let Some(false) = self.correct_io[i] {
-                return Some(i);
+    pub fn fault(&self) -> Option<Fault> {
+        // Check null commitment
+        for i in 0..self.io_field_elements.len() {
+            if self.io_field_elements[i].is_zero() {
+                return Some(Fault::Null(i));
             }
-        }
-        // Check divergence in final claim
-        if let Some(false) = self.correct_claim {
-            return Some(self.io_field_elements.len());
         }
         // Check divergence in trail data
         for i in 0..self.correct_trail.len() {
             if let Some(false) = self.correct_trail[i] {
-                return Some(self.io_field_elements.len() + i + 1);
+                return Some(Fault::Null(self.io_field_elements.len() + i + 1));
             }
+        }
+        // Check divergence in IO
+        for i in 0..self.correct_io.len() {
+            if let Some(false) = self.correct_io[i] {
+                return Some(Fault::Output(i));
+            }
+        }
+        // Check divergence in final claim
+        if let Some(false) = self.correct_claim {
+            return Some(Fault::Output(self.io_field_elements.len()));
         }
         // Report equivalence
         None

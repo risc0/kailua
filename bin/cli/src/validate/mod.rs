@@ -230,9 +230,9 @@ pub async fn handle_proposals(
         kailua_db.state.next_factory_index
     );
     // init channel buffers
-    let mut proof_buffer = VecDeque::new();
-    let mut fault_buffer = VecDeque::new();
-    let mut trail_buffer = VecDeque::new();
+    let mut output_fault_proof_buffer = VecDeque::new();
+    let mut output_fault_buffer = VecDeque::new();
+    let mut null_fault_buffer = VecDeque::new();
     let mut valid_buffer = VecDeque::new();
     loop {
         // Wait for new data on every iteration
@@ -408,27 +408,27 @@ pub async fn handle_proposals(
             }
 
             // Get divergence point
-            let Some(divergence_point) = proposal.divergence_point() else {
+            let Some(fault) = proposal.fault() else {
                 error!("Attempted to request fault proof for correct proposal {proposal_index}");
                 continue;
             };
             // Queue fault proof
-            if divergence_point <= proposal.io_field_elements.len() {
+            if fault.is_output() {
                 // Queue output fault proof request
-                fault_buffer.push_back(proposal_index);
+                output_fault_buffer.push_back(proposal_index);
             } else {
-                // Queue trail fault proof
-                trail_buffer.push_back(proposal_index);
+                // Queue null fault proof submission
+                null_fault_buffer.push_back(proposal_index);
             }
         }
 
-        // dispatch buffered fault proof requests
-        let fault_proof_requests = fault_buffer.len();
-        for _ in 0..fault_proof_requests {
-            let proposal_index = fault_buffer.pop_front().unwrap();
+        // dispatch buffered output fault proof requests
+        let output_fault_proof_requests = output_fault_buffer.len();
+        for _ in 0..output_fault_proof_requests {
+            let proposal_index = output_fault_buffer.pop_front().unwrap();
             let Some(proposal) = kailua_db.get_local_proposal(&proposal_index) else {
                 error!("Proposal {proposal_index} missing from database.");
-                fault_buffer.push_back(proposal_index);
+                output_fault_buffer.push_back(proposal_index);
                 continue;
             };
             // Look up parent proposal
@@ -437,7 +437,7 @@ pub async fn handle_proposals(
                     "Proposal {} parent {} missing from database.",
                     proposal.index, proposal.parent
                 );
-                fault_buffer.push_back(proposal_index);
+                output_fault_buffer.push_back(proposal_index);
                 continue;
             };
 
@@ -453,7 +453,7 @@ pub async fn handle_proposals(
                 )
             ) {
                 error!("Could not request fault proof for {proposal_index}: {err:?}");
-                fault_buffer.push_back(proposal_index);
+                output_fault_buffer.push_back(proposal_index);
             }
         }
         // dispatch buffered validity proof requests
@@ -512,24 +512,25 @@ pub async fn handle_proposals(
                 error!("Proofs receiver channel closed");
                 break;
             };
-            proof_buffer.push_back(message);
+            output_fault_proof_buffer.push_back(message);
         }
 
-        // publish computed proofs
-        let computed_proofs = proof_buffer.len();
+        // publish computed output fault proofs
+        let computed_proofs = output_fault_proof_buffer.len();
         for _ in 0..computed_proofs {
-            let Some(Message::Proof(proposal_index, proof)) = proof_buffer.pop_front() else {
+            let Some(Message::Proof(proposal_index, proof)) = output_fault_proof_buffer.pop_front()
+            else {
                 error!("Validator loop received an unexpected message.");
                 continue;
             };
             let Some(proposal) = kailua_db.get_local_proposal(&proposal_index) else {
                 error!("Proposal {proposal_index} missing from database.");
-                proof_buffer.push_back(Message::Proof(proposal_index, proof));
+                output_fault_proof_buffer.push_back(Message::Proof(proposal_index, proof));
                 continue;
             };
             let Some(parent) = kailua_db.get_local_proposal(&proposal.parent) else {
                 error!("Parent proposal {} missing from database.", proposal.parent);
-                proof_buffer.push_back(Message::Proof(proposal_index, proof));
+                output_fault_proof_buffer.push_back(Message::Proof(proposal_index, proof));
                 continue;
             };
             // Abort early if a validity proof is already submitted in this tournament
@@ -672,16 +673,22 @@ pub async fn handle_proposals(
                     }
                     Err(e) => {
                         error!("Failed to confirm validity proof txn: {e:?}");
-                        proof_buffer.push_back(Message::Proof(proposal_index, proof));
+                        output_fault_proof_buffer.push_back(Message::Proof(proposal_index, proof));
                     }
                 }
                 // Skip fault proof submission logic
                 continue;
             }
 
-            // The index of the intermediate output to challenge
-            // ZERO for trail data challenges
-            let divergence_point = proposal.divergence_point().expect("Correct proposal") as u64;
+            // The index of the non-zero intermediate output to challenge
+            let Some(fault) = proposal.fault() else {
+                error!("Attempted output proof for correct proposal!");
+                continue;
+            };
+            if !fault.is_output() {
+                error!("Received computed proof for null fault!");
+            }
+            let divergence_point = fault.divergence_point() as u64;
 
             // Proofs of faulty trail data do not derive outputs beyond the parent proposal claim
             let output_fe = proposal.output_fe_at(divergence_point);
@@ -906,36 +913,49 @@ pub async fn handle_proposals(
                 }
                 Err(e) => {
                     error!("Failed to confirm fault proof txn: {e:?}");
-                    proof_buffer.push_back(Message::Proof(proposal_index, proof));
+                    output_fault_proof_buffer.push_back(Message::Proof(proposal_index, proof));
                 }
             }
         }
-        // publish trail proofs
-        let trail_proofs = trail_buffer.len();
-        for _ in 0..trail_proofs {
-            let proposal_index = trail_buffer.pop_front().unwrap();
+        // publish null fault proofs
+        let null_fault_proof_count = null_fault_buffer.len();
+        for _ in 0..null_fault_proof_count {
+            let proposal_index = null_fault_buffer.pop_front().unwrap();
             // Fetch proposal from db
             let Some(proposal) = kailua_db.get_local_proposal(&proposal_index) else {
                 error!("Proposal {proposal_index} missing from database.");
-                trail_buffer.push_back(proposal_index);
+                null_fault_buffer.push_back(proposal_index);
                 continue;
             };
             let proposal_contract = proposal.tournament_contract_instance(&validator_provider);
             // Fetch proposal parent from db
             let Some(parent) = kailua_db.get_local_proposal(&proposal.parent) else {
                 error!("Parent proposal {} missing from database.", proposal.parent);
-                trail_buffer.push_back(proposal_index);
+                null_fault_buffer.push_back(proposal_index);
                 continue;
             };
             let parent_contract = parent.tournament_contract_instance(&validator_provider);
 
-            let divergence_point = proposal.divergence_point().expect("Correct proposal") as u64;
+            let Some(fault) = proposal.fault() else {
+                error!("Attempted null proof for correct proposal!");
+                continue;
+            };
+            if !fault.is_null() {
+                error!("Attempting null proof for output fault!");
+            }
+            let divergence_point = fault.divergence_point() as u64;
             let output_fe = proposal.output_fe_at(divergence_point);
-
-            if !output_fe.is_zero() {
-                warn!("Proposal has non-zero output {output_fe} in trail data.");
+            let expect_zero_fe = fault.expect_zero(&proposal);
+            let fe_position = if expect_zero_fe {
+                divergence_point - 1
             } else {
-                info!("Proposal trail output is zero.")
+                divergence_point
+            };
+
+            if expect_zero_fe == output_fe.is_zero() {
+                error!("Proposal fe {output_fe} zeroness as expected.");
+            } else {
+                warn!("Proposal fe {output_fe} zeroness divergent.");
             }
 
             // Skip proof submission if already proven
@@ -951,16 +971,15 @@ pub async fn handle_proposals(
                 info!("Fault proof status: {fault_proof_status}");
             }
 
-            let blob_commitment = proposal.io_commitment_for(divergence_point - 1);
-            let kzg_proof = proposal.io_proof_for(divergence_point - 1)?;
+            let blob_commitment = proposal.io_commitment_for(fe_position);
+            let kzg_proof = proposal.io_proof_for(fe_position)?;
 
             // sanity check kzg proof
             {
-                let divergent_trail_point = divergence_point - 1;
                 // check trail data
                 if !proposal_contract
                     .verifyIntermediateOutput(
-                        divergent_trail_point,
+                        fe_position,
                         output_fe,
                         blob_commitment.clone(),
                         kzg_proof.clone(),
@@ -1011,7 +1030,7 @@ pub async fn handle_proposals(
                 }
                 Err(e) => {
                     error!("Failed to confirm fault proof txn: {e:?}");
-                    trail_buffer.push_back(proposal_index);
+                    null_fault_buffer.push_back(proposal_index);
                 }
             }
         }
@@ -1029,11 +1048,11 @@ async fn request_fault_proof(
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("request_fault_proof"));
 
-    let Some(divergence_point) = proposal.divergence_point() else {
+    let Some(fault) = proposal.fault() else {
         error!("Proposal {} does not diverge from canon.", proposal.index);
         return Ok(());
     };
-    let divergence_point = divergence_point as u64;
+    let divergence_point = fault.divergence_point() as u64;
 
     // Read additional data for Kona invocation
     info!(
