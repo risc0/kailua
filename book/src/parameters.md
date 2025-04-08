@@ -48,7 +48,9 @@ timestamp on the parent chain (ethereum).
 While the Kailua proposer agent won't publish a sequencing proposal until it is considered safe by op-node, the Kailua contracts
 allow you to enforce this requirement so that even an eager (potentially dishonest) proposer cannot have a head start!
 
-The minimum value for the time gap is equal to the length of your rollup's sequencing window.
+```admonish warning
+The combined duration of the time gap and the challenge timeout should not be less than twice the length of your rollup's sequencing window.
+```
 
 ```admonish example
 Consider a Rollup on Ethereum with a 50 block sequencing window.
@@ -94,6 +96,10 @@ Consequently, you should keep your existing challenge timeout period.
 ```admonish note
 If you wish to practically operate Kailua using only validity proofs, set this value to `31536000000000000` seconds
 (i.e. 1 billion calendar years).
+```
+
+```admonish warning
+The combined duration of the time gap and the challenge timeout should not be less than twice the length of your rollup's sequencing window.
 ```
 
 ## Verifier Contract
