@@ -607,7 +607,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         }
 
         // We expect all trail data to be zeroed, while non-trail data to be non-zero
-        bool expectZeroFe = co[1] < PROPOSAL_OUTPUT_COUNT - 1 ? false : true;
+        bool expectZeroFe = co[1] >= PROPOSAL_OUTPUT_COUNT;
         bool isZeroFe = proposedOutputFe == 0;
         if (expectZeroFe == isZeroFe) {
             revert NoConflict();
