@@ -2030,7 +2030,7 @@ dependencies = [
 
 [[package]]
 name = "kailua-common"
-version = "0.3.5"
+version = "0.3.6"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -2071,7 +2071,7 @@ dependencies = [
 
 [[package]]
 name = "kailua-fpvm"
-version = "0.3.5"
+version = "0.3.6"
 dependencies = [
  "blst",
  "c-kzg",
