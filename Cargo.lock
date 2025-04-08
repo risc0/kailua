@@ -4707,7 +4707,7 @@ dependencies = [
  "op-alloy-flz",
  "op-alloy-rpc-types-engine",
  "pot",
- "risc0-groth16",
+ "risc0-groth16 2.0.0",
  "risc0-zkvm",
  "risc0-zkvm-platform",
  "rkyv",
@@ -7297,6 +7297,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "risc0-groth16"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a800c55717c52f764325bdb18a164843d417a4c8c8a123b7d4206705c11a54c3"
+dependencies = [
+ "anyhow",
+ "ark-bn254",
+ "ark-ec",
+ "ark-groth16",
+ "ark-serialize 0.5.0",
+ "bytemuck",
+ "hex",
+ "num-bigint 0.4.6",
+ "risc0-binfmt",
+ "risc0-zkp",
+ "serde",
+ "stability",
+]
+
+[[package]]
 name = "risc0-sys"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7381,7 +7401,7 @@ dependencies = [
  "risc0-circuit-recursion",
  "risc0-circuit-rv32im",
  "risc0-core",
- "risc0-groth16",
+ "risc0-groth16 1.4.0",
  "risc0-zkos-v1compat",
  "risc0-zkp",
  "risc0-zkvm-platform",
