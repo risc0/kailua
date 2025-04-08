@@ -34,15 +34,17 @@ The below table contains rounded-up gas cost estimates of various contract opera
 | RiscZeroGroth16Verifier | deploy           | 1,300K |                        |
 | RiscZeroSetVerifier     | deploy           | 1,060K |                        |
 | RiscZeroMockVerifier    | deploy           |   615K |                        |
-| KailuaTreasury          | deploy           | 4,900K |                        |
-| KailuaTreasury          | propose          |   350K |                        |
-| KailuaGame              | deploy           | 4,725K |                        |
-| KailuaGame              | proveValidity    |   400K | Groth16 proof          |
-| KailuaGame              | resolve          |   115K | Undisputed validity    |
-| KailuaGame              | proveOutputFault |   275K | 4 kzg proofs           |
-| KailuaGame              | proveOutputFault |   625K | Groth16 + 4 kzg proofs |
-| KailuaGame              | proveOutputFault |   500K | Groth16 + 2 kzg proofs |
-| KailuaGame              | resolve          |   210K | 1 disputed fault       |
+| KailuaTreasury          | deploy           | 5,050K |                        |
+| KailuaTreasury          | propose          |   380K |                        |
+| KailuaGame              | deploy           | 4,800K |                        |
+| KailuaGame              | proveValidity    |   375K | Groth16 proof          |
+| KailuaGame              | proveOutputFault |   415K | Groth16 + 1 KZG proofs |
+| KailuaGame              | proveOutputFault |   470K | Groth16 + 2 KZG proofs |
+| KailuaGame              | proveNullFault   |   171K | 1 KZG proof            |
+| KailuaGame              | resolve          |   120K | Undisputed             |
+| KailuaGame              | resolve          |   160K | 1 fault                |
+| KailuaGame              | resolve          |   280K | 2 faults               |
+| KailuaGame              | resolve          |   370K | 3 faults               |
 
 
 ## Fast-track Migration

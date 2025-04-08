@@ -21,6 +21,27 @@ If your rollup `owner` account is controlled by a `Safe` contract, or some other
 `cast calldata` to get the necessary input that your wallet contract should forward.
 ```
 
+## Set Collateral Requirement
+
+Before allowing sequencing proposals past the anchor state, you'll need to set the bond value (in wei) required for sequencers.
+This is done by calling the `setParticipationBond` function on the treasury contract using the `owner` wallet for your
+rollup.
+
+For example, if your bond value is 12 eth, first convert this to wei using `cast`:
+```shell
+cast to-wei 12
+```
+```
+12000000000000000000
+```
+Then, configure the bond as follows using the rollup `owner` wallet:
+```shell
+cast send \
+  [YOUR_DEPLOYED_TREASURY_CONTRACT] \
+  "setParticipationBond(uint256 amount)" \
+  12000000000000000000
+```
+
 
 ## Set KailuaGame Implementation
 

@@ -1,4 +1,5 @@
 use crate::db::config::Config;
+use crate::db::fault::Fault;
 use crate::provider::{blob_fe_proof, blob_sidecar, get_block, BlobProvider};
 use crate::retry_with_context;
 use crate::stall::Stall;
@@ -34,6 +35,8 @@ pub struct Proposal {
     // pointers
     /// Address of the contract instance
     pub contract: Address,
+    /// Address of the tied treasury
+    pub treasury: Address,
     /// DGF Index of the game
     pub index: u64,
     /// DGF Index of the game's parent
@@ -78,7 +81,6 @@ pub struct Proposal {
 
 impl Proposal {
     pub async fn load<P: Provider<N>, N: Network>(
-        config: &Config,
         blob_provider: &BlobProvider,
         tournament_instance: &KailuaTournamentInstance<(), P, N>,
     ) -> anyhow::Result<Self> {
@@ -105,7 +107,6 @@ impl Proposal {
             await_tel!(
                 context,
                 Self::load_game(
-                    config,
                     blob_provider,
                     &KailuaGame::new(instance_address, tournament_instance.provider()),
                 )
@@ -120,6 +121,11 @@ impl Proposal {
         let context =
             opentelemetry::Context::current_with_span(tracer.start("Proposal::load_treasury"));
 
+        let treasury = treasury_instance
+            .KAILUA_TREASURY()
+            .stall_with_context(context.clone(), "KailuaGame::KAILUA_TREASURY")
+            .await
+            ._0;
         let index = treasury_instance
             .gameIndex()
             .stall_with_context(context.clone(), "KailuaTreasury::gameIndex")
@@ -161,6 +167,7 @@ impl Proposal {
             .into();
         Ok(Self {
             contract: *treasury_instance.address(),
+            treasury,
             index,
             parent: index,
             proposer: *treasury_instance.address(),
@@ -183,7 +190,6 @@ impl Proposal {
     }
 
     async fn load_game<P: Provider<N>, N: Network>(
-        config: &Config,
         blob_provider: &BlobProvider,
         game_instance: &KailuaGameInstance<(), P, N>,
     ) -> anyhow::Result<Self> {
@@ -191,6 +197,11 @@ impl Proposal {
         let context =
             opentelemetry::Context::current_with_span(tracer.start("Proposal::load_game"));
 
+        let treasury = game_instance
+            .KAILUA_TREASURY()
+            .stall_with_context(context.clone(), "KailuaGame::KAILUA_TREASURY")
+            .await
+            ._0;
         let index = game_instance
             .gameIndex()
             .stall_with_context(context.clone(), "KailuaGame::gameIndex")
@@ -216,7 +227,19 @@ impl Proposal {
         let mut io_blobs = Vec::new();
         let mut io_field_elements = Vec::new();
         let mut trail_field_elements = Vec::new();
-        for _ in 0..config.proposal_blobs {
+        let proposal_blobs: u64 = game_instance
+            .PROPOSAL_BLOBS()
+            .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_BLOBS")
+            .await
+            ._0
+            .to();
+        let proposal_output_count: u64 = game_instance
+            .PROPOSAL_OUTPUT_COUNT()
+            .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_OUTPUT_COUNT")
+            .await
+            ._0
+            .to();
+        for _ in 0..proposal_blobs {
             let blob_kzg_hash = game_instance
                 .proposalBlobHashes(U256::from(io_blobs.len()))
                 .stall_with_context(context.clone(), "KailuaGame::proposalBlobHashes")
@@ -225,7 +248,7 @@ impl Proposal {
             let blob_data = await_tel!(context, blob_provider.get_blob(created_at, blob_kzg_hash))
                 .context("get_blob")?;
             // save data
-            let io_remaining = config.proposal_output_count - (io_field_elements.len() as u64) - 1;
+            let io_remaining = proposal_output_count - (io_field_elements.len() as u64) - 1;
             let io_in_blob = io_remaining.min(FIELD_ELEMENTS_PER_BLOB) as usize;
             io_field_elements.extend(intermediate_outputs(&blob_data, io_in_blob)?);
             trail_field_elements.extend(trail_data(&blob_data, io_in_blob)?);
@@ -262,6 +285,7 @@ impl Proposal {
         let trail_len = trail_field_elements.len();
         Ok(Self {
             contract: *game_instance.address(),
+            treasury,
             index,
             parent,
             proposer,
@@ -276,7 +300,7 @@ impl Proposal {
             children: Default::default(),
             successor: None,
             correct_io: repeat(None)
-                .take((config.proposal_output_count - 1) as usize)
+                .take((proposal_output_count - 1) as usize)
                 .collect(),
             correct_trail: repeat(None).take(trail_len).collect(),
             correct_claim: None,
@@ -314,7 +338,7 @@ impl Proposal {
             tracer,
             "KailuaTournament::pruneChildren",
             parent_tournament_instance
-                .pruneChildren(children)
+                .pruneChildren(children * U256::from(2))
                 .call()
                 .into_future()
         )?
@@ -560,22 +584,28 @@ impl Proposal {
         self.index != self.parent
     }
 
-    pub fn divergence_point(&self) -> Option<usize> {
-        // Check divergence in IO
-        for i in 0..self.correct_io.len() {
-            if let Some(false) = self.correct_io[i] {
-                return Some(i);
+    pub fn fault(&self) -> Option<Fault> {
+        // Check null commitment
+        for i in 0..self.io_field_elements.len() {
+            if self.io_field_elements[i].is_zero() {
+                return Some(Fault::Null(i));
             }
-        }
-        // Check divergence in final claim
-        if let Some(false) = self.correct_claim {
-            return Some(self.io_field_elements.len());
         }
         // Check divergence in trail data
         for i in 0..self.correct_trail.len() {
             if let Some(false) = self.correct_trail[i] {
-                return Some(self.io_field_elements.len() + i + 1);
+                return Some(Fault::Null(self.io_field_elements.len() + i + 1));
             }
+        }
+        // Check divergence in IO
+        for i in 0..self.correct_io.len() {
+            if let Some(false) = self.correct_io[i] {
+                return Some(Fault::Output(i));
+            }
+        }
+        // Check divergence in final claim
+        if let Some(false) = self.correct_claim {
+            return Some(Fault::Output(self.io_field_elements.len()));
         }
         // Report equivalence
         None

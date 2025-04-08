@@ -64,7 +64,7 @@ devnet-propose target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l1_bea
       --proposer-key {{proposer}} \
       {{verbosity}}
 
-devnet-fault offset parent target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" proposer="0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a":
+devnet-fault offset parent target="debug" proposer="0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a" verbosity="" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545":
   ./target/{{target}}/kailua-cli test-fault \
       --eth-rpc-url {{l1_rpc}} \
       --beacon-rpc-url {{l1_beacon_rpc}} \
@@ -171,7 +171,7 @@ query block_number l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc:
 
 prove-offline block_number l2_claim l2_output_root l2_head l1_head l2_chain_id data target="release" verbosity="":
   echo "Running host program with zk client program..."
-  ./target/{{target}}/kailua-host {{verbosity}} \
+  NUM_CONCURRENT_PREFLIGHTS=1 ./target/{{target}}/kailua-host {{verbosity}} \
     --l1-head {{l1_head}} \
     --agreed-l2-head-hash {{l2_head}} \
     --claimed-l2-output-root {{l2_claim}} \

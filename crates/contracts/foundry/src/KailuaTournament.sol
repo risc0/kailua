@@ -68,6 +68,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         ROLLUP_CONFIG_HASH = _configHash;
         PROPOSAL_OUTPUT_COUNT = _proposalOutputCount;
         OUTPUT_BLOCK_SPAN = _outputBlockSpan;
+        // discard published root commitment in calldata
+        _proposalOutputCount--;
         PROPOSAL_BLOBS = (_proposalOutputCount / KailuaKZGLib.FIELD_ELEMENTS_PER_BLOB)
             + ((_proposalOutputCount % KailuaKZGLib.FIELD_ELEMENTS_PER_BLOB) == 0 ? 0 : 1);
         GAME_TYPE = _gameType;
@@ -305,6 +307,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             return KailuaTournament(address(0x0));
         }
 
+        // Advance v if needed
+        if (v < u) {
+            v = u + 1;
+        }
+
         // Note: u < children.length
         // Fetch contender details
         KailuaTournament contender = children[u];
@@ -521,7 +528,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                 childContract.verifyIntermediateOutput(
                     co[1] - 1, KailuaKZGLib.hashToFe(acceptedOutputHash), blobCommitments[0], kzgProofs[0]
                 ),
-                "bad child acceptedOutput kzg proof"
+                "bad acceptedOutput kzg"
             );
         }
 
@@ -539,7 +546,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                     blobCommitments[blobCommitments.length - 1],
                     kzgProofs[kzgProofs.length - 1]
                 ),
-                "bad left child proposedOutput kzg proof"
+                "bad proposedOutput kzg"
             );
         }
 
@@ -574,8 +581,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         updateProofStatus(payoutRecipient, childSignature, ProofStatus.FAULT);
     }
 
-    /// @notice Proves that a proposal contains invalid trailing data
-    function proveTrailFault(
+    /// @notice Proves that a proposal contains invalid intermediate data
+    function proveNullFault(
         address payoutRecipient,
         uint64[2] calldata co,
         uint256 proposedOutputFe,
@@ -594,25 +601,31 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             revert AlreadyProven();
         }
 
-        // INVARIANT: Proofs can only pertain to trailing blob data
-        if (co[1] < PROPOSAL_OUTPUT_COUNT) {
+        // INVARIANT: Proofs can only pertain to intermediate commitments
+        if (co[1] == PROPOSAL_OUTPUT_COUNT - 1) {
             revert InvalidDisputedClaimIndex();
+        }
+
+        // We expect all trail data to be zeroed, while non-trail data to be non-zero
+        bool isTrailFe = co[1] >= PROPOSAL_OUTPUT_COUNT;
+        bool isZeroFe = proposedOutputFe == 0;
+        if (isTrailFe == isZeroFe) {
+            revert NoConflict();
         }
 
         // Because the root claim is considered the last published output, we shift the output offset down by one to
         // correctly point to the target trailing zero output
-        uint64 trailOffset = co[1] - 1;
-
-        // INVARIANT: The trail divergence occurs at the last blob
-        if (KailuaKZGLib.blobIndex(trailOffset) != PROPOSAL_BLOBS - 1) {
+        // INVARIANT: The divergence occurs at a proper blob index
+        uint64 feOffset = isTrailFe ? co[1] - 1 : co[1];
+        if (KailuaKZGLib.blobIndex(feOffset) >= PROPOSAL_BLOBS) {
             revert InvalidDataRemainder();
         }
 
         // Validate the claimed output root publications
         // Note: proposedOutputFe must be a canonical field element or point eval precompile call will fail
         require(
-            childContract.verifyIntermediateOutput(trailOffset, proposedOutputFe, blobCommitment, kzgProof),
-            "bad child proposedOutput kzg proof"
+            childContract.verifyIntermediateOutput(feOffset, proposedOutputFe, blobCommitment, kzgProof),
+            "bad proposedOutput kzg"
         );
 
         // Update dispute status based on trailing data

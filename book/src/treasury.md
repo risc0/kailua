@@ -64,25 +64,23 @@ This step is only to be done once in order to create a starting point for sequen
 This step will publish and immediately resolve (finalize) a single sequencing proposal with no chance for dispute.
 ```
 
-First, you will need to choose the rollup block number from which Kailua sequencing should start.
-Then, you need to query your `op-node` for the `outputRoot` at that block number as follows:
+Recall the rollup block number and its output root from the deployment in the previous section.
+
 ```shell
 cast rpc --rpc-url [YOUR_OP_NODE_ADDRESS] \
   "optimism_outputAtBlock" \
   $(cast 2h [YOUR_STARTING_L2_BLOCK_NUMBER])
 ```
-
 ```admonish tip
 You can quickly filter through the response for `outputRoot` by piping it to `jq -r .outputRoot`
 ```
 
-Once you have the `outputRoot` value you wish to start sequencing from, the next step is to call `create` on `DisputeGameFactory` using the `owner` wallet:
+Once you have the `outputRoot` value you wish to start sequencing from, the next step is to call `propose` on `KailuaTreasury` using the `owner` wallet:
 ```shell
-cast send [YOUR_DISPUTE_GAME_FACTORY] \
-  "create(uint32, bytes32, bytes)" \
-  [YOUR_KAILUA_GAME_TYPE] \
+cast send [YOUR_DEPLOYED_TREASURY_CONTRACT] \
+  "propose(bytes32, bytes)" \
   [YOUR_OUTPUT_ROOT] \
-  $(cast abi-encode --packed "f(uint64)" [YOUR_STARTING_L2_BLOCK_NUMBER])
+  $(cast abi-encode --packed "f(uint64,address)" [YOUR_STARTING_L2_BLOCK_NUMBER] [YOUR_DEPLOYED_TREASURY_CONTRACT])
 ```
 
 ```admonish note
@@ -96,7 +94,7 @@ cast call [YOUR_DISPUTE_GAME_FACTORY] \
   "games(uint32, bytes32, bytes) returns (address, uint64)" \
   [YOUR_KAILUA_GAME_TYPE] \
   [YOUR_OUTPUT_ROOT] \
-  $(cast abi-encode --packed "f(uint64)" [YOUR_STARTING_L2_BLOCK_NUMBER])
+  $(cast abi-encode --packed "f(uint64,address)" [YOUR_STARTING_L2_BLOCK_NUMBER] [YOUR_DEPLOYED_TREASURY_CONTRACT])
 ```
 
 With this instance address, the last step is to call `resolve()` on it using the `owner` wallet:

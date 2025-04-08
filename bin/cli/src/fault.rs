@@ -45,6 +45,10 @@ pub struct FaultArgs {
     /// Index of the parent of the faulty proposal
     #[clap(long, env)]
     pub fault_parent: u64,
+
+    /// Form of fault
+    #[clap(long, env, default_value_t = false)]
+    pub fault_null: bool,
 }
 
 pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
@@ -144,7 +148,11 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .to();
     // Prepare faulty proposal
     let faulty_block_number = parent_block_number + args.fault_offset * output_block_span;
-    let faulty_root_claim = B256::from(games_count.to_be_bytes());
+    let faulty_root_claim = if args.fault_null {
+        B256::ZERO
+    } else {
+        B256::from(games_count.to_be_bytes())
+    };
     // Prepare remainder of proposal
     let proposed_block_number = parent_block_number + proposal_block_count;
     let proposed_output_root = if proposed_block_number == faulty_block_number {
@@ -168,7 +176,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
 
         let output_hash = if io_block_number == normalized_fault_block_number {
             faulty_root_claim
-        } else if io_block_number < proposal_block_count {
+        } else if io_block_number < proposed_block_number {
             await_tel_res!(
                 context,
                 tracer,
@@ -222,10 +230,15 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         ._0;
     let owed_collateral = bond_value.saturating_sub(paid_in);
 
-    match kailua_treasury_instance
-        .propose(proposed_output_root, Bytes::from(extra_data))
-        .value(owed_collateral)
-        .sidecar(sidecar)
+    let mut transaction =
+        kailua_treasury_instance.propose(proposed_output_root, Bytes::from(extra_data));
+    if !owed_collateral.is_zero() {
+        transaction = transaction.value(owed_collateral);
+    }
+    if !sidecar.blobs.is_empty() {
+        transaction = transaction.sidecar(sidecar);
+    }
+    match transaction
         .transact_with_context(context.clone(), "KailuaTreasury::propose")
         .await
         .context("KailuaTreasury::propose")

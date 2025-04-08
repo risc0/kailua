@@ -20,13 +20,12 @@ use crate::transact::Transact;
 use crate::{retry_with_context, stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::consensus::BlockHeader;
 use alloy::eips::BlockNumberOrTag;
-use std::future::IntoFuture;
-
 use alloy::network::{BlockResponse, Ethereum, TxSigner};
-use alloy::primitives::{Bytes, U256};
+use alloy::primitives::{Address, Bytes, U256};
 use alloy::providers::{Provider, ProviderBuilder, RootProvider};
 use alloy::sol_types::SolValue;
 use anyhow::Context;
+use kailua_client::args::parse_address;
 use kailua_client::provider::OpNodeProvider;
 use kailua_client::telemetry::TelemetryArgs;
 use kailua_client::{await_tel, await_tel_res};
@@ -36,6 +35,7 @@ use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
+use std::future::IntoFuture;
 use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
@@ -50,6 +50,9 @@ pub struct ProposeArgs {
     /// L1 wallet to use for proposing outputs
     #[clap(flatten)]
     pub proposer_signer: ProposerSignerArgs,
+    /// Address of the KailuaGame implementation to use
+    #[clap(long, env, value_parser = parse_address)]
+    pub kailua_game_implementation: Option<Address>,
 
     #[clap(flatten)]
     pub telemetry: TelemetryArgs,
@@ -110,14 +113,24 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         .gameCount_
         .to();
     info!("There have been {game_count} games created using DisputeGameFactory");
-    let kailua_game_implementation = KailuaGame::new(
-        dispute_game_factory
-            .gameImpls(KAILUA_GAME_TYPE)
-            .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
-            .await
-            .impl_,
-        &proposer_provider,
-    );
+
+    // Look up deployment to target
+    let latest_game_impl_addr = dispute_game_factory
+        .gameImpls(KAILUA_GAME_TYPE)
+        .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
+        .await
+        .impl_;
+    let kailua_game_implementation_address = args
+        .kailua_game_implementation
+        .unwrap_or(latest_game_impl_addr);
+    if args.kailua_game_implementation.is_some() {
+        warn!("Using provided KailuaGame implementation {kailua_game_implementation_address}.");
+    } else {
+        info!("Using latest KailuaGame implementation {kailua_game_implementation_address} from DisputeGameFactory.");
+    }
+
+    let kailua_game_implementation =
+        KailuaGame::new(kailua_game_implementation_address, &proposer_provider);
     info!("KailuaGame({:?})", kailua_game_implementation.address());
     if kailua_game_implementation.address().is_zero() {
         error!("Fault proof game is not installed!");
@@ -125,8 +138,15 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
     }
     // Initialize empty DB
     info!("Initializing..");
-    let mut kailua_db = await_tel!(context, KailuaDB::init(data_dir, &dispute_game_factory))
-        .context("KailuaDB::init")?;
+    let mut kailua_db = await_tel!(
+        context,
+        KailuaDB::init(
+            data_dir,
+            &dispute_game_factory,
+            kailua_game_implementation_address
+        )
+    )
+    .context("KailuaDB::init")?;
     info!("KailuaTreasury({:?})", kailua_db.treasury.address);
     // Run the proposer loop to sync and post
     info!(
@@ -255,7 +275,10 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             .unwrap_or_default()
             .unwrap_or_default()
             {
-                error!("Failed to determine proposal as next survivor.");
+                error!(
+                    "Failed to determine proposal at {} as successor of proposal at {}.",
+                    proposal.contract, parent.contract
+                );
                 break;
             }
 
@@ -268,6 +291,17 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             if let Err(e) = await_tel!(context, proposal.resolve(&proposer_provider)) {
                 error!("Failed to resolve proposal: {e:?}");
             }
+        }
+
+        // Check if deployment is still valid
+        let latest_game_impl_addr = dispute_game_factory
+            .gameImpls(KAILUA_GAME_TYPE)
+            .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
+            .await
+            .impl_;
+        if latest_game_impl_addr != kailua_game_implementation_address {
+            warn!("Not proposing. KailuaGame {kailua_game_implementation_address} outdated. Found new KailuaGame {latest_game_impl_addr}.");
+            continue;
         }
 
         // Submit proposal to extend canonical chain
@@ -376,8 +410,10 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                 continue;
             }
         };
-
         info!("Candidate proposal prepared");
+
+        //
+
         // Calculate required duplication counter
         let mut dupe_counter = 0u64;
         let unique_extra_data = loop {
@@ -457,12 +493,19 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         }
         // Submit proposal
         info!("Proposing output {proposed_output_root} at l2 block number {proposed_block_number} with {owed_collateral} additional collateral and duplication counter {dupe_counter}.");
-        match kailua_db
+
+        let treasury_contract_instance = kailua_db
             .treasury
-            .treasury_contract_instance(&proposer_provider)
-            .propose(proposed_output_root, Bytes::from(extra_data))
-            .value(owed_collateral)
-            .sidecar(sidecar)
+            .treasury_contract_instance(&proposer_provider);
+        let mut transaction =
+            treasury_contract_instance.propose(proposed_output_root, Bytes::from(extra_data));
+        if !owed_collateral.is_zero() {
+            transaction = transaction.value(owed_collateral);
+        }
+        if !sidecar.blobs.is_empty() {
+            transaction = transaction.sidecar(sidecar);
+        }
+        match transaction
             .transact_with_context(context.clone(), "KailuaTreasury::propose")
             .await
             .context("KailuaTreasury::propose")

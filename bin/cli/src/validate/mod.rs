@@ -79,6 +79,9 @@ pub struct ValidateArgs {
     /// Address of the recipient account to use for bond payouts
     #[clap(long, env, value_parser = parse_address)]
     pub payout_recipient_address: Option<Address>,
+    /// Address of the KailuaGame implementation to use
+    #[clap(long, env, value_parser = parse_address)]
+    pub kailua_game_implementation: Option<Address>,
 
     #[clap(flatten)]
     pub telemetry: TelemetryArgs,
@@ -182,14 +185,24 @@ pub async fn handle_proposals(
         .gameCount_
         .to();
     info!("There have been {game_count} games created using DisputeGameFactory");
-    let kailua_game_implementation = KailuaGame::new(
-        dispute_game_factory
-            .gameImpls(KAILUA_GAME_TYPE)
-            .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
-            .await
-            .impl_,
-        &validator_provider,
-    );
+
+    // Look up deployment to target
+    let latest_game_impl_addr = dispute_game_factory
+        .gameImpls(KAILUA_GAME_TYPE)
+        .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
+        .await
+        .impl_;
+    let kailua_game_implementation_address = args
+        .kailua_game_implementation
+        .unwrap_or(latest_game_impl_addr);
+    if args.kailua_game_implementation.is_some() {
+        warn!("Using provided KailuaGame implementation {kailua_game_implementation_address}.");
+    } else {
+        info!("Using latest KailuaGame implementation {kailua_game_implementation_address} from DisputeGameFactory.");
+    }
+
+    let kailua_game_implementation =
+        KailuaGame::new(kailua_game_implementation_address, &validator_provider);
     info!("KailuaGame({:?})", kailua_game_implementation.address());
     if kailua_game_implementation.address().is_zero() {
         error!("Fault proof game is not installed!");
@@ -197,8 +210,15 @@ pub async fn handle_proposals(
     }
     // Initialize empty DB
     info!("Initializing..");
-    let mut kailua_db = await_tel!(context, KailuaDB::init(data_dir, &dispute_game_factory))
-        .context("KailuaDB::init")?;
+    let mut kailua_db = await_tel!(
+        context,
+        KailuaDB::init(
+            data_dir,
+            &dispute_game_factory,
+            kailua_game_implementation_address
+        )
+    )
+    .context("KailuaDB::init")?;
     info!("KailuaTreasury({:?})", kailua_db.treasury.address);
     // Run the validator loop
     info!(
@@ -206,9 +226,9 @@ pub async fn handle_proposals(
         kailua_db.state.next_factory_index
     );
     // init channel buffers
-    let mut proof_buffer = VecDeque::new();
-    let mut fault_buffer = VecDeque::new();
-    let mut trail_buffer = VecDeque::new();
+    let mut output_fault_proof_buffer = VecDeque::new();
+    let mut output_fault_buffer = VecDeque::new();
+    let mut null_fault_buffer = VecDeque::new();
     let mut valid_buffer = VecDeque::new();
     loop {
         // Wait for new data on every iteration
@@ -269,37 +289,103 @@ pub async fn handle_proposals(
                 // skip fault proving if a validity proof is en-route
                 if let Some(successor) = parent.successor {
                     info!(
-                        "Skipping fault proving for proposal {proposal_index} assuming ongoing \
+                        "Skipping proving for proposal {proposal_index} assuming ongoing \
                         validity proof generation for proposal {successor}."
                     );
                     continue;
                 }
             }
-            // Skip fault proving if fault with same signature already being proven
+
+            // Switch to validity proving if only one output is admissible
+            if kailua_db.config.proposal_output_count == 1 {
+                // Check if there is a faulty predecessor
+                let is_prior_fault =
+                    parent
+                        .children
+                        .iter()
+                        .filter(|p| **p < proposal_index)
+                        .any(|p| {
+                            // Fetch predecessor from db
+                            let Some(predecessor) = kailua_db.get_local_proposal(p) else {
+                                error!("Proposal {p} missing from database.");
+                                return false;
+                            };
+                            let invalid_predecessor = predecessor.is_correct() == Some(false);
+                            if invalid_predecessor {
+                                info!("Found invalid predecessor proposal {p}");
+                            }
+                            invalid_predecessor
+                        });
+                // Check canonical proposal status
+                match parent.successor {
+                    Some(p) if p == proposal.index && is_prior_fault => {
+                        // Compute validity proof on arrival of correct proposal after faulty proposal
+                        info!(
+                            "Computing validity proof for {proposal_index} to discard invalid predecessors."
+                        );
+                        valid_buffer.push_back(p);
+                    }
+                    Some(p) if p == proposal.index => {
+                        // Skip proving as no conflicts exist
+                        info!("Skipping proving for proposal {proposal_index} with no invalid predecessors.");
+                    }
+                    Some(p) if proposal.is_correct() == Some(false) && !is_prior_fault => {
+                        // Compute validity proof on arrival of faulty proposal after correct proposal
+                        info!("Computing validity proof for {p} to discard invalid successor.");
+                        valid_buffer.push_back(p);
+                    }
+                    Some(p) if proposal.is_correct() == Some(false) => {
+                        // is_prior_fault is true and a successor exists, so some proof must be queued
+                        info!(
+                            "Skipping proving for proposal {proposal_index} assuming ongoing validity proof for proposal {p}."
+                        );
+                    }
+                    Some(p) => {
+                        info!(
+                            "Skipping proving for correct proposal {proposal_index} replicating {p}."
+                        );
+                    }
+                    None => {
+                        info!(
+                            "Skipping fault proving for proposal {proposal_index} with no valid sibling."
+                        );
+                    }
+                }
+                continue;
+            }
+
+            // Skip proving on repeat signature
             let is_repeat_signature =
                 parent
                     .children
                     .iter()
                     .filter(|p| **p < proposal_index)
                     .any(|p| {
-                        // Fetch prior predecessor from db
+                        // Fetch predecessor from db
                         let Some(predecessor) = kailua_db.get_local_proposal(p) else {
                             error!("Proposal {p} missing from database.");
                             return false;
                         };
-
-                        predecessor.signature == proposal.signature
+                        let duplicate_predecessor = predecessor.signature == proposal.signature;
+                        if duplicate_predecessor {
+                            info!("Found duplicate predecessor proposal {p}");
+                        }
+                        duplicate_predecessor
                     });
             if is_repeat_signature {
                 info!(
-                    "Skipping fault proving for proposal {proposal_index} assuming ongoing \
-                fault proof generation for signature {}",
+                    "Skipping fault proving for proposal {proposal_index} with repeat signature {}",
                     proposal.signature
                 );
                 continue;
             }
+
             // Skip attempting to fault prove correct proposals
             if let Some(true) = proposal.is_correct() {
+                info!(
+                    "Skipping fault proving for proposal {proposal_index} with valid signature {}",
+                    proposal.signature
+                );
                 continue;
             }
 
@@ -318,27 +404,27 @@ pub async fn handle_proposals(
             }
 
             // Get divergence point
-            let Some(divergence_point) = proposal.divergence_point() else {
+            let Some(fault) = proposal.fault() else {
                 error!("Attempted to request fault proof for correct proposal {proposal_index}");
                 continue;
             };
             // Queue fault proof
-            if divergence_point <= proposal.io_field_elements.len() {
+            if fault.is_output() {
                 // Queue output fault proof request
-                fault_buffer.push_back(proposal_index);
+                output_fault_buffer.push_back(proposal_index);
             } else {
-                // Queue trail fault proof
-                trail_buffer.push_back(proposal_index);
+                // Queue null fault proof submission
+                null_fault_buffer.push_back(proposal_index);
             }
         }
 
-        // dispatch buffered fault proof requests
-        let fault_proof_requests = fault_buffer.len();
-        for _ in 0..fault_proof_requests {
-            let proposal_index = fault_buffer.pop_front().unwrap();
+        // dispatch buffered output fault proof requests
+        let output_fault_proof_requests = output_fault_buffer.len();
+        for _ in 0..output_fault_proof_requests {
+            let proposal_index = output_fault_buffer.pop_front().unwrap();
             let Some(proposal) = kailua_db.get_local_proposal(&proposal_index) else {
                 error!("Proposal {proposal_index} missing from database.");
-                fault_buffer.push_back(proposal_index);
+                output_fault_buffer.push_back(proposal_index);
                 continue;
             };
             // Look up parent proposal
@@ -347,7 +433,7 @@ pub async fn handle_proposals(
                     "Proposal {} parent {} missing from database.",
                     proposal.index, proposal.parent
                 );
-                fault_buffer.push_back(proposal_index);
+                output_fault_buffer.push_back(proposal_index);
                 continue;
             };
 
@@ -363,7 +449,7 @@ pub async fn handle_proposals(
                 )
             ) {
                 error!("Could not request fault proof for {proposal_index}: {err:?}");
-                fault_buffer.push_back(proposal_index);
+                output_fault_buffer.push_back(proposal_index);
             }
         }
         // dispatch buffered validity proof requests
@@ -384,6 +470,22 @@ pub async fn handle_proposals(
                 valid_buffer.push_front(proposal_index);
                 continue;
             };
+
+            let parent_contract = parent.tournament_contract_instance(&validator_provider);
+            // Check that a validity proof had not already been posted
+            let proof_status = parent_contract
+                .proofStatus(proposal.signature)
+                .stall_with_context(context.clone(), "KailuaTournament::proofStatus")
+                .await
+                ._0;
+            if proof_status != 0 {
+                info!(
+                    "Proposal {} signature {} already proven {proof_status}",
+                    proposal.index, proposal.signature
+                );
+                continue;
+            }
+
             if let Err(err) = await_tel!(
                 context,
                 request_validity_proof(
@@ -406,24 +508,25 @@ pub async fn handle_proposals(
                 error!("Proofs receiver channel closed");
                 break;
             };
-            proof_buffer.push_back(message);
+            output_fault_proof_buffer.push_back(message);
         }
 
-        // publish computed proofs
-        let computed_proofs = proof_buffer.len();
+        // publish computed output fault proofs
+        let computed_proofs = output_fault_proof_buffer.len();
         for _ in 0..computed_proofs {
-            let Some(Message::Proof(proposal_index, proof)) = proof_buffer.pop_front() else {
+            let Some(Message::Proof(proposal_index, proof)) = output_fault_proof_buffer.pop_front()
+            else {
                 error!("Validator loop received an unexpected message.");
                 continue;
             };
             let Some(proposal) = kailua_db.get_local_proposal(&proposal_index) else {
                 error!("Proposal {proposal_index} missing from database.");
-                proof_buffer.push_back(Message::Proof(proposal_index, proof));
+                output_fault_proof_buffer.push_back(Message::Proof(proposal_index, proof));
                 continue;
             };
             let Some(parent) = kailua_db.get_local_proposal(&proposal.parent) else {
                 error!("Parent proposal {} missing from database.", proposal.parent);
-                proof_buffer.push_back(Message::Proof(proposal_index, proof));
+                output_fault_proof_buffer.push_back(Message::Proof(proposal_index, proof));
                 continue;
             };
             // Abort early if a validity proof is already submitted in this tournament
@@ -566,16 +669,22 @@ pub async fn handle_proposals(
                     }
                     Err(e) => {
                         error!("Failed to confirm validity proof txn: {e:?}");
-                        proof_buffer.push_back(Message::Proof(proposal_index, proof));
+                        output_fault_proof_buffer.push_back(Message::Proof(proposal_index, proof));
                     }
                 }
                 // Skip fault proof submission logic
                 continue;
             }
 
-            // The index of the intermediate output to challenge
-            // ZERO for trail data challenges
-            let divergence_point = proposal.divergence_point().expect("Correct proposal") as u64;
+            // The index of the non-zero intermediate output to challenge
+            let Some(fault) = proposal.fault() else {
+                error!("Attempted output proof for correct proposal!");
+                continue;
+            };
+            if !fault.is_output() {
+                error!("Received computed proof for null fault!");
+            }
+            let divergence_point = fault.divergence_point() as u64;
 
             // Proofs of faulty trail data do not derive outputs beyond the parent proposal claim
             let output_fe = proposal.output_fe_at(divergence_point);
@@ -800,36 +909,49 @@ pub async fn handle_proposals(
                 }
                 Err(e) => {
                     error!("Failed to confirm fault proof txn: {e:?}");
-                    proof_buffer.push_back(Message::Proof(proposal_index, proof));
+                    output_fault_proof_buffer.push_back(Message::Proof(proposal_index, proof));
                 }
             }
         }
-        // publish trail proofs
-        let trail_proofs = trail_buffer.len();
-        for _ in 0..trail_proofs {
-            let proposal_index = fault_buffer.pop_front().unwrap();
+        // publish null fault proofs
+        let null_fault_proof_count = null_fault_buffer.len();
+        for _ in 0..null_fault_proof_count {
+            let proposal_index = null_fault_buffer.pop_front().unwrap();
             // Fetch proposal from db
             let Some(proposal) = kailua_db.get_local_proposal(&proposal_index) else {
                 error!("Proposal {proposal_index} missing from database.");
-                fault_buffer.push_back(proposal_index);
+                null_fault_buffer.push_back(proposal_index);
                 continue;
             };
             let proposal_contract = proposal.tournament_contract_instance(&validator_provider);
             // Fetch proposal parent from db
             let Some(parent) = kailua_db.get_local_proposal(&proposal.parent) else {
                 error!("Parent proposal {} missing from database.", proposal.parent);
-                fault_buffer.push_back(proposal_index);
+                null_fault_buffer.push_back(proposal_index);
                 continue;
             };
             let parent_contract = parent.tournament_contract_instance(&validator_provider);
 
-            let divergence_point = proposal.divergence_point().expect("Correct proposal") as u64;
+            let Some(fault) = proposal.fault() else {
+                error!("Attempted null proof for correct proposal!");
+                continue;
+            };
+            if !fault.is_null() {
+                error!("Attempting null proof for output fault!");
+            }
+            let divergence_point = fault.divergence_point() as u64;
             let output_fe = proposal.output_fe_at(divergence_point);
-
-            if !output_fe.is_zero() {
-                warn!("Proposal has non-zero output {output_fe} in trail data.");
+            let expect_zero_fe = fault.expect_zero(&proposal);
+            let fe_position = if expect_zero_fe {
+                divergence_point - 1
             } else {
-                info!("Proposal trail output is zero.")
+                divergence_point
+            };
+
+            if expect_zero_fe == output_fe.is_zero() {
+                error!("Proposal fe {output_fe} zeroness as expected.");
+            } else {
+                warn!("Proposal fe {output_fe} zeroness divergent.");
             }
 
             // Skip proof submission if already proven
@@ -845,16 +967,15 @@ pub async fn handle_proposals(
                 info!("Fault proof status: {fault_proof_status}");
             }
 
-            let blob_commitment = proposal.io_commitment_for(divergence_point - 1);
-            let kzg_proof = proposal.io_proof_for(divergence_point - 1)?;
+            let blob_commitment = proposal.io_commitment_for(fe_position);
+            let kzg_proof = proposal.io_proof_for(fe_position)?;
 
             // sanity check kzg proof
             {
-                let divergent_trail_point = divergence_point - 1;
                 // check trail data
                 if !proposal_contract
                     .verifyIntermediateOutput(
-                        divergent_trail_point,
+                        fe_position,
                         output_fe,
                         blob_commitment.clone(),
                         kzg_proof.clone(),
@@ -880,16 +1001,16 @@ pub async fn handle_proposals(
             );
 
             let transaction_dispatch = parent_contract
-                .proveTrailFault(
+                .proveNullFault(
                     validator_address,
                     [child_index, divergence_point],
                     output_fe,
                     blob_commitment,
                     kzg_proof,
                 )
-                .transact_with_context(context.clone(), "KailuaTournament::proveTrailFault")
+                .transact_with_context(context.clone(), "KailuaTournament::proveNullFault")
                 .await
-                .context("KailuaTournament::proveTrailFault");
+                .context("KailuaTournament::proveNullFault");
 
             match transaction_dispatch {
                 Ok(receipt) => {
@@ -901,14 +1022,11 @@ pub async fn handle_proposals(
                         ._0;
                     info!("Proposal {} proven: {proof_status}", proposal.index);
 
-                    info!(
-                        "KailuaTournament::proveTrailFault: {} gas",
-                        receipt.gas_used
-                    );
+                    info!("KailuaTournament::proveNullFault: {} gas", receipt.gas_used);
                 }
                 Err(e) => {
                     error!("Failed to confirm fault proof txn: {e:?}");
-                    trail_buffer.push_back(proposal_index);
+                    null_fault_buffer.push_back(proposal_index);
                 }
             }
         }
@@ -926,11 +1044,11 @@ async fn request_fault_proof(
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("request_fault_proof"));
 
-    let Some(divergence_point) = proposal.divergence_point() else {
+    let Some(fault) = proposal.fault() else {
         error!("Proposal {} does not diverge from canon.", proposal.index);
         return Ok(());
     };
-    let divergence_point = divergence_point as u64;
+    let divergence_point = fault.divergence_point() as u64;
 
     // Read additional data for Kona invocation
     info!(
