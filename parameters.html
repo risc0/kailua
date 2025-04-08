@@ -32,10 +32,11 @@
         <link rel="stylesheet" href="./mdbook-admonish.css">
 
 
-        <!-- Provide site root to javascript -->
+        <!-- Provide site root and default themes to javascript -->
         <script>
-            var path_to_root = "";
-            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "ayu" : "ayu";
+            const path_to_root = "";
+            const default_light_theme = "ayu";
+            const default_dark_theme = "ayu";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc.js"></script>
@@ -45,8 +46,8 @@
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script>
             try {
-                var theme = localStorage.getItem('mdbook-theme');
-                var sidebar = localStorage.getItem('mdbook-sidebar');
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
 
                 if (theme.startsWith('"') && theme.endsWith('"')) {
                     localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
@@ -60,7 +61,8 @@
 
         <!-- Set the theme before any content is loaded, prevents flash -->
         <script>
-            var theme;
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
@@ -73,8 +75,8 @@
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
-            var sidebar = null;
-            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
@@ -110,6 +112,7 @@
                             <i class="fa fa-paint-brush"></i>
                         </button>
                         <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
@@ -220,7 +223,17 @@ proposals from being made eagerly before the parent chain data supporting that s
 timestamp on the parent chain (ethereum).</p>
 <p>While the Kailua proposer agent won't publish a sequencing proposal until it is considered safe by op-node, the Kailua contracts
 allow you to enforce this requirement so that even an eager (potentially dishonest) proposer cannot have a head start!</p>
-<p>The minimum value for the time gap is equal to the length of your rollup's sequencing window.</p>
+<div id="admonition-warning" class="admonition admonish-warning" role="note" aria-labelledby="admonition-warning-title">
+<div class="admonition-title">
+<div id="admonition-warning-title">
+<p>Warning</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-warning"></a>
+</div>
+<div>
+<p>The combined duration of the time gap and the challenge timeout should not be less than twice the length of your rollup's sequencing window.</p>
+</div>
+</div>
 <div id="admonition-example-1" class="admonition admonish-example" role="note" aria-labelledby="admonition-example-1-title">
 <div class="admonition-title">
 <div id="admonition-example-1-title">
@@ -287,6 +300,17 @@ Consequently, you should keep your existing challenge timeout period.</p>
 (i.e. 1 billion calendar years).</p>
 </div>
 </div>
+<div id="admonition-warning-1" class="admonition admonish-warning" role="note" aria-labelledby="admonition-warning-1-title">
+<div class="admonition-title">
+<div id="admonition-warning-1-title">
+<p>Warning</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-warning-1"></a>
+</div>
+<div>
+<p>The combined duration of the time gap and the challenge timeout should not be less than twice the length of your rollup's sequencing window.</p>
+</div>
+</div>
 <h2 id="verifier-contract"><a class="header" href="#verifier-contract">Verifier Contract</a></h2>
 <p>RISC Zero maintains a set of pre-deployed verifier contracts for its ZK proving system.
 These contracts are regularly upgraded to support new releases of the prover, and also have a permissionless fail-safe
@@ -322,12 +346,12 @@ The Vanguard still needs to lock up the necessary bond to make proposals.</p>
 <p>Having a Vanguard that makes honest proposals within the advantage time guarantees the safety of the rollup.</p>
 </div>
 </div>
-<div id="admonition-warning" class="admonition admonish-warning" role="note" aria-labelledby="admonition-warning-title">
+<div id="admonition-warning-2" class="admonition admonish-warning" role="note" aria-labelledby="admonition-warning-2-title">
 <div class="admonition-title">
-<div id="admonition-warning-title">
+<div id="admonition-warning-2-title">
 <p>Warning</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-warning"></a>
+<a class="admonition-anchor-link" href="#admonition-warning-2"></a>
 </div>
 <div>
 <p>If the advantage time is unreasonably long, Vanguard downtime delays the liveness of the rollup.</p>
