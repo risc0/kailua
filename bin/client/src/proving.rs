@@ -21,17 +21,16 @@ use kailua_common::client::stitching::split_executions;
 use kailua_common::executor::Execution;
 use kailua_common::journal::ProofJournal;
 use kailua_common::oracle::vec::{PreimageVecEntry, VecOracle};
-use kailua_common::proof::Proof;
 use kailua_common::witness::{StitchedBootInfo, Witness};
 use kona_preimage::{HintWriterClient, PreimageOracleClient};
 use kona_proof::l1::OracleBlobProvider;
 use kona_proof::CachingOracle;
+use risc0_zkvm::Receipt;
 use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tracing::{error, info, warn};
-use risc0_zkvm::Receipt;
 
 /// The size of the LRU cache in the oracle.
 pub const ORACLE_LRU_SIZE: usize = 1024;
@@ -100,7 +99,7 @@ pub async fn run_proving_client<P, H>(
     precondition_validation_data_hash: B256,
     stitched_executions: Vec<Vec<Execution>>,
     stitched_boot_info: Vec<StitchedBootInfo>,
-    stitched_proofs: Vec<Proof>,
+    stitched_proofs: Vec<Receipt>,
     prove_snark: bool,
     force_attempt: bool,
     seek_proof: bool,
@@ -116,7 +115,7 @@ where
         execution_cache.len(),
         stitched_executions.len()
     );
-    let (journal, mut witness_vec): (ProofJournal, Witness<VecOracle>) = {
+    let (_, mut witness_vec): (ProofJournal, Witness<VecOracle>) = {
         // Instantiate oracles
         let preimage_oracle = Arc::new(CachingOracle::new(
             ORACLE_LRU_SIZE,
@@ -168,7 +167,6 @@ where
         encode_witness_frames(witness_vec).expect("Failed to encode VecOracle");
     seek_fpvm_proof(
         &proving,
-        journal,
         [preloaded_frames, streamed_frames].concat(),
         stitched_proofs,
         prove_snark,
@@ -222,9 +220,8 @@ pub fn sum_witness_size(witness: &Witness<VecOracle>) -> (usize, usize) {
 }
 pub async fn seek_fpvm_proof(
     proving: &ProvingArgs,
-    journal: ProofJournal,
     witness_frames: Vec<Vec<u8>>,
-    stitched_proofs: Vec<Proof>,
+    stitched_proofs: Vec<Receipt>,
     prove_snark: bool,
 ) -> Result<(), ProvingError> {
     // compute the zkvm proof
@@ -246,10 +243,10 @@ pub async fn seek_fpvm_proof(
     Ok(())
 }
 
-pub async fn save_proof_to_disk(proof: &Proof) {
+pub async fn save_proof_to_disk(proof: &Receipt) {
     // Save proof file to disk
-    let proof_journal = ProofJournal::decode_packed(proof.journal().as_ref())
-        .expect("Failed to decode proof output");
+    let proof_journal =
+        ProofJournal::decode_packed(proof.journal.as_ref()).expect("Failed to decode proof output");
     let mut output_file = File::create(proof::proof_file_name(&proof_journal))
         .await
         .expect("Failed to create proof output file");

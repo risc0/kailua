@@ -15,17 +15,10 @@
 use alloy_primitives::keccak256;
 use anyhow::{bail, Context};
 use kailua_common::journal::ProofJournal;
-use kailua_common::proof::Proof;
+use risc0_zkvm::Receipt;
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
-
-pub fn encode_seal(proof: &Proof) -> anyhow::Result<Vec<u8>> {
-    match proof {
-        Proof::ZKVMReceipt(receipt) => risc0_ethereum_contracts::encode_seal(receipt),
-        Proof::SetBuilderReceipt(..) => unimplemented!(),
-    }
-}
 
 pub fn proof_file_name(proof_journal: &ProofJournal) -> String {
     let version = risc0_zkvm::get_version().unwrap();
@@ -50,7 +43,7 @@ pub fn proof_file_name(proof_journal: &ProofJournal) -> String {
     format!("risc0-{version}-{file_name}.{suffix}")
 }
 
-pub async fn read_proof_file(proof_file_name: &str) -> anyhow::Result<Proof> {
+pub async fn read_proof_file(proof_file_name: &str) -> anyhow::Result<Receipt> {
     // Read receipt file
     if !Path::new(proof_file_name).exists() {
         bail!("Proof file {proof_file_name} not found.");
@@ -65,7 +58,7 @@ pub async fn read_proof_file(proof_file_name: &str) -> anyhow::Result<Proof> {
         .context(format!(
             "Failed to read proof file {proof_file_name} data until end."
         ))?;
-    bincode::deserialize::<Proof>(&proof_data).context(format!(
+    bincode::deserialize::<Receipt>(&proof_data).context(format!(
         "Failed to deserialize proof file {proof_file_name} data with bincode"
     ))
 }
