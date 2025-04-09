@@ -16,6 +16,7 @@ use crate::witness::StitchedBootInfo;
 use alloy_primitives::{Address, B256};
 use anyhow::Context;
 use kona_proof::BootInfo;
+use risc0_zkvm::Receipt;
 use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Clone, Copy, Debug, Serialize, Deserialize)]
@@ -111,5 +112,11 @@ impl ProofJournal {
             config_hash: encoded[156..188].try_into().context("config_hash")?,
             fpvm_image_id: encoded[188..220].try_into().context("fpvm_image_id")?,
         })
+    }
+}
+
+impl From<&Receipt> for ProofJournal {
+    fn from(value: &Receipt) -> Self {
+        Self::decode_packed(value.journal.as_ref()).unwrap()
     }
 }

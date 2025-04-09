@@ -20,6 +20,7 @@ use crate::rkyv::{AddressDef, B256Def};
 use alloy_primitives::{Address, B256};
 use kona_preimage::{CommsClient, PreimageKey};
 use kona_proof::FlushableCache;
+use risc0_zkvm::Receipt;
 use std::fmt::Debug;
 
 #[derive(Clone, Debug, Default, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
@@ -86,5 +87,11 @@ impl From<ProofJournal> for StitchedBootInfo {
             claimed_l2_output_root: value.claimed_l2_output_root,
             claimed_l2_block_number: value.claimed_l2_block_number,
         }
+    }
+}
+
+impl From<&Receipt> for StitchedBootInfo {
+    fn from(value: &Receipt) -> Self {
+        Self::from(ProofJournal::from(value))
     }
 }

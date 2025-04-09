@@ -13,10 +13,8 @@
 // limitations under the License.
 
 use crate::client::log;
-use crate::config::SET_BUILDER_ID;
 use crate::executor::Execution;
 use crate::journal::ProofJournal;
-use crate::proof::Proof;
 use crate::witness::StitchedBootInfo;
 use alloy_primitives::map::HashSet;
 use alloy_primitives::{Address, B256};
@@ -25,7 +23,7 @@ use kona_preimage::CommsClient;
 use kona_proof::{BootInfo, FlushableCache};
 use risc0_zkvm::serde::Deserializer;
 use risc0_zkvm::sha::{Digest, Digestible};
-use risc0_zkvm::{Groth16ReceiptVerifierParameters, MaybePruned, ReceiptClaim};
+use risc0_zkvm::Receipt;
 use serde::Deserialize;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -35,7 +33,7 @@ pub struct StitchedData {
     pub stitched_executions: Vec<Vec<Execution>>,
     pub stitched_boot_info: Vec<StitchedBootInfo>,
     #[rkyv(with = rkyv::with::Skip)]
-    pub stitched_proofs: Vec<Proof>,
+    pub stitched_proofs: Vec<Receipt>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -101,57 +99,22 @@ pub fn load_stitching_journals(fpvm_image_id: B256) -> HashSet<Digest> {
 
     let fpvm_image_id = Digest::from(fpvm_image_id.0);
     let mut proven_fpvm_journals = HashSet::new();
-    let mut verifying_params: Option<Digest> = None;
 
     loop {
-        let Ok(proof) = Proof::deserialize(&mut Deserializer::new(risc0_zkvm::guest::env::stdin()))
+        let Ok(receipt) =
+            Receipt::deserialize(&mut Deserializer::new(risc0_zkvm::guest::env::stdin()))
         else {
             log(&format!("PROOFS {}", proven_fpvm_journals.len()));
             break proven_fpvm_journals;
         };
 
-        let journal_digest = proof.journal().digest();
+        let journal_digest = receipt.journal.digest();
         log(&format!("VERIFY {journal_digest}"));
 
-        match proof {
-            Proof::ZKVMReceipt(receipt) => {
-                // Validate RISC Zero receipts natively
-                receipt
-                    .verify(fpvm_image_id)
-                    .expect("Failed to verify receipt for {journal_digest}.");
-            }
-            Proof::SetBuilderReceipt(receipt, set_builder_siblings, journal) => {
-                // Support only proofs with default verifier params
-                assert_eq!(
-                    &receipt.verifier_parameters,
-                    verifying_params.get_or_insert_with(|| {
-                        Groth16ReceiptVerifierParameters::default().digest()
-                    })
-                );
-                // build the claim for the fpvm
-                let fpvm_claim_digest =
-                    ReceiptClaim::ok(fpvm_image_id, MaybePruned::Pruned(journal.digest())).digest();
-                // construct set builder root from merkle proof
-                let set_builder_journal = crate::proof::encoded_set_builder_journal(
-                    &fpvm_claim_digest,
-                    set_builder_siblings,
-                    fpvm_image_id,
-                );
-                // Verify set builder claim digest equivalence
-                assert_eq!(
-                    receipt.claim.digest(),
-                    ReceiptClaim::ok(
-                        SET_BUILDER_ID.0,
-                        MaybePruned::Pruned(set_builder_journal.digest()),
-                    )
-                    .digest()
-                );
-                // Verify set builder receipt validity
-                receipt.verify_integrity().unwrap_or_else(|e| {
-                    panic!("Failed to verify Groth16Receipt for {journal_digest}: {e:?}")
-                });
-            }
-        }
+        // Validate RISC Zero receipts natively
+        receipt
+            .verify(fpvm_image_id)
+            .expect("Failed to verify receipt for {journal_digest}.");
 
         proven_fpvm_journals.insert(journal_digest);
     }

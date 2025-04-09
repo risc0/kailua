@@ -1,6 +1,6 @@
 [package]
 name = "kailua-common"
-version = "0.3.6"
+version = "0.3.7"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
@@ -44,9 +44,7 @@ kona-preimage.workspace = true
 kona-proof.workspace = true
 kona-protocol.workspace = true
 
-risc0-groth16.workspace = true
 risc0-zkvm.workspace = true
-risc0-zkvm-platform.workspace = true
 
 serde.workspace = true
 tracing.workspace = true
