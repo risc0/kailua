@@ -31,8 +31,8 @@ pub async fn generate_rollup_config(
     tmp_dir: &TempDir,
 ) -> anyhow::Result<RollupConfig> {
     // generate a RollupConfig for the target network
-    match cfg.kona.read_rollup_config().ok() {
-        Some(rollup_config) => Ok(rollup_config),
+    Ok(match cfg.kona.read_rollup_config().ok() {
+        Some(rollup_config) => rollup_config,
         None => {
             let registry = Registry::from_chain_list();
             let tmp_cfg_file = tmp_dir.path().join("rollup-config.json");
@@ -63,9 +63,10 @@ pub async fn generate_rollup_config(
                 .await?;
             }
             cfg.kona.rollup_config_path = Some(tmp_cfg_file);
-            cfg.kona.read_rollup_config()
+            debug!("{:?}", cfg.kona.rollup_config_path);
+            cfg.kona.read_rollup_config()?
         }
-    }
+    })
 }
 
 pub async fn fetch_rollup_config(
@@ -99,25 +100,6 @@ pub async fn fetch_rollup_config(
 
     debug!("ChainConfig: {:?}", chain_config);
 
-    // base_fee_params
-    rollup_config["base_fee_params"] = json!({
-        "elasticity_multiplier": chain_config["optimism"]["eip1559Elasticity"]
-        .as_u64()
-        .unwrap(),
-        "max_change_denominator": chain_config["optimism"]["eip1559Denominator"]
-        .as_u64()
-        .unwrap()
-    });
-    // canyon_base_fee_params
-    if let Some(canyon_denominator) = chain_config["optimism"]["eip1559DenominatorCanyon"].as_u64()
-    {
-        rollup_config["canyon_base_fee_params"] = json!({
-            "elasticity_multiplier": chain_config["optimism"]["eip1559Elasticity"]
-        .as_u64()
-        .unwrap(),
-            "max_change_denominator": canyon_denominator
-        });
-    }
     // fork times
     for fork in &[
         "regolithTime",
@@ -132,24 +114,7 @@ pub async fn fetch_rollup_config(
             rollup_config[fork] = json!(value);
         }
     }
-    // remove unused fields (todo: reintegrate on Kona update)
-    {
-        let rollup_config_map = rollup_config.as_object_mut().unwrap();
-        rollup_config_map.remove("chain_op_config");
-        rollup_config_map.remove("alt_da_config");
-        rollup_config_map.remove("pectra_blob_schedule_time");
-        let genesis_config_map = rollup_config_map
-            .get_mut("genesis")
-            .unwrap()
-            .as_object_mut()
-            .unwrap();
-        let system_config_map = genesis_config_map
-            .get_mut("system_config")
-            .unwrap()
-            .as_object_mut()
-            .unwrap();
-        system_config_map.remove("operatorFeeParams");
-    }
+
     // export
     let ser_config = serde_json::to_string(&rollup_config)?;
     if let Some(json_file_path) = json_file_path {

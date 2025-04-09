@@ -20,9 +20,8 @@ use kona_derive::attributes::StatefulAttributesBuilder;
 use kona_derive::errors::PipelineErrorKind;
 use kona_derive::pipeline::{DerivationPipeline, PipelineBuilder};
 use kona_derive::prelude::{
-    AttributesQueue, BatchProvider, BatchStream, BlobProvider, ChannelProvider, ChannelReader,
-    EthereumDataSource, FrameQueue, L1Retrieval, L1Traversal, OriginProvider, Pipeline,
-    PipelineResult, Signal, SignalReceiver, StepResult,
+    AttributesQueueStage, BlobProvider, EthereumDataSource, L2ChainProvider, OriginProvider,
+    Pipeline, PipelineResult, ResetSignal, Signal, SignalReceiver, StepResult,
 };
 use kona_driver::{DriverPipeline, PipelineCursor};
 use kona_genesis::{RollupConfig, SystemConfig};
@@ -37,7 +36,12 @@ use std::sync::Arc;
 
 /// An oracle-backed derivation pipeline.
 pub type OracleDerivationPipeline<O, B> = DerivationPipeline<
-    OracleAttributesQueue<OracleDataProvider<O, B>, O>,
+    AttributesQueueStage<
+        OracleDataProvider<O, B>,
+        OracleL1ChainProvider<O>,
+        OracleL2ChainProvider<O>,
+        OracleAttributesBuilder<O>,
+    >,
     OracleL2ChainProvider<O>,
 >;
 
@@ -48,22 +52,6 @@ pub type OracleDataProvider<O, B> = EthereumDataSource<OracleL1ChainProvider<O>,
 /// pipeline.
 pub type OracleAttributesBuilder<O> =
     StatefulAttributesBuilder<OracleL1ChainProvider<O>, OracleL2ChainProvider<O>>;
-
-/// An oracle-backed attributes queue for the derivation pipeline.
-pub type OracleAttributesQueue<DAP, O> = AttributesQueue<
-    BatchProvider<
-        BatchStream<
-            ChannelReader<
-                ChannelProvider<
-                    FrameQueue<L1Retrieval<DAP, L1Traversal<OracleL1ChainProvider<O>>>>,
-                >,
-            >,
-            OracleL2ChainProvider<O>,
-        >,
-        OracleL2ChainProvider<O>,
-    >,
-    OracleAttributesBuilder<O>,
->;
 
 /// An oracle-backed derivation pipeline.
 #[derive(Debug)]
@@ -84,14 +72,14 @@ where
     B: BlobProvider + Send + Sync + Debug + Clone,
 {
     /// Constructs a new oracle-backed derivation pipeline.
-    pub fn new(
+    pub async fn new(
         cfg: Arc<RollupConfig>,
         sync_start: Arc<RwLock<PipelineCursor>>,
         caching_oracle: Arc<O>,
         blob_provider: B,
         chain_provider: OracleL1ChainProvider<O>,
-        l2_chain_provider: OracleL2ChainProvider<O>,
-    ) -> Self {
+        mut l2_chain_provider: OracleL2ChainProvider<O>,
+    ) -> PipelineResult<Self> {
         let attributes = StatefulAttributesBuilder::new(
             cfg.clone(),
             l2_chain_provider.clone(),
@@ -99,18 +87,35 @@ where
         );
         let dap = EthereumDataSource::new_from_parts(chain_provider.clone(), blob_provider, &cfg);
 
-        let pipeline = PipelineBuilder::new()
-            .rollup_config(cfg)
+        let mut pipeline = PipelineBuilder::new()
+            .rollup_config(cfg.clone())
             .dap_source(dap)
-            .l2_chain_provider(l2_chain_provider)
+            .l2_chain_provider(l2_chain_provider.clone())
             .chain_provider(chain_provider)
             .builder(attributes)
             .origin(sync_start.read().origin())
             .build();
-        Self {
+
+        // Reset the pipeline to populate the initial system configuration in L1 Traversal.
+        let l2_safe_head = *sync_start.read().l2_safe_head();
+        pipeline
+            .signal(
+                ResetSignal {
+                    l2_safe_head,
+                    l1_origin: sync_start.read().origin(),
+                    system_config: l2_chain_provider
+                        .system_config_by_number(l2_safe_head.block_info.number, cfg)
+                        .await
+                        .ok(),
+                }
+                .signal(),
+            )
+            .await?;
+
+        Ok(Self {
             pipeline,
             caching_oracle,
-        }
+        })
     }
 }
 

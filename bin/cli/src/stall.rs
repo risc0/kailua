@@ -36,16 +36,10 @@ pub trait Stall<R> {
 }
 
 #[async_trait]
-impl<
-        'req,
-        'coder,
-        T: Sync + Send + 'static,
-        P: Provider<N>,
-        C: SolCall + 'static + Sync,
-        N: Network,
-    > Stall<C::Return> for SolCallBuilder<T, P, C, N>
+impl<'coder, T: Sync + Send + 'static, P: Provider<N>, C: SolCall + 'static + Sync, N: Network>
+    Stall<C::Return> for SolCallBuilder<T, P, C, N>
 where
-    EthCall<'req, 'coder, PhantomData<C>, N>: IntoFuture,
+    EthCall<'coder, PhantomData<C>, N>: IntoFuture,
     C::Return: Send,
 {
     async fn stall(&self, span: &'static str) -> C::Return {

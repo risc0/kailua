@@ -15,11 +15,12 @@
 use clap::Parser;
 use kailua_client::args::KailuaClientArgs;
 use kailua_client::oracle::{HINT_WRITER, ORACLE_READER};
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = KailuaClientArgs::parse();
-    kona_host::cli::init_tracing_subscriber(args.kailua_verbosity)?;
+    kona_cli::init_tracing_subscriber(args.kailua_verbosity, None::<EnvFilter>)?;
     let precondition_validation_data_hash =
         args.precondition_validation_data_hash.unwrap_or_default();
 

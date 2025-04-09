@@ -16,7 +16,6 @@ use crate::{retry, retry_with_context};
 use alloy::consensus::{Blob, BlobTransactionSidecar, BlockHeader};
 use alloy::eips::eip4844::{kzg_to_versioned_hash, BLS_MODULUS, FIELD_ELEMENTS_PER_BLOB};
 use alloy::eips::{BlockId, BlockNumberOrTag};
-use alloy::network::primitives::BlockTransactionsKind;
 use alloy::network::{BlockResponse, Network};
 use alloy::primitives::{BlockNumber, B256, U256};
 use alloy::providers::Provider;
@@ -209,7 +208,7 @@ pub async fn get_next_block<P: Provider<N>, N: Network>(
         "Provider::get_block_by_hash",
         retry_with_context!(async {
             provider
-                .get_block_by_hash(parent_hash, BlockTransactionsKind::Hashes)
+                .get_block_by_hash(parent_hash)
                 .await
                 .context("get_block_by_hash")?
                 .ok_or_else(|| anyhow!("Failed to fetch parent block"))
@@ -234,10 +233,7 @@ pub async fn get_block_by_number<P: Provider<N>, N: Network>(
         "Provider::get_block_by_number",
         retry_with_context!(async {
             provider
-                .get_block_by_number(
-                    BlockNumberOrTag::Number(block_number),
-                    BlockTransactionsKind::Hashes,
-                )
+                .get_block_by_number(BlockNumberOrTag::Number(block_number))
                 .await
                 .context("get_block_by_number")?
                 .ok_or_else(|| anyhow!("Failed to fetch block"))
@@ -260,7 +256,7 @@ pub async fn get_block<P: Provider<N>, N: Network>(
         "Provider::get_block",
         retry_with_context!(async {
             provider
-                .get_block(BlockId::Number(block_id), BlockTransactionsKind::Hashes)
+                .get_block(BlockId::Number(block_id))
                 .await
                 .context("get_block")?
                 .ok_or_else(|| anyhow!("Failed to fetch block"))

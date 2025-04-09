@@ -22,7 +22,7 @@ use kailua_common::witness::StitchedBootInfo;
 use kona_host::single::{SingleChainHintHandler, SingleChainHost, SingleChainLocalInputs};
 use kona_host::{
     DiskKeyValueStore, MemoryKeyValueStore, OfflineHostBackend, OnlineHostBackend, PreimageServer,
-    SharedKeyValueStore, SplitKeyValueStore,
+    PreimageServerError, SharedKeyValueStore, SplitKeyValueStore,
 };
 use kona_preimage::{
     BidirectionalChannel, Channel, HintReader, HintWriter, OracleReader, OracleServer,
@@ -121,7 +121,7 @@ pub async fn start_server<C>(
     kv_store: SharedKeyValueStore,
     hint: C,
     preimage: C,
-) -> anyhow::Result<JoinHandle<anyhow::Result<()>>>
+) -> anyhow::Result<JoinHandle<Result<(), PreimageServerError>>>
 where
     C: Channel + Send + Sync + 'static,
 {

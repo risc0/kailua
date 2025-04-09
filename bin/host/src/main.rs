@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy::network::primitives::BlockTransactionsKind;
 use alloy::providers::{Provider, RootProvider};
 use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::B256;
@@ -31,11 +30,12 @@ use std::collections::BinaryHeap;
 use std::env::set_var;
 use tempfile::tempdir;
 use tracing::{info, warn};
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let mut args = KailuaHostArgs::parse();
-    kona_host::cli::init_tracing_subscriber(args.v)?;
+    kona_cli::init_tracing_subscriber(args.v, None::<EnvFilter>)?;
     set_var("KAILUA_VERBOSITY", args.v.to_string());
 
     // fetch starting block number
@@ -124,10 +124,7 @@ async fn main() -> anyhow::Result<()> {
                 .expect("Failed to recv prover task");
             let starting_block = if let Some(l2_provider) = l2_provider.as_ref() {
                 l2_provider
-                    .get_block_by_hash(
-                        job_args.kona.agreed_l2_head_hash,
-                        BlockTransactionsKind::Hashes,
-                    )
+                    .get_block_by_hash(job_args.kona.agreed_l2_head_hash)
                     .await?
                     .unwrap()
                     .header
@@ -245,10 +242,7 @@ async fn main() -> anyhow::Result<()> {
                 let mid_block = l2_provider
                     .as_ref()
                     .expect("Missing l2_provider")
-                    .get_block_by_number(
-                        BlockNumberOrTag::Number(mid_point),
-                        BlockTransactionsKind::Hashes,
-                    )
+                    .get_block_by_number(BlockNumberOrTag::Number(mid_point))
                     .await?
                     .unwrap_or_else(|| panic!("Block {mid_point} not found"));
                 // Lower half workload ends at midpoint (inclusive)
@@ -291,10 +285,9 @@ async fn main() -> anyhow::Result<()> {
             base_args.kona.agreed_l2_head_hash = l2_provider
                 .as_ref()
                 .unwrap()
-                .get_block_by_number(
-                    BlockNumberOrTag::Number(base_args.kona.claimed_l2_block_number),
-                    BlockTransactionsKind::Hashes,
-                )
+                .get_block_by_number(BlockNumberOrTag::Number(
+                    base_args.kona.claimed_l2_block_number,
+                ))
                 .await?
                 .unwrap_or_else(|| {
                     panic!("Block {} not found", base_args.kona.claimed_l2_block_number)

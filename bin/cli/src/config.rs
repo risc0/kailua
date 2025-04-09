@@ -27,6 +27,7 @@ use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, Status, TraceContextExt, Tracer};
 use risc0_zkvm::compute_image_id;
 use risc0_zkvm::sha::Digest;
+use tracing::debug;
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct ConfigArgs {
@@ -56,6 +57,7 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
         fetch_rollup_config(&args.op_node_url, &args.op_geth_url, None)
     )
     .context("fetch_rollup_config")?;
+    debug!("{config:?}");
     let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
 
     let eth_rpc_provider = ProviderBuilder::new().on_http(args.eth_rpc_url.as_str().try_into()?);

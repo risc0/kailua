@@ -36,7 +36,6 @@ pub trait Transact<N: Network> {
 
 #[async_trait]
 impl<
-        'req,
         'coder,
         T: Sync + Send + 'static,
         P: Provider<N>,
@@ -44,7 +43,7 @@ impl<
         N: Network,
     > Transact<N> for CallBuilder<T, P, D, N>
 where
-    EthCall<'req, 'coder, D, N>: IntoFuture,
+    EthCall<'coder, D, N>: IntoFuture,
 {
     async fn transact(&self, span: &'static str) -> anyhow::Result<N::ReceiptResponse> {
         let tracer = tracer("kailua");

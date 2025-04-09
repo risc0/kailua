@@ -39,6 +39,7 @@ kailua-client.workspace = true
 kailua-common.workspace = true
 
 # Kona
+kona-cli.workspace = true
 kona-client.workspace = true
 kona-derive.workspace = true
 kona-genesis.workspace = true

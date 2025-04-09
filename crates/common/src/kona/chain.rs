@@ -104,9 +104,7 @@ impl<T: CommsClient + Sync + Send> ChainProvider for OracleL1ChainProvider<T> {
         // Walk back the block headers to the desired block number.
         while self.headers_map.len() <= header_index {
             let header_hash = self.headers[self.headers_map.len() - 1].parent_hash;
-            let header = self
-                .header_by_hash(self.headers[self.headers_map.len() - 1].parent_hash)
-                .await?;
+            let header = self.header_by_hash(header_hash).await?;
             self.headers_map.insert(header_hash, self.headers.len());
             self.headers.push(header.seal(header_hash));
         }

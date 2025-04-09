@@ -183,7 +183,8 @@ where
             beacon,
             l1_provider.clone(),
             l2_provider.clone(),
-        );
+        )
+        .await?;
         let cached_executor = CachedExecutor {
             cache: {
                 // The cache elements will be popped from first to last

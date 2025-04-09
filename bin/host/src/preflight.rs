@@ -15,7 +15,6 @@
 use crate::args::KailuaHostArgs;
 use crate::kv::RWLKeyValueStore;
 use alloy::consensus::Transaction;
-use alloy::network::primitives::BlockTransactionsKind;
 use alloy::providers::{Provider, RootProvider};
 use alloy_eips::eip4844::IndexedBlobHash;
 use alloy_eips::BlockNumberOrTag;
@@ -38,7 +37,7 @@ pub async fn get_blob_fetch_request(
     blob_hash: B256,
 ) -> anyhow::Result<BlobFetchRequest> {
     let block = l1_provider
-        .get_block_by_hash(block_hash, BlockTransactionsKind::Full)
+        .get_block_by_hash(block_hash)
         .await?
         .expect("Failed to fetch block {block_hash}.");
     let mut blob_index = 0;
@@ -140,7 +139,7 @@ pub async fn concurrent_execution_preflight(
 ) -> anyhow::Result<()> {
     let l2_provider = args.kona.create_providers().await?.l2;
     let starting_block = l2_provider
-        .get_block_by_hash(args.kona.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
+        .get_block_by_hash(args.kona.agreed_l2_head_hash)
         .await?
         .unwrap()
         .header
@@ -164,7 +163,7 @@ pub async fn concurrent_execution_preflight(
 
         // update ending block
         args.kona.claimed_l2_block_number = l2_provider
-            .get_block_by_hash(args.kona.agreed_l2_head_hash, BlockTransactionsKind::Hashes)
+            .get_block_by_hash(args.kona.agreed_l2_head_hash)
             .await?
             .unwrap()
             .header
@@ -191,10 +190,7 @@ pub async fn concurrent_execution_preflight(
         // update starting block for next job
         if num_blocks > 0 {
             args.kona.agreed_l2_head_hash = l2_provider
-                .get_block_by_number(
-                    BlockNumberOrTag::Number(args.kona.claimed_l2_block_number),
-                    BlockTransactionsKind::Hashes,
-                )
+                .get_block_by_number(BlockNumberOrTag::Number(args.kona.claimed_l2_block_number))
                 .await?
                 .unwrap()
                 .header
