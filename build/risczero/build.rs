@@ -18,28 +18,38 @@ fn main() {
             #[cfg(not(any(feature = "debug-guest-build", debug_assertions)))]
             let root_dir = {
                 let cwd = std::env::current_dir().unwrap();
-                cwd.parent().unwrap().parent().map(|d| d.to_path_buf())
+                cwd.parent()
+                    .unwrap()
+                    .parent()
+                    .map(|d| d.to_path_buf())
+                    .unwrap()
             };
-            std::collections::HashMap::from([(
-                "kailua-fpvm",
-                {
-                    let opts = risc0_build::GuestOptions::default();
-                    // Build a reproducible ELF file using docker under the release profile
-                    #[cfg(not(any(feature = "debug-guest-build", debug_assertions)))]
-                    {
-                        opts.use_docker = Some(risc0_build::DockerOptions { root_dir });
-                    }
-                    // Disable dev-mode receipts from being validated inside the guest
-                    #[cfg(any(
-                        feature = "disable-dev-mode",
-                        not(any(feature = "debug-guest-build", debug_assertions))
-                    ))]
-                    {
-                        opts.features.push(String::from("disable-dev-mode"));
-                    }
+            std::collections::HashMap::from([("kailua-fpvm", {
+                let opts = risc0_build::GuestOptions::default();
+                // Build a reproducible ELF file using docker under the release profile
+                #[cfg(not(any(feature = "debug-guest-build", debug_assertions)))]
+                let opts = {
+                    let mut opts = opts;
+                    opts.use_docker = Some(
+                        risc0_build::DockerOptionsBuilder::default()
+                            .root_dir(root_dir)
+                            .build()
+                            .unwrap(),
+                    );
                     opts
-                },
-            )])
+                };
+                // Disable dev-mode receipts from being validated inside the guest
+                #[cfg(any(
+                    feature = "disable-dev-mode",
+                    not(any(feature = "debug-guest-build", debug_assertions))
+                ))]
+                let opts = {
+                    let mut opts = opts;
+                    opts.features.push(String::from("disable-dev-mode"));
+                    opts
+                };
+                opts
+            })])
         };
 
         risc0_build::embed_methods_with_options(build_opts);
