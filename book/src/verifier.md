@@ -22,7 +22,7 @@ This section describes the contracts that make up the on-chain proof verificatio
 ### Verifier Router
 The [RISCZeroVerifierRouter contract](https://dev.risczero.com/api/blockchain-integration/contracts/verifier#verifier-router)
 routes proofs from different sources to their correct verifier.
-This allows your application (and Kailua) to leverage proofs generated using different zkVM versions, or aggregated through
+This allows your application (and Kailua) to leverage proofs generated using different zkVM versions, or through
 the [Boundless proving network](https://docs.beboundless.xyz/), while delegating the complexity of managing the
 verifier version to the router contract.
 
@@ -42,13 +42,6 @@ and id constructor parameters.
 This verifier is intended to be deployed and then added as a possible backend to a router instead of being used directly on its own.
 However, it is possible to call and use this verifier directly if the prover and verifier versions align.
 
-### Set Verifier (Boundless Network)
-The [RISCZeroSetVerifier](https://github.com/risc0/risc0-ethereum/blob/release-1.2/contracts/src/RiscZeroSetVerifier.sol)
-accepts aggregated proofs, which are generated through recursively verifying other proofs inside an aggregator program.
-This verifier only verifies "inclusion proofs", and delegates the verification of the cryptographic proof of correct
-aggregation to another verifier (such as the router or the Groth16 verifier directly).
-This means it must be paired with another verifier contract.
-
 ### Fake Proof Verifier (INSECURE)
 This verifier accepts fake proofs generated while running the RISC Zero zkVM in "dev mode".
 It is only useful for testing out the zkVM in a development environment without being delayed by proving time.
@@ -58,7 +51,7 @@ Do not use the fake proof verifier anywhere near production.
 
 ## Deployment
 
-This section will walk you through creating your own verifier deployment that supports individual and aggregated proofs.
+This section will walk you through creating your own verifier deployment.
 The commands below will be using Foundry's `forge` and `cast` utilities, which you should have installed as part of the
 foundry [prerequisite](quickstart.md#prerequisites).
 
@@ -103,86 +96,6 @@ We will use this in the following commands when adding proving backends.
 The router cannot verify any proofs on its own.
 ```
 
-
-### Aggregate Verifier
-```solidity
-constructor(IRiscZeroVerifier verifier, bytes32 imageId, string memory _imageUrl)
-```
-
-The aggregate verifier requires two main parameters to construct it, an address for a verifier to use to validate proofs of
-aggregation, and an image id defining the program to use for aggregating proofs.
-The third parameter specifies where the aggregation program is hosted, and can be left blank.
-
-We will reuse the router contract we just deployed as the verifier, and the `SET_BUILDER_ID` value we got from running
-`kailua-cli config`. 
-
-To deploy a new aggregate verifier
-```shell
-forge create RiscZeroSetVerifier --constructor-args \
-  [YOUR_DEPLOYED_ROUTER_CONTRACT] \
-  [SET_BUILDER_ID] \
-  ""
-```
-
-On success, you should see output similar to the following:
-```
-Deployer: [YOUR_DEPLOYER_WALLET_ADDRESS]
-Deployed to: [YOUR_DEPLOYED_AGGREGATE_VERIFIER_CONTRACT]
-Transaction hash: [YOUR_DEPLOYMENT_TRANSACTION_HASH]
-```
-
-The next step is to now add this aggregate verifier contract as a backend for our router to use to verify any aggregated
-proofs it receives.
-For this, we will first to need to query the aggregate verifier for its "selector" using foundry's `cast` utility:
-```shell
-cast call \
-  [YOUR_DEPLOYED_AGGREGATE_VERIFIER_CONTRACT] \
-  "SELECTOR() returns (bytes4)"
-```
-This should return a short string similar to the following:
-```
-0x9cc26c32
-```
-
-We can now use this selector to add the aggregate verifier to the router using the `admin` wallet you specified while
-deploying the router:
-```shell
-cast send \
-  [YOUR_DEPLOYED_ROUTER_CONTRACT] \
-  "addVerifier(bytes4 selector, address verifier)" \
-  [YOUR_AGGREGATE_VERIFIER_SELECTOR] \
-  [YOUR_DEPLOYED_AGGREGATE_VERIFIER_CONTRACT]
-```
-
-The output from successfully issuing this transaction should resemble the following:
-```
-blockHash               0x9cb7f77cab555ff8907a62d19165795e7dbd51d558ee29a7383ced32daea18ab
-blockNumber             821
-contractAddress         
-cumulativeGasUsed       414546
-effectiveGasPrice       1000000007
-from                    0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc
-gasUsed                 46831
-logs                    []
-logsBloom               0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-root                    
-status                  1 (success)
-transactionHash         0x1446eeeb02008e6ef37dc60556f6a45848f106e175d0ea597fc41370918022c9
-transactionIndex        1
-type                    2
-blobGasPrice            
-blobGasUsed             
-authorizationList       
-to                      0x0116686E2291dbd5e317F47faDBFb43B599786Ef
-```
-Make sure that the status field in your output indicates success!
-
-```admonish success
-You've now connected your verifier router to the aggregate verifier.
-However, this pair still cannot verify any proofs on its own!
-Next, we will install a cryptographic verifier for this task.
-```
-
 ### Groth16 Verifier
 
 The Groth16 verifier validates stand-alone cryptographic proofs generated using the RISC Zero zkVM and compressed using
@@ -221,5 +134,5 @@ cast send \
 ```
 
 ```admonish success
-You now have a RISC Zero verifier contract for stand-alone and aggregated ZK (fault) proofs!
+You now have a RISC Zero verifier contract!
 ```

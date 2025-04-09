@@ -32,7 +32,6 @@ The below table contains rounded-up gas cost estimates of various contract opera
 | RiscZeroVerifierRouter  | deploy           |   800K |                        |
 | RiscZeroVerifierRouter  | addVerifier      |    50K |                        |
 | RiscZeroGroth16Verifier | deploy           | 1,300K |                        |
-| RiscZeroSetVerifier     | deploy           | 1,060K |                        |
 | RiscZeroMockVerifier    | deploy           |   615K |                        |
 | KailuaTreasury          | deploy           | 5,050K |                        |
 | KailuaTreasury          | propose          |   380K |                        |

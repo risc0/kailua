@@ -41,7 +41,7 @@ pub struct ProvingArgs {
     pub payout_recipient_address: Option<Address>,
     #[clap(long, env, required = false, default_value_t = 21)]
     pub segment_limit: u32,
-    #[clap(long, env, required = false, default_value_t = 104_857_600)]
+    #[clap(long, env, required = false, default_value_t = 2_684_354_560)]
     pub max_witness_size: usize,
     #[clap(long, env, default_value_t = false)]
     pub skip_derivation_proof: bool,
