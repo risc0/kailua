@@ -4647,6 +4647,7 @@ dependencies = [
  "bytemuck",
  "c-kzg",
  "clap",
+ "futures",
  "gcloud-sdk",
  "hex",
  "kailua-build",
