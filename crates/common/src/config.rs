@@ -22,8 +22,6 @@ pub const CONTROL_ROOT: B256 =
     b256!("8cdad9242664be3112aba377c5425a4df735eb1c6966472b561d2855932c0469");
 pub const BN254_CONTROL_ID: B256 =
     b256!("04446e66d300eb7fb45c9726bb53c793dda407a62e9601618bb43c5c14657ac0");
-pub const SET_BUILDER_ID: B256 =
-    b256!("744cca56cde6933dea72752c78b4a6ca894ed620e8af6437ab05fad53bcec40a");
 
 pub fn safe_default<V: Debug + Eq>(opt: Option<V>, default: V) -> anyhow::Result<V> {
     if let Some(v) = opt {

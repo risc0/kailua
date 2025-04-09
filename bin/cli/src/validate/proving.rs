@@ -133,42 +133,30 @@ pub fn create_proving_args(
 
 #[cfg(feature = "devnet")]
 pub fn maybe_patch_proof(
-    mut proof: kailua_common::proof::Proof,
+    mut receipt: risc0_zkvm::Receipt,
     expected_fpvm_image_id: [u8; 32],
-    expected_set_builder_image_id: [u8; 32],
-) -> anyhow::Result<kailua_common::proof::Proof> {
+) -> anyhow::Result<risc0_zkvm::Receipt> {
     // Return the proof if we can't patch it
-    if !is_dev_mode() {
-        return Ok(proof);
+    if !risc0_zkvm::is_dev_mode() {
+        return Ok(receipt);
     }
-
-    use alloy::sol_types::SolValue;
-    use anyhow::Context;
-    use risc0_zkvm::is_dev_mode;
-    use risc0_zkvm::sha::Digestible;
-    use tracing::{error, warn};
 
     let expected_fpvm_image_id = risc0_zkvm::sha::Digest::from(expected_fpvm_image_id);
 
-    match &mut proof {
-        kailua_common::proof::Proof::ZKVMReceipt(receipt) => {
-            // Patch the image id of the receipt to match the expected one
-            if let risc0_zkvm::InnerReceipt::Fake(fake_inner_receipt) = &mut receipt.inner {
-                if let risc0_zkvm::MaybePruned::Value(claim) = &mut fake_inner_receipt.claim {
-                    warn!("DEV-MODE ONLY: Patching fake receipt image id to match game contract.");
-                    claim.pre = risc0_zkvm::MaybePruned::Pruned(expected_fpvm_image_id);
-                    if let risc0_zkvm::MaybePruned::Value(Some(output)) = &mut claim.output {
-                        if let risc0_zkvm::MaybePruned::Value(journal) = &mut output.journal {
-                            let n = journal.len();
-                            journal[n - 32..n].copy_from_slice(expected_fpvm_image_id.as_bytes());
-                            receipt.journal.bytes[n - 32..n]
-                                .copy_from_slice(expected_fpvm_image_id.as_bytes());
-                        }
-                    }
+    // Patch the image id of the receipt to match the expected one
+    if let risc0_zkvm::InnerReceipt::Fake(fake_inner_receipt) = &mut receipt.inner {
+        if let risc0_zkvm::MaybePruned::Value(claim) = &mut fake_inner_receipt.claim {
+            tracing::warn!("DEV-MODE ONLY: Patching fake receipt image id to match game contract.");
+            claim.pre = risc0_zkvm::MaybePruned::Pruned(expected_fpvm_image_id);
+            if let risc0_zkvm::MaybePruned::Value(Some(output)) = &mut claim.output {
+                if let risc0_zkvm::MaybePruned::Value(journal) = &mut output.journal {
+                    let n = journal.len();
+                    journal[n - 32..n].copy_from_slice(expected_fpvm_image_id.as_bytes());
+                    receipt.journal.bytes[n - 32..n]
+                        .copy_from_slice(expected_fpvm_image_id.as_bytes());
                 }
             }
         }
-        kailua_common::proof::Proof::SetBuilderReceipt(..) => {}
     }
-    Ok(proof)
+    Ok(receipt)
 }

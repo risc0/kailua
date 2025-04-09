@@ -4,7 +4,7 @@ set fallback := true
 default:
   @just --list
 
-build +ARGS="--release -F prove --locked":
+build +ARGS="--release -F prove -F disable-dev-mode --locked":
   cargo build {{ARGS}}
 
 clippy:

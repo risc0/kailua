@@ -307,7 +307,7 @@ impl KailuaDB {
             // Consider updating canonical chain tip if none exists or proposal has greater height
             if self
                 .canonical_tip_height()
-                .map_or(true, |h| h < proposal.output_block_number)
+                .is_none_or(|h| h < proposal.output_block_number)
             {
                 proposal.canonical = Some(true);
             } else {

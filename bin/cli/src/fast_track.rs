@@ -25,7 +25,7 @@ use kailua_build::KAILUA_FPVM_ID;
 use kailua_client::provider::OpNodeProvider;
 use kailua_client::telemetry::TelemetryArgs;
 use kailua_client::{await_tel, await_tel_res};
-use kailua_common::config::{config_hash, BN254_CONTROL_ID, CONTROL_ROOT, SET_BUILDER_ID};
+use kailua_common::config::{config_hash, BN254_CONTROL_ID, CONTROL_ROOT};
 use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
 use opentelemetry::global::tracer;
@@ -502,44 +502,6 @@ pub async fn deploy_verifier<P1: Provider<N>, P2: Provider<N>, N: Network>(
         .context("RiscZeroVerifierRouter::addVerifier(RiscZeroGroth16Verifier)")?;
     info!(
         "RiscZeroVerifierRouter::addVerifier(RiscZeroGroth16Verifier): {} gas",
-        receipt.gas_used()
-    );
-
-    // Deploy RiscZeroSetVerifier contract
-    info!("Deploying RiscZeroSetVerifier contract to L1.");
-    let receipt = RiscZeroSetVerifier::deploy_builder(
-        &deployer_provider,
-        verifier_contract_address,
-        SET_BUILDER_ID,
-        String::default(),
-    )
-    .transact_with_context(context.clone(), "RiscZeroSetVerifier::deploy")
-    .await
-    .context("RiscZeroSetVerifier::deploy")?;
-    info!("RiscZeroSetVerifier::deploy: {} gas", receipt.gas_used());
-    let set_verifier_contract = RiscZeroSetVerifier::new(
-        receipt
-            .contract_address()
-            .ok_or_else(|| anyhow!("RiscZeroSetVerifier not deployed"))?,
-        &deployer_provider,
-    );
-    info!("{:?}", &set_verifier_contract);
-    let selector = set_verifier_contract
-        .SELECTOR()
-        .stall_with_context(context.clone(), "RiscZeroSetVerifier::selector")
-        .await
-        ._0;
-    info!("Adding RiscZeroSetVerifier contract to RiscZeroVerifierRouter.");
-    let receipt = verifier_contract
-        .addVerifier(selector, *set_verifier_contract.address())
-        .transact_with_context(
-            context.clone(),
-            "RiscZeroVerifierRouter::addVerifier(RiscZeroSetVerifier)",
-        )
-        .await
-        .context("RiscZeroVerifierRouter::addVerifier(RiscZeroSetVerifier)")?;
-    info!(
-        "RiscZeroVerifierRouter::addVerifier(RiscZeroSetVerifier): {} gas",
         receipt.gas_used()
     );
 

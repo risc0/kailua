@@ -31,7 +31,7 @@ use alloy::providers::{ProviderBuilder, RootProvider};
 use anyhow::{anyhow, bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_client::args::parse_address;
-use kailua_client::proof::{encode_seal, proof_file_name, read_proof_file};
+use kailua_client::proof::{proof_file_name, read_proof_file};
 use kailua_client::provider::OpNodeProvider;
 use kailua_client::telemetry::TelemetryArgs;
 use kailua_client::{await_tel, await_tel_res};
@@ -40,14 +40,13 @@ use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::config::config_hash;
 use kailua_common::journal::ProofJournal;
 use kailua_common::precondition::{equivalence_precondition_hash, PreconditionValidationData};
-use kailua_common::proof::Proof;
 use kailua_contracts::*;
 use kailua_host::channel::AsyncChannel;
 use kailua_host::config::fetch_rollup_config;
 use kona_protocol::BlockInfo;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
-use risc0_zkvm::is_dev_mode;
+use risc0_zkvm::{is_dev_mode, Receipt};
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::process::exit;
@@ -122,7 +121,7 @@ pub enum Message {
         claimed_l2_block_number: u64,
         claimed_l2_output_root: FixedBytes<32>,
     },
-    Proof(u64, Proof),
+    Proof(u64, Receipt),
 }
 
 pub async fn handle_proposals(
@@ -514,19 +513,20 @@ pub async fn handle_proposals(
         // publish computed output fault proofs
         let computed_proofs = output_fault_proof_buffer.len();
         for _ in 0..computed_proofs {
-            let Some(Message::Proof(proposal_index, proof)) = output_fault_proof_buffer.pop_front()
+            let Some(Message::Proof(proposal_index, receipt)) =
+                output_fault_proof_buffer.pop_front()
             else {
                 error!("Validator loop received an unexpected message.");
                 continue;
             };
             let Some(proposal) = kailua_db.get_local_proposal(&proposal_index) else {
                 error!("Proposal {proposal_index} missing from database.");
-                output_fault_proof_buffer.push_back(Message::Proof(proposal_index, proof));
+                output_fault_proof_buffer.push_back(Message::Proof(proposal_index, receipt));
                 continue;
             };
             let Some(parent) = kailua_db.get_local_proposal(&proposal.parent) else {
                 error!("Parent proposal {} missing from database.", proposal.parent);
-                output_fault_proof_buffer.push_back(Message::Proof(proposal_index, proof));
+                output_fault_proof_buffer.push_back(Message::Proof(proposal_index, receipt));
                 continue;
             };
             // Abort early if a validity proof is already submitted in this tournament
@@ -549,24 +549,18 @@ pub async fn handle_proposals(
                 .0;
             // patch the proof if in dev mode
             #[cfg(feature = "devnet")]
-            let proof = proving::maybe_patch_proof(
-                proof,
-                expected_fpvm_image_id,
-                kailua_common::config::SET_BUILDER_ID.0,
-            )?;
+            let receipt = proving::maybe_patch_proof(receipt, expected_fpvm_image_id)?;
             // verify that the zkvm receipt is valid
-            if let Some(receipt) = proof.as_zkvm_receipt() {
-                if let Err(e) = receipt.verify(expected_fpvm_image_id) {
-                    error!("Could not verify receipt against image id in contract: {e:?}");
-                } else {
-                    info!("Receipt validated.");
-                }
+            if let Err(e) = receipt.verify(expected_fpvm_image_id) {
+                error!("Could not verify receipt against image id in contract: {e:?}");
+            } else {
+                info!("Receipt validated.");
             }
             // Decode ProofJournal
-            let proof_journal = ProofJournal::decode_packed(proof.journal().as_ref())?;
+            let proof_journal = ProofJournal::decode_packed(receipt.journal.as_ref())?;
             info!("Proof journal: {:?}", proof_journal);
             // encode seal data
-            let encoded_seal = Bytes::from(encode_seal(&proof)?);
+            let encoded_seal = Bytes::from(risc0_ethereum_contracts::encode_seal(&receipt)?);
 
             let child_index = parent
                 .child_index(proposal.index)
@@ -669,7 +663,8 @@ pub async fn handle_proposals(
                     }
                     Err(e) => {
                         error!("Failed to confirm validity proof txn: {e:?}");
-                        output_fault_proof_buffer.push_back(Message::Proof(proposal_index, proof));
+                        output_fault_proof_buffer
+                            .push_back(Message::Proof(proposal_index, receipt));
                     }
                 }
                 // Skip fault proof submission logic
@@ -909,7 +904,7 @@ pub async fn handle_proposals(
                 }
                 Err(e) => {
                     error!("Failed to confirm fault proof txn: {e:?}");
-                    output_fault_proof_buffer.push_back(Message::Proof(proposal_index, proof));
+                    output_fault_proof_buffer.push_back(Message::Proof(proposal_index, receipt));
                 }
             }
         }

@@ -612,7 +612,7 @@ impl Proposal {
     }
 
     pub fn append_child(&mut self, child_index: u64) -> bool {
-        let should_insert = self.children.last().map_or(true, |i| i < &child_index);
+        let should_insert = self.children.last().is_none_or(|i| i < &child_index);
         // The assumption is that this is always sorted and out of order insertions are duplicates
         if should_insert {
             self.children.push(child_index);
