@@ -20,9 +20,9 @@ use anyhow::Context;
 use async_channel::{Receiver, Sender};
 use kailua_client::proving::ProvingError;
 use kailua_common::executor::Execution;
-use kailua_common::proof::Proof;
 use kailua_common::witness::StitchedBootInfo;
 use kona_genesis::RollupConfig;
+use risc0_zkvm::Receipt;
 use std::cmp::Ordering;
 use tracing::error;
 
@@ -35,14 +35,14 @@ pub struct Cached {
     pub precondition_validation_data_hash: B256,
     pub stitched_executions: Vec<Vec<Execution>>,
     pub stitched_boot_info: Vec<StitchedBootInfo>,
-    pub stitched_proofs: Vec<Proof>,
+    pub stitched_proofs: Vec<Receipt>,
     pub prove_snark: bool,
     pub force_attempt: bool,
     pub seek_proof: bool,
 }
 
 impl Cached {
-    pub async fn compute_cached(self) -> Result<Proof, ProvingError> {
+    pub async fn compute_cached(self) -> Result<Receipt, ProvingError> {
         prove::compute_cached_proof(
             self.args,
             self.rollup_config,
@@ -62,7 +62,7 @@ impl Cached {
     pub async fn compute_fpvm(
         self,
         task_sender: Sender<Oneshot>,
-    ) -> Result<Option<Proof>, ProvingError> {
+    ) -> Result<Option<Receipt>, ProvingError> {
         prove::compute_fpvm_proof(
             self.args,
             self.rollup_config,
@@ -101,7 +101,7 @@ impl Ord for Cached {
 #[derive(Debug)]
 pub struct OneshotResult {
     pub cached: Cached,
-    pub result: Result<Proof, ProvingError>,
+    pub result: Result<Receipt, ProvingError>,
 }
 
 impl PartialEq for OneshotResult {
@@ -161,12 +161,12 @@ pub async fn compute_oneshot_task(
     precondition_validation_data_hash: B256,
     stitched_executions: Vec<Vec<Execution>>,
     stitched_boot_info: Vec<StitchedBootInfo>,
-    stitched_proofs: Vec<Proof>,
+    stitched_proofs: Vec<Receipt>,
     prove_snark: bool,
     force_attempt: bool,
     seek_proof: bool,
     task_sender: Sender<Oneshot>,
-) -> Result<Proof, ProvingError> {
+) -> Result<Receipt, ProvingError> {
     // create proving task
     let cached_task = Cached {
         args,

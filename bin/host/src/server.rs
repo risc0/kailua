@@ -18,7 +18,6 @@ use alloy_primitives::B256;
 use anyhow::anyhow;
 use kailua_client::proving::ProvingError;
 use kailua_common::executor::Execution;
-use kailua_common::proof::Proof;
 use kailua_common::witness::StitchedBootInfo;
 use kona_host::single::{SingleChainHintHandler, SingleChainHost, SingleChainLocalInputs};
 use kona_host::{
@@ -29,6 +28,7 @@ use kona_preimage::{
     BidirectionalChannel, Channel, HintReader, HintWriter, OracleReader, OracleServer,
 };
 use kona_proof::HintType;
+use risc0_zkvm::Receipt;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::task;
@@ -52,7 +52,7 @@ pub async fn start_server_and_native_client(
     precondition_validation_data_hash: B256,
     stitched_executions: Vec<Vec<Execution>>,
     stitched_boot_info: Vec<StitchedBootInfo>,
-    stitched_proofs: Vec<Proof>,
+    stitched_proofs: Vec<Receipt>,
     prove_snark: bool,
     force_attempt: bool,
     seek_proof: bool,
