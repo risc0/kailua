@@ -16,7 +16,7 @@
 pragma solidity ^0.8.15;
 
 import "./vendor/FlatOPImportV1.4.0.sol";
-import "./vendor/FlatR0ImportV1.2.0.sol";
+import "./vendor/FlatR0ImportV2.0.2.sol";
 import "./KailuaLib.sol";
 import "./KailuaTournament.sol";
 

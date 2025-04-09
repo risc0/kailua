@@ -19,7 +19,7 @@ use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use std::fmt::Debug;
 
 pub const CONTROL_ROOT: B256 =
-    b256!("8cdad9242664be3112aba377c5425a4df735eb1c6966472b561d2855932c0469");
+    b256!("539032186827b06719244873b17b2d4c122e2d02cfb1994fe958b2523b844576");
 pub const BN254_CONTROL_ID: B256 =
     b256!("04446e66d300eb7fb45c9726bb53c793dda407a62e9601618bb43c5c14657ac0");
 

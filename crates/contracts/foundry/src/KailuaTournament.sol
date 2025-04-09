@@ -18,7 +18,7 @@ pragma solidity ^0.8.24;
 import "./KailuaLib.sol";
 import "./vendor/FlatOPImportV1.4.0.sol";
 import "./vendor/FlatOPImportV1.4.0.sol";
-import "./vendor/FlatR0ImportV1.2.0.sol";
+import "./vendor/FlatR0ImportV2.0.2.sol";
 
 abstract contract KailuaTournament is Clone, IDisputeGame {
     // ------------------------------

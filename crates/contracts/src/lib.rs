@@ -37,31 +37,25 @@ sol!(
 sol!(
     #[sol(rpc)]
     IRiscZeroVerifier,
-    "foundry/out/FlatR0ImportV1.2.0.sol/IRiscZeroVerifier.json"
+    "foundry/out/FlatR0ImportV2.0.2.sol/IRiscZeroVerifier.json"
 );
 
 sol!(
     #[sol(rpc)]
     RiscZeroVerifierRouter,
-    "foundry/out/FlatR0ImportV1.2.0.sol/RiscZeroVerifierRouter.json"
-);
-
-sol!(
-    #[sol(rpc)]
-    RiscZeroSetVerifier,
-    "foundry/out/FlatR0ImportV1.2.0.sol/RiscZeroSetVerifier.json"
+    "foundry/out/FlatR0ImportV2.0.2.sol/RiscZeroVerifierRouter.json"
 );
 
 sol!(
     #[sol(rpc)]
     RiscZeroGroth16Verifier,
-    "foundry/out/FlatR0ImportV1.2.0.sol/RiscZeroGroth16Verifier.json"
+    "foundry/out/FlatR0ImportV2.0.2.sol/RiscZeroGroth16Verifier.json"
 );
 
 sol!(
     #[sol(rpc)]
     RiscZeroMockVerifier,
-    "foundry/out/FlatR0ImportV1.2.0.sol/RiscZeroMockVerifier.json"
+    "foundry/out/FlatR0ImportV2.0.2.sol/RiscZeroMockVerifier.json"
 );
 
 sol!(
