@@ -20,6 +20,7 @@ bincode.workspace = true
 bytemuck.workspace = true
 c-kzg.workspace = true
 clap.workspace = true
+futures.workspace = true
 gcloud-sdk.workspace = true
 hex.workspace = true
 paste.workspace = true
