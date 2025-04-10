@@ -1705,6 +1705,7 @@ library OutputLib {
 }
 
 /// @notice Error raised when cryptographic verification of the zero-knowledge proof fails.
+// 0x439cc0cd
 error VerificationFailed();
 
 /// @notice Verifier interface for RISC Zero receipts of execution.
@@ -1964,6 +1965,7 @@ library StructHash {
 /// @notice Error raised when this verifier receives a receipt with a selector that does not match
 ///         its own. The selector value is calculated from the verifier parameters, and so this
 ///         usually indicates a mismatch between the version of the prover and this verifier.
+// 0xb8b38d4c
 error SelectorMismatch(bytes4 received, bytes4 expected);
 
 /// @notice Mock verifier contract for RISC Zero receipts of execution.
@@ -2051,6 +2053,7 @@ contract RiscZeroVerifierRouter is IRiscZeroVerifier, Ownable2Step {
     ///         registered on this router. Generally, this indicates a version mismatch where the
     ///         prover generated a receipt with version of the zkVM that does not match any
     ///         registered version on this router contract.
+    // 0xe4ea6542
     error SelectorUnknown(bytes4 selector);
     /// @notice Error raised when attempting to add a verifier for a selector that is already registered.
     error SelectorInUse(bytes4 selector);

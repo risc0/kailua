@@ -4500,6 +4500,7 @@ error CannotDefendRootClaim();
 error ClaimAlreadyExists();
 
 /// @notice Thrown when a disputed claim does not match its index in the game.
+// 0x30140332
 error InvalidDisputedClaimIndex();
 
 // 0x67fe1950

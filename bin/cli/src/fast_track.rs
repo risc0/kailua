@@ -510,7 +510,7 @@ pub async fn deploy_verifier<P1: Provider<N>, P2: Provider<N>, N: Network>(
     if risc0_zkvm::is_dev_mode() {
         // Deploy MockVerifier contract
         tracing::warn!("Deploying RiscZeroMockVerifier contract to L1. This will accept fake proofs which are not cryptographically secure!");
-        let receipt = RiscZeroMockVerifier::deploy_builder(&deployer_provider, [0u8; 4].into())
+        let receipt = RiscZeroMockVerifier::deploy_builder(&deployer_provider, [0xFFu8; 4].into())
             .transact_with_context(context.clone(), "RiscZeroMockVerifier::deploy")
             .await
             .context("RiscZeroMockVerifier::deploy")?;
@@ -525,7 +525,7 @@ pub async fn deploy_verifier<P1: Provider<N>, P2: Provider<N>, N: Network>(
         tracing::warn!("{:?}", &mock_verifier_contract);
         tracing::warn!("Adding RiscZeroMockVerifier contract to RiscZeroVerifierRouter.");
         let receipt = verifier_contract
-            .addVerifier([0u8; 4].into(), *mock_verifier_contract.address())
+            .addVerifier([0xFFu8; 4].into(), *mock_verifier_contract.address())
             .transact_with_context(
                 context.clone(),
                 "RiscZeroVerifierRouter::addVerifier(RiscZeroMockVerifier)",
