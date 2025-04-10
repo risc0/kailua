@@ -126,7 +126,7 @@ where
         // Run witness generation with oracles
         witgen::run_witgen_client(
             preimage_oracle,
-            proving.max_witness_size / 10,
+            10 * 1024 * 1024, // default to 10MB chunks
             blob_provider,
             proving.payout_recipient_address.unwrap_or_default(),
             precondition_validation_data_hash,
