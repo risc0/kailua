@@ -16,6 +16,7 @@ use crate::proving::ProvingError;
 use crate::proving::{KailuaProveInfo, KailuaSessionStats};
 use anyhow::{anyhow, Context};
 use bonsai_sdk::non_blocking::Client;
+use human_bytes::human_bytes;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use risc0_zkvm::serde::to_vec;
 use risc0_zkvm::sha::Digest;
@@ -68,15 +69,22 @@ pub async fn run_bonsai_client(
     }
 
     // Upload the ELF with the image_id as its key.
-    info!("Uploading Kailua ELF to Bonsai.");
+    let elf = KAILUA_FPVM_ELF.to_vec();
+    info!(
+        "Uploading {} Kailua ELF to Bonsai.",
+        human_bytes(elf.len() as f64).to_string()
+    );
     let image_id_hex = hex::encode(Digest::from(KAILUA_FPVM_ID));
     client
-        .upload_img(&image_id_hex, KAILUA_FPVM_ELF.to_vec())
+        .upload_img(&image_id_hex, elf)
         .await
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
 
     // Upload the input data
-    info!("Uploading input data to Bonsai.");
+    info!(
+        "Uploading {} input data to Bonsai.",
+        human_bytes(input.len() as f64).to_string()
+    );
     let input_id = client
         .upload_input(input)
         .await

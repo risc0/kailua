@@ -31,6 +31,7 @@ foundry-compilers = "0.11.0"
 gcloud-sdk = { version = "0.26.3", features = ["google-cloud-kms-v1"] }
 hashbrown = { version = "0.15.0", features = ["rayon"] }
 hex = "0.4.3"
+human_bytes = "0.4.3"
 lazy_static = "1.5.0"
 lru = "0.12.4"
 paste = "1.0.15"
