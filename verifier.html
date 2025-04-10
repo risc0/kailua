@@ -196,7 +196,7 @@ of adopting any updates to Kailua that change the RISC Zero zkVM version used fo
 <h3 id="verifier-router"><a class="header" href="#verifier-router">Verifier Router</a></h3>
 <p>The <a href="https://dev.risczero.com/api/blockchain-integration/contracts/verifier#verifier-router">RISCZeroVerifierRouter contract</a>
 routes proofs from different sources to their correct verifier.
-This allows your application (and Kailua) to leverage proofs generated using different zkVM versions, or aggregated through
+This allows your application (and Kailua) to leverage proofs generated using different zkVM versions, or through
 the <a href="https://docs.beboundless.xyz/">Boundless proving network</a>, while delegating the complexity of managing the
 verifier version to the router contract.</p>
 <p>Depending on your needs, you may need to deploy and manage your own verifier instead of relying on the pre-deployed
@@ -220,12 +220,6 @@ only accepts valid Groth16 proofs generated using its hardcoded RISC Zero zkVM v
 and id constructor parameters.
 This verifier is intended to be deployed and then added as a possible backend to a router instead of being used directly on its own.
 However, it is possible to call and use this verifier directly if the prover and verifier versions align.</p>
-<h3 id="set-verifier-boundless-network"><a class="header" href="#set-verifier-boundless-network">Set Verifier (Boundless Network)</a></h3>
-<p>The <a href="https://github.com/risc0/risc0-ethereum/blob/release-1.2/contracts/src/RiscZeroSetVerifier.sol">RISCZeroSetVerifier</a>
-accepts aggregated proofs, which are generated through recursively verifying other proofs inside an aggregator program.
-This verifier only verifies "inclusion proofs", and delegates the verification of the cryptographic proof of correct
-aggregation to another verifier (such as the router or the Groth16 verifier directly).
-This means it must be paired with another verifier contract.</p>
 <h3 id="fake-proof-verifier-insecure"><a class="header" href="#fake-proof-verifier-insecure">Fake Proof Verifier (INSECURE)</a></h3>
 <p>This verifier accepts fake proofs generated while running the RISC Zero zkVM in "dev mode".
 It is only useful for testing out the zkVM in a development environment without being delayed by proving time.</p>
@@ -241,7 +235,7 @@ It is only useful for testing out the zkVM in a development environment without 
 </div>
 </div>
 <h2 id="deployment"><a class="header" href="#deployment">Deployment</a></h2>
-<p>This section will walk you through creating your own verifier deployment that supports individual and aggregated proofs.
+<p>This section will walk you through creating your own verifier deployment.
 The commands below will be using Foundry's <code>forge</code> and <code>cast</code> utilities, which you should have installed as part of the
 foundry <a href="quickstart.html#prerequisites">prerequisite</a>.</p>
 <div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
@@ -291,77 +285,6 @@ We will use this in the following commands when adding proving backends.
 The router cannot verify any proofs on its own.</p>
 </div>
 </div>
-<h3 id="aggregate-verifier"><a class="header" href="#aggregate-verifier">Aggregate Verifier</a></h3>
-<pre><code class="language-solidity">constructor(IRiscZeroVerifier verifier, bytes32 imageId, string memory _imageUrl)
-</code></pre>
-<p>The aggregate verifier requires two main parameters to construct it, an address for a verifier to use to validate proofs of
-aggregation, and an image id defining the program to use for aggregating proofs.
-The third parameter specifies where the aggregation program is hosted, and can be left blank.</p>
-<p>We will reuse the router contract we just deployed as the verifier, and the <code>SET_BUILDER_ID</code> value we got from running
-<code>kailua-cli config</code>.</p>
-<p>To deploy a new aggregate verifier</p>
-<pre><code class="language-shell">forge create RiscZeroSetVerifier --constructor-args \
-  [YOUR_DEPLOYED_ROUTER_CONTRACT] \
-  [SET_BUILDER_ID] \
-  ""
-</code></pre>
-<p>On success, you should see output similar to the following:</p>
-<pre><code>Deployer: [YOUR_DEPLOYER_WALLET_ADDRESS]
-Deployed to: [YOUR_DEPLOYED_AGGREGATE_VERIFIER_CONTRACT]
-Transaction hash: [YOUR_DEPLOYMENT_TRANSACTION_HASH]
-</code></pre>
-<p>The next step is to now add this aggregate verifier contract as a backend for our router to use to verify any aggregated
-proofs it receives.
-For this, we will first to need to query the aggregate verifier for its "selector" using foundry's <code>cast</code> utility:</p>
-<pre><code class="language-shell">cast call \
-  [YOUR_DEPLOYED_AGGREGATE_VERIFIER_CONTRACT] \
-  "SELECTOR() returns (bytes4)"
-</code></pre>
-<p>This should return a short string similar to the following:</p>
-<pre><code>0x9cc26c32
-</code></pre>
-<p>We can now use this selector to add the aggregate verifier to the router using the <code>admin</code> wallet you specified while
-deploying the router:</p>
-<pre><code class="language-shell">cast send \
-  [YOUR_DEPLOYED_ROUTER_CONTRACT] \
-  "addVerifier(bytes4 selector, address verifier)" \
-  [YOUR_AGGREGATE_VERIFIER_SELECTOR] \
-  [YOUR_DEPLOYED_AGGREGATE_VERIFIER_CONTRACT]
-</code></pre>
-<p>The output from successfully issuing this transaction should resemble the following:</p>
-<pre><code>blockHash               0x9cb7f77cab555ff8907a62d19165795e7dbd51d558ee29a7383ced32daea18ab
-blockNumber             821
-contractAddress         
-cumulativeGasUsed       414546
-effectiveGasPrice       1000000007
-from                    0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc
-gasUsed                 46831
-logs                    []
-logsBloom               0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-root                    
-status                  1 (success)
-transactionHash         0x1446eeeb02008e6ef37dc60556f6a45848f106e175d0ea597fc41370918022c9
-transactionIndex        1
-type                    2
-blobGasPrice            
-blobGasUsed             
-authorizationList       
-to                      0x0116686E2291dbd5e317F47faDBFb43B599786Ef
-</code></pre>
-<p>Make sure that the status field in your output indicates success!</p>
-<div id="admonition-success-1" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-1-title">
-<div class="admonition-title">
-<div id="admonition-success-1-title">
-<p>Success</p>
-</div>
-<a class="admonition-anchor-link" href="#admonition-success-1"></a>
-</div>
-<div>
-<p>You've now connected your verifier router to the aggregate verifier.
-However, this pair still cannot verify any proofs on its own!
-Next, we will install a cryptographic verifier for this task.</p>
-</div>
-</div>
 <h3 id="groth16-verifier-1"><a class="header" href="#groth16-verifier-1">Groth16 Verifier</a></h3>
 <p>The Groth16 verifier validates stand-alone cryptographic proofs generated using the RISC Zero zkVM and compressed using
 the RISC Zero STARK-to-SNARK wrapper.</p>
@@ -389,17 +312,18 @@ Transaction hash: [YOUR_DEPLOYMENT_TRANSACTION_HASH]
   [YOUR_GROTH16_SELECTOR] \
   [YOUR_DEPLOYED_GROTH16_VERIFIER_CONTRACT]
 </code></pre>
-<div id="admonition-success-2" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-2-title">
+<div id="admonition-success-1" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-1-title">
 <div class="admonition-title">
-<div id="admonition-success-2-title">
+<div id="admonition-success-1-title">
 <p>Success</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-success-2"></a>
+<a class="admonition-anchor-link" href="#admonition-success-1"></a>
 </div>
 <div>
-<p>You now have a RISC Zero verifier contract for stand-alone and aggregated ZK (fault) proofs!</p>
+<p>You now have a RISC Zero verifier contract!</p>
 </div>
 </div>
+
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">

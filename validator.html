@@ -303,7 +303,7 @@ is made by an honest proposer!</p>
 </div>
 </div>
 <h2 id="delegated-proof-generation"><a class="header" href="#delegated-proof-generation">Delegated Proof Generation</a></h2>
-<p>Several extra parameters and environment variables can be specified to determine exactly where the RISC Zero proof
+<p>Extra parameters and environment variables can be specified to determine exactly where the RISC Zero proof
 generation takes place.
 Running using only the parameters above will generate proofs using the local RISC Zero prover available to the validator.
 Alternatively, proof generation can be delegated to an external service such as <a href="https://risczero.com/bonsai">Bonsai</a>,
@@ -344,40 +344,15 @@ for every fault proof, a proof request is submitted to the network, where it goe
 your validator to settle a dispute.</p>
 <p>This functionality requires some additional parameters when starting the validator.
 These parameters can be passed in as CLI arguments or set as environment variables</p>
-<h4 id="proof-requests"><a class="header" href="#proof-requests">Proof Requests</a></h4>
-<p>The following first set of parameters determine where/how requests are made:</p>
-<ul>
-<li><code>boundless-rpc-url</code>: The rpc endpoint of the L1 chain where the Boundless network is deployed.</li>
-<li><code>boundless-wallet-key</code>: The wallet private key to use to send proof request transactions.</li>
-<li><code>boundless-offchain</code>: (Optional) Flag instructing whether to submit proofs off-chain.</li>
-<li><code>boundless-order-stream-url</code>: (Optional) The URL to use for off-chain order submission.</li>
-<li><code>boundless-set-verifier-address</code>: The address of the RISC Zero verifier supporting aggregated proofs for order validation.</li>
-<li><code>boundless-market-address</code>: The address of the Boundless market contract.</li>
-<li><code>boundless-lookback</code>: (Defaults to <code>5</code>) The number of previous proof requests to inspect for duplicates before making a new proof request.</li>
-</ul>
-<h4 id="storage-provider"><a class="header" href="#storage-provider">Storage Provider</a></h4>
-<p>The below second set of parameters determine where the proven executable and its input are stored:</p>
-<ul>
-<li><code>storage-provider</code>: One of <code>s3</code>, <code>pinata</code>, or <code>file</code>.</li>
-<li><code>s3-access-key</code>: The <code>s3</code> access key.</li>
-<li><code>s3-secret-key</code>: The <code>s3</code> secret key.</li>
-<li><code>s3-bucket</code>: The <code>s3</code> bucket.</li>
-<li><code>s3-url</code>: The <code>s3</code> url.</li>
-<li><code>aws-region</code>: The <code>s3</code> region.</li>
-<li><code>pinata-jwt</code>: The private <code>pinata</code> jwt.</li>
-<li><code>pinata-api-url</code>: The <code>pinata</code> api URL.</li>
-<li><code>ipfs-gateway-url</code>: The <code>pinata</code> gateway URL.</li>
-<li><code>file-path</code>: The file storage provider path.</li>
-</ul>
-<div id="admonition-success-3" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-3-title">
+<div id="admonition-todo" class="admonition admonish-info" role="note" aria-labelledby="admonition-todo-title">
 <div class="admonition-title">
-<div id="admonition-success-3-title">
-<p>Success</p>
+<div id="admonition-todo-title">
+<p>Todo</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-success-3"></a>
+<a class="admonition-anchor-link" href="#admonition-todo"></a>
 </div>
 <div>
-<p>Running <code>kailua-cli validate</code> with the above extra arguments should now delegate all validator proving to the <a href="https://docs.beboundless.xyz/">Boundless proving network</a>!</p>
+<p>Boundless support has been temporarily removed and will be reintegrated.</p>
 </div>
 </div>
 <h2 id="advanced-settings"><a class="header" href="#advanced-settings">Advanced Settings</a></h2>
@@ -387,7 +362,7 @@ These parameters can be passed in as CLI arguments or set as environment variabl
 <li><code>NUM_CONCURRENT_PREFLIGHTS</code>: (default 4) Sets the number of concurrent data preflights per proving task.</li>
 <li><code>NUM_CONCURRENT_PROOFS</code>: (default 1) Sets the number of concurrent proofs to seek per proving task.</li>
 <li><code>SEGMENT_LIMIT</code>: The <a href="https://docs.rs/risc0-zkvm/1.2.3/risc0_zkvm/struct.ExecutorEnvBuilder.html#method.segment_limit_po2">segment size limit</a> used for local proving (Default 21).</li>
-<li><code>MAX_WITNESS_SIZE</code>: The maximum input size per single proof (Default 100MB).</li>
+<li><code>MAX_WITNESS_SIZE</code>: The maximum input size per single proof (Default 2.5GB).</li>
 </ul>
 <p>When manually computing individual proofs, the following parameters (or equiv. env. vars) take effect:</p>
 <ul>
