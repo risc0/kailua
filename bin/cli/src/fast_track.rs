@@ -350,13 +350,6 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     let receipt = KailuaGame::deploy_builder(
         &deployer_provider,
         *kailua_treasury_implementation.address(),
-        verifier_contract_address,
-        bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
-        rollup_config_hash.into(),
-        Uint::from(args.proposal_output_count),
-        Uint::from(args.output_block_span),
-        KAILUA_GAME_TYPE,
-        portal_address,
         U256::from(config.genesis.l2_time),
         U256::from(config.block_time),
         U256::from(args.proposal_time_gap),
