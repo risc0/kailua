@@ -1,4 +1,4 @@
-// Copyright 2024 RISC Zero, Inc.
+// Copyright 2024, 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -43,44 +43,27 @@ contract KailuaGame is KailuaTournament {
     uint256 public immutable PROPOSAL_TIME_GAP;
 
     constructor(
-        IKailuaTreasury _kailuaTreasury,
-        IRiscZeroVerifier _verifierContract,
-        bytes32 _imageId,
-        bytes32 _configHash,
-        uint256 _proposalOutputCount,
-        uint256 _outputBlockSpan,
-        GameType _gameType,
-        OptimismPortal2 _optimismPortal,
+        KailuaTreasury _kailuaTreasury,
         uint256 _genesisTimeStamp,
         uint256 _l2BlockTime,
         uint256 _proposalTimeGap,
         Duration _maxClockDuration
     )
         KailuaTournament(
-            _kailuaTreasury,
-            _verifierContract,
-            _imageId,
-            _configHash,
-            _proposalOutputCount,
-            _outputBlockSpan,
-            _gameType,
-            _optimismPortal
+            IKailuaTreasury(address(_kailuaTreasury)),
+            _kailuaTreasury.RISC_ZERO_VERIFIER(),
+            _kailuaTreasury.FPVM_IMAGE_ID(),
+            _kailuaTreasury.ROLLUP_CONFIG_HASH(),
+            _kailuaTreasury.PROPOSAL_OUTPUT_COUNT(),
+            _kailuaTreasury.OUTPUT_BLOCK_SPAN(),
+            _kailuaTreasury.GAME_TYPE(),
+            _kailuaTreasury.OPTIMISM_PORTAL()
         )
     {
-        MAX_CLOCK_DURATION = _maxClockDuration;
         GENESIS_TIME_STAMP = _genesisTimeStamp;
         L2_BLOCK_TIME = _l2BlockTime;
         PROPOSAL_TIME_GAP = _proposalTimeGap;
-        // Require KailuaTreasury tournament config to match KailuaGame tournament config
-        KailuaTreasury treasury = KailuaTreasury(address(_kailuaTreasury));
-        require(treasury.RISC_ZERO_VERIFIER() == RISC_ZERO_VERIFIER);
-        require(treasury.FPVM_IMAGE_ID() == FPVM_IMAGE_ID);
-        require(treasury.ROLLUP_CONFIG_HASH() == ROLLUP_CONFIG_HASH);
-        require(treasury.PROPOSAL_OUTPUT_COUNT() == PROPOSAL_OUTPUT_COUNT);
-        require(treasury.OUTPUT_BLOCK_SPAN() == OUTPUT_BLOCK_SPAN);
-        require(treasury.PROPOSAL_BLOBS() == PROPOSAL_BLOBS);
-        require(treasury.GAME_TYPE().raw() == GAME_TYPE.raw());
-        require(treasury.DISPUTE_GAME_FACTORY() == DISPUTE_GAME_FACTORY);
+        MAX_CLOCK_DURATION = _maxClockDuration;
     }
 
     // ------------------------------
