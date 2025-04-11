@@ -18,12 +18,14 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
-import {ScaffoldFactory} from "./ScaffoldFactory.sol";
-import {ScaffoldPortal} from "./ScaffoldPortal.sol";
-import {KailuaTreasury} from "../src/KailuaTreasury.sol";
 import "../src/vendor/FlatOPImportV1.4.0.sol";
 import "../src/vendor/FlatR0ImportV2.0.2.sol";
+
+import {KailuaTreasury} from "../src/KailuaTreasury.sol";
 import {KailuaGame} from "../src/KailuaGame.sol";
+
+import {ScaffoldFactory} from "./ScaffoldFactory.sol";
+import {ScaffoldPortal} from "./ScaffoldPortal.sol";
 
 contract DeployTest is Test {
     ScaffoldFactory factory;
