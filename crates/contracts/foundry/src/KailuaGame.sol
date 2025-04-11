@@ -50,7 +50,7 @@ contract KailuaGame is KailuaTournament {
         uint256 _proposalOutputCount,
         uint256 _outputBlockSpan,
         GameType _gameType,
-        IDisputeGameFactory _disputeGameFactory,
+        OptimismPortal2 _optimismPortal,
         uint256 _genesisTimeStamp,
         uint256 _l2BlockTime,
         uint256 _proposalTimeGap,
@@ -64,7 +64,7 @@ contract KailuaGame is KailuaTournament {
             _proposalOutputCount,
             _outputBlockSpan,
             _gameType,
-            _disputeGameFactory
+            _optimismPortal
         )
     {
         MAX_CLOCK_DURATION = _maxClockDuration;

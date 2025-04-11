@@ -49,8 +49,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     /// @notice The game type ID
     GameType public immutable GAME_TYPE;
 
-    /// @notice The dispute game factory
-    IDisputeGameFactory public immutable DISPUTE_GAME_FACTORY;
+    /// @notice The OptimismPortal2 instance
+    OptimismPortal2 public immutable OPTIMISM_PORTAL;
+
+    /// @notice The DisputeGameFactory instance
+    DisputeGameFactory public immutable DISPUTE_GAME_FACTORY;
 
     constructor(
         IKailuaTreasury _kailuaTreasury,
@@ -60,7 +63,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         uint256 _proposalOutputCount,
         uint256 _outputBlockSpan,
         GameType _gameType,
-        IDisputeGameFactory _disputeGameFactory
+        OptimismPortal2 _optimismPortal
     ) {
         KAILUA_TREASURY = _kailuaTreasury;
         RISC_ZERO_VERIFIER = _verifierContract;
@@ -73,7 +76,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         PROPOSAL_BLOBS = (_proposalOutputCount / KailuaKZGLib.FIELD_ELEMENTS_PER_BLOB)
             + ((_proposalOutputCount % KailuaKZGLib.FIELD_ELEMENTS_PER_BLOB) == 0 ? 0 : 1);
         GAME_TYPE = _gameType;
-        DISPUTE_GAME_FACTORY = _disputeGameFactory;
+        OPTIMISM_PORTAL = _optimismPortal;
+        DISPUTE_GAME_FACTORY = OPTIMISM_PORTAL.disputeGameFactory();
     }
 
     function initializeInternal() internal {
@@ -88,6 +92,9 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
         // Initialize contenderList
         contenderList.push(0);
+
+        // Read respected status
+        wasRespectedGameTypeWhenCreated = OPTIMISM_PORTAL.respectedGameType().raw() == GAME_TYPE.raw();
     }
 
     // ------------------------------
@@ -260,6 +267,9 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         rootClaim_ = this.rootClaim();
         extraData_ = this.extraData();
     }
+
+    /// @notice True iff the Kailua GameType was respected by OptimismPortal at time of creation
+    bool public wasRespectedGameTypeWhenCreated;
 
     // ------------------------------
     // Tournament
