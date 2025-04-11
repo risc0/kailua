@@ -40,7 +40,7 @@ constructor(
   uint256 _proposalOutputCount,
   uint256 _outputBlockSpan,
   GameType _gameType,
-  IDisputeGameFactory _disputeGameFactory,
+  OptimismPortal2 _optimismPortal,
   Claim _rootClaim,
   uint64 _l2BlockNumber
 )
@@ -79,7 +79,7 @@ forge create KailuaTreasury --constructor-args \
   [YOUR_PROPOSAL_OUTPUT_COUNT] \
   [YOUR_OUTPUT_BLOCK_SPAN] \
   [YOUR_KAILUA_GAME_TYPE] \
-  [YOUR_DISPUTE_GAME_FACTORY] \
+  [YOUR_OPTIMISM_PORTAL] \
   [YOUR_OUTPUT_ROOT_CLAIM] \
   [YOUR_L2_BLOCK_NUMBER]
 ```
@@ -110,7 +110,7 @@ constructor(
   uint256 _proposalOutputCount,
   uint256 _outputBlockSpan,
   GameType _gameType,
-  IDisputeGameFactory _disputeGameFactory,
+  OptimismPortal2 _optimismPortal,
   uint256 _genesisTimeStamp,
   uint256 _l2BlockTime,
   uint256 _proposalTimeGap,
@@ -131,7 +131,7 @@ forge create KailuaGame --evm-version cancun --constructor-args \
   [YOUR_PROPOSAL_OUTPUT_COUNT] \
   [YOUR_OUTPUT_BLOCK_SPAN] \
   [YOUR_KAILUA_GAME_TYPE] \
-  [YOUR_DISPUTE_GAME_FACTORY] \
+  [YOUR_OPTIMISM_PORTAL] \
   [YOUR_GENESIS_TIMESTAMP] \
   [YOUR_BLOCK_TIME] \
   [YOUR_PROPOSAL_TIME_GAP] \
