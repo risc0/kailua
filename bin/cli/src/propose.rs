@@ -290,6 +290,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
 
             if let Err(e) = await_tel!(context, proposal.resolve(&proposer_provider)) {
                 error!("Failed to resolve proposal: {e:?}");
+                break;
             }
         }
 
