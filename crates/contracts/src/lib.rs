@@ -87,13 +87,3 @@ sol!(
     SystemConfig,
     "foundry/out/FlatOPImportV1.4.0.sol/SystemConfig.json"
 );
-
-sol! {
-    #[sol(rpc)]
-    struct SetVerifierSeal {
-        /// Merkle path to the leaf.
-        bytes32[] path;
-        /// Root seal.
-        bytes rootSeal;
-    }
-}

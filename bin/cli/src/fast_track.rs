@@ -209,7 +209,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         Uint::from(args.proposal_output_count),
         Uint::from(args.output_block_span),
         KAILUA_GAME_TYPE,
-        dgf_address,
+        portal_address,
         root_claim,
         args.starting_block_number,
     )
@@ -356,7 +356,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         Uint::from(args.proposal_output_count),
         Uint::from(args.output_block_span),
         KAILUA_GAME_TYPE,
-        dgf_address,
+        portal_address,
         U256::from(config.genesis.l2_time),
         U256::from(config.block_time),
         U256::from(args.proposal_time_gap),
