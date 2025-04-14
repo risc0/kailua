@@ -18,20 +18,20 @@ pragma solidity ^0.8.24;
 import "./KailuaTest.sol";
 
 contract DeployTest is KailuaTest {
-    function test_canDeployContracts() public {
-        KailuaTreasury treasury = new KailuaTreasury(
-            IRiscZeroVerifier(address(0x0)),
-            bytes32(0x0),
-            bytes32(0x0),
+    function setUp() public override {
+        super.setUp();
+    }
+
+    function test_canDeployKailua() public {
+        deployKailua(
             uint256(0x1),
             uint256(0x1),
-            GameType.wrap(1337),
-            OptimismPortal2(payable(address(portal))),
-            Claim.wrap(bytes32(0x0)),
+            sha256(abi.encodePacked(bytes32(0x00))),
+            uint64(0x0),
+            uint256(0x0),
+            uint256(0x0),
+            uint256(0x0),
             uint64(0x0)
         );
-        console.logAddress(address(treasury));
-        KailuaGame game = new KailuaGame(treasury, uint256(0x0), uint256(0x0), uint256(0x0), Duration.wrap(0x0));
-        console.logAddress(address(game));
     }
 }

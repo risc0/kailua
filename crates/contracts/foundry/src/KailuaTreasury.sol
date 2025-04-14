@@ -349,7 +349,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         if (vanguard != address(0x0) && vanguard != msg.sender) {
             // The proposer may only counter the vanguard during the advantage time
             KailuaTournament proposalParent = tournament.parentGame();
-            if (proposalParent.childCount() == 0) {
+            if (proposalParent.childCount() == 1) {
                 // Count the advantage clock since proposal was possible
                 uint64 elapsedAdvantage = uint64(block.timestamp - tournament.minCreationTime().raw());
                 if (elapsedAdvantage < vanguardAdvantage.raw()) {
