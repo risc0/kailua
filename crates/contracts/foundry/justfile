@@ -7,10 +7,8 @@ default:
 test-deployable:
     #!/usr/bin/env bash
 
-    KTD_SCAFFOLD_FACTORY=$(forge create ScaffoldFactory --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast --json | jq -r .deployedTo)
-
-    KTD_SCAFFOLD_PORTAL=$(forge create ScaffoldPortal --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast --json --constructor-args \
-                            $KTD_SCAFFOLD_FACTORY | jq -r .deployedTo)
+    KTD_PORTAL=$(forge create OptimismPortal2 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast --json --constructor-args \
+    0 0 | jq -r .deployedTo)
 
     KTD_KAILUA_TREASURY=$(forge create KailuaTreasury --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast --json --constructor-args \
                             0x0000000000000000000000000000000000000001 \
@@ -19,7 +17,7 @@ test-deployable:
                             0x01 \
                             0x01 \
                             0x01 \
-                            $KTD_SCAFFOLD_PORTAL \
+                            $KTD_PORTAL \
                             0x0000000000000000000000000000000000000000000000000000000000000001 \
                             0x01 | jq -r .deployedTo)
 
