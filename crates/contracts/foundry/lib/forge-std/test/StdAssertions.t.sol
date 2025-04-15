@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.7.0 <0.9.0;
 
-import "../src/StdAssertions.sol";
+import {StdAssertions} from "../src/StdAssertions.sol";
 import {Vm} from "../src/Vm.sol";
 
 interface VmInternal is Vm {
@@ -113,10 +113,6 @@ contract StdAssertionsTest is StdAssertions {
         bool strictRevertData
     ) public {
         assertEqCall(targetA, callDataA, targetB, callDataB, strictRevertData);
-    }
-
-    function testFailFail() public {
-        fail();
     }
 }
 

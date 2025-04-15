@@ -228,7 +228,7 @@ abstract contract StdCheatsSafe {
 
     // Checks that `addr` is not blacklisted by token contracts that have a blacklist.
     // This is identical to `assumeNotBlacklisted(address,address)` but with a different name, for
-    // backwards compatibility, since this name was used in the original PR which has already has
+    // backwards compatibility, since this name was used in the original PR which already has
     // a release. This function can be removed in a future release once we want a breaking change.
     function assumeNoBlacklisted(address token, address addr) internal view virtual {
         assumeNotBlacklisted(token, addr);
@@ -322,8 +322,8 @@ abstract contract StdCheatsSafe {
         // Note: For some chains like Optimism these are technically predeploys (i.e. bytecode placed at a specific
         // address), but the same rationale for excluding them applies so we include those too.
 
-        // These should be present on all EVM-compatible chains.
-        vm.assume(addr < address(0x1) || addr > address(0x9));
+        // These are reserved by Ethereum and may be on all EVM-compatible chains.
+        vm.assume(addr < address(0x1) || addr > address(0xff));
 
         // forgefmt: disable-start
         if (chainId == 10 || chainId == 420) {
@@ -347,6 +347,18 @@ abstract contract StdCheatsSafe {
             addr != address(vm) && addr != 0x000000000000000000636F6e736F6c652e6c6f67
                 && addr != 0x4e59b44847b379578588920cA78FbF26c0B4956C
         );
+    }
+
+    function assumeUnusedAddress(address addr) internal view virtual {
+        uint256 size;
+        assembly {
+            size := extcodesize(addr)
+        }
+        vm.assume(size == 0);
+
+        assumeNotPrecompile(addr);
+        assumeNotZeroAddress(addr);
+        assumeNotForgeAddress(addr);
     }
 
     function readEIP1559ScriptArtifact(string memory path)
@@ -645,11 +657,11 @@ abstract contract StdCheats is StdCheatsSafe {
 
     // Skip forward or rewind time by the specified number of seconds
     function skip(uint256 time) internal virtual {
-        vm.warp(block.timestamp + time);
+        vm.warp(vm.getBlockTimestamp() + time);
     }
 
     function rewind(uint256 time) internal virtual {
-        vm.warp(block.timestamp - time);
+        vm.warp(vm.getBlockTimestamp() - time);
     }
 
     // Setup a prank from an address that has some ether

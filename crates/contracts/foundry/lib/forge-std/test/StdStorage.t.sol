@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.7.0 <0.9.0;
 
-import "../src/StdStorage.sol";
-import "../src/Test.sol";
+import {stdStorage, StdStorage} from "../src/StdStorage.sol";
+import {Test} from "../src/Test.sol";
 
 contract StdStorageTest is Test {
     using stdStorage for StdStorage;
@@ -198,9 +198,11 @@ contract StdStorageTest is Test {
         assertEq(1337, test.read_struct_lower(address(1337)));
     }
 
-    function testFail_StorageConst() public {
-        // vm.expectRevert(abi.encodeWithSignature("NotStorage(bytes4)", bytes4(keccak256("const()"))));
-        stdstore.target(address(test)).sig("const()").find();
+    function test_RevertStorageConst() public {
+        StorageTestTarget target = new StorageTestTarget(test);
+
+        vm.expectRevert("stdStorage find(StdStorage): No storage use detected for target.");
+        target.expectRevertStorageConst();
     }
 
     function testFuzz_StorageNativePack(uint248 val1, uint248 val2, bool boolVal1, bool boolVal2) public {
@@ -230,7 +232,7 @@ contract StdStorageTest is Test {
         assertEq(val, true);
     }
 
-    function test_StorageReadBool_Revert() public {
+    function test_RevertIf_ReadingNonBoolValue() public {
         vm.expectRevert("stdStorage read_bool(StdStorage): Cannot decode. Make sure you are reading a bool.");
         this.readNonBoolValue();
     }
@@ -254,7 +256,7 @@ contract StdStorageTest is Test {
         assertEq(val, type(int256).min);
     }
 
-    function testFuzzPacked(uint256 val, uint8 elemToGet) public {
+    function testFuzz_Packed(uint256 val, uint8 elemToGet) public {
         // This function tries an assortment of packed slots, shifts meaning number of elements
         // that are packed. Shiftsizes are the size of each element, i.e. 8 means a data type that is 8 bits, 16 == 16 bits, etc.
         // Combined, these determine how a slot is packed. Making it random is too hard to avoid global rejection limit
@@ -296,7 +298,7 @@ contract StdStorageTest is Test {
         }
     }
 
-    function testFuzzPacked2(uint256 nvars, uint256 seed) public {
+    function testFuzz_Packed2(uint256 nvars, uint256 seed) public {
         // Number of random variables to generate.
         nvars = bound(nvars, 1, 20);
 
@@ -349,6 +351,21 @@ contract StdStorageTest is Test {
     function testEdgeCaseArray() public {
         stdstore.target(address(test)).sig("edgeCaseArray(uint256)").with_key(uint256(0)).checked_write(1);
         assertEq(test.edgeCaseArray(0), 1);
+    }
+}
+
+contract StorageTestTarget {
+    using stdStorage for StdStorage;
+
+    StdStorage internal stdstore;
+    StorageTest internal test;
+
+    constructor(StorageTest test_) {
+        test = test_;
+    }
+
+    function expectRevertStorageConst() public {
+        stdstore.target(address(test)).sig("const()").find();
     }
 }
 

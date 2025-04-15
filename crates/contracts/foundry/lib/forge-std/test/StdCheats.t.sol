@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.7.0 <0.9.0;
 
-import "../src/StdCheats.sol";
-import "../src/Test.sol";
-import "../src/StdJson.sol";
-import "../src/StdToml.sol";
-import "../src/interfaces/IERC20.sol";
+import {StdCheats} from "../src/StdCheats.sol";
+import {Test} from "../src/Test.sol";
+import {stdJson} from "../src/StdJson.sol";
+import {stdToml} from "../src/StdToml.sol";
+import {IERC20} from "../src/interfaces/IERC20.sol";
 
 contract StdCheatsTest is Test {
     Bar test;
@@ -205,7 +205,7 @@ contract StdCheatsTest is Test {
         deployCode(what);
     }
 
-    function test_DeployCodeFail() public {
+    function test_RevertIf_DeployCodeFail() public {
         vm.expectRevert(bytes("StdCheats deployCode(string): Deployment failed."));
         this.deployCodeHelper("StdCheats.t.sol:RevertingContract");
     }
@@ -415,7 +415,7 @@ contract StdCheatsTest is Test {
         );
     }
 
-    function test_CannotDeployCodeTo() external {
+    function test_RevertIf_CannotDeployCodeTo() external {
         vm.expectRevert("StdCheats deployCodeTo(string,bytes,uint256,address): Failed to create runtime bytecode.");
         this._revertDeployCodeTo();
     }
@@ -459,18 +459,21 @@ contract StdCheatsMock is StdCheats {
 }
 
 contract StdCheatsForkTest is Test {
-    address internal constant SHIB = 0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE;
-    address internal constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address internal constant USDC_BLACKLISTED_USER = 0x1E34A77868E19A6647b1f2F47B51ed72dEDE95DD;
-    address internal constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
     address internal constant USDT_BLACKLISTED_USER = 0x8f8a8F4B54a2aAC7799d7bc81368aC27b852822A;
 
+    MockUSDT public USDT;
+    MockUSDC public USDC;
+
     function setUp() public {
-        // All tests of the `assumeNotBlacklisted` method are fork tests using live contracts.
-        vm.createSelectFork({urlOrAlias: "mainnet", blockNumber: 16_428_900});
+        USDT = new MockUSDT();
+        USDC = new MockUSDC();
+
+        USDC.setBlacklisted(USDC_BLACKLISTED_USER, true);
+        USDT.setBlacklisted(USDT_BLACKLISTED_USER, true);
     }
 
-    function test_CannotAssumeNoBlacklisted_EOA() external {
+    function test_RevertIf_CannotAssumeNoBlacklisted_EOA() external {
         // We deploy a mock version so we can properly test the revert.
         StdCheatsMock stdCheatsMock = new StdCheatsMock();
         address eoa = vm.addr({privateKey: 1});
@@ -479,41 +482,67 @@ contract StdCheatsForkTest is Test {
     }
 
     function testFuzz_AssumeNotBlacklisted_TokenWithoutBlacklist(address addr) external view {
-        assumeNotBlacklisted(SHIB, addr);
+        assumeNotBlacklisted(address(USDC), addr);
+        assumeNotBlacklisted(address(USDT), addr);
         assertTrue(true);
     }
 
-    function test_AssumeNoBlacklisted_USDC() external {
+    function test_RevertIf_AssumeNoBlacklisted_USDC() external {
         // We deploy a mock version so we can properly test the revert.
         StdCheatsMock stdCheatsMock = new StdCheatsMock();
         vm.expectRevert();
-        stdCheatsMock.exposed_assumeNotBlacklisted(USDC, USDC_BLACKLISTED_USER);
+        stdCheatsMock.exposed_assumeNotBlacklisted(address(USDC), USDC_BLACKLISTED_USER);
     }
 
     function testFuzz_AssumeNotBlacklisted_USDC(address addr) external view {
-        assumeNotBlacklisted(USDC, addr);
+        assumeNotBlacklisted(address(USDC), addr);
         assertFalse(USDCLike(USDC).isBlacklisted(addr));
     }
 
-    function test_AssumeNoBlacklisted_USDT() external {
+    function test_RevertIf_AssumeNoBlacklisted_USDT() external {
         // We deploy a mock version so we can properly test the revert.
         StdCheatsMock stdCheatsMock = new StdCheatsMock();
         vm.expectRevert();
-        stdCheatsMock.exposed_assumeNotBlacklisted(USDT, USDT_BLACKLISTED_USER);
+        stdCheatsMock.exposed_assumeNotBlacklisted(address(USDT), USDT_BLACKLISTED_USER);
     }
 
     function testFuzz_AssumeNotBlacklisted_USDT(address addr) external view {
-        assumeNotBlacklisted(USDT, addr);
+        assumeNotBlacklisted(address(USDT), addr);
         assertFalse(USDTLike(USDT).isBlackListed(addr));
     }
+}
 
-    function test_dealUSDC() external {
-        // roll fork to the point when USDC contract updated to store balance in packed slots
-        vm.rollFork(19279215);
+/// @dev https://etherscan.io/token/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48#readProxyContract
+interface USDCLike {
+    function isBlacklisted(address) external view returns (bool);
+}
 
-        uint256 balance = 100e6;
-        deal(USDC, address(this), balance);
-        assertEq(IERC20(USDC).balanceOf(address(this)), balance);
+/// @dev https://etherscan.io/token/0xdac17f958d2ee523a2206206994597c13d831ec7#readContract
+interface USDTLike {
+    function isBlackListed(address) external view returns (bool);
+}
+
+contract MockUSDT is USDTLike {
+    mapping(address => bool) private blacklist;
+
+    function isBlackListed(address addr) external view returns (bool) {
+        return blacklist[addr];
+    }
+
+    function setBlacklisted(address addr, bool value) external {
+        blacklist[addr] = value;
+    }
+}
+
+contract MockUSDC is USDCLike {
+    mapping(address => bool) private blacklist;
+
+    function isBlacklisted(address addr) external view returns (bool) {
+        return blacklist[addr];
+    }
+
+    function setBlacklisted(address addr, bool value) external {
+        blacklist[addr] = value;
     }
 }
 
@@ -585,14 +614,6 @@ contract BarERC721 {
 
     mapping(uint256 => address) private _owners;
     mapping(address => uint256) private _balances;
-}
-
-interface USDCLike {
-    function isBlacklisted(address) external view returns (bool);
-}
-
-interface USDTLike {
-    function isBlackListed(address) external view returns (bool);
 }
 
 contract RevertingContract {
