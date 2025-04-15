@@ -21,6 +21,7 @@ import {console} from "forge-std/console.sol";
 import "../src/vendor/FlatOPImportV1.4.0.sol";
 import "../src/vendor/FlatR0ImportV2.0.2.sol";
 
+import "../src/KailuaLib.sol";
 import "../src/KailuaTournament.sol";
 import "../src/KailuaTreasury.sol";
 import "../src/KailuaGame.sol";
@@ -76,5 +77,79 @@ contract KailuaTest is Test {
         anchor.resolve();
         // Proposals
         factory.setImplementation(GameType.wrap(1337), game);
+    }
+
+    function mockFaultProof(
+        address payoutRecipient,
+        bytes32 l1Head,
+        bytes32 acceptedOutputHash,
+        bytes32 computedOutputHash,
+        uint64 claimedBlockNumber
+    ) public view returns (bytes memory proof) {
+        bytes32 journalDigest = sha256(
+            abi.encodePacked(
+                // The address of the recipient of the payout for this proof
+                payoutRecipient,
+                // No precondition hash
+                bytes32(0x0),
+                // The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
+                l1Head,
+                // The latest finalized L2 output root.
+                acceptedOutputHash,
+                // The L2 output root claim.
+                computedOutputHash,
+                // The L2 claim block number.
+                claimedBlockNumber,
+                // The rollup configuration hash
+                bytes32(0x0),
+                // The FPVM Image ID
+                bytes32(0x0)
+            )
+        );
+        bytes32 claimDigest = ReceiptClaimLib.digest(ReceiptClaimLib.ok(bytes32(0x0), journalDigest));
+
+        proof = abi.encodePacked(verifier.SELECTOR(), claimDigest);
+    }
+
+    function mockValidityProof(
+        address payoutRecipient,
+        bytes32 l1Head,
+        bytes32 acceptedOutputHash,
+        bytes32 computedOutputHash,
+        uint64 claimedBlockNumber,
+        uint64 proposalOutputCount,
+        uint64 outputBlockSpan,
+        bytes32 blobsHash
+    ) public view returns (bytes memory proof) {
+        // Calculate the expected precondition hash if blob data is necessary for proposal
+        bytes32 preconditionHash = bytes32(0x0);
+        if (proposalOutputCount > 1) {
+            uint64 l2BlockNumber = claimedBlockNumber - proposalOutputCount * outputBlockSpan;
+            preconditionHash = sha256(abi.encodePacked(l2BlockNumber, proposalOutputCount, outputBlockSpan, blobsHash));
+        }
+
+        bytes32 journalDigest = sha256(
+            abi.encodePacked(
+                // The address of the recipient of the payout for this proof
+                payoutRecipient,
+                // The blob equivalence precondition hash
+                preconditionHash,
+                // The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
+                l1Head,
+                // The latest finalized L2 output root.
+                acceptedOutputHash,
+                // The L2 output root claim.
+                computedOutputHash,
+                // The L2 claim block number.
+                claimedBlockNumber,
+                // The rollup configuration hash
+                bytes32(0x0),
+                // The FPVM Image ID
+                bytes32(0x0)
+            )
+        );
+        bytes32 claimDigest = ReceiptClaimLib.digest(ReceiptClaimLib.ok(bytes32(0x0), journalDigest));
+
+        proof = abi.encodePacked(verifier.SELECTOR(), claimDigest);
     }
 }

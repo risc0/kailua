@@ -91,6 +91,8 @@ contract Propose is KailuaTest {
         );
         // Finalize
         proposal_128_0.resolve();
+        vm.expectRevert();
+        proposal_128_1.resolve();
     }
 
     function test_duplication() public {
@@ -117,13 +119,15 @@ contract Propose is KailuaTest {
             abi.encodePacked(uint64(128), anchorIndex, uint64(2))
         );
         // Succeed on correct next counter
-        treasury.propose(
+        KailuaTournament proposal_128_1 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(128), anchorIndex, uint64(1))
         );
         vm.stopPrank();
         // Finalize
         proposal_128_0.resolve();
+        vm.expectRevert();
+        proposal_128_1.resolve();
     }
 
     function test_lastProposal() public {
@@ -159,7 +163,7 @@ contract Propose is KailuaTest {
         vm.prank(address(0x007));
         // [128]
         // [128]
-        treasury.propose(
+        KailuaTournament proposal_128_1 = treasury.propose(
             Claim.wrap(0x000101000001010000001010000010100000101000001010000001010000010F),
             abi.encodePacked(uint64(128), anchorIndex, uint64(0))
         );
@@ -205,6 +209,8 @@ contract Propose is KailuaTest {
         vm.stopPrank();
         // Finalize
         proposal_128_0.resolve();
+        vm.expectRevert();
+        proposal_128_1.resolve();
         proposal_256_0.resolve();
         proposal_384_0.resolve();
         proposal_512_0.resolve();
