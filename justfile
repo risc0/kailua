@@ -129,6 +129,17 @@ prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data 
   AGREED_L2_OUTPUT_ROOT=$(cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $((L2_BLOCK_NUMBER - 1))) | jq -r .outputRoot)
   AGREED_L2_HEAD=$(cast block --rpc-url $L2_NODE_ADDRESS $((L2_BLOCK_NUMBER - 1)) --json | jq -r .hash)
 
+  # Save parameters to params.json for offline use
+  mkdir -p {{data}}
+  echo '{' > {{data}}/params.json
+  echo '  "l1_head": "'$L1_HEAD'",' >> {{data}}/params.json
+  echo '  "l2_head": "'$AGREED_L2_HEAD'",' >> {{data}}/params.json
+  echo '  "l2_claim": "'$CLAIMED_L2_OUTPUT_ROOT'",' >> {{data}}/params.json
+  echo '  "l2_output_root": "'$AGREED_L2_OUTPUT_ROOT'",' >> {{data}}/params.json
+  echo '  "block_number": "'$CLAIMED_L2_BLOCK_NUMBER'",' >> {{data}}/params.json
+  echo '  "l2_chain_id": "'$L2_CHAIN_ID'"' >> {{data}}/params.json
+  echo '}' >> {{data}}/params.json
+
   echo "Running host program with zk client program..."
   ./target/{{target}}/kailua-host {{verbosity}} \
     --op-node-address $OP_NODE_ADDRESS \
@@ -143,6 +154,28 @@ prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data 
     --l2-node-address $L2_NODE_ADDRESS \
     --data-dir {{data}} \
     --native
+
+# Run the client program using saved testdata
+prove-testdata data_dir target="release" verbosity="":
+  #!/usr/bin/env bash
+
+  if [ ! -f "{{data_dir}}/params.json" ]; then
+    echo "Error: params.json not found in {{data_dir}}"
+    exit 1
+  fi
+
+  PARAMS=$(cat {{data_dir}}/params.json)
+  echo "Running host program with saved testdata from {{data_dir}}"
+  just prove-offline \
+    $(echo $PARAMS | jq -r '.block_number') \
+    $(echo $PARAMS | jq -r '.l2_claim') \
+    $(echo $PARAMS | jq -r '.l2_output_root') \
+    $(echo $PARAMS | jq -r '.l2_head') \
+    $(echo $PARAMS | jq -r '.l1_head') \
+    $(echo $PARAMS | jq -r '.l2_chain_id') \
+    {{data_dir}} \
+    {{target}} \
+    {{verbosity}}
 
 # Show the input args for proving
 query block_number l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc:
