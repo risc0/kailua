@@ -250,4 +250,37 @@ contract Propose is KailuaTest {
         // Finalize
         proposal_128_0.resolve();
     }
+
+    function test_extraData() public {
+        uint64 parentIndex = anchorIndex;
+        uint256 blocksPerProposal = game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN();
+        for (uint256 i = 1; i <= 128; i++) {
+            vm.warp(game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP() + blocksPerProposal * game.L2_BLOCK_TIME() * i);
+            KailuaGame proposal = KailuaGame(
+                address(
+                    treasury.propose(
+                        Claim.wrap(sha256(abi.encodePacked(bytes32(i)))),
+                        abi.encodePacked(uint64(blocksPerProposal * i), parentIndex, uint64(0))
+                    )
+                )
+            );
+
+            vm.assertEq(
+                proposal.extraData(),
+                abi.encodePacked(
+                    uint64(proposal.l2BlockNumber()),
+                    uint64(proposal.parentGameIndex()),
+                    uint64(proposal.duplicationCounter())
+                )
+            );
+
+            vm.assertEq(proposal.l2BlockNumber(), blocksPerProposal * i);
+
+            vm.assertEq(proposal.parentGameIndex(), uint256(parentIndex));
+
+            vm.assertEq(proposal.duplicationCounter(), 0);
+
+            parentIndex = uint64(proposal.gameIndex());
+        }
+    }
 }
