@@ -286,6 +286,17 @@ contract Propose is KailuaTest {
             // Update parent
             parentIndex = uint64(proposals[i].gameIndex());
         }
+
+        // Validate eliminations count
+        uint256 eliminationsCount = (PROPOSAL_BUFFER_LEN - 1) * (PROPOSAL_BUFFER_LEN - 2);
+        vm.expectRevert();
+        treasury.eliminations(address(this), eliminationsCount);
+        // This should not revert
+        treasury.eliminations(address(this), eliminationsCount - 1);
+
+        // Claim elimination bonds
+        treasury.claimEliminationBonds(eliminationsCount);
+        vm.assertEq(treasury.eliminationsPaid(address(this)), eliminationsCount);
     }
 
     function test_proveOutputFault_duplicates() public {
