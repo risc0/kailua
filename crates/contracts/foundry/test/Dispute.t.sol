@@ -8,7 +8,7 @@ contract Propose is KailuaTest {
     KailuaGame game;
     uint64 anchorIndex;
 
-    uint256 public constant PROPOSAL_BUFFER_LEN = 35;
+    uint256 public constant PROPOSAL_BUFFER_LEN = 21;
 
     function setUp() public override {
         super.setUp();
@@ -229,6 +229,13 @@ contract Propose is KailuaTest {
                 proposals[j].resolve();
             }
 
+            // Publish late proposal
+            vm.startPrank(address(bytes20(uint160(100000 * i))));
+            proposals[0] = treasury.propose(
+                Claim.wrap(sha256(abi.encodePacked(bytes32(0)))), abi.encodePacked(blockHeight, parentIndex, uint64(0))
+            );
+            vm.stopPrank();
+
             // Submit fault proofs
             for (uint256 j = 1; j < PROPOSAL_BUFFER_LEN; j++) {
                 // Don't prove the ith proposal faulty
@@ -258,8 +265,23 @@ contract Propose is KailuaTest {
                 );
             }
 
-            // Finalize
+            // Fail to resolve any non-canonical proposal
+            for (uint256 j = 0; j < PROPOSAL_BUFFER_LEN; j++) {
+                if (i == j) {
+                    continue;
+                }
+                vm.expectRevert();
+                proposals[j].resolve();
+            }
+
+            // Finalize canonical proposal
             proposals[i].resolve();
+
+            // Fail to resolve any proposal after correct resolution
+            for (uint256 j = 0; j < PROPOSAL_BUFFER_LEN; j++) {
+                vm.expectRevert();
+                proposals[j].resolve();
+            }
 
             // Update parent
             parentIndex = uint64(proposals[i].gameIndex());
@@ -280,7 +302,7 @@ contract Propose is KailuaTest {
 
             KailuaTournament[PROPOSAL_BUFFER_LEN] memory proposals;
             for (uint256 j = 1; j < PROPOSAL_BUFFER_LEN; j++) {
-                vm.startPrank(address(bytes20(uint160(100 * i + j))));
+                vm.startPrank(address(bytes20(uint160(10000 * i + j))));
                 if (j % i == 0) {
                     // Send successful proposal
                     proposals[j] = treasury.propose(
@@ -304,6 +326,13 @@ contract Propose is KailuaTest {
                     proposals[j].resolve();
                 }
             }
+
+            // Publish late proposal
+            vm.startPrank(address(bytes20(uint160(100000 * i))));
+            proposals[0] = treasury.propose(
+                Claim.wrap(sha256(abi.encodePacked(bytes32(0)))), abi.encodePacked(blockHeight, parentIndex, uint64(0))
+            );
+            vm.stopPrank();
 
             // Submit fault proofs
             for (uint256 j = 1; j < PROPOSAL_BUFFER_LEN; j++) {
@@ -334,11 +363,20 @@ contract Propose is KailuaTest {
                 );
             }
 
-            // Finalize
+            // Fail to resolve any non-canonical proposal
+            for (uint256 j = 0; j < PROPOSAL_BUFFER_LEN; j++) {
+                if (i == j) {
+                    continue;
+                }
+                vm.expectRevert();
+                proposals[j].resolve();
+            }
+
+            // Finalize canonical proposal
             proposals[i].resolve();
 
             // Fail to resolve any proposal after correct resolution
-            for (uint256 j = i + 1; j < PROPOSAL_BUFFER_LEN; j++) {
+            for (uint256 j = 0; j < PROPOSAL_BUFFER_LEN; j++) {
                 vm.expectRevert();
                 proposals[j].resolve();
             }
