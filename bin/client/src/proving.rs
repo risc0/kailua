@@ -47,15 +47,6 @@ pub struct ProvingArgs {
     pub skip_derivation_proof: bool,
 }
 
-impl ProvingArgs {
-    pub fn can_fit_witness(&self, witness: &Witness<VecOracle>) -> bool {
-        let (witness_frames, _) =
-            encode_witness_frames(witness.deep_clone()).expect("Failed to encode VecOracle");
-        let witness_size = witness_frames.iter().map(|f| f.len()).sum::<usize>();
-        witness_size < self.max_witness_size
-    }
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum ProvingError {
     #[error("DerivationProofError error: execution proofs {0}")]
@@ -180,7 +171,7 @@ pub fn encode_witness_frames(
 ) -> anyhow::Result<(Vec<Vec<u8>>, Vec<Vec<u8>>)> {
     // serialize preloaded shards
     let mut preloaded_data = witness_vec.oracle_witness.preimages.lock().unwrap();
-    let shards = shard_witness_data(&mut preloaded_data[1..])?;
+    let shards = shard_witness_data(&mut preloaded_data)?;
     drop(preloaded_data);
     // serialize streamed data
     let mut streamed_data = witness_vec.stream_witness.preimages.lock().unwrap();
