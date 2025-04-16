@@ -98,6 +98,9 @@ contract Propose is KailuaTest {
         // Accept validity proof
         proposal_128_0.parentGame().proveValidity(address(this), uint64(0), proof);
 
+        // Ensure signature is unviable
+        vm.assertTrue(proposal_128_0.parentGame().isViableSignature(proposal_128_0.signature()));
+
         // Finalize
         proposal_128_0.resolve();
     }
@@ -146,10 +149,12 @@ contract Propose is KailuaTest {
         // Accept validity proof
         proposal_128_0.parentGame().proveValidity(address(this), uint64(0), proof);
 
-        // Fail to resolve disputed claims
         for (uint256 i = 1; i < 12; i++) {
+            // Fail to resolve disputed claims
             vm.expectRevert();
             proposal_128[i].resolve();
+            // Ensure signature is unviable
+            vm.assertFalse(proposal_128[i].parentGame().isViableSignature(proposal_128[i].signature()));
         }
 
         // Finalize
@@ -187,6 +192,9 @@ contract Propose is KailuaTest {
             new bytes[](0),
             new bytes[](0)
         );
+
+        // Ensure signature is unviable
+        vm.assertFalse(proposal_128_0.parentGame().isViableSignature(proposal_128_0.signature()));
 
         // Fail to finalize disproven claim
         vm.expectRevert();
@@ -263,7 +271,11 @@ contract Propose is KailuaTest {
                     new bytes[](0),
                     new bytes[](0)
                 );
+
+                // Ensure signature is unviable
+                vm.assertFalse(proposals[j].parentGame().isViableSignature(proposals[j].signature()));
             }
+
 
             // Fail to resolve any non-canonical proposal
             for (uint256 j = 0; j < PROPOSAL_BUFFER_LEN; j++) {
@@ -372,6 +384,9 @@ contract Propose is KailuaTest {
                     new bytes[](0),
                     new bytes[](0)
                 );
+
+                // Ensure signature is unviable
+                vm.assertFalse(proposals[j].parentGame().isViableSignature(proposals[j].signature()));
             }
 
             // Fail to resolve any non-canonical proposal
