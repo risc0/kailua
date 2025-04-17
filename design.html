@@ -205,31 +205,18 @@ graph LR;
 While a standard proposal for sequencing 64-blocks would only comprise a single commitment, the Kailua variant here is
 configured to also require the commitment for every 8th block.
 In this configuration, any Kailua fault proof would only have to provably derive a sequence of at most 8 blocks.</p>
-<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
-<div class="admonition-title">
-<div id="admonition-note-1-title">
-<p>Note</p>
-</div>
-<a class="admonition-anchor-link" href="#admonition-note-1"></a>
-</div>
-<div>
-<p>To save on DA costs, blobs or alternative DA layers can be used to publish intermediate commitments.
-Moreover, as empty blocks are cheap to prove, an intermediate commitment can be defined to cover at most N empty and
-at most M non-empty blocks, where N &gt;&gt; M.</p>
-</div>
-</div>
 <h2 id="disputes"><a class="header" href="#disputes">Disputes</a></h2>
 <p>Each new sequencing proposal implicitly disputes the last existing proposal that contradicts it.
 Once this happens, a proof is required to demonstrate which of the two contradictory proposals, if any, commits to the
 correct sequencing state at their first point of divergence.
 The proof then eliminates one, or both, contradictory proposals, and neither proposals can be finalized until the proof
 is submitted.</p>
-<div id="admonition-note-2" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-2-title">
+<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
 <div class="admonition-title">
-<div id="admonition-note-2-title">
+<div id="admonition-note-1-title">
 <p>Note</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-note-2"></a>
+<a class="admonition-anchor-link" href="#admonition-note-1"></a>
 </div>
 <div>
 <p>While any new contradictory proposal has to be made within the timeout period of the prior proposal it contradicts,

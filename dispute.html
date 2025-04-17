@@ -219,7 +219,7 @@ The same <code>KailuaTreasury</code> deployment <strong>should NOT</strong> be r
   uint256 _proposalOutputCount,
   uint256 _outputBlockSpan,
   GameType _gameType,
-  IDisputeGameFactory _disputeGameFactory,
+  OptimismPortal2 _optimismPortal,
   Claim _rootClaim,
   uint64 _l2BlockNumber
 )
@@ -265,7 +265,7 @@ Then, you need to query your <code>op-node</code> for the <code>outputRoot</code
   [YOUR_PROPOSAL_OUTPUT_COUNT] \
   [YOUR_OUTPUT_BLOCK_SPAN] \
   [YOUR_KAILUA_GAME_TYPE] \
-  [YOUR_DISPUTE_GAME_FACTORY] \
+  [YOUR_OPTIMISM_PORTAL] \
   [YOUR_OUTPUT_ROOT_CLAIM] \
   [YOUR_L2_BLOCK_NUMBER]
 </code></pre>
@@ -295,12 +295,6 @@ Transaction hash: [YOUR_DEPLOYMENT_TRANSACTION_HASH]
 <pre><code class="language-solidity">constructor(
   IKailuaTreasury _kailuaTreasury,
   IRiscZeroVerifier _verifierContract,
-  bytes32 _imageId,
-  bytes32 _configHash,
-  uint256 _proposalOutputCount,
-  uint256 _outputBlockSpan,
-  GameType _gameType,
-  IDisputeGameFactory _disputeGameFactory,
   uint256 _genesisTimeStamp,
   uint256 _l2BlockTime,
   uint256 _proposalTimeGap,
@@ -312,13 +306,6 @@ initial one in the <code>KailuaTreasury</code>.
 Deployment is fairly similar to the treasury via the command below:</p>
 <pre><code class="language-shell">forge create KailuaGame --evm-version cancun --constructor-args \
   [YOUR_DEPLOYED_TREASURY_CONTRACT] \
-  [YOUR_RISC_ZERO_VERIFIER] \
-  [YOUR_FPVM_IMAGE_ID] \
-  [YOUR_ROLLUP_CONFIG_HASH] \
-  [YOUR_PROPOSAL_OUTPUT_COUNT] \
-  [YOUR_OUTPUT_BLOCK_SPAN] \
-  [YOUR_KAILUA_GAME_TYPE] \
-  [YOUR_DISPUTE_GAME_FACTORY] \
   [YOUR_GENESIS_TIMESTAMP] \
   [YOUR_BLOCK_TIME] \
   [YOUR_PROPOSAL_TIME_GAP] \

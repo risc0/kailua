@@ -361,31 +361,18 @@ graph LR;
 While a standard proposal for sequencing 64-blocks would only comprise a single commitment, the Kailua variant here is
 configured to also require the commitment for every 8th block.
 In this configuration, any Kailua fault proof would only have to provably derive a sequence of at most 8 blocks.</p>
-<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
-<div class="admonition-title">
-<div id="admonition-note-1-title">
-<p>Note</p>
-</div>
-<a class="admonition-anchor-link" href="design.html#admonition-note-1"></a>
-</div>
-<div>
-<p>To save on DA costs, blobs or alternative DA layers can be used to publish intermediate commitments.
-Moreover, as empty blocks are cheap to prove, an intermediate commitment can be defined to cover at most N empty and
-at most M non-empty blocks, where N &gt;&gt; M.</p>
-</div>
-</div>
 <h2 id="disputes"><a class="header" href="#disputes">Disputes</a></h2>
 <p>Each new sequencing proposal implicitly disputes the last existing proposal that contradicts it.
 Once this happens, a proof is required to demonstrate which of the two contradictory proposals, if any, commits to the
 correct sequencing state at their first point of divergence.
 The proof then eliminates one, or both, contradictory proposals, and neither proposals can be finalized until the proof
 is submitted.</p>
-<div id="admonition-note-2" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-2-title">
+<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
 <div class="admonition-title">
-<div id="admonition-note-2-title">
+<div id="admonition-note-1-title">
 <p>Note</p>
 </div>
-<a class="admonition-anchor-link" href="design.html#admonition-note-2"></a>
+<a class="admonition-anchor-link" href="design.html#admonition-note-1"></a>
 </div>
 <div>
 <p>While any new contradictory proposal has to be made within the timeout period of the prior proposal it contradicts,
@@ -837,9 +824,9 @@ If the command does not yet support your configuration, you'll need to follow th
 <tr><td style="text-align: left">RiscZeroVerifierRouter</td><td style="text-align: left">addVerifier</td><td style="text-align: right">50K</td><td></td></tr>
 <tr><td style="text-align: left">RiscZeroGroth16Verifier</td><td style="text-align: left">deploy</td><td style="text-align: right">1,300K</td><td></td></tr>
 <tr><td style="text-align: left">RiscZeroMockVerifier</td><td style="text-align: left">deploy</td><td style="text-align: right">615K</td><td></td></tr>
-<tr><td style="text-align: left">KailuaTreasury</td><td style="text-align: left">deploy</td><td style="text-align: right">5,050K</td><td></td></tr>
-<tr><td style="text-align: left">KailuaTreasury</td><td style="text-align: left">propose</td><td style="text-align: right">380K</td><td></td></tr>
-<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">deploy</td><td style="text-align: right">4,800K</td><td></td></tr>
+<tr><td style="text-align: left">KailuaTreasury</td><td style="text-align: left">deploy</td><td style="text-align: right">5,200K</td><td></td></tr>
+<tr><td style="text-align: left">KailuaTreasury</td><td style="text-align: left">propose</td><td style="text-align: right">420K</td><td></td></tr>
+<tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">deploy</td><td style="text-align: right">5,000K</td><td></td></tr>
 <tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">proveValidity</td><td style="text-align: right">375K</td><td>Groth16 proof</td></tr>
 <tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">proveOutputFault</td><td style="text-align: right">415K</td><td>Groth16 + 1 KZG proofs</td></tr>
 <tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">proveOutputFault</td><td style="text-align: right">470K</td><td>Groth16 + 2 KZG proofs</td></tr>
@@ -1232,7 +1219,7 @@ The same <code>KailuaTreasury</code> deployment <strong>should NOT</strong> be r
   uint256 _proposalOutputCount,
   uint256 _outputBlockSpan,
   GameType _gameType,
-  IDisputeGameFactory _disputeGameFactory,
+  OptimismPortal2 _optimismPortal,
   Claim _rootClaim,
   uint64 _l2BlockNumber
 )
@@ -1278,7 +1265,7 @@ Then, you need to query your <code>op-node</code> for the <code>outputRoot</code
   [YOUR_PROPOSAL_OUTPUT_COUNT] \
   [YOUR_OUTPUT_BLOCK_SPAN] \
   [YOUR_KAILUA_GAME_TYPE] \
-  [YOUR_DISPUTE_GAME_FACTORY] \
+  [YOUR_OPTIMISM_PORTAL] \
   [YOUR_OUTPUT_ROOT_CLAIM] \
   [YOUR_L2_BLOCK_NUMBER]
 </code></pre>
@@ -1308,12 +1295,6 @@ Transaction hash: [YOUR_DEPLOYMENT_TRANSACTION_HASH]
 <pre><code class="language-solidity">constructor(
   IKailuaTreasury _kailuaTreasury,
   IRiscZeroVerifier _verifierContract,
-  bytes32 _imageId,
-  bytes32 _configHash,
-  uint256 _proposalOutputCount,
-  uint256 _outputBlockSpan,
-  GameType _gameType,
-  IDisputeGameFactory _disputeGameFactory,
   uint256 _genesisTimeStamp,
   uint256 _l2BlockTime,
   uint256 _proposalTimeGap,
@@ -1325,13 +1306,6 @@ initial one in the <code>KailuaTreasury</code>.
 Deployment is fairly similar to the treasury via the command below:</p>
 <pre><code class="language-shell">forge create KailuaGame --evm-version cancun --constructor-args \
   [YOUR_DEPLOYED_TREASURY_CONTRACT] \
-  [YOUR_RISC_ZERO_VERIFIER] \
-  [YOUR_FPVM_IMAGE_ID] \
-  [YOUR_ROLLUP_CONFIG_HASH] \
-  [YOUR_PROPOSAL_OUTPUT_COUNT] \
-  [YOUR_OUTPUT_BLOCK_SPAN] \
-  [YOUR_KAILUA_GAME_TYPE] \
-  [YOUR_DISPUTE_GAME_FACTORY] \
   [YOUR_GENESIS_TIMESTAMP] \
   [YOUR_BLOCK_TIME] \
   [YOUR_PROPOSAL_TIME_GAP] \
