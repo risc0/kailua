@@ -43,11 +43,11 @@ While a standard proposal for sequencing 64-blocks would only comprise a single 
 configured to also require the commitment for every 8th block.
 In this configuration, any Kailua fault proof would only have to provably derive a sequence of at most 8 blocks. 
 
-```admonish note
-To save on DA costs, blobs or alternative DA layers can be used to publish intermediate commitments.
-Moreover, as empty blocks are cheap to prove, an intermediate commitment can be defined to cover at most N empty and
-at most M non-empty blocks, where N >> M.
-```
+[//]: # (```admonish note)
+
+[//]: # (To save on DA costs, blobs or alternative DA layers can be used to publish intermediate commitments.)
+
+[//]: # (```)
 
 ## Disputes
 
