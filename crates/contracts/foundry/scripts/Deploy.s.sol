@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import "../src/vendor/FlatOPImportV1.4.0.sol";
-import "../src/vendor/FlatR0ImportV1.2.0.sol";
+import "../src/vendor/FlatR0ImportV2.0.2.sol";
 import {KailuaTreasury} from "../src/KailuaTreasury.sol";
 import {KailuaGame} from "../src/KailuaGame.sol";
 
@@ -50,18 +50,14 @@ contract DeployScript is Script {
     function _6_1_proofVerification() public {
         RiscZeroVerifierRouter router = new RiscZeroVerifierRouter(deployer);
 
-        RiscZeroSetVerifier setVerifier = new RiscZeroSetVerifier(router, fpvmImageId, "");
-        bytes4 setSelector = setVerifier.SELECTOR();
-        router.addVerifier(setSelector, setVerifier);
-
         RiscZeroGroth16Verifier groth16Verifier = new RiscZeroGroth16Verifier(controlRoot, controlId);
         bytes4 groth16Selector = groth16Verifier.SELECTOR();
         router.addVerifier(groth16Selector, groth16Verifier);
     }
 
     function _6_2_disputeResolution() public returns (KailuaTreasury, KailuaGame) {
-        KailuaTreasury treasury = new KailuaTreasury(riscZeroVerifier, fpvmImageId, rollupConfigHash, proposalOutputCount, outputBlockSpan, gameType, dgf, outputRootClaim, l2BlockNumber);
-        KailuaGame game = new KailuaGame(treasury, riscZeroVerifier, fpvmImageId, rollupConfigHash, proposalOutputCount, outputBlockSpan, gameType, dgf, genesisTimestamp, blocktime, proposalTimeGap, maxClockDuration);
+        KailuaTreasury treasury = new KailuaTreasury(riscZeroVerifier, fpvmImageId, rollupConfigHash, proposalOutputCount, outputBlockSpan, gameType, optimismPortal, outputRootClaim, l2BlockNumber);
+        KailuaGame game = new KailuaGame(treasury, genesisTimestamp, blocktime, proposalTimeGap, maxClockDuration);
 
         return (treasury, game);
     }
