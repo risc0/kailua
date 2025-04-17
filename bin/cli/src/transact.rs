@@ -20,6 +20,7 @@ use async_trait::async_trait;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use std::future::IntoFuture;
+use std::time::Duration;
 
 #[async_trait]
 pub trait Transact<N: Network> {
@@ -53,6 +54,7 @@ where
             .with_context(context.with_span(tracer.start_with_context("send", &context)))
             .await
             .context("send")?
+            .with_timeout(Some(Duration::from_secs(30)))
             .get_receipt()
             .with_context(context.with_span(tracer.start_with_context("get_receipt", &context)))
             .await
