@@ -233,7 +233,8 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                     );
 
                     if let Err(err) = result {
-                        warn!("pruneChildren: {err:?}");
+                        // Pruning failure means unresolved disputes
+                        debug!("pruneChildren: {err:?}");
                         break false;
                     };
                     let result = result.unwrap();
