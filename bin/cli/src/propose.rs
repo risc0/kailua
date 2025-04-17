@@ -184,7 +184,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             meter_sync_canonical.record(
                 canonical_tip.index,
                 &[
-                    KeyValue::new("tournament", canonical_tip.contract.to_string()),
+                    KeyValue::new("proposal", canonical_tip.contract.to_string()),
                     KeyValue::new("l2_height", canonical_tip.output_block_number.to_string()),
                 ],
             );
@@ -370,7 +370,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                     meter_resolve_num.add(
                         1,
                         &[
-                            KeyValue::new("tournament", proposal.contract.to_string()),
+                            KeyValue::new("proposal", proposal.contract.to_string()),
                             KeyValue::new("l2_height", proposal.output_block_number.to_string()),
                             KeyValue::new("txn_hash", receipt.transaction_hash.to_string()),
                             KeyValue::new("txn_from", receipt.from.to_string()),
@@ -390,7 +390,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                     meter_resolve_last.record(
                         proposal.index,
                         &[
-                            KeyValue::new("tournament", proposal.contract.to_string()),
+                            KeyValue::new("proposal", proposal.contract.to_string()),
                             KeyValue::new("l2_height", proposal.output_block_number.to_string()),
                         ],
                     );
@@ -400,7 +400,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                     meter_resolve_fail.add(
                         1,
                         &[
-                            KeyValue::new("tournament", proposal.contract.to_string()),
+                            KeyValue::new("proposal", proposal.contract.to_string()),
                             KeyValue::new("l2_height", proposal.output_block_number.to_string()),
                             KeyValue::new("msg", err.to_string()),
                         ],
