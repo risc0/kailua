@@ -33,8 +33,9 @@ use kailua_common::blobs::hash_to_fe;
 use kailua_common::config::config_hash;
 use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
-use opentelemetry::global::tracer;
+use opentelemetry::global::{meter, tracer};
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
+use opentelemetry::KeyValue;
 use std::future::IntoFuture;
 use std::path::PathBuf;
 use std::process::exit;
@@ -59,6 +60,19 @@ pub struct ProposeArgs {
 }
 
 pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()> {
+    // Telemetry
+    let meter = meter("kailua");
+    let meter_prune_num = meter.u64_counter("proposer.prune.count").build();
+    let meter_prune_fail = meter.u64_counter("proposer.prune.errs").build();
+    let meter_resolve_num = meter.u64_counter("proposer.resolve.count").build();
+    let meter_resolve_last = meter.u64_gauge("proposer.resolve.last").build();
+    let meter_resolve_fail = meter.u64_counter("proposer.resolve.errs").build();
+    let meter_propose_num = meter.u64_counter("proposer.propose.count").build();
+    let meter_propose_last = meter.u64_gauge("proposer.propose.last").build();
+    let meter_propose_fail = meter.u64_counter("proposer.propose.errs").build();
+    let meter_propose_fault = meter.u64_gauge("proposer.propose.fault").build();
+    let meter_sync_canonical = meter.u64_gauge("proposer.sync.canonical").build();
+    let meter_sync_next = meter.u64_gauge("proposer.sync.next").build();
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("propose"));
 
@@ -165,10 +179,29 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         )
         .context("KailuaDB::load_proposals")?;
 
+        // Update sync telemetry
+        if let Some(canonical_tip) = kailua_db.canonical_tip() {
+            meter_sync_canonical.record(
+                canonical_tip.index,
+                &[
+                    KeyValue::new("tournament", canonical_tip.contract.to_string()),
+                    KeyValue::new("l2_height", canonical_tip.output_block_number.to_string()),
+                ],
+            );
+        };
+        meter_sync_next.record(kailua_db.state.next_factory_index, &[]);
+
         // alert on honesty compromise
         if let Some(elimination_index) = kailua_db.state.eliminations.get(&proposer_address) {
             error!(
                 "Proposer {proposer_address} honesty compromised at proposal {elimination_index}."
+            );
+            meter_propose_fault.record(
+                *elimination_index,
+                &[
+                    KeyValue::new("treasury", kailua_db.treasury.address.to_string()),
+                    KeyValue::new("proposer", proposer_address.to_string()),
+                ],
             );
         }
 
@@ -254,9 +287,47 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                     {
                         Ok(receipt) => {
                             info!("KailuaTournament::pruneChildren: {} gas", receipt.gas_used);
+                            meter_prune_num.add(
+                                1,
+                                &[
+                                    KeyValue::new(
+                                        "tournament",
+                                        parent_contract.address().to_string(),
+                                    ),
+                                    KeyValue::new("txn_hash", receipt.transaction_hash.to_string()),
+                                    KeyValue::new("txn_from", receipt.from.to_string()),
+                                    KeyValue::new(
+                                        "txn_to",
+                                        receipt.to.unwrap_or_default().to_string(),
+                                    ),
+                                    KeyValue::new("txn_gas_used", receipt.gas_used.to_string()),
+                                    KeyValue::new(
+                                        "txn_gas_price",
+                                        receipt.effective_gas_price.to_string(),
+                                    ),
+                                    KeyValue::new(
+                                        "txn_blob_gas_used",
+                                        receipt.blob_gas_used.unwrap_or_default().to_string(),
+                                    ),
+                                    KeyValue::new(
+                                        "txn_blob_gas_price",
+                                        receipt.blob_gas_price.unwrap_or_default().to_string(),
+                                    ),
+                                ],
+                            );
                         }
                         Err(err) => {
                             error!("KailuaTournament::pruneChildren: {err:?}");
+                            meter_prune_fail.add(
+                                1,
+                                &[
+                                    KeyValue::new(
+                                        "tournament",
+                                        parent_contract.address().to_string(),
+                                    ),
+                                    KeyValue::new("msg", err.to_string()),
+                                ],
+                            );
                             break false;
                         }
                     }
@@ -289,9 +360,53 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                 proposal.index, proposal.output_block_number
             );
 
-            if let Err(e) = await_tel!(context, proposal.resolve(&proposer_provider)) {
-                error!("Failed to resolve proposal: {e:?}");
-                break;
+            match proposal
+                .resolve(&proposer_provider)
+                .await
+                .context("KailuaTournament::resolve transact")
+            {
+                Ok(receipt) => {
+                    info!("KailuaTournament::resolve: {} gas", receipt.gas_used);
+                    meter_resolve_num.add(
+                        1,
+                        &[
+                            KeyValue::new("tournament", proposal.contract.to_string()),
+                            KeyValue::new("l2_height", proposal.output_block_number.to_string()),
+                            KeyValue::new("txn_hash", receipt.transaction_hash.to_string()),
+                            KeyValue::new("txn_from", receipt.from.to_string()),
+                            KeyValue::new("txn_to", receipt.to.unwrap_or_default().to_string()),
+                            KeyValue::new("txn_gas_used", receipt.gas_used.to_string()),
+                            KeyValue::new("txn_gas_price", receipt.effective_gas_price.to_string()),
+                            KeyValue::new(
+                                "txn_blob_gas_used",
+                                receipt.blob_gas_used.unwrap_or_default().to_string(),
+                            ),
+                            KeyValue::new(
+                                "txn_blob_gas_price",
+                                receipt.blob_gas_price.unwrap_or_default().to_string(),
+                            ),
+                        ],
+                    );
+                    meter_resolve_last.record(
+                        proposal.index,
+                        &[
+                            KeyValue::new("tournament", proposal.contract.to_string()),
+                            KeyValue::new("l2_height", proposal.output_block_number.to_string()),
+                        ],
+                    );
+                }
+                Err(err) => {
+                    error!("KailuaTournament::resolve: {err:?}");
+                    meter_resolve_fail.add(
+                        1,
+                        &[
+                            KeyValue::new("tournament", proposal.contract.to_string()),
+                            KeyValue::new("l2_height", proposal.output_block_number.to_string()),
+                            KeyValue::new("msg", err.to_string()),
+                        ],
+                    );
+                    break;
+                }
             }
         }
 
@@ -414,8 +529,6 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         };
         info!("Candidate proposal prepared");
 
-        //
-
         // Calculate required duplication counter
         let mut dupe_counter = 0u64;
         let unique_extra_data = loop {
@@ -515,9 +628,53 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             Ok(receipt) => {
                 info!("Proposal submitted: {:?}", receipt.transaction_hash);
                 info!("KailuaTreasury::propose: {} gas", receipt.gas_used);
+                meter_propose_num.add(
+                    1,
+                    &[
+                        KeyValue::new("l2_height", proposed_block_number.to_string()),
+                        KeyValue::new("txn_hash", receipt.transaction_hash.to_string()),
+                        KeyValue::new("txn_from", receipt.from.to_string()),
+                        KeyValue::new("txn_to", receipt.to.unwrap_or_default().to_string()),
+                        KeyValue::new("txn_gas_used", receipt.gas_used.to_string()),
+                        KeyValue::new("txn_gas_price", receipt.effective_gas_price.to_string()),
+                        KeyValue::new(
+                            "txn_blob_gas_used",
+                            receipt.blob_gas_used.unwrap_or_default().to_string(),
+                        ),
+                        KeyValue::new(
+                            "txn_blob_gas_price",
+                            receipt.blob_gas_price.unwrap_or_default().to_string(),
+                        ),
+                    ],
+                );
+                meter_propose_last.record(
+                    proposed_block_number,
+                    &[
+                        KeyValue::new("txn_hash", receipt.transaction_hash.to_string()),
+                        KeyValue::new("txn_from", receipt.from.to_string()),
+                        KeyValue::new("txn_to", receipt.to.unwrap_or_default().to_string()),
+                        KeyValue::new("txn_gas_used", receipt.gas_used.to_string()),
+                        KeyValue::new("txn_gas_price", receipt.effective_gas_price.to_string()),
+                        KeyValue::new(
+                            "txn_blob_gas_used",
+                            receipt.blob_gas_used.unwrap_or_default().to_string(),
+                        ),
+                        KeyValue::new(
+                            "txn_blob_gas_price",
+                            receipt.blob_gas_price.unwrap_or_default().to_string(),
+                        ),
+                    ],
+                );
             }
             Err(e) => {
                 error!("Failed to confirm proposal txn: {e:?}");
+                meter_propose_fail.add(
+                    1,
+                    &[
+                        KeyValue::new("l2_height", proposed_block_number.to_string()),
+                        KeyValue::new("msg", e.to_string()),
+                    ],
+                );
             }
         }
     }
