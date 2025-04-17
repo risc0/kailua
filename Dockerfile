@@ -16,12 +16,14 @@ COPY . .
 RUN cargo install svm-rs && \
     svm install 0.8.24
 
+ARG CARGO_BUILD_JOBS=1
+
 RUN --mount=type=cache,target=/root/.cargo/registry --mount=type=cache,target=/root/.cargo/git --mount=type=cache,target=/kailua/target \
-    cargo build --jobs 4 \
+    cargo build --jobs ${CARGO_BUILD_JOBS} --release -F disable-dev-mode \
     && mkdir out \
-    && mv target/debug/kailua-host out/ \
-    && mv target/debug/kailua-cli out/ \
-    && mv target/debug/kailua-client out/ \
+    && mv target/release/kailua-host out/ \
+    && mv target/release/kailua-cli out/ \
+    && mv target/release/kailua-client out/ \
     && strip out/kailua-host \
     && strip out/kailua-cli \
     && strip out/kailua-client;
