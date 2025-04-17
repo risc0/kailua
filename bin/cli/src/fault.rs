@@ -23,6 +23,7 @@ use alloy::primitives::{Bytes, B256, U256};
 use alloy::providers::{ProviderBuilder, RootProvider};
 use alloy::sol_types::SolValue;
 use anyhow::Context;
+use futures::future::join_all;
 use kailua_client::provider::OpNodeProvider;
 use kailua_client::{await_tel, await_tel_res};
 use kailua_common::blobs::hash_to_fe;
@@ -31,6 +32,8 @@ use kailua_contracts::*;
 use kailua_host::config::fetch_rollup_config;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
+use std::sync::Arc;
+use tokio::task;
 use tracing::{error, info};
 
 #[derive(clap::Args, Debug, Clone)]
@@ -52,8 +55,8 @@ pub struct FaultArgs {
 }
 
 pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
-    let tracer = tracer("kailua");
-    let context = opentelemetry::Context::current_with_span(tracer.start("fault"));
+    let kailua_tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(kailua_tracer.start("fault"));
 
     let op_node_provider = OpNodeProvider(RootProvider::new_http(
         args.propose_args.core.op_node_url.as_str().try_into()?,
@@ -86,7 +89,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     // init l1 stuff
     let tester_wallet = await_tel_res!(
         context,
-        tracer,
+        kailua_tracer,
         "ProposerSignerArgs::wallet",
         args.propose_args
             .proposer_signer
@@ -160,34 +163,77 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     } else {
         await_tel_res!(
             context,
-            tracer,
+            kailua_tracer,
             "proposed_output_root",
             retry_with_context!(op_node_provider.output_at_block(proposed_block_number))
         )?
     };
 
     // Prepare intermediate outputs
-    let mut io_field_elements = vec![];
     let is_output_fault = faulty_block_number <= proposal_block_count;
     let normalized_fault_block_number =
         faulty_block_number - (!is_output_fault as u64) * output_block_span;
+    
+    // Create shared provider and context for parallel tasks
+    let arc_context = Arc::new(context.clone());
+    let arc_provider = Arc::new(op_node_provider);
+    
+    // Create a vector of futures for each field element calculation
+    let mut fetch_tasks: Vec<tokio::task::JoinHandle<anyhow::Result<alloy::primitives::Uint<256, 4>>>> = 
+        Vec::with_capacity((FIELD_ELEMENTS_PER_BLOB - 1) as usize);
+    
     for i in 1..FIELD_ELEMENTS_PER_BLOB {
         let io_block_number = parent_block_number + i * output_block_span;
-
-        let output_hash = if io_block_number == normalized_fault_block_number {
-            faulty_root_claim
-        } else if io_block_number < proposed_block_number {
-            await_tel_res!(
-                context,
-                tracer,
-                "output_hash",
-                retry_with_context!(op_node_provider.output_at_block(io_block_number))
-            )?
-        } else {
-            B256::ZERO
-        };
-        io_field_elements.push(hash_to_fe(output_hash));
+        let context_ref = arc_context.clone();
+        let provider_ref = arc_provider.clone();
+        let fault_claim = faulty_root_claim;
+        let proposed_num = proposed_block_number;
+        let norm_fault_num = normalized_fault_block_number;
+        
+        // Spawn a task for each field element
+        let task = task::spawn(async move {
+            if io_block_number == norm_fault_num {
+                Ok(hash_to_fe(fault_claim))
+            } else if io_block_number < proposed_num {
+                let cloned_context = context_ref.as_ref().clone();
+                // Create a new tracer for each async task
+                let task_tracer = tracer("kailua");
+                let output_hash = await_tel_res!(
+                    cloned_context,
+                    task_tracer,
+                    "output_hash",
+                    retry_with_context!(provider_ref.output_at_block(io_block_number))
+                )?;
+                Ok(hash_to_fe(output_hash))
+            } else {
+                Ok(hash_to_fe(B256::ZERO))
+            }
+        });
+        
+        fetch_tasks.push(task);
     }
+    
+    // Wait for all tasks to complete and collect results
+    let results = join_all(fetch_tasks).await;
+    let io_field_elements = results
+        .into_iter()
+        .filter_map(|result| match result {
+            Ok(Ok(fe)) => Some(fe),
+            Ok(Err(e)) => {
+                error!("Error fetching field element: {:?}", e);
+                None
+            },
+            Err(e) => {
+                error!("Task join error: {:?}", e);
+                None
+            },
+        })
+        .collect::<Vec<_>>();
+    
+    // Ensure we got all the elements we need
+    if io_field_elements.len() != (FIELD_ELEMENTS_PER_BLOB - 1) as usize {
+        return Err(anyhow::anyhow!("Failed to fetch all required field elements"));
+    }  
     let sidecar = Proposal::create_sidecar(&io_field_elements)?;
 
     // Calculate required duplication counter
