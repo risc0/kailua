@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use opentelemetry::global::set_tracer_provider;
-use opentelemetry::trace::TraceError;
+use opentelemetry::global::{set_meter_provider, set_tracer_provider};
 use opentelemetry::KeyValue;
-use opentelemetry_otlp::{SpanExporter, WithExportConfig};
+use opentelemetry_otlp::{MetricExporter, SpanExporter, WithExportConfig};
+use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider, Temporality};
 use opentelemetry_sdk::{runtime::Tokio, trace::TracerProvider, Resource};
 
 #[derive(clap::Args, Debug, Clone)]
@@ -25,10 +25,10 @@ pub struct TelemetryArgs {
     pub otlp_collector: Option<String>,
 }
 
-pub fn init_tracer_provider(args: &TelemetryArgs) -> Result<(), TraceError> {
+pub fn init_tracer_provider(args: &TelemetryArgs) -> anyhow::Result<()> {
     if let Some(otlp_collector) = &args.otlp_collector {
         println!("OTLP Collector endpoint: {otlp_collector}");
-        // Build and set default global provider
+        // Build and set default global tracer provider
         set_tracer_provider(
             TracerProvider::builder()
                 .with_batch_exporter(
@@ -41,6 +41,23 @@ pub fn init_tracer_provider(args: &TelemetryArgs) -> Result<(), TraceError> {
                 .with_resource(Resource::new(vec![KeyValue::new("service.name", "kailua")]))
                 .build(),
         );
+        // Build and set default global meter provider
+        set_meter_provider(
+            SdkMeterProvider::builder()
+                .with_reader(
+                    PeriodicReader::builder(
+                        MetricExporter::builder()
+                            .with_temporality(Temporality::Delta)
+                            .with_tonic()
+                            .with_endpoint(otlp_collector)
+                            .build()?,
+                        Tokio,
+                    )
+                    .build(),
+                )
+                .with_resource(Resource::new(vec![KeyValue::new("service.name", "kailua")]))
+                .build(),
+        )
     }
     Ok(())
 }
