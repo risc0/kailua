@@ -4,6 +4,10 @@ set fallback := true
 default:
   @just --list
 
+
+test:
+    forge test -vvv
+
 test-deployable:
     #!/usr/bin/env bash
 

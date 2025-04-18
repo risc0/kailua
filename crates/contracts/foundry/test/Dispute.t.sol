@@ -173,11 +173,12 @@ contract Propose is KailuaTest {
         );
 
         // Generate mock proof
+        bytes32 goodClaim = bytes32(uint256(proposal_128_0.rootClaim().raw()) + KailuaKZGLib.BLS_MODULUS);
         bytes memory proof = mockFaultProof(
             address(this),
             proposal_128_0.l1Head().raw(),
             proposal_128_0.parentGame().rootClaim().raw(),
-            ~proposal_128_0.rootClaim().raw(),
+            goodClaim,
             uint64(proposal_128_0.l2BlockNumber())
         );
 
@@ -188,7 +189,7 @@ contract Propose is KailuaTest {
             proof,
             proposal_128_0.parentGame().rootClaim().raw(),
             KailuaKZGLib.hashToFe(proposal_128_0.rootClaim().raw()),
-            ~proposal_128_0.rootClaim().raw(),
+            goodClaim,
             new bytes[](0),
             new bytes[](0)
         );
@@ -275,7 +276,6 @@ contract Propose is KailuaTest {
                 // Ensure signature is unviable
                 vm.assertFalse(proposals[j].parentGame().isViableSignature(proposals[j].signature()));
             }
-
 
             // Fail to resolve any non-canonical proposal
             for (uint256 j = 0; j < PROPOSAL_BUFFER_LEN; j++) {

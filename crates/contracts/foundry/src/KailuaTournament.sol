@@ -516,11 +516,6 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             revert AlreadyProven();
         }
 
-        // INVARIANT: Proofs can only show disparities
-        if (KailuaKZGLib.hashToFe(computedOutputHash) == proposedOutputFe) {
-            revert NoConflict();
-        }
-
         // INVARIANT: Proofs can only pertain to computed outputs
         if (co[1] >= PROPOSAL_OUTPUT_COUNT) {
             revert InvalidDisputedClaimIndex();
@@ -542,10 +537,12 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             );
         }
 
-        // Validate the claimed output roots.
+        // Validate the claimed output root.
         if (co[1] == PROPOSAL_OUTPUT_COUNT - 1) {
-            // Note: proposedOutputFe must be a canonical point or comparison below will fail
-            require(proposedOutputFe == KailuaKZGLib.hashToFe(childContract.rootClaim().raw()), "bad proposedOutputFe");
+            // INVARIANT: Proofs can only show disparities
+            if (computedOutputHash == childContract.rootClaim().raw()) {
+                revert NoConflict();
+            }
         } else {
             // Note: proposedOutputFe must be a canonical point or point eval precompile call will fail
             // Prove divergent output publication
@@ -558,6 +555,10 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                 ),
                 "bad proposedOutput kzg"
             );
+            // INVARIANT: Proofs can only show disparities
+            if (KailuaKZGLib.hashToFe(computedOutputHash) == proposedOutputFe) {
+                revert NoConflict();
+            }
         }
 
         // Construct the expected journal
