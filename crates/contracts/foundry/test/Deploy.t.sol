@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
-import "./KailuaTest.sol";
+import "./KailuaTest.t.sol";
 
 contract DeployTest is KailuaTest {
     function setUp() public override {

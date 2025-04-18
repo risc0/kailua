@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.10;
 
-import "./KailuaTest.sol";
+import "./KailuaTest.t.sol";
 
 contract Propose is KailuaTest {
     KailuaTreasury treasury;

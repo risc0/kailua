@@ -27,3 +27,6 @@ test-deployable:
       0x01 \
       0x01 \
       0x01
+
+coverage +ARGS="":
+    forge coverage --no-match-coverage src/vendor {{ARGS}}
