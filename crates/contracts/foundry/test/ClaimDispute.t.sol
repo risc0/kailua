@@ -17,17 +17,17 @@ pragma solidity ^0.8.24;
 
 import "./KailuaTest.t.sol";
 
-contract DisputeTest is KailuaTest {
+contract ClaimDisputeTest is KailuaTest {
     KailuaTreasury treasury;
     KailuaGame game;
-    uint64 anchorIndex;
+    KailuaTournament anchor;
 
     uint256 public constant PROPOSAL_BUFFER_LEN = 21;
 
     function setUp() public override {
         super.setUp();
         // Deploy dispute contracts
-        (treasury, game) = deployKailua(
+        (treasury, game, anchor) = deployKailua(
             uint256(0x1), // no intermediate commitments
             uint256(0x80), // 128 blocks per proposal
             sha256(abi.encodePacked(bytes32(0x00))), // arbitrary block hash
@@ -37,8 +37,6 @@ contract DisputeTest is KailuaTest {
             uint256(0x5), // 5-second wait
             uint64(0xA) // 10-second dispute timeout
         );
-        // Get anchor proposal
-        anchorIndex = uint64(factory.gameCount() - 1);
     }
 
     function test_getChallengerDuration() public {
@@ -49,7 +47,7 @@ contract DisputeTest is KailuaTest {
         // Succeed to propose after proposal time gap
         KailuaTournament proposal_128_0 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
-            abi.encodePacked(uint64(128), anchorIndex, uint64(0))
+            abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
         );
 
         // Fail to resolve before dispute timeout
@@ -74,7 +72,7 @@ contract DisputeTest is KailuaTest {
         // Succeed to propose after proposal time gap
         KailuaTournament proposal_128_0 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
-            abi.encodePacked(uint64(128), anchorIndex, uint64(0))
+            abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
         );
 
         // Generate mock proof
@@ -127,14 +125,15 @@ contract DisputeTest is KailuaTest {
         // Succeed to propose after proposal time gap
         KailuaTournament proposal_128_0 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
-            abi.encodePacked(uint64(128), anchorIndex, uint64(0))
+            abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
         );
 
         KailuaTournament[12] memory proposal_128;
         for (uint256 i = 1; i < 12; i++) {
             vm.startPrank(address(bytes20(uint160(i))));
             proposal_128[i] = treasury.propose(
-                Claim.wrap(sha256(abi.encodePacked(bytes32(i)))), abi.encodePacked(uint64(128), anchorIndex, uint64(0))
+                Claim.wrap(sha256(abi.encodePacked(bytes32(i)))),
+                abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
             );
             vm.stopPrank();
         }
@@ -176,14 +175,15 @@ contract DisputeTest is KailuaTest {
     }
 
     function test_proveOutputFault_undisputed() public {
+        // Time for at most two proposals
         vm.warp(
             game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
         // Succeed to propose after proposal time gap
         KailuaTournament proposal_128_0 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
-            abi.encodePacked(uint64(128), anchorIndex, uint64(0))
+            abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
         );
 
         // Generate mock proof
@@ -214,10 +214,18 @@ contract DisputeTest is KailuaTest {
         // Fail to finalize disproven claim
         vm.expectRevert();
         proposal_128_0.resolve();
+
+        // Fail to repeat disproven claim
+        uint64 parentIndex = uint64(anchor.gameIndex());
+        vm.expectRevert(ProvenFaulty.selector);
+        treasury.propose(
+            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
+            abi.encodePacked(uint64(128), parentIndex, uint64(1))
+        );
     }
 
     function test_proveOutputFault_disputed() public {
-        uint64 parentIndex = anchorIndex;
+        uint64 parentIndex = uint64(anchor.gameIndex());
 
         for (uint256 i = 1; i < PROPOSAL_BUFFER_LEN; i++) {
             uint64 blockHeight = uint64(128 * i);
@@ -326,7 +334,7 @@ contract DisputeTest is KailuaTest {
     }
 
     function test_proveOutputFault_duplicates() public {
-        uint64 parentIndex = anchorIndex;
+        uint64 parentIndex = uint64(anchor.gameIndex());
 
         for (uint256 i = 1; i < PROPOSAL_BUFFER_LEN; i++) {
             uint64 blockHeight = uint64(128 * i);

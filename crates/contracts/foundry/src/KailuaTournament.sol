@@ -84,6 +84,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         // INVARIANT: The game must not have already been initialized.
         if (createdAt.raw() > 0) revert AlreadyInitialized();
 
+        // Allow only the treasury to create new games
+        if (gameCreator() != address(KAILUA_TREASURY)) {
+            revert Blacklisted(gameCreator(), address(KAILUA_TREASURY));
+        }
+
         // Set the game's starting timestamp
         createdAt = Timestamp.wrap(uint64(block.timestamp));
 

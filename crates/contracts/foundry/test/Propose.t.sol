@@ -20,12 +20,12 @@ import "./KailuaTest.t.sol";
 contract ProposeTest is KailuaTest {
     KailuaTreasury treasury;
     KailuaGame game;
-    uint64 anchorIndex;
+    KailuaTournament anchor;
 
     function setUp() public override {
         super.setUp();
         // Deploy dispute contracts
-        (treasury, game) = deployKailua(
+        (treasury, game, anchor) = deployKailua(
             uint256(0x1), // no intermediate commitments
             uint256(0x80), // 128 blocks per proposal
             sha256(abi.encodePacked(bytes32(0x00))), // arbitrary block hash
@@ -35,8 +35,6 @@ contract ProposeTest is KailuaTest {
             uint256(0x5), // 5-second wait
             uint64(0x0) // no dispute timeout
         );
-        // Get anchor proposal
-        anchorIndex = uint64(factory.gameCount() - 1);
     }
 
     fallback() external payable {}
@@ -50,6 +48,7 @@ contract ProposeTest is KailuaTest {
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 1
         );
         // Fail without deposit
+        uint64 anchorIndex = uint64(anchor.gameIndex());
         vm.expectRevert(IncorrectBondAmount.selector);
         treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
@@ -87,6 +86,7 @@ contract ProposeTest is KailuaTest {
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 1
         );
         // Fail if not vanguard
+        uint64 anchorIndex = uint64(anchor.gameIndex());
         vm.expectRevert();
         treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
@@ -115,6 +115,7 @@ contract ProposeTest is KailuaTest {
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 1
         );
         // Succeed on fresh proposal
+        uint64 anchorIndex = uint64(anchor.gameIndex());
         KailuaTournament proposal_128_0 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(128), anchorIndex, uint64(0))
@@ -144,12 +145,65 @@ contract ProposeTest is KailuaTest {
         proposal_128_1.resolve();
     }
 
+    function test_proposerOf() public {
+        vm.warp(
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
+        );
+
+        // Succeed on first proposal from 0x0000..
+        vm.startPrank(address(0x0));
+        KailuaTournament proposal_128_0 = treasury.propose(
+            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
+            abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
+        );
+        vm.stopPrank();
+
+        // Fail on creating a child
+        uint64 parentIndex = uint64(proposal_128_0.gameIndex());
+        vm.expectRevert(InvalidParent.selector);
+        treasury.propose(
+            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
+            abi.encodePacked(uint64(256), parentIndex, uint64(0))
+        );
+    }
+
+    function test_nullClaim() public {
+        vm.warp(
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
+        );
+
+        // Fail to propose 0x0000..
+        uint64 parentIndex = uint64(anchor.gameIndex());
+        vm.expectPartialRevert(UnexpectedRootClaim.selector);
+        treasury.propose(Claim.wrap(bytes32(0x0)), abi.encodePacked(uint64(128), parentIndex, uint64(0)));
+    }
+
+    function test_gameCreator() public {
+        vm.warp(
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+        );
+
+        // Fail to bypass treasury.propose
+        GameType gameType = treasury.GAME_TYPE();
+        uint64 parentIndex = uint64(anchor.gameIndex());
+        vm.expectPartialRevert(Blacklisted.selector);
+        factory.create(
+            gameType,
+            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
+            abi.encodePacked(uint64(256), parentIndex, uint64(0))
+        );
+    }
+
     function test_lastProposal() public {
         vm.warp(
             game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
         // Fail on low successor height
+        uint64 anchorIndex = uint64(anchor.gameIndex());
         vm.expectRevert();
         treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
@@ -232,6 +286,7 @@ contract ProposeTest is KailuaTest {
 
     function test_minCreationTime() public {
         // Fail before l2 block time
+        uint64 anchorIndex = uint64(anchor.gameIndex());
         vm.expectRevert();
         treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
@@ -266,19 +321,26 @@ contract ProposeTest is KailuaTest {
     }
 
     function test_extraData() public {
-        uint64 parentIndex = anchorIndex;
+        uint64 parentIndex = uint64(anchor.gameIndex());
         uint256 blocksPerProposal = game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN();
+        // Propose in order
         for (uint256 i = 1; i <= 128; i++) {
             vm.warp(game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP() + blocksPerProposal * game.L2_BLOCK_TIME() * i);
+            bytes32 claim = sha256(abi.encodePacked(bytes32(i)));
+            // Fail with bad extra data
+            vm.expectRevert(BadExtraData.selector);
+            treasury.propose(Claim.wrap(claim), abi.encodePacked(uint64(blocksPerProposal * i), parentIndex, uint72(0)));
+
+            // Succeed with correct info
             KailuaGame proposal = KailuaGame(
                 address(
                     treasury.propose(
-                        Claim.wrap(sha256(abi.encodePacked(bytes32(i)))),
-                        abi.encodePacked(uint64(blocksPerProposal * i), parentIndex, uint64(0))
+                        Claim.wrap(claim), abi.encodePacked(uint64(blocksPerProposal * i), parentIndex, uint64(0))
                     )
                 )
             );
 
+            // Verify initialization data
             vm.assertEq(
                 proposal.extraData(),
                 abi.encodePacked(
@@ -287,14 +349,38 @@ contract ProposeTest is KailuaTest {
                     uint64(proposal.duplicationCounter())
                 )
             );
-
             vm.assertEq(proposal.l2BlockNumber(), blocksPerProposal * i);
-
             vm.assertEq(proposal.parentGameIndex(), uint256(parentIndex));
-
             vm.assertEq(proposal.duplicationCounter(), 0);
 
+            // Verify other data
+            vm.assertEq(proposal.proposer(), address(this));
+            vm.assertEq(proposal.gameType().raw(), treasury.GAME_TYPE().raw());
+            vm.assertEq(proposal.gameCreator(), address(treasury));
+            (GameType gameType_, Claim rootClaim_, bytes memory extraData_) = proposal.gameData();
+            vm.assertEq(proposal.gameType().raw(), gameType_.raw());
+            vm.assertEq(proposal.rootClaim().raw(), rootClaim_.raw());
+            vm.assertEq(proposal.extraData(), extraData_);
+
             parentIndex = uint64(proposal.gameIndex());
+        }
+        // Fail to resolve out of order
+        (,, IDisputeGame lastGame) = factory.gameAtIndex(parentIndex);
+        for (
+            KailuaTournament proposal = KailuaTournament(address(lastGame));
+            proposal.parentGame() != anchor;
+            proposal = proposal.parentGame()
+        ) {
+            vm.expectRevert(OutOfOrderResolution.selector);
+            proposal.resolve();
+        }
+        // Resolve in order
+        for (
+            KailuaTournament proposal = anchor.pruneChildren(128);
+            proposal.childCount() > 0;
+            proposal = proposal.pruneChildren(128)
+        ) {
+            proposal.resolve();
         }
     }
 }

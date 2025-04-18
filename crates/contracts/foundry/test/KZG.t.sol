@@ -22,12 +22,30 @@ contract KZGTest is KailuaTest {
         super.setUp();
     }
 
-    function verifyKZGBlobProof(uint32 index, uint256 value, bytes calldata commitment, bytes calldata proof)
-        external
-        returns (bool)
-    {
-        return
-            KailuaKZGLib.verifyKZGBlobProof(KailuaKZGLib.versionedKZGHash(commitment), index, value, commitment, proof);
+    function test_modExp() public {
+        // Check success branch
+        vm.assertEq(KailuaKZGLib.modExp(0), 1);
+        // Check failure branch
+        vm.mockCallRevert(address(0x05), 0, abi.encodePacked(), hex"1234567890");
+        vm.expectRevert();
+        this.modExp(uint256(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff));
+    }
+
+    function test_versionedKZGHash() public {
+        // Test bad input size
+        vm.expectRevert();
+        this.versionedKZGHash(
+            abi.encodePacked(
+                hex"0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            )
+        );
+
+        // Test good input size
+        this.versionedKZGHash(
+            abi.encodePacked(
+                hex"c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            )
+        );
     }
 
     function test_verifyKZGBlobProof_0() public {
@@ -65,6 +83,20 @@ contract KZGTest is KailuaTest {
         uint256 value = 0x0000000000000000000000000000000000000000000000000000000000000002;
         for (uint32 i = 0; i < 4096; i++) {
             vm.assertTrue(this.verifyKZGBlobProof(i, value, commitment, proof));
+        }
+    }
+
+    function test_verifyKZGBlobProof_3() public {
+        bytes memory commitment = abi.encodePacked(
+            hex"a472cbea904d67468808c8eb50a9450c9721db309128012543902d0ac358a62ae28f75bb8f1c7c42c39a8c5529bf0f4e"
+        );
+        bytes memory proof = abi.encodePacked(
+            hex"c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+        );
+        uint256 value = 0x0000000000000000000000000000000000000000000000000000000000000002;
+        for (uint32 i = 0; i < 2; i++) {
+            vm.expectRevert();
+            this.verifyKZGBlobProof(i, value, commitment, proof);
         }
     }
 }

@@ -80,7 +80,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         // - 0x14 creator address               0x04 0x18
         // - 0x20 root claim                    0x18 0x38
         // - 0x20 l1 head                       0x38 0x58
-        // - 0x18 extraData:                    0x58 0x70
+        // - 0x1c extraData:                    0x58 0x74
         //      + 0x08 l2BlockNumber            0x58 0x60
         //      + 0x14 kailuaTreasuryAddress    0x60 0x74
         // - 0x02 CWIA bytes                    0x74 0x76
@@ -102,11 +102,6 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         if (treasuryAddress() != address(KAILUA_TREASURY)) {
             revert BadExtraData();
         }
-
-        // Allow only the treasury to create new games
-        if (gameCreator() != address(KAILUA_TREASURY)) {
-            revert Blacklisted(gameCreator(), address(KAILUA_TREASURY));
-        }
     }
 
     /// @notice Returns the treasury address used in initialization
@@ -122,7 +117,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     function extraData() external pure returns (bytes memory extraData_) {
         // The extra data starts at the second word within the cwia calldata and
         // is 32 bytes long.
-        extraData_ = _getArgBytes(0x54, 0x08);
+        extraData_ = _getArgBytes(0x54, 0x1c);
     }
 
     /// @inheritdoc IDisputeGame

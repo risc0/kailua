@@ -129,11 +129,6 @@ contract KailuaGame is KailuaTournament {
             revert ProvenFaulty();
         }
 
-        // Allow only the treasury to create new games
-        if (gameCreator() != address(KAILUA_TREASURY)) {
-            revert Blacklisted(gameCreator(), address(KAILUA_TREASURY));
-        }
-
         // Prohibit null claims
         if (rootClaim().raw() == 0x0) {
             revert UnexpectedRootClaim(rootClaim());
@@ -209,10 +204,7 @@ contract KailuaGame is KailuaTournament {
 
     /// @inheritdoc KailuaTournament
     function parentGame() public view override returns (KailuaTournament parentGame_) {
-        (GameType parentGameType,, IDisputeGame parentDisputeGame) = DISPUTE_GAME_FACTORY.gameAtIndex(parentGameIndex());
-
-        // Only allow fault claim games to be based off of other instances of the same game type
-        if (parentGameType.raw() != GAME_TYPE.raw()) revert GameTypeMismatch(parentGameType, GAME_TYPE);
+        (,, IDisputeGame parentDisputeGame) = DISPUTE_GAME_FACTORY.gameAtIndex(parentGameIndex());
 
         // Interpret parent game as another instance of this game type
         parentGame_ = KailuaTournament(address(parentDisputeGame));

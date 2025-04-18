@@ -23,7 +23,7 @@ contract DeployTest is KailuaTest {
     }
 
     function test_canDeployKailua() public {
-        deployKailua(
+        (KailuaTreasury treasury,, KailuaTournament anchor) = deployKailua(
             uint256(0x1),
             uint256(0x1),
             sha256(abi.encodePacked(bytes32(0x00))),
@@ -33,5 +33,14 @@ contract DeployTest is KailuaTest {
             uint256(0x0),
             uint64(0x0)
         );
+        // Check anchor data
+        vm.assertEq(factory.gameCount() - 1, anchor.gameIndex());
+        vm.assertEq(address(anchor.parentGame()), address(anchor));
+        vm.assertEq(anchor.minCreationTime().raw(), anchor.createdAt().raw());
+        vm.assertEq(anchor.getChallengerDuration(anchor.createdAt().raw()).raw(), 0);
+        vm.assertEq(anchor.extraData(), abi.encodePacked(uint64(anchor.l2BlockNumber()), address(treasury)));
+        vm.assertFalse(anchor.verifyIntermediateOutput(0, 0, hex"", hex""));
+        KailuaTreasury anchorTreasury = KailuaTreasury(address(anchor));
+        vm.assertEq(anchorTreasury.treasuryAddress(), address(treasury));
     }
 }

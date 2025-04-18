@@ -196,9 +196,9 @@ library KailuaKZGLib {
     function modExp(uint256 exponent) internal returns (uint256 result) {
         bytes memory modExpData =
             abi.encodePacked(uint256(32), uint256(32), uint256(32), ROOT_OF_UNITY, exponent, BLS_MODULUS);
-        (bool success, bytes memory rootOfUnity) = MOD_EXP.call(modExpData);
+        (bool success, bytes memory mexpResult) = MOD_EXP.call(modExpData);
         require(success);
-        result = uint256(bytes32(rootOfUnity));
+        result = uint256(bytes32(mexpResult));
     }
 
     /// @notice Reverses the bits of the input index
