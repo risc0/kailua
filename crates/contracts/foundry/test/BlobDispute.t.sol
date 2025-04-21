@@ -335,4 +335,69 @@ contract BlobDisputeTest is KailuaTest {
         vm.expectRevert(NotProven.selector);
         proposal_128_0.resolve();
     }
+
+    function test_proveValidity() public {
+        vm.warp(
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+        );
+        // honest proposal
+        bytes32[] memory blobs = new bytes32[](1);
+        blobs[0] = this.versionedKZGHash(BLOB_NZ_COMMIT);
+        vm.blobhashes(blobs);
+        KailuaTournament proposal_128_0 = treasury.propose(
+            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000100),
+            abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
+        );
+
+        vm.warp(
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
+        );
+        proposal_128_0.resolve();
+        // Generate mock proof
+        bytes memory proof = mockValidityProof(
+            address(this),
+            proposal_128_0.l1Head().raw(),
+            anchor.rootClaim().raw(),
+            proposal_128_0.rootClaim().raw(),
+            uint64(proposal_128_0.l2BlockNumber()),
+            uint64(treasury.PROPOSAL_OUTPUT_COUNT()),
+            uint64(treasury.OUTPUT_BLOCK_SPAN()),
+            proposal_128_0.blobsHash()
+        );
+
+        // Reject validity proof after resolution
+        vm.expectRevert(GameNotInProgress.selector);
+        anchor.proveValidity(address(this), uint64(0), proof);
+
+        // honest proposal
+        vm.blobhashes(blobs);
+        KailuaTournament proposal_256_0 = treasury.propose(
+            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000100),
+            abi.encodePacked(uint64(256), uint64(proposal_128_0.gameIndex()), uint64(0))
+        );
+
+        // Generate mock proof
+        proof = mockValidityProof(
+            address(this),
+            proposal_256_0.l1Head().raw(),
+            proposal_128_0.rootClaim().raw(),
+            proposal_256_0.rootClaim().raw(),
+            uint64(proposal_256_0.l2BlockNumber()),
+            uint64(treasury.PROPOSAL_OUTPUT_COUNT()),
+            uint64(treasury.OUTPUT_BLOCK_SPAN()),
+            proposal_256_0.blobsHash()
+        );
+
+        // Accept validity proof
+        proposal_128_0.proveValidity(address(this), uint64(0), proof);
+
+        // Reject repeat validity proof
+        vm.expectRevert(AlreadyProven.selector);
+        proposal_128_0.proveValidity(address(this), uint64(0), proof);
+
+        // Resolve
+        proposal_256_0.resolve();
+    }
 }

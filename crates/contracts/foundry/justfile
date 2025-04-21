@@ -32,5 +32,8 @@ test-deployable:
       0x01 \
       0x01
 
-coverage +ARGS="":
+coverage +ARGS="-vvv":
     forge coverage --no-match-coverage "(src/vendor|test/)" {{ARGS}}
+
+report +ARGS="-vvv":
+    just coverage --report debug > coverage.out
