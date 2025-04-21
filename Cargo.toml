@@ -67,6 +67,7 @@ alloy = { version = "0.12.6", default-features = false, features = ["json"] }
 alloy-chains = "0.1.46"
 alloy-consensus = { version = "0.12.6", default-features = false, features = ["serde"] }
 alloy-eips = { version = "0.12.6", default-features = false, features = ["kzg"] }
+alloy-provider = { version = "0.12.6" }
 alloy-rlp = "0.3.11"
 alloy-primitives = { version = "0.8.24", default-features = false, features = ["map-hashbrown"] }
 alloy-rpc-types-beacon = "0.12.6"

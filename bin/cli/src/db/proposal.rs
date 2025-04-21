@@ -3,7 +3,7 @@ use crate::db::fault::Fault;
 use crate::provider::{blob_fe_proof, blob_sidecar, get_block, BlobProvider};
 use crate::retry_with_context;
 use crate::stall::Stall;
-use crate::transact::Transact;
+use crate::transact::{Transact, TransactArgs};
 use alloy::consensus::{Blob, BlobTransactionSidecar, BlockHeader};
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy::eips::BlockNumberOrTag;
@@ -526,6 +526,7 @@ impl Proposal {
     pub async fn resolve<P: Provider<N>, N: Network>(
         &self,
         provider: P,
+        txn_args: &TransactArgs,
     ) -> anyhow::Result<N::ReceiptResponse> {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("Proposal::resolve"));
@@ -560,7 +561,11 @@ impl Proposal {
             info!("Eliminating {ELIMINATIONS_LIMIT} opponents before resolution.");
             let receipt = parent_tournament_instance
                 .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
-                .transact_with_context(context.clone(), "KailuaTournament::pruneChildren")
+                .timed_transact_with_context(
+                    context.clone(),
+                    "KailuaTournament::pruneChildren",
+                    txn_args.txn_timeout,
+                )
                 .await
                 .context("KailuaTournament::pruneChildren")?;
             info!(
@@ -572,7 +577,11 @@ impl Proposal {
         // Issue resolution call
         let receipt = contract_instance
             .resolve()
-            .transact_with_context(context.clone(), "KailuaTournament::resolve")
+            .timed_transact_with_context(
+                context.clone(),
+                "KailuaTournament::resolve",
+                txn_args.txn_timeout,
+            )
             .await
             .context("KailuaTournament::resolve")?;
         info!("KailuaTournament::resolve: {} gas", receipt.gas_used());

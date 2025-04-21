@@ -20,7 +20,7 @@ use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
 use crate::provider::{get_block_by_number, get_next_block, BlobProvider};
 use crate::signer::ValidatorSignerArgs;
-use crate::transact::Transact;
+use crate::transact::{Transact, TransactArgs};
 use crate::validate::proving::{create_proving_args, Task};
 use crate::{retry_with_context, stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::IndexedBlobHash;
@@ -76,6 +76,9 @@ pub struct ValidateArgs {
     /// Secret key of L1 wallet to use for challenging and proving outputs
     #[clap(flatten)]
     pub validator_signer: ValidatorSignerArgs,
+    /// Timeout for transaction confirmation
+    #[clap(flatten)]
+    pub txn_args: TransactArgs,
     /// Address of the recipient account to use for bond payouts
     #[clap(long, env, value_parser = parse_address)]
     pub payout_recipient_address: Option<Address>,

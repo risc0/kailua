@@ -16,7 +16,7 @@ use crate::db::proposal::{Proposal, ELIMINATIONS_LIMIT};
 use crate::db::KailuaDB;
 use crate::provider::{get_block, BlobProvider};
 use crate::signer::ProposerSignerArgs;
-use crate::transact::Transact;
+use crate::transact::{Transact, TransactArgs};
 use crate::{retry_with_context, stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::consensus::BlockHeader;
 use alloy::eips::BlockNumberOrTag;
@@ -51,6 +51,9 @@ pub struct ProposeArgs {
     /// L1 wallet to use for proposing outputs
     #[clap(flatten)]
     pub proposer_signer: ProposerSignerArgs,
+    /// Timeout for transaction confirmation
+    #[clap(flatten)]
+    pub txn_args: TransactArgs,
     /// Address of the KailuaGame implementation to use
     #[clap(long, env, value_parser = parse_address)]
     pub kailua_game_implementation: Option<Address>,
@@ -281,7 +284,11 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                     info!("Eliminating {ELIMINATIONS_LIMIT} opponents before resolution.");
                     match parent_contract
                         .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
-                        .transact_with_context(context.clone(), "KailuaTournament::pruneChildren")
+                        .timed_transact_with_context(
+                            context.clone(),
+                            "KailuaTournament::pruneChildren",
+                            args.txn_args.txn_timeout,
+                        )
                         .await
                         .context("KailuaTournament::pruneChildren transact")
                     {
@@ -361,7 +368,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             );
 
             match proposal
-                .resolve(&proposer_provider)
+                .resolve(&proposer_provider, &args.txn_args)
                 .await
                 .context("KailuaTournament::resolve transact")
             {
@@ -621,7 +628,11 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             transaction = transaction.sidecar(sidecar);
         }
         match transaction
-            .transact_with_context(context.clone(), "KailuaTreasury::propose")
+            .timed_transact_with_context(
+                context.clone(),
+                "KailuaTreasury::propose",
+                args.txn_args.txn_timeout,
+            )
             .await
             .context("KailuaTreasury::propose")
         {

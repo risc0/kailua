@@ -143,7 +143,7 @@ pub async fn exec_safe_txn<T, P1: Provider<N>, P2: Provider<N>, C, N: Network>(
         .concat()
         .into(),
     )
-    .transact("Safe::execTransaction")
+    .transact("Safe::execTransaction", None)
     .await
     .context("Safe::execTransaction")?;
     Ok(())

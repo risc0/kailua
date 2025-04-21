@@ -4273,6 +4273,7 @@ name = "kailua-cli"
 version = "0.3.8"
 dependencies = [
  "alloy",
+ "alloy-provider",
  "alloy-rpc-types-beacon",
  "anyhow",
  "assert_cmd",
