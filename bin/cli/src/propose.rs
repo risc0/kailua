@@ -22,7 +22,7 @@ use alloy::consensus::BlockHeader;
 use alloy::eips::BlockNumberOrTag;
 use alloy::network::{BlockResponse, Ethereum, TxSigner};
 use alloy::primitives::{Address, Bytes, U256};
-use alloy::providers::{Provider, ProviderBuilder, RootProvider};
+use alloy::providers::{Provider, RootProvider};
 use alloy::sol_types::SolValue;
 use anyhow::Context;
 use kailua_client::args::parse_address;
@@ -51,7 +51,7 @@ pub struct ProposeArgs {
     /// L1 wallet to use for proposing outputs
     #[clap(flatten)]
     pub proposer_signer: ProposerSignerArgs,
-    /// Timeout for transaction confirmation
+    /// Transaction publication configuration
     #[clap(flatten)]
     pub txn_args: TransactArgs,
     /// Address of the KailuaGame implementation to use
@@ -115,7 +115,9 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         args.proposer_signer.wallet(Some(config.l1_chain_id))
     )?;
     let proposer_address = proposer_wallet.default_signer().address();
-    let proposer_provider = ProviderBuilder::new()
+    let proposer_provider = args
+        .txn_args
+        .provider::<Ethereum>()
         .wallet(&proposer_wallet)
         .on_http(args.core.eth_rpc_url.as_str().try_into()?);
     info!("Proposer address: {proposer_address}");
@@ -287,7 +289,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                         .timed_transact_with_context(
                             context.clone(),
                             "KailuaTournament::pruneChildren",
-                            args.txn_args.txn_timeout,
+                            Some(Duration::from_secs(args.txn_args.txn_timeout)),
                         )
                         .await
                         .context("KailuaTournament::pruneChildren transact")
@@ -631,7 +633,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             .timed_transact_with_context(
                 context.clone(),
                 "KailuaTreasury::propose",
-                args.txn_args.txn_timeout,
+                Some(Duration::from_secs(args.txn_args.txn_timeout)),
             )
             .await
             .context("KailuaTreasury::propose")

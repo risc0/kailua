@@ -25,9 +25,9 @@ use crate::validate::proving::{create_proving_args, Task};
 use crate::{retry_with_context, stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::IndexedBlobHash;
 use alloy::network::primitives::HeaderResponse;
-use alloy::network::BlockResponse;
+use alloy::network::{BlockResponse, Ethereum};
 use alloy::primitives::{Address, Bytes, FixedBytes, B256};
-use alloy::providers::{ProviderBuilder, RootProvider};
+use alloy::providers::RootProvider;
 use anyhow::{anyhow, bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_client::args::parse_address;
@@ -76,7 +76,7 @@ pub struct ValidateArgs {
     /// Secret key of L1 wallet to use for challenging and proving outputs
     #[clap(flatten)]
     pub validator_signer: ValidatorSignerArgs,
-    /// Timeout for transaction confirmation
+    /// Transaction publication configuration
     #[clap(flatten)]
     pub txn_args: TransactArgs,
     /// Address of the recipient account to use for bond payouts
@@ -188,7 +188,9 @@ pub async fn handle_proposals(
         args.validator_signer.wallet(Some(config.l1_chain_id))
     )?;
     let validator_address = validator_wallet.default_signer().address();
-    let validator_provider = ProviderBuilder::new()
+    let validator_provider = args
+        .txn_args
+        .provider::<Ethereum>()
         .wallet(validator_wallet)
         .on_http(args.core.eth_rpc_url.as_str().try_into()?);
     info!("Validator address: {validator_address}");

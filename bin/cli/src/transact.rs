@@ -13,11 +13,15 @@
 // limitations under the License.
 
 use alloy::contract::{CallBuilder, CallDecoder, EthCall};
-use alloy::network::Network;
+use alloy::network::{Network, TransactionBuilder4844};
 use alloy::providers::fillers::{FillerControlFlow, TxFiller};
 use alloy::providers::{Provider, SendableTx};
 use alloy::transports::TransportResult;
-use alloy_provider::fillers::{GasFillable, GasFiller};
+use alloy_provider::fillers::{
+    BlobGasFiller, ChainIdFiller, GasFillable, GasFiller, JoinFill, NonceFiller, SimpleNonceManager,
+};
+use alloy_provider::network::TransactionBuilder;
+use alloy_provider::{Identity, ProviderBuilder};
 use anyhow::Context;
 use async_trait::async_trait;
 use opentelemetry::global::tracer;
@@ -28,12 +32,25 @@ use std::time::Duration;
 #[derive(clap::Args, Debug, Clone)]
 pub struct TransactArgs {
     /// Transaction Confirmation Timeout
-    #[clap(long, env, value_parser = parse_duration)]
-    pub txn_timeout: Option<Duration>,
+    #[clap(long, env, required = false, default_value_t = 120)]
+    pub txn_timeout: u64,
+    /// Execution Gas Fee Premium
+    #[clap(long, env, required = false, default_value_t = 25)]
+    pub exec_gas_premium: u128,
+    /// Blob Gas Fee Premium
+    #[clap(long, env, required = false, default_value_t = 25)]
+    pub blob_gas_premium: u128,
 }
 
-fn parse_duration(arg: &str) -> Result<Duration, std::num::ParseIntError> {
-    Ok(Duration::from_secs(arg.parse()?))
+impl TransactArgs {
+    pub fn provider<N: Network>(
+        &self,
+    ) -> ProviderBuilder<Identity, JoinFill<Identity, PremiumFiller>>
+    where
+        N::TransactionRequest: TransactionBuilder4844,
+    {
+        premium_provider::<N>(self.exec_gas_premium, self.blob_gas_premium)
+    }
 }
 
 #[async_trait]
@@ -94,19 +111,34 @@ where
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct PriorityGasFiller {
+pub struct PremiumExecGasFiller {
     pub inner: GasFiller,
+    pub premium: u128,
 }
 
-impl<N: Network> TxFiller<N> for PriorityGasFiller {
+impl PremiumExecGasFiller {
+    pub fn with_premium(premium: u128) -> Self {
+        Self {
+            inner: Default::default(),
+            premium,
+        }
+    }
+
+    pub fn make_premium(&self, price: u128) -> u128 {
+        let price = price.max(1);
+        price + price * self.premium.max(1) / 100
+    }
+}
+
+impl<N: Network> TxFiller<N> for PremiumExecGasFiller {
     type Fillable = GasFillable;
 
     fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
-        self.inner.status(tx)
+        <GasFiller as TxFiller<N>>::status(&self.inner, tx)
     }
 
     fn fill_sync(&self, tx: &mut SendableTx<N>) {
-        self.inner.fill_sync(tx)
+        self.inner.fill_sync(tx);
     }
 
     async fn prepare<P: Provider<N>>(
@@ -122,6 +154,96 @@ impl<N: Network> TxFiller<N> for PriorityGasFiller {
         fillable: Self::Fillable,
         tx: SendableTx<N>,
     ) -> TransportResult<SendableTx<N>> {
-        self.inner.fill(fillable, tx).await
+        let mut tx = self.inner.fill(fillable, tx).await?;
+        if let Some(builder) = tx.as_mut_builder() {
+            if let Some(gas_price) = builder.gas_price() {
+                builder.set_gas_price(self.make_premium(gas_price));
+            }
+            if let Some(base_fee) = builder.max_fee_per_gas() {
+                builder.set_max_fee_per_gas(self.make_premium(base_fee));
+            }
+            if let Some(priority_fee) = builder.max_priority_fee_per_gas() {
+                builder.set_max_priority_fee_per_gas(self.make_premium(priority_fee));
+            }
+        }
+        Ok(tx)
     }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PremiumBlobGasFiller {
+    pub inner: BlobGasFiller,
+    pub premium: u128,
+}
+
+impl PremiumBlobGasFiller {
+    pub fn with_premium(premium: u128) -> Self {
+        Self {
+            inner: Default::default(),
+            premium,
+        }
+    }
+
+    pub fn make_premium(&self, price: u128) -> u128 {
+        let price = price.max(1);
+        price + price * self.premium.max(1) / 100
+    }
+}
+
+impl<N: Network> TxFiller<N> for PremiumBlobGasFiller
+where
+    N::TransactionRequest: TransactionBuilder4844,
+{
+    type Fillable = u128;
+
+    fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
+        <BlobGasFiller as TxFiller<N>>::status(&self.inner, tx)
+    }
+
+    fn fill_sync(&self, tx: &mut SendableTx<N>) {
+        self.inner.fill_sync(tx);
+    }
+
+    async fn prepare<P: Provider<N>>(
+        &self,
+        provider: &P,
+        tx: &N::TransactionRequest,
+    ) -> TransportResult<Self::Fillable> {
+        self.inner.prepare(provider, tx).await
+    }
+
+    async fn fill(
+        &self,
+        fillable: Self::Fillable,
+        tx: SendableTx<N>,
+    ) -> TransportResult<SendableTx<N>> {
+        let mut tx = self.inner.fill(fillable, tx).await?;
+        if let Some(builder) = tx.as_mut_builder() {
+            if let Some(blob_base_fee) = builder.max_fee_per_blob_gas() {
+                builder.set_max_fee_per_blob_gas(self.make_premium(blob_base_fee));
+            }
+        }
+        Ok(tx)
+    }
+}
+
+pub type PremiumFiller = JoinFill<
+    PremiumExecGasFiller,
+    JoinFill<PremiumBlobGasFiller, JoinFill<NonceFiller<SimpleNonceManager>, ChainIdFiller>>,
+>;
+
+pub fn premium_provider<N: Network>(
+    premium_exec_gas: u128,
+    premium_blob_gas: u128,
+) -> ProviderBuilder<Identity, JoinFill<Identity, PremiumFiller>>
+where
+    N::TransactionRequest: TransactionBuilder4844,
+{
+    ProviderBuilder::default().filler(JoinFill::new(
+        PremiumExecGasFiller::with_premium(premium_exec_gas),
+        JoinFill::new(
+            PremiumBlobGasFiller::with_premium(premium_blob_gas),
+            Default::default(),
+        ),
+    ))
 }

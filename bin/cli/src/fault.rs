@@ -20,7 +20,7 @@ use crate::{retry_with_context, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy::network::Ethereum;
 use alloy::primitives::{Bytes, B256, U256};
-use alloy::providers::{ProviderBuilder, RootProvider};
+use alloy::providers::RootProvider;
 use alloy::sol_types::SolValue;
 use anyhow::Context;
 use kailua_client::provider::OpNodeProvider;
@@ -93,7 +93,10 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
             .wallet(Some(config.l1_chain_id))
     )?;
     let tester_address = tester_wallet.default_signer().address();
-    let tester_provider = ProviderBuilder::new()
+    let tester_provider = args
+        .propose_args
+        .txn_args
+        .provider::<Ethereum>()
         .wallet(tester_wallet)
         .on_http(args.propose_args.core.eth_rpc_url.as_str().try_into()?);
 

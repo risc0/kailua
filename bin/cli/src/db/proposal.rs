@@ -26,6 +26,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::future::IntoFuture;
 use std::iter::repeat;
+use std::time::Duration;
 use tracing::{error, info};
 
 pub const ELIMINATIONS_LIMIT: u64 = 128;
@@ -564,7 +565,7 @@ impl Proposal {
                 .timed_transact_with_context(
                     context.clone(),
                     "KailuaTournament::pruneChildren",
-                    txn_args.txn_timeout,
+                    Some(Duration::from_secs(txn_args.txn_timeout)),
                 )
                 .await
                 .context("KailuaTournament::pruneChildren")?;
@@ -580,7 +581,7 @@ impl Proposal {
             .timed_transact_with_context(
                 context.clone(),
                 "KailuaTournament::resolve",
-                txn_args.txn_timeout,
+                Some(Duration::from_secs(txn_args.txn_timeout)),
             )
             .await
             .context("KailuaTournament::resolve")?;
