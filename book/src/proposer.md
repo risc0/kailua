@@ -14,7 +14,10 @@ kailua-cli propose \
   --op-geth-url [YOUR_OP_GETH_URL] \
   --op-node-url [YOUR_OP_NODE_URL] \
   --data-dir [YOUR_PROPOSER_DATA_CACHE_PATH] \
-  --proposer-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY]
+  --proposer-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY] \
+  --txn-timeout [YOUR_TRANSACTION_TIMEOUT_SECONDS] \
+  --exec-gas-premium [YOUR_EXECUTION_GAS_PREMIUM_PERCENTAGE] \
+  --blob-gas-premium [YOUR_BLOB_GAS_PREMIUM_PERCENTAGE]
 ```
 
 ```admonish tip
@@ -46,6 +49,14 @@ The proposer requires a funded wallet to be able to publish new sequencing propo
 The Kailua proposer wallet is critical for security.
 You must keep your proposer's wallet well funded to guarantee the safety and liveness of your rollup.
 ```
+
+### Transactions
+You can control transaction publication through the three following parameters:
+* `txn-timeout`: A timeout in seconds for transaction broadcast (default 120)
+* `exec-gas-premium`: An added premium percentage to estimated execution gas fees (Default 25)
+* `blob-gas-premium`: An added premium percentage to estimated blob gas fees (Default 25).
+
+The premium parameters increase the internally estimated fees by the specified percentage.
 
 ### Upgrades
 If you re-deploy the KailuaTreasury/KailuaGame contracts to upgrade your fault proof system, you will need to restart

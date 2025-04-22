@@ -19,7 +19,9 @@ kailua-cli validate \
   --op-node-url [YOUR_OP_NODE_URL] \
   --kailua-host [YOUR_KAILUA_HOST_BINARY_PATH] \
   --validator-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY] \
-  --payout-recipient-address [YOUR_FAULT_PROOF_PAYOUT_RECIPIENT]
+  --payout-recipient-address [YOUR_FAULT_PROOF_PAYOUT_RECIPIENT] \
+  --txn-timeout [YOUR_TRANSACTION_TIMEOUT_SECONDS] \
+  --exec-gas-premium [YOUR_EXECUTION_GAS_PREMIUM_PERCENTAGE]
 ```
 
 ```admonish tip
@@ -55,6 +57,13 @@ from delaying the finality of honest sequencing proposals.
 ```admonish success
 Running `kailua-cli validate` should monitor your rollup for any disputes and generate the required proofs!
 ```
+
+### Transactions
+You can control transaction publication through the two following parameters:
+* `txn-timeout`: A timeout in seconds for transaction broadcast (default 120)
+* `exec-gas-premium`: An added premium percentage to estimated execution gas fees (Default 25)
+
+The premium parameter increases the internally estimated fees by the specified percentage.
 
 ### Upgrades
 If you re-deploy the KailuaTreasury/KailuaGame contracts to upgrade your fault proof system, you will need to restart
