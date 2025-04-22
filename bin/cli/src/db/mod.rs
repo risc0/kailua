@@ -104,12 +104,13 @@ impl KailuaDB {
             opentelemetry::Context::current_with_span(tracer.start("KailuaDB::load_proposals"));
 
         let canonical_start = self.state.canonical_tip_index;
-        let game_count: u64 = dispute_game_factory
+        let game_count = dispute_game_factory
             .gameCount()
             .stall_with_context(context.clone(), "DisputeGameFactory::gameCount")
             .await
             .gameCount_
-            .to();
+            .to::<u64>()
+            .max(self.state.next_factory_index + 32);
         let mut proposals =
             Vec::with_capacity((game_count - self.state.next_factory_index) as usize);
         while self.state.next_factory_index < game_count {
