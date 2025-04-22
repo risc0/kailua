@@ -110,8 +110,7 @@ impl KailuaDB {
             .await
             .gameCount_
             .to();
-        let capacity = ((game_count - self.state.next_factory_index) as usize).max(1024);
-        let mut proposals = Vec::with_capacity(capacity);
+        let mut proposals = Vec::new();
         while self.state.next_factory_index < game_count {
             let proposal = match self.get_local_proposal(&self.state.next_factory_index) {
                 Some(proposal) => {
