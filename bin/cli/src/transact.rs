@@ -13,12 +13,14 @@
 // limitations under the License.
 
 use alloy::contract::{CallBuilder, CallDecoder, EthCall};
+use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::{Network, TransactionBuilder4844};
+use alloy::primitives::Address;
 use alloy::providers::fillers::{FillerControlFlow, TxFiller};
 use alloy::providers::{Provider, SendableTx};
 use alloy::transports::TransportResult;
 use alloy_provider::fillers::{
-    BlobGasFiller, ChainIdFiller, GasFillable, GasFiller, JoinFill, NonceFiller, SimpleNonceManager,
+    BlobGasFiller, ChainIdFiller, GasFillable, GasFiller, JoinFill, NonceFiller, NonceManager,
 };
 use alloy_provider::network::TransactionBuilder;
 use alloy_provider::{Identity, ProviderBuilder};
@@ -43,7 +45,7 @@ pub struct TransactArgs {
 }
 
 impl TransactArgs {
-    pub fn provider<N: Network>(
+    pub fn premium_provider<N: Network>(
         &self,
     ) -> ProviderBuilder<Identity, JoinFill<Identity, PremiumFiller>>
     where
@@ -227,9 +229,26 @@ where
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct LatestNonceManager;
+
+#[async_trait]
+impl NonceManager for LatestNonceManager {
+    async fn get_next_nonce<P, N>(&self, provider: &P, address: Address) -> TransportResult<u64>
+    where
+        P: Provider<N>,
+        N: Network,
+    {
+        provider
+            .get_transaction_count(address)
+            .block_id(BlockId::Number(BlockNumberOrTag::Latest))
+            .await
+    }
+}
+
 pub type PremiumFiller = JoinFill<
     PremiumExecGasFiller,
-    JoinFill<PremiumBlobGasFiller, JoinFill<NonceFiller<SimpleNonceManager>, ChainIdFiller>>,
+    JoinFill<PremiumBlobGasFiller, JoinFill<NonceFiller<LatestNonceManager>, ChainIdFiller>>,
 >;
 
 pub fn premium_provider<N: Network>(

@@ -190,13 +190,13 @@ pub async fn handle_proposals(
     let validator_address = validator_wallet.default_signer().address();
     let validator_provider = args
         .txn_args
-        .provider::<Ethereum>()
+        .premium_provider::<Ethereum>()
         .wallet(validator_wallet)
         .on_http(args.core.eth_rpc_url.as_str().try_into()?);
     info!("Validator address: {validator_address}");
 
     // Init factory contract
-    let dispute_game_factory = IDisputeGameFactory::new(dgf_address, &validator_provider);
+    let dispute_game_factory = IDisputeGameFactory::new(dgf_address, &eth_rpc_provider);
     info!("DisputeGameFactory({:?})", dispute_game_factory.address());
     let game_count: u64 = dispute_game_factory
         .gameCount()
@@ -222,7 +222,7 @@ pub async fn handle_proposals(
     }
 
     let kailua_game_implementation =
-        KailuaGame::new(kailua_game_implementation_address, &validator_provider);
+        KailuaGame::new(kailua_game_implementation_address, &eth_rpc_provider);
     info!("KailuaGame({:?})", kailua_game_implementation.address());
     if kailua_game_implementation.address().is_zero() {
         error!("Fault proof game is not installed!");
@@ -323,11 +323,11 @@ pub async fn handle_proposals(
                 );
                 continue;
             };
-            let parent_contract = parent.tournament_contract_instance(&validator_provider);
+            let parent_contract = parent.tournament_contract_instance(&eth_rpc_provider);
             // Check that a validity proof has not already been posted
             let is_validity_proven = await_tel!(
                 context,
-                parent.fetch_is_successor_validity_proven(&validator_provider)
+                parent.fetch_is_successor_validity_proven(&eth_rpc_provider)
             )
             .context("is_validity_proven")?;
             if is_validity_proven {
@@ -581,7 +581,7 @@ pub async fn handle_proposals(
                 continue;
             };
 
-            let parent_contract = parent.tournament_contract_instance(&validator_provider);
+            let parent_contract = parent.tournament_contract_instance(&eth_rpc_provider);
             // Check that a validity proof had not already been posted
             let proof_status = parent_contract
                 .proofStatus(proposal.signature)
@@ -652,7 +652,7 @@ pub async fn handle_proposals(
             // Abort early if a validity proof is already submitted in this tournament
             if await_tel!(
                 context,
-                parent.fetch_is_successor_validity_proven(&validator_provider)
+                parent.fetch_is_successor_validity_proven(&eth_rpc_provider)
             )? {
                 info!(
                     "Skipping proof submission in tournament {} with validity proof.",
@@ -692,7 +692,7 @@ pub async fn handle_proposals(
             let child_index = parent
                 .child_index(proposal.index)
                 .expect("Could not look up proposal's index in parent tournament");
-            let proposal_contract = proposal.tournament_contract_instance(&validator_provider);
+            let proposal_contract = proposal.tournament_contract_instance(&eth_rpc_provider);
             // Check if proof is a viable validity proof
             if proof_journal.l1_head == proposal.l1_head
                 && proof_journal.agreed_l2_output_root == parent.output_root
@@ -1129,7 +1129,7 @@ pub async fn handle_proposals(
                 null_fault_buffer.push_back(proposal_index);
                 continue;
             };
-            let proposal_contract = proposal.tournament_contract_instance(&validator_provider);
+            let proposal_contract = proposal.tournament_contract_instance(&eth_rpc_provider);
             // Fetch proposal parent from db
             let Some(parent) = kailua_db.get_local_proposal(&proposal.parent) else {
                 error!("Parent proposal {} missing from database.", proposal.parent);

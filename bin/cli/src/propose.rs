@@ -117,13 +117,13 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
     let proposer_address = proposer_wallet.default_signer().address();
     let proposer_provider = args
         .txn_args
-        .provider::<Ethereum>()
+        .premium_provider::<Ethereum>()
         .wallet(&proposer_wallet)
         .on_http(args.core.eth_rpc_url.as_str().try_into()?);
     info!("Proposer address: {proposer_address}");
 
     // Init registry and factory contracts
-    let dispute_game_factory = IDisputeGameFactory::new(dgf_address, &proposer_provider);
+    let dispute_game_factory = IDisputeGameFactory::new(dgf_address, &eth_rpc_provider);
     info!("DisputeGameFactory({:?})", dispute_game_factory.address());
     let game_count: u64 = dispute_game_factory
         .gameCount()
@@ -149,7 +149,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
     }
 
     let kailua_game_implementation =
-        KailuaGame::new(kailua_game_implementation_address, &proposer_provider);
+        KailuaGame::new(kailua_game_implementation_address, &eth_rpc_provider);
     info!("KailuaGame({:?})", kailua_game_implementation.address());
     if kailua_game_implementation.address().is_zero() {
         error!("Fault proof game is not installed!");
@@ -592,23 +592,22 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
 
         let Some(extra_data) = unique_extra_data else {
             // this proposal was already correctly made or we need more data
+            warn!("Skipping proposal attempt.");
             continue;
         };
         // Check collateral requirements
-        let bond_value = await_tel!(context, kailua_db.treasury.fetch_bond(&proposer_provider));
+        let bond_value = await_tel!(context, kailua_db.treasury.fetch_bond(&eth_rpc_provider));
         let paid_in = await_tel!(
             context,
             kailua_db
                 .treasury
-                .fetch_balance(&proposer_provider, proposer_address)
+                .fetch_balance(&eth_rpc_provider, proposer_address)
         );
         let balance = await_tel_res!(
             context,
             tracer,
             "ReqwestProvider::get_balance",
-            retry_with_context!(proposer_provider
-                .get_balance(proposer_address)
-                .into_future())
+            retry_with_context!(eth_rpc_provider.get_balance(proposer_address).into_future())
         )?;
         let owed_collateral = bond_value.saturating_sub(paid_in);
         if balance < owed_collateral {

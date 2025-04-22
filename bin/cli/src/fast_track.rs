@@ -143,7 +143,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     )?;
     let owner_provider = args
         .txn_args
-        .provider::<Ethereum>()
+        .premium_provider::<Ethereum>()
         .wallet(&owner_wallet)
         .on_http(args.eth_rpc_url.as_str().try_into()?);
 
@@ -187,7 +187,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     )?;
     let deployer_provider = args
         .txn_args
-        .provider::<Ethereum>()
+        .premium_provider::<Ethereum>()
         .wallet(&deployer_wallet)
         .on_http(args.eth_rpc_url.as_str().try_into()?);
 
@@ -422,7 +422,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         let guardian_address = guardian_wallet.default_signer().address();
         let guardian_provider = args
             .txn_args
-            .provider::<Ethereum>()
+            .premium_provider::<Ethereum>()
             .wallet(&guardian_wallet)
             .on_http(args.eth_rpc_url.as_str().try_into()?);
         let optimism_portal = OptimismPortal2::new(portal_address, &guardian_provider);

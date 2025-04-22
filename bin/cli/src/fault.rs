@@ -96,7 +96,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let tester_provider = args
         .propose_args
         .txn_args
-        .provider::<Ethereum>()
+        .premium_provider::<Ethereum>()
         .wallet(tester_wallet)
         .on_http(args.propose_args.core.eth_rpc_url.as_str().try_into()?);
 
