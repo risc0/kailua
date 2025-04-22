@@ -30,6 +30,7 @@ use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use std::future::IntoFuture;
 use std::time::Duration;
+use tracing::info;
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct TransactArgs {
@@ -100,10 +101,24 @@ where
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start(span));
 
-        self.send()
+        // Require call to succeed against pending block
+        self.call_raw()
+            .block(BlockId::Number(BlockNumberOrTag::Pending))
+            .into_future()
+            .with_context(context.with_span(tracer.start_with_context("call_raw", &context)))
+            .await
+            .context("call_raw")?;
+
+        // Publish transaction
+        let pending_txn = self
+            .send()
             .with_context(context.with_span(tracer.start_with_context("send", &context)))
             .await
-            .context("send")?
+            .context("send")?;
+        info!("Published transaction: {:?}", pending_txn.tx_hash());
+
+        // Wait for receipt with timeout
+        pending_txn
             .with_timeout(timeout)
             .get_receipt()
             .with_context(context.with_span(tracer.start_with_context("get_receipt", &context)))
