@@ -78,6 +78,13 @@ contract ProposeTest is KailuaTest {
     }
 
     function test_vanguard() public {
+        // Fail assignment
+        vm.prank(address(0xbeef));
+        vm.expectRevert("not owner");
+        treasury.assignVanguard(address(0x007), Duration.wrap(0xFFFFFFFFFFFFFFFF));
+        vm.assertEq(treasury.vanguard(), address(0x0));
+
+        // Assign vanguard
         treasury.assignVanguard(address(0x007), Duration.wrap(0xFFFFFFFFFFFFFFFF));
         vm.assertEq(treasury.vanguard(), address(0x007));
 
@@ -364,6 +371,61 @@ contract ProposeTest is KailuaTest {
 
         // Finalize
         proposal_128_0.resolve();
+    }
+
+    function test_KailuaTreasury_extraData() public {
+        bytes32 rootClaim = treasury.rootClaim().raw();
+        uint64 l2BlockNumber = uint64(treasury.l2BlockNumber());
+        // Kailua
+        KailuaTreasury new_treasury = new KailuaTreasury(
+            verifier,
+            bytes32(0x0),
+            bytes32(0x0),
+            treasury.PROPOSAL_OUTPUT_COUNT(),
+            treasury.OUTPUT_BLOCK_SPAN(),
+            GameType.wrap(1337),
+            OptimismPortal2(payable(address(portal))),
+            Claim.wrap(rootClaim),
+            uint64(treasury.l2BlockNumber())
+        );
+        // Anchoring
+        factory.setImplementation(GameType.wrap(1337), IDisputeGame(address(new_treasury)));
+
+        // fail to propose with bad root claim
+        vm.expectPartialRevert(UnexpectedRootClaim.selector);
+        new_treasury.propose(Claim.wrap(~rootClaim), abi.encodePacked(l2BlockNumber, address(new_treasury)));
+
+        // fail to propose with bad extra data
+        vm.expectRevert(BadExtraData.selector);
+        new_treasury.propose(Claim.wrap(rootClaim), abi.encodePacked(uint256(l2BlockNumber), address(new_treasury)));
+
+        // fail to propose with bad extra data
+        vm.expectRevert(BadExtraData.selector);
+        new_treasury.propose(Claim.wrap(rootClaim), abi.encodePacked(l2BlockNumber, address(treasury)));
+
+        // fail to propose with bad root claim
+        vm.expectPartialRevert(BlockNumberMismatch.selector);
+        new_treasury.propose(Claim.wrap(rootClaim), abi.encodePacked(l2BlockNumber + 1, address(new_treasury)));
+    }
+
+    function test_KailuaTreasury_resolve() public {
+        // Fail to resolve anonymously
+        vm.startPrank(address(0xdeadbeef));
+        vm.expectRevert("not owner");
+        treasury.resolve();
+        vm.stopPrank();
+        // Fail to resolve again
+        vm.expectRevert(GameNotInProgress.selector);
+        anchor.resolve();
+    }
+
+    function test_KailuaTreasury_verifyIntermediateOutput() public {
+        vm.assertFalse(treasury.verifyIntermediateOutput(0, 0, hex"", hex""));
+        vm.assertFalse(anchor.verifyIntermediateOutput(0, 0, hex"", hex""));
+    }
+
+    function test_KailuaTreasury_getChallengerDuration() public view {
+        vm.assertEq(anchor.getChallengerDuration(anchor.createdAt().raw()).raw(), 0);
     }
 
     function test_extraData() public {

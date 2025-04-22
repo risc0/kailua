@@ -224,9 +224,13 @@ contract KailuaGame is KailuaTournament {
         uint256 blobIndex = KailuaKZGLib.blobIndex(outputNumber);
         uint32 blobPosition = KailuaKZGLib.fieldElementIndex(outputNumber);
         bytes32 proposalBlobHash = KailuaKZGLib.versionedKZGHash(blobCommitment);
-        // Note: The below check also implies that we can validate only against known blobs
-        require(proposalBlobHash == proposalBlobHashes[blobIndex].raw(), "bad proposalBlobHash");
-        success = KailuaKZGLib.verifyKZGBlobProof(proposalBlobHash, blobPosition, outputFe, blobCommitment, kzgProof);
+        // Note: Only known blobs can be used to validate an intermediate output
+        if (proposalBlobHash != proposalBlobHashes[blobIndex].raw()) {
+            success = false;
+        } else {
+            success =
+                KailuaKZGLib.verifyKZGBlobProof(proposalBlobHash, blobPosition, outputFe, blobCommitment, kzgProof);
+        }
     }
 
     /// @inheritdoc KailuaTournament

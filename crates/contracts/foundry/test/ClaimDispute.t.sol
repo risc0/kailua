@@ -64,6 +64,84 @@ contract ClaimDisputeTest is KailuaTest {
         proposal_128_0.resolve();
     }
 
+    function test_eliminate() public {
+        vm.warp(
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+        );
+        // Succeed to propose after proposal time gap
+        KailuaTournament proposal_128_0 = treasury.propose(
+            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
+            abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
+        );
+        vm.warp(
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
+        );
+        // Succeed to propose after proposal time gap
+        KailuaTournament proposal_256_0 = treasury.propose(
+            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
+            abi.encodePacked(uint64(256), uint64(proposal_128_0.gameIndex()), uint64(0))
+        );
+
+        // Fail to eliminate from random address
+        vm.expectPartialRevert(Blacklisted.selector);
+        treasury.eliminate(address(proposal_256_0), address(this));
+
+        // Succeed to eliminate from parent address
+        vm.startPrank(address(proposal_128_0));
+        treasury.eliminate(address(proposal_256_0), address(this));
+
+        // Fail to double eliminate
+        vm.expectRevert(AlreadyEliminated.selector);
+        treasury.eliminate(address(proposal_256_0), address(this));
+        vm.stopPrank();
+
+        // Fail to propose again after elimination
+        uint64 parentIndex = uint64(proposal_128_0.gameIndex());
+        vm.expectRevert(BadAuth.selector);
+        treasury.propose(
+            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000100),
+            abi.encodePacked(uint64(256), parentIndex, uint64(0))
+        );
+
+        (KailuaTreasury new_treasury, KailuaGame new_game, KailuaTournament new_anchor) = deployKailua(
+            uint256(0x1), // no intermediate commitments
+            uint256(0x80), // 128 blocks per proposal
+            sha256(abi.encodePacked(bytes32(0x00))), // arbitrary block hash
+            uint64(0x0), // genesis
+            uint256(block.timestamp), // start l2 from now
+            uint256(0x1), // 1-second block times
+            uint256(0x5), // 5-second wait
+            uint64(0xA) // 10-second dispute timeout
+        );
+
+        vm.warp(
+            new_game.GENESIS_TIME_STAMP() + new_game.PROPOSAL_TIME_GAP()
+                + new_game.PROPOSAL_OUTPUT_COUNT() * new_game.OUTPUT_BLOCK_SPAN() * new_game.L2_BLOCK_TIME()
+        );
+        // Succeed to propose after proposal time gap
+        KailuaTournament new_proposal_128_0 = new_treasury.propose(
+            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
+            abi.encodePacked(uint64(128), uint64(new_anchor.gameIndex()), uint64(0))
+        );
+        vm.warp(
+            new_game.GENESIS_TIME_STAMP() + new_game.PROPOSAL_TIME_GAP()
+                + new_game.PROPOSAL_OUTPUT_COUNT() * new_game.OUTPUT_BLOCK_SPAN() * new_game.L2_BLOCK_TIME() * 2
+        );
+        // Succeed to propose after proposal time gap
+        KailuaTournament new_proposal_256_0 = new_treasury.propose(
+            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
+            abi.encodePacked(uint64(256), uint64(new_proposal_128_0.gameIndex()), uint64(0))
+        );
+
+        // Fail to eliminate from parent address
+        vm.startPrank(address(new_proposal_128_0));
+        vm.expectRevert(NotProposed.selector);
+        treasury.eliminate(address(new_proposal_256_0), address(this));
+        vm.stopPrank();
+    }
+
     function test_proveValidity_undisputed() public {
         vm.warp(
             game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
@@ -133,6 +211,7 @@ contract ClaimDisputeTest is KailuaTest {
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
         proposal_128_0.resolve();
+
         // Generate mock proof
         bytes memory proof = mockFaultProof(
             address(this),
@@ -152,6 +231,14 @@ contract ClaimDisputeTest is KailuaTest {
             abi.encodePacked(uint64(256), uint64(proposal_128_0.gameIndex()), uint64(0))
         );
 
+        // bad proposal
+        vm.startPrank(address(0x01));
+        KailuaTournament proposal_256_1 = treasury.propose(
+            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
+            abi.encodePacked(uint64(256), uint64(proposal_128_0.gameIndex()), uint64(0))
+        );
+        vm.stopPrank();
+
         // Generate mock proof
         proof = mockFaultProof(
             address(this),
@@ -168,7 +255,11 @@ contract ClaimDisputeTest is KailuaTest {
         vm.expectRevert(AlreadyProven.selector);
         proposal_128_0.proveValidity(address(this), uint64(0), proof);
 
-        // Resolve
+        // Reject resolve for bad proposal
+        vm.expectRevert(ProvenFaulty.selector);
+        proposal_256_1.resolve();
+
+        // Resolve honest proposal
         proposal_256_0.resolve();
     }
 
@@ -694,34 +785,34 @@ contract ClaimDisputeTest is KailuaTest {
         );
 
         // Prune all contradictions
-        console2.log("anchor %s:%s/%s", anchor.contenderIndex(), anchor.opponentIndex(), anchor.childCount());
+        //        console2.log("anchor %s:%s/%s", anchor.contenderIndex(), anchor.opponentIndex(), anchor.childCount());
         while (address(anchor.pruneChildren(1)) != address(proposal_128_0)) {
-            console2.log("anchor %s:%s/%s", anchor.contenderIndex(), anchor.opponentIndex(), anchor.childCount());
+            //            console2.log("anchor %s:%s/%s", anchor.contenderIndex(), anchor.opponentIndex(), anchor.childCount());
         }
         proposal_128_0.resolve();
 
-        console2.log(
-            "pre proposal_128_0 %s:%s/%s",
-            proposal_128_0.contenderIndex(),
-            proposal_128_0.opponentIndex(),
-            proposal_128_0.childCount()
-        );
+        //        console2.log(
+        //            "pre proposal_128_0 %s:%s/%s",
+        //            proposal_128_0.contenderIndex(),
+        //            proposal_128_0.opponentIndex(),
+        //            proposal_128_0.childCount()
+        //        );
         while (proposal_128_0.contenderIndex() < proposal_128_0.childCount()) {
             proposal_128_0.pruneChildren(1);
-            console2.log(
-                "zer proposal_128_0 %s:%s/%s",
-                proposal_128_0.contenderIndex(),
-                proposal_128_0.opponentIndex(),
-                proposal_128_0.childCount()
-            );
+            //            console2.log(
+            //                "zer proposal_128_0 %s:%s/%s",
+            //                proposal_128_0.contenderIndex(),
+            //                proposal_128_0.opponentIndex(),
+            //                proposal_128_0.childCount()
+            //            );
         }
         proposal_128_0.pruneChildren(1);
-        console2.log(
-            "pos proposal_128_0 %s:%s/%s",
-            proposal_128_0.contenderIndex(),
-            proposal_128_0.opponentIndex(),
-            proposal_128_0.childCount()
-        );
+        //        console2.log(
+        //            "pos proposal_128_0 %s:%s/%s",
+        //            proposal_128_0.contenderIndex(),
+        //            proposal_128_0.opponentIndex(),
+        //            proposal_128_0.childCount()
+        //        );
 
         // honest proposal
         KailuaTournament proposal_256_X = treasury.propose(
@@ -730,19 +821,19 @@ contract ClaimDisputeTest is KailuaTest {
         );
 
         while (address(proposal_128_0.pruneChildren(1)) != address(proposal_256_X)) {
-            console2.log(
-                "nxt proposal_128_0 %s:%s/%s",
-                proposal_128_0.contenderIndex(),
-                proposal_128_0.opponentIndex(),
-                proposal_128_0.childCount()
-            );
+            //            console2.log(
+            //                "nxt proposal_128_0 %s:%s/%s",
+            //                proposal_128_0.contenderIndex(),
+            //                proposal_128_0.opponentIndex(),
+            //                proposal_128_0.childCount()
+            //            );
         }
-        console2.log(
-            "pos proposal_128_0 %s:%s/%s",
-            proposal_128_0.contenderIndex(),
-            proposal_128_0.opponentIndex(),
-            proposal_128_0.childCount()
-        );
+        //        console2.log(
+        //            "pos proposal_128_0 %s:%s/%s",
+        //            proposal_128_0.contenderIndex(),
+        //            proposal_128_0.opponentIndex(),
+        //            proposal_128_0.childCount()
+        //        );
         vm.warp(
             game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 3

@@ -145,12 +145,12 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
         override
         returns (bool success)
     {
-        success = false;
+        // No known blobs to reference
     }
 
     /// @inheritdoc KailuaTournament
     function getChallengerDuration(uint256) public pure override returns (Duration duration_) {
-        duration_ = Duration.wrap(0);
+        // No challenge period
     }
 
     /// @inheritdoc KailuaTournament
@@ -247,27 +247,24 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
 
     /// @notice Pays out the prover for the eliminations it has accrued
     function claimEliminationBonds(uint256 claims) public nonReentrant {
-        // INVARIANT: Must claim a non-zero number of payouts
-        if (claims == 0) {
-            revert NoCreditToClaim();
-        }
-
         uint256 claimed = 0;
+        uint256 payout = 0;
         for (
             uint256 i = eliminationsPaid[msg.sender];
             claimed < claims && i < eliminations[msg.sender].length;
             (i++, claimed++)
         ) {
             address eliminated = eliminations[msg.sender][i];
-            uint256 payout = paidBonds[eliminated];
-            if (payout > 0) {
-                paidBonds[eliminated] = 0;
-                pay(payout, msg.sender);
-            }
+            payout += paidBonds[eliminated];
+            paidBonds[eliminated] = 0;
         }
         // Increase number of bonds claimed
         if (claimed > 0) {
             eliminationsPaid[msg.sender] += claimed;
+        }
+        // Transfer payout
+        if (payout > 0) {
+            pay(payout, msg.sender);
         }
     }
 
