@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use kailua_common::client::stateless::run_stateless_client;
 use kailua_common::oracle::vec::{read_shard, VecOracle};
-use kailua_common::{
-    client::log,
-    witness::Witness,
-};
+use kailua_common::{client::log, witness::Witness};
 use risc0_zkvm::guest::env;
 use rkyv::rancor::Error;
-use kailua_common::client::stateless::run_stateless_client;
 
 fn main() {
     // Load main witness

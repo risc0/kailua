@@ -7,6 +7,11 @@ default:
 build +ARGS="--release -F prove -F disable-dev-mode --locked":
   cargo build {{ARGS}}
 
+fmt:
+  cargo fmt --all
+
+  cargo fmt --all --manifest-path build/risczero/fpvm/Cargo.toml
+
 clippy:
   RISC0_SKIP_BUILD=1 cargo clippy --workspace --all --all-targets -- -D warnings
 
