@@ -110,7 +110,7 @@ jobs:
         run: |
           {
           echo 'COVERAGE<<EOF'
-          forge coverage --root crates/contracts/foundry --no-match-coverage "(src/vendor|test/)" | grep %
+          forge coverage --root crates/contracts/foundry --no-match-coverage "(src/vendor|test/)" | tail -n 13
           echo EOF
           }  >> "$GITHUB_OUTPUT"
       - name: Report Coverage
