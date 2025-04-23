@@ -61,6 +61,7 @@ jobs:
       - name: Install solc
         continue-on-error: true
         run: svm install $SOLC_VERSION
+      - run: svm use $SOLC_VERSION
       - uses: foundry-rs/foundry-toolchain@v1
       - name: cargo clippy kailua
         run: cargo clippy --locked --workspace --all --all-targets
@@ -97,6 +98,7 @@ jobs:
       - name: Install solc
         continue-on-error: true
         run: svm install $SOLC_VERSION
+      - run: svm use $SOLC_VERSION
       - uses: foundry-rs/foundry-toolchain@v1
       - run: forge test -vvv
         working-directory: crates/contracts/foundry
