@@ -43,7 +43,7 @@ jobs:
           - os: Linux
             feature: default
             device: cpu
-    runs-on: [ self-hosted, prod, "${{ matrix.os }}", "${{ matrix.device }}" ]
+    runs-on: [ self-hosted, prod, "${{ matrix.os }}" ]
     steps:
       - uses: actions/checkout@v4
         with:
