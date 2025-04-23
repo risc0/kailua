@@ -117,9 +117,12 @@ jobs:
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
+            const output = `${{ steps.coverage.outputs.COVERAGE }}`;
+            const commentBody = `Forge code coverage:\n${output}\n`;
+            
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: 'Forge code coverage:\n${{ steps.coverage.outputs.COVERAGE }}\n'
+              body: commentBody
             })
