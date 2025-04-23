@@ -49,11 +49,11 @@ jobs:
         with:
           submodules: recursive
       - uses: risc0/risc0/.github/actions/rustup@main
-      - name: Install cargo-risczero
-        uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
-        with:
-          crate: cargo-risczero
-          version: "2.0.1"
+#      - name: Install cargo-risczero
+#        uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
+#        with:
+#          crate: cargo-risczero
+#          version: "2.0.1"
       - name: Install svm-rs
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
@@ -86,11 +86,11 @@ jobs:
         with:
           submodules: recursive
       - uses: risc0/risc0/.github/actions/rustup@main
-      - name: Install cargo-risczero
-        uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
-        with:
-          crate: cargo-risczero
-          version: "2.0.1"
+#      - name: Install cargo-risczero
+#        uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
+#        with:
+#          crate: cargo-risczero
+#          version: "2.0.1"
       - name: Install svm-rs
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
