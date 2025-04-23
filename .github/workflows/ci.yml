@@ -37,17 +37,31 @@ jobs:
           cargo fmt --all --check --manifest-path build/risczero/fpvm/Cargo.toml
 
   clippy:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: Linux
+            feature: default
+            device: cpu
+    runs-on: [ self-hosted, prod, "${{ matrix.os }}", "${{ matrix.device }}" ]
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
       - uses: risc0/risc0/.github/actions/rustup@main
+      - uses: risc0/risc0/.github/actions/sccache@main
+        with:
+          key: ${{ matrix.os }}-${{ matrix.feature }}
       - name: Install cargo-risczero
-        run: cargo install cargo-risczero --version $RISC0_VERSION
-      - uses: foundry-rs/foundry-toolchain@v1
+        uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
+        with:
+          crate: cargo-risczero
+          version: "2.0.1"
       - name: Install svm-rs
-        run: cargo install svm-rs
+        uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
+        with:
+          crate: svm-rs
+      - uses: foundry-rs/foundry-toolchain@v1
       - name: cargo clippy kailua
         run: cargo clippy --locked --workspace --all --all-targets
         env:
