@@ -6,6 +6,8 @@ on:
     branches:
       - main
   pull_request:
+    branches:
+      - main
 
 jobs:
   publish:
@@ -26,6 +28,7 @@ jobs:
         working-directory: ./book
         run: mdbook build
 
+      # Publish if running from main branch
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
         if: github.ref == 'refs/heads/main'
