@@ -42,16 +42,12 @@ jobs:
         include:
           - os: Linux
             feature: default
-            device: cpu
     runs-on: [ self-hosted, prod, "${{ matrix.os }}" ]
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
       - uses: risc0/risc0/.github/actions/rustup@main
-      - uses: risc0/risc0/.github/actions/sccache@main
-        with:
-          key: ${{ matrix.os }}-${{ matrix.feature }}
       - name: Install cargo-risczero
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
