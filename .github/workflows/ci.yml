@@ -25,7 +25,7 @@ env:
   RISC0_TOOLCHAIN_VERSION: 1.85.0
 
 jobs:
-  fmt:
+  cargo-fmt:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +37,7 @@ jobs:
         run: |
           cargo fmt --all --check --manifest-path build/risczero/fpvm/Cargo.toml
 
-  clippy:
+  cargo-clippy:
     strategy:
       matrix:
         include:
@@ -49,11 +49,6 @@ jobs:
         with:
           submodules: recursive
       - uses: risc0/risc0/.github/actions/rustup@main
-#      - name: Install cargo-risczero
-#        uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
-#        with:
-#          crate: cargo-risczero
-#          version: "2.0.1"
       - name: Install svm-rs
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
@@ -86,11 +81,6 @@ jobs:
         with:
           submodules: recursive
       - uses: risc0/risc0/.github/actions/rustup@main
-#      - name: Install cargo-risczero
-#        uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
-#        with:
-#          crate: cargo-risczero
-#          version: "2.0.1"
       - name: Install svm-rs
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
@@ -100,5 +90,46 @@ jobs:
         run: svm install $SOLC_VERSION
       - run: svm use $SOLC_VERSION
       - uses: foundry-rs/foundry-toolchain@v1
-      - run: forge test -vvv
-        working-directory: crates/contracts/foundry
+      - name: Run forge test
+        run:  forge test --root crates/contracts/foundry
+
+  forge-coverage:
+    strategy:
+      matrix:
+        include:
+          - os: Linux
+            feature: default
+    runs-on: [ self-hosted, prod, "${{ matrix.os }}" ]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: risc0/risc0/.github/actions/rustup@main
+      - name: Install svm-rs
+        uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
+        with:
+          crate: svm-rs
+      - name: Install solc
+        continue-on-error: true
+        run: svm install $SOLC_VERSION
+      - run: svm use $SOLC_VERSION
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Run forge coverage
+        id: coverage
+        run: |
+          {
+          echo 'COVERAGE<<EOF'
+          forge coverage --root crates/contracts/foundry --no-match-coverage "(src/vendor|test/)" | grep %
+          echo EOF
+          }  >> "$GITHUB_OUTPUT"
+      - name: Report Coverage
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: 'Forge code coverage:\n${{ steps.coverage.outputs.COVERAGE }}\n'
+            })
