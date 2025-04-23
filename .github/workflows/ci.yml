@@ -71,3 +71,30 @@ jobs:
         run: cargo clippy --manifest-path build/risczero/fpvm/Cargo.toml --locked --workspace --all --all-targets --all-features
         env:
           RUSTFLAGS: -Dwarnings
+
+  forge-test:
+    strategy:
+      matrix:
+        include:
+          - os: Linux
+            feature: default
+    runs-on: [ self-hosted, prod, "${{ matrix.os }}" ]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: risc0/risc0/.github/actions/rustup@main
+      - name: Install cargo-risczero
+        uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
+        with:
+          crate: cargo-risczero
+          version: "2.0.1"
+      - name: Install svm-rs
+        uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
+        with:
+          crate: svm-rs
+      - name: Install solc
+        run: svm install $SOLC_VERSION
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: forge test -vvv
+        working-directory: crates/contracts/foundry
