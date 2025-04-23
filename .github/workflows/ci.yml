@@ -20,8 +20,8 @@ permissions:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  RISC0_VERSION: 2.0.1
   RISC0_TOOLCHAIN_VERSION: 1.85.0
-  RISC0_MONOREPO_REF: "main"
 
 jobs:
   fmt:
@@ -37,28 +37,15 @@ jobs:
           cargo fmt --all --check --manifest-path build/risczero/fpvm/Cargo.toml
 
   clippy:
-    runs-on: [ self-hosted, prod, "${{ matrix.os }}", "${{ matrix.device }}" ]
-    strategy:
-      matrix:
-        include:
-          - os: Linux
-            feature: default
-            device: cpu
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - if: matrix.feature == 'cuda'
-        uses: risc0/risc0/.github/actions/cuda@main
       - uses: risc0/risc0/.github/actions/rustup@main
       - uses: risc0/risc0/.github/actions/sccache@main
-        with:
-          key: ${{ matrix.os }}-${{ matrix.feature }}
       - name: Install cargo-risczero
-        uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
-        with:
-          crate: cargo-risczero
-          version: "2.0.1"
+        run: cargo install cargo-risczero --version $RISC0_VERSION
       - uses: foundry-rs/foundry-toolchain@v1
       - name: cargo clippy kailua
         run: cargo clippy --locked --workspace --all --all-targets
