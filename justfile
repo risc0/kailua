@@ -13,7 +13,9 @@ fmt:
   cargo fmt --all --manifest-path build/risczero/fpvm/Cargo.toml
 
 clippy:
-  RISC0_SKIP_BUILD=1 cargo clippy --workspace --all --all-targets -- -D warnings
+  RISC0_SKIP_BUILD=true cargo clippy --locked --workspace --all --all-targets -- -D warnings
+
+  cargo clippy --manifest-path build/risczero/fpvm/Cargo.toml --locked --workspace --all --all-targets -- -D warnings
 
 devnet-fetch:
   git clone --depth 1 --branch v1.9.1 --recursive https://github.com/ethereum-optimism/optimism.git

@@ -35,3 +35,39 @@ jobs:
       - name: cargo fmt kailua-fpvm
         run: |
           cargo fmt --all --check --manifest-path build/risczero/fpvm/Cargo.toml
+
+  clippy:
+    runs-on: [ self-hosted, prod, "${{ matrix.os }}", "${{ matrix.device }}" ]
+    strategy:
+      matrix:
+        include:
+          - os: Linux
+            feature: default
+            device: cpu
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - if: matrix.feature == 'cuda'
+        uses: risc0/risc0/.github/actions/cuda@main
+      - uses: risc0/risc0/.github/actions/rustup@main
+      - uses: risc0/risc0/.github/actions/sccache@main
+        with:
+          key: ${{ matrix.os }}-${{ matrix.feature }}
+      - name: Install cargo-risczero
+        uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
+        with:
+          crate: cargo-risczero
+          version: "2.0.1"
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: cargo clippy kailua
+        run: cargo clippy --locked --workspace --all --all-targets
+        env:
+          RUSTFLAGS: -Dwarnings
+          RISC0_SKIP_BUILD: true
+          RISC0_SKIP_BUILD_KERNEL: true
+      - name: cargo clippy kailua-fpvm
+        run: cargo clippy --manifest-path build/risczero/fpvm/Cargo.toml --locked --workspace --all --all-targets --all-features
+        env:
+          RUSTFLAGS: -Dwarnings
+      - run: sccache --show-stats
