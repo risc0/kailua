@@ -1,4 +1,4 @@
-// Copyright 2024 RISC Zero, Inc.
+// Copyright 2024, 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -130,6 +130,9 @@ library KailuaKZGLib {
     /// @notice The point evaluation precompile
     address internal constant KZG = address(0x0a);
 
+    /// @notice The expected result from the point evaluation precompile
+    bytes32 internal constant KZG_RESULT = keccak256(abi.encodePacked(FIELD_ELEMENTS_PER_BLOB, BLS_MODULUS));
+
     /// @notice Scalar field modulus of BLS12-381
     uint256 internal constant BLS_MODULUS =
         52435875175126190479447740508185965837690552500527637822603658699938581184513;
@@ -184,7 +187,8 @@ library KailuaKZGLib {
         // The precompile will reject non-canonical field elements (i.e. value must be less than BLS_MODULUS).
         (bool _success, bytes memory kzgResult) = KZG.call(kzgCallData);
         // Validate the precompile response
-        require(keccak256(kzgResult) == keccak256(abi.encodePacked(FIELD_ELEMENTS_PER_BLOB, BLS_MODULUS)));
+        require(keccak256(kzgResult) == KZG_RESULT);
+        // Return the result
         success = _success;
     }
 
@@ -192,9 +196,9 @@ library KailuaKZGLib {
     function modExp(uint256 exponent) internal returns (uint256 result) {
         bytes memory modExpData =
             abi.encodePacked(uint256(32), uint256(32), uint256(32), ROOT_OF_UNITY, exponent, BLS_MODULUS);
-        (bool success, bytes memory rootOfUnity) = MOD_EXP.call(modExpData);
+        (bool success, bytes memory mexpResult) = MOD_EXP.call(modExpData);
         require(success);
-        result = uint256(bytes32(rootOfUnity));
+        result = uint256(bytes32(mexpResult));
     }
 
     /// @notice Reverses the bits of the input index

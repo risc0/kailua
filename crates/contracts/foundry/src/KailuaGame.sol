@@ -129,11 +129,6 @@ contract KailuaGame is KailuaTournament {
             revert ProvenFaulty();
         }
 
-        // Allow only the treasury to create new games
-        if (gameCreator() != address(KAILUA_TREASURY)) {
-            revert Blacklisted(gameCreator(), address(KAILUA_TREASURY));
-        }
-
         // Prohibit null claims
         if (rootClaim().raw() == 0x0) {
             revert UnexpectedRootClaim(rootClaim());
@@ -209,10 +204,7 @@ contract KailuaGame is KailuaTournament {
 
     /// @inheritdoc KailuaTournament
     function parentGame() public view override returns (KailuaTournament parentGame_) {
-        (GameType parentGameType,, IDisputeGame parentDisputeGame) = DISPUTE_GAME_FACTORY.gameAtIndex(parentGameIndex());
-
-        // Only allow fault claim games to be based off of other instances of the same game type
-        if (parentGameType.raw() != GAME_TYPE.raw()) revert GameTypeMismatch(parentGameType, GAME_TYPE);
+        (,, IDisputeGame parentDisputeGame) = DISPUTE_GAME_FACTORY.gameAtIndex(parentGameIndex());
 
         // Interpret parent game as another instance of this game type
         parentGame_ = KailuaTournament(address(parentDisputeGame));
@@ -232,9 +224,13 @@ contract KailuaGame is KailuaTournament {
         uint256 blobIndex = KailuaKZGLib.blobIndex(outputNumber);
         uint32 blobPosition = KailuaKZGLib.fieldElementIndex(outputNumber);
         bytes32 proposalBlobHash = KailuaKZGLib.versionedKZGHash(blobCommitment);
-        // Note: The below check also implies that we can validate only against known blobs
-        require(proposalBlobHash == proposalBlobHashes[blobIndex].raw(), "bad proposalBlobHash");
-        success = KailuaKZGLib.verifyKZGBlobProof(proposalBlobHash, blobPosition, outputFe, blobCommitment, kzgProof);
+        // Note: Only known blobs can be used to validate an intermediate output
+        if (proposalBlobHash != proposalBlobHashes[blobIndex].raw()) {
+            success = false;
+        } else {
+            success =
+                KailuaKZGLib.verifyKZGBlobProof(proposalBlobHash, blobPosition, outputFe, blobCommitment, kzgProof);
+        }
     }
 
     /// @inheritdoc KailuaTournament

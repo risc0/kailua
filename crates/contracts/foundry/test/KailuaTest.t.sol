@@ -1,4 +1,4 @@
-// Copyright 2024, 2025 RISC Zero, Inc.
+// Copyright 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
+import {console2} from "forge-std/console2.sol";
 
 import "../src/vendor/FlatOPImportV1.4.0.sol";
 import "../src/vendor/FlatR0ImportV2.0.2.sol";
@@ -56,7 +56,7 @@ contract KailuaTest is Test {
         uint256 l2BlockTime,
         uint256 proposalTimeGap,
         uint64 maxClockDuration
-    ) public returns (KailuaTreasury treasury, KailuaGame game) {
+    ) public returns (KailuaTreasury treasury, KailuaGame game, KailuaTournament anchor) {
         // Kailua
         treasury = new KailuaTreasury(
             verifier,
@@ -72,8 +72,7 @@ contract KailuaTest is Test {
         game = new KailuaGame(treasury, genesisTimestamp, l2BlockTime, proposalTimeGap, Duration.wrap(maxClockDuration));
         // Anchoring
         factory.setImplementation(GameType.wrap(1337), treasury);
-        KailuaTournament anchor =
-            treasury.propose(Claim.wrap(rootClaim), abi.encodePacked(l2BlockNumber, address(treasury)));
+        anchor = treasury.propose(Claim.wrap(rootClaim), abi.encodePacked(l2BlockNumber, address(treasury)));
         anchor.resolve();
         // Proposals
         factory.setImplementation(GameType.wrap(1337), game);
@@ -151,5 +150,21 @@ contract KailuaTest is Test {
         bytes32 claimDigest = ReceiptClaimLib.digest(ReceiptClaimLib.ok(bytes32(0x0), journalDigest));
 
         proof = abi.encodePacked(verifier.SELECTOR(), claimDigest);
+    }
+
+    function versionedKZGHash(bytes calldata commitment) external pure returns (bytes32) {
+        return KailuaKZGLib.versionedKZGHash(commitment);
+    }
+
+    function verifyKZGBlobProof(uint32 index, uint256 value, bytes calldata commitment, bytes calldata proof)
+        external
+        returns (bool)
+    {
+        return
+            KailuaKZGLib.verifyKZGBlobProof(KailuaKZGLib.versionedKZGHash(commitment), index, value, commitment, proof);
+    }
+
+    function modExp(uint256 exponent) external returns (uint256) {
+        return KailuaKZGLib.modExp(exponent);
     }
 }

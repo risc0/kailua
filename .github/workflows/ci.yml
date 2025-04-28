@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  merge_group:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# OIDC access to S3 caching bucket
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  SOLC_VERSION: 0.8.24
+  RISC0_VERSION: 2.0.1
+  RISC0_TOOLCHAIN_VERSION: 1.85.0
+
+jobs:
+  cargo-fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: risc0/risc0/.github/actions/rustup@main
+      - name: cargo fmt kailua
+        run: |
+          cargo fmt --all --check
+      - name: cargo fmt kailua-fpvm
+        run: |
+          cargo fmt --all --check --manifest-path build/risczero/fpvm/Cargo.toml
+
+  cargo-clippy:
+    strategy:
+      matrix:
+        include:
+          - os: Linux
+            feature: default
+    runs-on: [ self-hosted, prod, "${{ matrix.os }}" ]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: risc0/risc0/.github/actions/rustup@main
+      - name: Install svm-rs
+        uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
+        with:
+          crate: svm-rs
+      - name: Install solc
+        continue-on-error: true
+        run: svm install $SOLC_VERSION
+      - run: svm use $SOLC_VERSION
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: cargo clippy kailua
+        run: cargo clippy --locked --workspace --all --all-targets
+        env:
+          RUSTFLAGS: -Dwarnings
+          RISC0_SKIP_BUILD: true
+          RISC0_SKIP_BUILD_KERNEL: true
+      - name: cargo clippy kailua-fpvm
+        run: cargo clippy --manifest-path build/risczero/fpvm/Cargo.toml --locked --workspace --all --all-targets --all-features
+        env:
+          RUSTFLAGS: -Dwarnings
+
+  forge-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: risc0/risc0/.github/actions/rustup@main
+      - name: Install svm-rs
+        uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
+        with:
+          crate: svm-rs
+      - name: Install solc
+        continue-on-error: true
+        run: svm install $SOLC_VERSION
+      - run: svm use $SOLC_VERSION
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Run forge test
+        run:  forge test --root crates/contracts/foundry
+
+  forge-coverage:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: risc0/risc0/.github/actions/rustup@main
+      - name: Install svm-rs
+        uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
+        with:
+          crate: svm-rs
+      - name: Install solc
+        continue-on-error: true
+        run: svm install $SOLC_VERSION
+      - run: svm use $SOLC_VERSION
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Run forge coverage
+        id: coverage
+        run: |
+          {
+          echo 'COVERAGE<<EOF'
+          forge coverage --root crates/contracts/foundry --no-match-coverage "(src/vendor|test/)" | grep "% ("
+          echo EOF
+          }  >> "$GITHUB_OUTPUT"
+      - name: Report Coverage
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `Forge code coverage:\n| File | Lines | Statements | Branches | Functions |\n|--|--|--|--|--|\n${{ steps.coverage.outputs.COVERAGE }}\n`
+            })

@@ -4,6 +4,10 @@ set fallback := true
 default:
   @just --list
 
+
+test:
+    forge test -vvv
+
 test-deployable:
     #!/usr/bin/env bash
 
@@ -27,3 +31,9 @@ test-deployable:
       0x01 \
       0x01 \
       0x01
+
+coverage +ARGS="-vvv":
+    forge coverage --no-match-coverage "(src/vendor|test/)" {{ARGS}}
+
+report +ARGS="-vvv":
+    just coverage --report debug > coverage.out
