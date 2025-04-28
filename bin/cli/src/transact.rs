@@ -13,12 +13,13 @@
 // limitations under the License.
 
 use alloy::contract::{CallBuilder, CallDecoder, EthCall};
+use alloy::eips::eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
 use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::{Network, TransactionBuilder4844};
 use alloy::primitives::Address;
 use alloy::providers::fillers::{FillerControlFlow, TxFiller};
 use alloy::providers::{Provider, SendableTx};
-use alloy::transports::TransportResult;
+use alloy::transports::{RpcError, TransportResult};
 use alloy_provider::fillers::{
     BlobGasFiller, ChainIdFiller, GasFillable, GasFiller, JoinFill, NonceFiller, NonceManager,
 };
@@ -226,7 +227,20 @@ where
         provider: &P,
         tx: &N::TransactionRequest,
     ) -> TransportResult<Self::Fillable> {
-        self.inner.prepare(provider, tx).await
+        let tx = tx
+            .max_fee_per_blob_gas()
+            .unwrap_or(BLOB_TX_MIN_BLOB_GASPRICE);
+
+        let rpc = provider
+            .get_fee_history(5, BlockNumberOrTag::Latest, &[])
+            .await?
+            .base_fee_per_blob_gas
+            .iter()
+            .max()
+            .ok_or(RpcError::NullResp)
+            .copied()?;
+
+        Ok(tx.max(rpc))
     }
 
     async fn fill(
