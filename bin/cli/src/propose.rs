@@ -14,8 +14,10 @@
 
 use crate::db::proposal::{Proposal, ELIMINATIONS_LIMIT};
 use crate::db::KailuaDB;
-use crate::provider::{get_block, BlobProvider};
-use crate::signer::ProposerSignerArgs;
+use crate::transact::blob::BlobProvider;
+use crate::transact::provider::SafeProvider;
+use crate::transact::rpc::get_block;
+use crate::transact::signer::ProposerSignerArgs;
 use crate::transact::{Transact, TransactArgs};
 use crate::{retry_with_context, stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::consensus::BlockHeader;
@@ -115,11 +117,12 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         args.proposer_signer.wallet(Some(config.l1_chain_id))
     )?;
     let proposer_address = proposer_wallet.default_signer().address();
-    let proposer_provider = args
-        .txn_args
-        .premium_provider::<Ethereum>()
-        .wallet(&proposer_wallet)
-        .on_http(args.core.eth_rpc_url.as_str().try_into()?);
+    let proposer_provider = SafeProvider::new(
+        args.txn_args
+            .premium_provider::<Ethereum>()
+            .wallet(&proposer_wallet)
+            .on_http(args.core.eth_rpc_url.as_str().try_into()?),
+    );
     info!("Proposer address: {proposer_address}");
 
     // Init registry and factory contracts

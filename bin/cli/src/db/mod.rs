@@ -18,8 +18,8 @@ pub mod proposal;
 pub mod state;
 pub mod treasury;
 
-use crate::provider::BlobProvider;
 use crate::stall::Stall;
+use crate::transact::blob::BlobProvider;
 use crate::KAILUA_GAME_TYPE;
 use alloy::network::Network;
 use alloy::primitives::{Address, U256};

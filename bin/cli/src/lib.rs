@@ -12,14 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::transact::Transact;
-use alloy::contract::SolCallBuilder;
-use alloy::network::{Network, TransactionBuilder};
-use alloy::primitives::{Address, Uint, U256};
-use alloy::providers::Provider;
-use anyhow::Context;
 use kailua_client::telemetry::TelemetryArgs;
-use kailua_contracts::Safe::SafeInstance;
 use std::path::PathBuf;
 
 pub mod bench;
@@ -29,9 +22,7 @@ pub mod db;
 pub mod fast_track;
 pub mod fault;
 pub mod propose;
-pub mod provider;
 pub mod retry;
-pub mod signer;
 pub mod stall;
 pub mod transact;
 pub mod validate;
@@ -116,35 +107,4 @@ impl KailuaCli {
             KailuaCli::Benchmark(args) => &args.telemetry,
         }
     }
-}
-
-pub async fn exec_safe_txn<T, P1: Provider<N>, P2: Provider<N>, C, N: Network>(
-    txn: SolCallBuilder<T, P1, C, N>,
-    safe: &SafeInstance<(), P2, N>,
-    from: Address,
-) -> anyhow::Result<()> {
-    let req = txn.into_transaction_request();
-    safe.execTransaction(
-        req.to().unwrap(),
-        req.value().unwrap_or_default(),
-        req.input().cloned().unwrap_or_default(),
-        0,
-        Uint::from(req.gas_limit().unwrap_or_default()),
-        U256::ZERO,
-        U256::ZERO,
-        Address::ZERO,
-        Address::ZERO,
-        [
-            [0u8; 12].as_slice(),
-            from.as_slice(),
-            [0u8; 32].as_slice(),
-            [1u8].as_slice(),
-        ]
-        .concat()
-        .into(),
-    )
-    .transact("Safe::execTransaction", None)
-    .await
-    .context("Safe::execTransaction")?;
-    Ok(())
 }

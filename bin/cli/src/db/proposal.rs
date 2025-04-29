@@ -1,8 +1,9 @@
 use crate::db::config::Config;
 use crate::db::fault::Fault;
-use crate::provider::{blob_fe_proof, blob_sidecar, get_block, BlobProvider};
 use crate::retry_with_context;
 use crate::stall::Stall;
+use crate::transact::blob::{blob_fe_proof, blob_sidecar, BlobProvider};
+use crate::transact::rpc::get_block;
 use crate::transact::{Transact, TransactArgs};
 use alloy::consensus::{Blob, BlobTransactionSidecar, BlockHeader};
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;

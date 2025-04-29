@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::signer::{DeployerSignerArgs, GuardianSignerArgs, OwnerSignerArgs};
 use crate::stall::Stall;
+use crate::transact::signer::{DeployerSignerArgs, GuardianSignerArgs, OwnerSignerArgs};
 use crate::transact::{Transact, TransactArgs};
 use crate::{retry_with_context, KAILUA_GAME_TYPE};
 use alloy::network::{Ethereum, Network, ReceiptResponse, TxSigner};
@@ -238,7 +238,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         context,
         tracer,
         "DisputeGameFactory::setImplementation",
-        crate::exec_safe_txn(
+        crate::transact::safe::exec_safe_txn(
             dispute_game_factory.setImplementation(KAILUA_GAME_TYPE, kailua_treasury_impl_addr),
             &factory_owner_safe,
             owner_address,
@@ -265,7 +265,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
             context,
             tracer,
             "DisputeGameFactory::setInitBond",
-            crate::exec_safe_txn(
+            crate::transact::safe::exec_safe_txn(
                 dispute_game_factory.setInitBond(KAILUA_GAME_TYPE, U256::ZERO),
                 &factory_owner_safe,
                 owner_address,
@@ -318,7 +318,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
             context,
             tracer,
             "KailuaTreasury::resolve",
-            crate::exec_safe_txn(
+            crate::transact::safe::exec_safe_txn(
                 kailua_treasury_instance.resolve(),
                 &factory_owner_safe,
                 owner_address,
@@ -338,7 +338,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         context,
         tracer,
         "KailuaTreasury::setParticipationBond",
-        crate::exec_safe_txn(
+        crate::transact::safe::exec_safe_txn(
             kailua_treasury_implementation.setParticipationBond(bond_value),
             &factory_owner_safe,
             owner_address,
@@ -381,7 +381,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         context,
         tracer,
         "DisputeGameFactory::setImplementation",
-        crate::exec_safe_txn(
+        crate::transact::safe::exec_safe_txn(
             dispute_game_factory
                 .setImplementation(KAILUA_GAME_TYPE, *kailua_game_contract.address()),
             &factory_owner_safe,
@@ -399,7 +399,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
             context,
             tracer,
             "KailuaTreasury::assignVanguard",
-            crate::exec_safe_txn(
+            crate::transact::safe::exec_safe_txn(
                 kailua_treasury_implementation.assignVanguard(vanguard_address, vanguard_advantage),
                 &factory_owner_safe,
                 owner_address,

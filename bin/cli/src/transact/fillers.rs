@@ -12,121 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy::contract::{CallBuilder, CallDecoder, EthCall};
 use alloy::eips::eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
 use alloy::eips::{BlockId, BlockNumberOrTag};
-use alloy::network::{Network, TransactionBuilder4844};
+use alloy::network::{Network, TransactionBuilder, TransactionBuilder4844};
 use alloy::primitives::Address;
-use alloy::providers::fillers::{FillerControlFlow, TxFiller};
-use alloy::providers::{Provider, SendableTx};
 use alloy::transports::{RpcError, TransportResult};
 use alloy_provider::fillers::{
-    BlobGasFiller, ChainIdFiller, GasFillable, GasFiller, JoinFill, NonceFiller, NonceManager,
+    BlobGasFiller, ChainIdFiller, FillerControlFlow, GasFillable, GasFiller, JoinFill, NonceFiller,
+    NonceManager, TxFiller,
 };
-use alloy_provider::network::TransactionBuilder;
-use alloy_provider::{Identity, ProviderBuilder};
-use anyhow::Context;
+use alloy_provider::{Provider, SendableTx};
 use async_trait::async_trait;
-use opentelemetry::global::tracer;
-use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
-use std::future::IntoFuture;
-use std::time::Duration;
-use tracing::info;
-
-#[derive(clap::Args, Debug, Clone)]
-pub struct TransactArgs {
-    /// Transaction Confirmation Timeout
-    #[clap(long, env, required = false, default_value_t = 120)]
-    pub txn_timeout: u64,
-    /// Execution Gas Fee Premium
-    #[clap(long, env, required = false, default_value_t = 25)]
-    pub exec_gas_premium: u128,
-    /// Blob Gas Fee Premium
-    #[clap(long, env, required = false, default_value_t = 25)]
-    pub blob_gas_premium: u128,
-}
-
-impl TransactArgs {
-    pub fn premium_provider<N: Network>(
-        &self,
-    ) -> ProviderBuilder<Identity, JoinFill<Identity, PremiumFiller>>
-    where
-        N::TransactionRequest: TransactionBuilder4844,
-    {
-        premium_provider::<N>(self.exec_gas_premium, self.blob_gas_premium)
-    }
-}
-
-#[async_trait]
-pub trait Transact<N: Network> {
-    async fn transact(
-        &self,
-        span: &'static str,
-        timeout: Option<Duration>,
-    ) -> anyhow::Result<N::ReceiptResponse>;
-
-    async fn timed_transact_with_context(
-        &self,
-        context: opentelemetry::Context,
-        span: &'static str,
-        timeout: Option<Duration>,
-    ) -> anyhow::Result<N::ReceiptResponse> {
-        self.transact(span, timeout).with_context(context).await
-    }
-
-    async fn transact_with_context(
-        &self,
-        context: opentelemetry::Context,
-        span: &'static str,
-    ) -> anyhow::Result<N::ReceiptResponse> {
-        self.timed_transact_with_context(context, span, None).await
-    }
-}
-
-#[async_trait]
-impl<
-        'coder,
-        T: Sync + Send + 'static,
-        P: Provider<N>,
-        D: CallDecoder + Send + Sync + 'static,
-        N: Network,
-    > Transact<N> for CallBuilder<T, P, D, N>
-where
-    EthCall<'coder, D, N>: IntoFuture,
-{
-    async fn transact(
-        &self,
-        span: &'static str,
-        timeout: Option<Duration>,
-    ) -> anyhow::Result<N::ReceiptResponse> {
-        let tracer = tracer("kailua");
-        let context = opentelemetry::Context::current_with_span(tracer.start(span));
-
-        // Require call to succeed against pending block
-        self.call_raw()
-            .block(BlockId::Number(BlockNumberOrTag::Pending))
-            .into_future()
-            .with_context(context.with_span(tracer.start_with_context("call_raw", &context)))
-            .await
-            .context("call_raw")?;
-
-        // Publish transaction
-        let pending_txn = self
-            .send()
-            .with_context(context.with_span(tracer.start_with_context("send", &context)))
-            .await
-            .context("send")?;
-        info!("Published transaction: {:?}", pending_txn.tx_hash());
-
-        // Wait for receipt with timeout
-        pending_txn
-            .with_timeout(timeout)
-            .get_receipt()
-            .with_context(context.with_span(tracer.start_with_context("get_receipt", &context)))
-            .await
-            .context("get_receipt")
-    }
-}
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PremiumExecGasFiller {
@@ -204,7 +100,7 @@ impl PremiumBlobGasFiller {
 
     pub fn make_premium(&self, price: u128) -> u128 {
         let price = price.max(1);
-        price + price * self.premium.max(1) / 100
+        price + price * self.premium / 100
     }
 }
 
@@ -240,7 +136,7 @@ where
             .ok_or(RpcError::NullResp)
             .copied()?;
 
-        Ok(tx.max(rpc))
+        Ok(tx.max(rpc * 2))
     }
 
     async fn fill(
@@ -248,13 +144,7 @@ where
         fillable: Self::Fillable,
         tx: SendableTx<N>,
     ) -> TransportResult<SendableTx<N>> {
-        let mut tx = self.inner.fill(fillable, tx).await?;
-        if let Some(builder) = tx.as_mut_builder() {
-            if let Some(blob_base_fee) = builder.max_fee_per_blob_gas() {
-                builder.set_max_fee_per_blob_gas(self.make_premium(blob_base_fee));
-            }
-        }
-        Ok(tx)
+        self.inner.fill(self.make_premium(fillable), tx).await
     }
 }
 
@@ -279,19 +169,3 @@ pub type PremiumFiller = JoinFill<
     PremiumExecGasFiller,
     JoinFill<PremiumBlobGasFiller, JoinFill<NonceFiller<LatestNonceManager>, ChainIdFiller>>,
 >;
-
-pub fn premium_provider<N: Network>(
-    premium_exec_gas: u128,
-    premium_blob_gas: u128,
-) -> ProviderBuilder<Identity, JoinFill<Identity, PremiumFiller>>
-where
-    N::TransactionRequest: TransactionBuilder4844,
-{
-    ProviderBuilder::default().filler(JoinFill::new(
-        PremiumExecGasFiller::with_premium(premium_exec_gas),
-        JoinFill::new(
-            PremiumBlobGasFiller::with_premium(premium_blob_gas),
-            Default::default(),
-        ),
-    ))
-}

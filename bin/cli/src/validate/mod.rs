@@ -18,8 +18,10 @@ use crate::channel::DuplexChannel;
 use crate::db::config::Config;
 use crate::db::proposal::Proposal;
 use crate::db::KailuaDB;
-use crate::provider::{get_block_by_number, get_next_block, BlobProvider};
-use crate::signer::ValidatorSignerArgs;
+use crate::transact::blob::BlobProvider;
+use crate::transact::provider::SafeProvider;
+use crate::transact::rpc::{get_block_by_number, get_next_block};
+use crate::transact::signer::ValidatorSignerArgs;
 use crate::transact::{Transact, TransactArgs};
 use crate::validate::proving::{create_proving_args, Task};
 use crate::{retry_with_context, stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
@@ -188,11 +190,12 @@ pub async fn handle_proposals(
         args.validator_signer.wallet(Some(config.l1_chain_id))
     )?;
     let validator_address = validator_wallet.default_signer().address();
-    let validator_provider = args
-        .txn_args
-        .premium_provider::<Ethereum>()
-        .wallet(validator_wallet)
-        .on_http(args.core.eth_rpc_url.as_str().try_into()?);
+    let validator_provider = SafeProvider::new(
+        args.txn_args
+            .premium_provider::<Ethereum>()
+            .wallet(validator_wallet)
+            .on_http(args.core.eth_rpc_url.as_str().try_into()?),
+    );
     info!("Validator address: {validator_address}");
 
     // Init factory contract
