@@ -24,14 +24,6 @@ contract BlobDisputeTest is KailuaTest {
 
     uint256 public constant PROPOSAL_BUFFER_LEN = 21;
 
-    uint256 public constant BLOB_NZ_VALUE = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000000;
-    bytes public constant BLOB_NZ_COMMIT = abi.encodePacked(
-        hex"b7f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb"
-    );
-    bytes public constant BLOB_ID_ELEM = abi.encodePacked(
-        hex"c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-    );
-
     function setUp() public override {
         super.setUp();
         // Deploy dispute contracts

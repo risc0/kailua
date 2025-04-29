@@ -64,7 +64,7 @@ error NoConflict();
 
 // 0x9276ab5a
 /// @notice Thrown when proposing before the proposal gap timeout
-error ProposalGapRemaining();
+error ProposalGapRemaining(uint256 currentTime, uint256 minCreationTime);
 
 // 0x1ebb374b
 /// @notice Thrown when a game is created with a parent instance from another game type
