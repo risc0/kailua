@@ -128,16 +128,16 @@ pub fn blob_sidecar(blob_data: Vec<Blob>) -> anyhow::Result<BlobTransactionSidec
     let mut blobs = Vec::with_capacity(blob_data.len());
     let mut commitments = Vec::with_capacity(blob_data.len());
     let mut proofs = Vec::with_capacity(blob_data.len());
+    let settings = alloy::consensus::EnvKzgSettings::default();
     for blob in blob_data {
         let c_kzg_blob = c_kzg::Blob::from_bytes(blob.as_slice())?;
-        let settings = alloy::consensus::EnvKzgSettings::default();
-        let commitment = c_kzg::KzgCommitment::blob_to_kzg_commitment(&c_kzg_blob, settings.get())
+        let commitment = settings
+            .get()
+            .blob_to_kzg_commitment(&c_kzg_blob)
             .expect("Failed to convert blob to commitment");
-        let proof = c_kzg::KzgProof::compute_blob_kzg_proof(
-            &c_kzg_blob,
-            &commitment.to_bytes(),
-            settings.get(),
-        )?;
+        let proof = settings
+            .get()
+            .compute_blob_kzg_proof(&c_kzg_blob, &commitment.to_bytes())?;
         blobs.push(blob);
         commitments.push(commitment.to_bytes().into_inner().into());
         proofs.push(proof.to_bytes().into_inner().into());
@@ -173,18 +173,15 @@ pub fn blob_fe_proof(
     let z = c_kzg::Bytes32::new(bytes);
     let c_kzg_blob = c_kzg::Blob::from_bytes(blob.as_slice())?;
     let settings = alloy::consensus::EnvKzgSettings::default();
-    let (proof, value) = c_kzg::KzgProof::compute_kzg_proof(&c_kzg_blob, &z, settings.get())?;
+    let (proof, value) = settings.get().compute_kzg_proof(&c_kzg_blob, &z)?;
 
-    let commitment = c_kzg::KzgCommitment::blob_to_kzg_commitment(&c_kzg_blob, settings.get())?;
+    let commitment = settings.get().blob_to_kzg_commitment(&c_kzg_blob)?;
 
     let proof_bytes = proof.to_bytes();
-    if c_kzg::KzgProof::verify_kzg_proof(
-        &commitment.to_bytes(),
-        &z,
-        &value,
-        &proof_bytes,
-        settings.get(),
-    )? {
+    if settings
+        .get()
+        .verify_kzg_proof(&commitment.to_bytes(), &z, &value, &proof_bytes)?
+    {
         Ok((proof_bytes, value))
     } else {
         bail!("Generated invalid kzg proof.")

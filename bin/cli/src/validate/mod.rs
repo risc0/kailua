@@ -23,7 +23,7 @@ use crate::transact::provider::SafeProvider;
 use crate::transact::rpc::{get_block_by_number, get_next_block};
 use crate::transact::signer::ValidatorSignerArgs;
 use crate::transact::{Transact, TransactArgs};
-use crate::validate::proving::{create_proving_args, Task};
+use crate::validate::proving::{create_proving_args, encode_seal, Task};
 use crate::{retry_with_context, stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::IndexedBlobHash;
 use alloy::network::primitives::HeaderResponse;
@@ -178,8 +178,7 @@ pub async fn handle_proposals(
     let dgf_address = system_config
         .disputeGameFactory()
         .stall_with_context(context.clone(), "SystemConfig::disputeGameFactory")
-        .await
-        .addr_;
+        .await;
 
     // initialize validator wallet
     info!("Initializing validator wallet.");
@@ -194,7 +193,7 @@ pub async fn handle_proposals(
         args.txn_args
             .premium_provider::<Ethereum>()
             .wallet(validator_wallet)
-            .on_http(args.core.eth_rpc_url.as_str().try_into()?),
+            .connect_http(args.core.eth_rpc_url.as_str().try_into()?),
     );
     info!("Validator address: {validator_address}");
 
@@ -205,7 +204,6 @@ pub async fn handle_proposals(
         .gameCount()
         .stall_with_context(context.clone(), "DisputeGameFactory::gameCount")
         .await
-        .gameCount_
         .to();
     info!("There have been {game_count} games created using DisputeGameFactory");
 
@@ -213,8 +211,7 @@ pub async fn handle_proposals(
     let latest_game_impl_addr = dispute_game_factory
         .gameImpls(KAILUA_GAME_TYPE)
         .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
-        .await
-        .impl_;
+        .await;
     let kailua_game_implementation_address = args
         .kailua_game_implementation
         .unwrap_or(latest_game_impl_addr);
@@ -482,8 +479,7 @@ pub async fn handle_proposals(
             let proof_status = parent_contract
                 .proofStatus(proposal.signature)
                 .stall_with_context(context.clone(), "KailuaTournament::proofStatus")
-                .await
-                ._0;
+                .await;
             if proof_status != 0 {
                 info!(
                     "Proposal {} signature {} already proven {proof_status}",
@@ -589,8 +585,7 @@ pub async fn handle_proposals(
             let proof_status = parent_contract
                 .proofStatus(proposal.signature)
                 .stall_with_context(context.clone(), "KailuaTournament::proofStatus")
-                .await
-                ._0;
+                .await;
             if proof_status != 0 {
                 info!(
                     "Proposal {} signature {} already proven {proof_status}",
@@ -675,7 +670,6 @@ pub async fn handle_proposals(
                 .FPVM_IMAGE_ID()
                 .stall_with_context(context.clone(), "KailuaTournament::FPVM_IMAGE_ID")
                 .await
-                ._0
                 .0;
             // patch the proof if in dev mode
             #[cfg(feature = "devnet")]
@@ -690,7 +684,7 @@ pub async fn handle_proposals(
             let proof_journal = ProofJournal::decode_packed(receipt.journal.as_ref())?;
             info!("Proof journal: {:?}", proof_journal);
             // encode seal data
-            let encoded_seal = Bytes::from(risc0_ethereum_contracts::encode_seal(&receipt)?);
+            let encoded_seal = Bytes::from(encode_seal(&receipt)?);
 
             let child_index = parent
                 .child_index(proposal.index)
@@ -711,8 +705,7 @@ pub async fn handle_proposals(
                     let contract_blobs_hash = proposal_contract
                         .blobsHash()
                         .stall_with_context(context.clone(), "KailuaGame::blobsHash")
-                        .await
-                        .blobsHash_;
+                        .await;
                     if proposal.blobs_hash() != contract_blobs_hash {
                         warn!(
                             "Local proposal blobs hash {} doesn't match contract blobs hash {}",
@@ -739,8 +732,7 @@ pub async fn handle_proposals(
                     let config_hash = proposal_contract
                         .ROLLUP_CONFIG_HASH()
                         .stall_with_context(context.clone(), "KailuaGame::ROLLUP_CONFIG_HASH")
-                        .await
-                        ._0;
+                        .await;
                     if proof_journal.config_hash != config_hash {
                         warn!(
                             "Proof config hash {} does not match contract hash {config_hash}",
@@ -786,8 +778,7 @@ pub async fn handle_proposals(
                         let proof_status = parent_contract
                             .provenAt(proposal.signature)
                             .stall_with_context(context.clone(), "KailuaTournament::provenAt")
-                            .await
-                            ._0;
+                            .await;
                         info!("Validity proof timestamp: {proof_status}");
                         info!("KailuaTournament::proveValidity: {} gas", receipt.gas_used);
 
@@ -914,8 +905,7 @@ pub async fn handle_proposals(
             let fault_proof_status = parent_contract
                 .proofStatus(proposal.signature)
                 .stall_with_context(context.clone(), "KailuaTournament::proofStatus")
-                .await
-                ._0;
+                .await;
             if fault_proof_status != 0 {
                 warn!("Skipping proof submission for already proven game at local index {proposal_index}.");
                 meter_proofs_discarded.add(
@@ -968,8 +958,7 @@ pub async fn handle_proposals(
                             proofs.last().unwrap().clone(),
                         )
                         .stall_with_context(context.clone(), "KailuaGame::verifyIntermediateOutput")
-                        .await
-                        .success;
+                        .await;
                     if !proposal_has_output {
                         warn!("Could not verify proposed output");
                     } else {
@@ -1002,8 +991,7 @@ pub async fn handle_proposals(
                             proofs.first().unwrap().clone(),
                         )
                         .stall_with_context(context.clone(), "KailuaGame::verifyIntermediateOutput")
-                        .await
-                        .success;
+                        .await;
                     if !proposal_has_output {
                         warn!("Could not verify last common output for proposal");
                     } else {
@@ -1037,8 +1025,7 @@ pub async fn handle_proposals(
                 let config_hash = parent_contract
                     .ROLLUP_CONFIG_HASH()
                     .stall_with_context(context.clone(), "KailuaTournament::ROLLUP_CONFIG_HASH")
-                    .await
-                    ._0;
+                    .await;
                 if proof_journal.config_hash != config_hash {
                     warn!(
                         "Config hash mismatch. Found {}, expected {config_hash}.",
@@ -1077,8 +1064,7 @@ pub async fn handle_proposals(
                     let proof_status = parent_contract
                         .proofStatus(proposal.signature)
                         .stall_with_context(context.clone(), "KailuaTournament::proofStatus")
-                        .await
-                        ._0;
+                        .await;
                     info!("Proposal {} proven: {proof_status}", proposal.index);
                     info!(
                         "KailuaTournament::proveOutputFault: {} gas",
@@ -1174,8 +1160,7 @@ pub async fn handle_proposals(
             let fault_proof_status = parent_contract
                 .proofStatus(proposal.signature)
                 .stall_with_context(context.clone(), "KailuaTournament::proofStatus")
-                .await
-                ._0;
+                .await;
             if fault_proof_status != 0 {
                 warn!("Skipping proof submission for already proven game at local index {proposal_index}.");
                 meter_proofs_discarded.add(
@@ -1205,7 +1190,6 @@ pub async fn handle_proposals(
                     )
                     .stall_with_context(context.clone(), "KailuaGame::verifyIntermediateOutput")
                     .await
-                    .success
                 {
                     warn!("Could not verify divergent trail output for proposal");
                 } else {
@@ -1241,8 +1225,7 @@ pub async fn handle_proposals(
                     let proof_status = parent_contract
                         .proofStatus(proposal.signature)
                         .stall_with_context(context.clone(), "KailuaTournament::proofStatus")
-                        .await
-                        ._0;
+                        .await;
                     info!("Proposal {} proven: {proof_status}", proposal.index);
                     info!("KailuaTournament::proveNullFault: {} gas", receipt.gas_used);
 

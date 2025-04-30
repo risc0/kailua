@@ -32,7 +32,7 @@ pub struct Treasury {
 
 impl Treasury {
     pub async fn init<P: Provider<N>, N: Network>(
-        treasury_implementation: &KailuaTreasuryInstance<(), P, N>,
+        treasury_implementation: &KailuaTreasuryInstance<P, N>,
     ) -> anyhow::Result<Self> {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("Treasury::init"));
@@ -41,8 +41,7 @@ impl Treasury {
         let participation_bond = treasury_implementation
             .participationBond()
             .stall_with_context(context.clone(), "KailuaTreasury::participationBond")
-            .await
-            ._0;
+            .await;
         Ok(Self {
             address: *treasury_implementation.address(),
             claim_proposer: Default::default(),
@@ -54,7 +53,7 @@ impl Treasury {
     pub fn treasury_contract_instance<P: Provider<N>, N: Network>(
         &self,
         provider: P,
-    ) -> KailuaTreasuryInstance<(), P, N> {
+    ) -> KailuaTreasuryInstance<P, N> {
         KailuaTreasury::new(self.address, provider)
     }
 
@@ -66,8 +65,7 @@ impl Treasury {
             .treasury_contract_instance(provider)
             .participationBond()
             .stall_with_context(context.clone(), "KailuaTreasury::participationBond")
-            .await
-            ._0;
+            .await;
         self.participation_bond
     }
 
@@ -79,7 +77,6 @@ impl Treasury {
             .vanguard()
             .stall_with_context(context.clone(), "KailuaTreasury::vanguard")
             .await
-            ._0
     }
 
     pub async fn fetch_vanguard_advantage<P: Provider<N>, N: Network>(
@@ -94,7 +91,6 @@ impl Treasury {
             .vanguardAdvantage()
             .stall_with_context(context.clone(), "KailuaTreasury::vanguardAdvantage")
             .await
-            ._0
     }
 
     pub async fn fetch_balance<P: Provider<N>, N: Network>(
@@ -109,8 +105,7 @@ impl Treasury {
             .treasury_contract_instance(provider)
             .paidBonds(address)
             .stall_with_context(context.clone(), "KailuaTreasury::paidBonds")
-            .await
-            ._0;
+            .await;
         self.paid_bond.insert(address, paid_bond);
         paid_bond
     }
@@ -129,8 +124,7 @@ impl Treasury {
                 let proposer = instance
                     .proposerOf(address)
                     .stall_with_context(context.clone(), "KailuaTreasury::proposerOf")
-                    .await
-                    ._0;
+                    .await;
                 *entry.insert(proposer)
             }
             Entry::Occupied(entry) => *entry.get(),

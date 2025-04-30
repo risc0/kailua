@@ -105,8 +105,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
     let dgf_address = system_config
         .disputeGameFactory()
         .stall_with_context(context.clone(), "SystemConfig::disputeGameFactory")
-        .await
-        .addr_;
+        .await;
 
     // initialize proposer wallet
     info!("Initializing proposer wallet.");
@@ -121,7 +120,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         args.txn_args
             .premium_provider::<Ethereum>()
             .wallet(&proposer_wallet)
-            .on_http(args.core.eth_rpc_url.as_str().try_into()?),
+            .connect_http(args.core.eth_rpc_url.as_str().try_into()?),
     );
     info!("Proposer address: {proposer_address}");
 
@@ -132,7 +131,6 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         .gameCount()
         .stall_with_context(context.clone(), "DisputeGameFactory::gameCount")
         .await
-        .gameCount_
         .to();
     info!("There have been {game_count} games created using DisputeGameFactory");
 
@@ -140,8 +138,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
     let latest_game_impl_addr = dispute_game_factory
         .gameImpls(KAILUA_GAME_TYPE)
         .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
-        .await
-        .impl_;
+        .await;
     let kailua_game_implementation_address = args
         .kailua_game_implementation
         .unwrap_or(latest_game_impl_addr);
@@ -281,7 +278,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                         let result = result.unwrap();
 
                         // Final prune will be during resolution
-                        if !result._0.is_zero() {
+                        if !result.0.is_zero() {
                             break true;
                         }
 
@@ -446,8 +443,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         let latest_game_impl_addr = dispute_game_factory
             .gameImpls(KAILUA_GAME_TYPE)
             .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
-            .await
-            .impl_;
+            .await;
         if latest_game_impl_addr != kailua_game_implementation_address {
             warn!("Not proposing. Implementation {kailua_game_implementation_address} outdated. Found new implementation {latest_game_impl_addr}.");
             continue;
@@ -591,7 +587,6 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
                 .gameIndex()
                 .stall_with_context(context.clone(), "KailuaTournament::gameIndex")
                 .await
-                ._0
                 .to();
             if dupe_game_index >= kailua_db.state.next_factory_index {
                 // we need to fetch this proposal's data

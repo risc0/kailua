@@ -70,7 +70,7 @@ pub async fn benchmark(args: BenchArgs) -> anyhow::Result<()> {
     let context = opentelemetry::Context::current_with_span(tracer.start("benchmark"));
 
     let l2_node_provider =
-        ProviderBuilder::new().on_http(args.core.op_geth_url.as_str().try_into()?);
+        ProviderBuilder::new().connect_http(args.core.op_geth_url.as_str().try_into()?);
     let mut cache: HashMap<u64, u64> = HashMap::new();
     // Scan L2 blocks for highest transaction counts
     let bench_end = args.bench_start + args.bench_range;

@@ -17,6 +17,7 @@ use crate::kona::chain::OracleL1ChainProvider;
 use crate::kona::pipeline::OraclePipeline;
 use crate::kona::sync::new_pipeline_cursor;
 use crate::precondition;
+use alloy_op_evm::OpEvmFactory;
 use alloy_primitives::{Sealed, B256};
 use anyhow::{bail, Context};
 use kona_derive::traits::BlobProvider;
@@ -94,7 +95,7 @@ where
                 rollup_config.as_ref(),
                 l2_provider.clone(),
                 l2_provider.clone(),
-                None,
+                OpEvmFactory::default(),
                 None,
             );
             kona_executor.update_safe_head(safe_head);
@@ -110,12 +111,7 @@ where
 
             // Validate terminating block number
             assert_eq!(
-                execution_cache
-                    .last()
-                    .unwrap()
-                    .artifacts
-                    .block_header
-                    .number,
+                execution_cache.last().unwrap().artifacts.header.number,
                 boot.claimed_l2_block_number
             );
 
@@ -128,13 +124,21 @@ where
                 );
                 // Verify transition
                 assert_eq!(
-                    execution.artifacts,
+                    execution.artifacts.header,
                     kona_executor
                         .execute_payload(execution.attributes.clone())
                         .await?
+                        .header
+                );
+                assert_eq!(
+                    execution.artifacts.execution_result,
+                    kona_executor
+                        .execute_payload(execution.attributes.clone())
+                        .await?
+                        .execution_result
                 );
                 // Update safe head
-                kona_executor.update_safe_head(execution.artifacts.block_header.clone());
+                kona_executor.update_safe_head(execution.artifacts.header.clone());
                 // Verify post state
                 assert_eq!(
                     execution.claimed_output,
@@ -142,7 +146,7 @@ where
                 );
                 log(&format!(
                     "OUTPUT: {}/{}",
-                    execution.artifacts.block_header.number, boot.claimed_l2_block_number
+                    execution.artifacts.header.number, boot.claimed_l2_block_number
                 ));
             }
 
@@ -196,7 +200,7 @@ where
                 rollup_config.as_ref(),
                 l2_provider.clone(),
                 l2_provider.clone(),
-                None,
+                OpEvmFactory::default(),
                 None,
             ),
             collection_target,

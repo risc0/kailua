@@ -174,9 +174,9 @@ pub fn stitch_executions(
         // Validate receipt roots
         for execution in execution_trace {
             assert_eq!(
-                execution.artifacts.block_header.receipts_root,
+                execution.artifacts.header.receipts_root,
                 crate::executor::compute_receipts_root(
-                    execution.artifacts.receipts.as_slice(),
+                    execution.artifacts.execution_result.receipts.as_slice(),
                     &boot.rollup_config,
                     execution.attributes.payload_attributes.timestamp
                 )
@@ -202,7 +202,7 @@ pub fn stitch_executions(
                     .last()
                     .expect("Empty execution trace")
                     .artifacts
-                    .block_header
+                    .header
                     .number,
             },
         )

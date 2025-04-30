@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::oracle::{needs_validation, validate_preimage};
-use crate::rkyv::PreimageVecStoreRkyv;
+use crate::rkyv::vec::PreimageVecStoreRkyv;
 use crate::witness::WitnessOracle;
 use alloy_primitives::map::HashMap;
 use anyhow::bail;

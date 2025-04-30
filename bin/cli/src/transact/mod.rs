@@ -84,15 +84,10 @@ pub trait Transact<N: Network> {
 }
 
 #[async_trait]
-impl<
-        'coder,
-        T: Sync + Send + 'static,
-        P: Provider<N>,
-        D: CallDecoder + Send + Sync + 'static,
-        N: Network,
-    > Transact<N> for CallBuilder<T, P, D, N>
+impl<'coder, P: Provider<N>, D: CallDecoder + Send + Sync + 'static, N: Network> Transact<N>
+    for CallBuilder<P, D, N>
 where
-    CallBuilder<T, P, D, N>: Clone,
+    CallBuilder<P, D, N>: Clone,
     EthCall<'coder, D, N>: IntoFuture,
 {
     async fn transact(

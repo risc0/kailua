@@ -78,7 +78,7 @@ pub async fn fetch_rollup_config(
     let context = opentelemetry::Context::current_with_span(tracer.start("fetch_rollup_config"));
 
     let op_node_provider = OpNodeProvider(RootProvider::new_http(op_node_address.try_into()?));
-    let l2_node_provider = ProviderBuilder::new().on_http(l2_node_address.try_into()?);
+    let l2_node_provider = ProviderBuilder::new().connect_http(l2_node_address.try_into()?);
 
     let mut rollup_config: Value = op_node_provider
         .rollup_config()

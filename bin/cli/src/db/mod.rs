@@ -63,7 +63,7 @@ impl KailuaDB {
 
     pub async fn init<P: Provider<N>, N: Network>(
         mut data_dir: PathBuf,
-        dispute_game_factory: &IDisputeGameFactoryInstance<(), P, N>,
+        dispute_game_factory: &IDisputeGameFactoryInstance<P, N>,
         game_implementation_address: Address,
     ) -> anyhow::Result<Self> {
         let tracer = tracer("kailua");
@@ -95,7 +95,7 @@ impl KailuaDB {
 
     pub async fn load_proposals<P: Provider<N>, N: Network>(
         &mut self,
-        dispute_game_factory: &IDisputeGameFactoryInstance<(), P, N>,
+        dispute_game_factory: &IDisputeGameFactoryInstance<P, N>,
         op_node_provider: &OpNodeProvider,
         blob_provider: &BlobProvider,
     ) -> anyhow::Result<Vec<u64>> {
@@ -108,7 +108,6 @@ impl KailuaDB {
             .gameCount()
             .stall_with_context(context.clone(), "DisputeGameFactory::gameCount")
             .await
-            .gameCount_
             .to();
         let mut proposals = Vec::new();
         while self.state.next_factory_index < game_count {
@@ -186,7 +185,7 @@ impl KailuaDB {
 
     pub async fn load_game_at_index<P: Provider<N>, N: Network>(
         &mut self,
-        dispute_game_factory: &IDisputeGameFactoryInstance<(), P, N>,
+        dispute_game_factory: &IDisputeGameFactoryInstance<P, N>,
         op_node_provider: &OpNodeProvider,
         blob_provider: &BlobProvider,
         index: u64,

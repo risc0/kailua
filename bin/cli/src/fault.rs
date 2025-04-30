@@ -80,8 +80,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let dgf_address = system_config
         .disputeGameFactory()
         .stall_with_context(context.clone(), "SystemConfig::disputeGameFactory")
-        .await
-        .addr_;
+        .await;
 
     // init l1 stuff
     let tester_wallet = await_tel_res!(
@@ -98,22 +97,20 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .txn_args
         .premium_provider::<Ethereum>()
         .wallet(tester_wallet)
-        .on_http(args.propose_args.core.eth_rpc_url.as_str().try_into()?);
+        .connect_http(args.propose_args.core.eth_rpc_url.as_str().try_into()?);
 
     let dispute_game_factory = IDisputeGameFactory::new(dgf_address, &tester_provider);
     let kailua_game_implementation = KailuaGame::new(
         dispute_game_factory
             .gameImpls(KAILUA_GAME_TYPE)
             .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
-            .await
-            .impl_,
+            .await,
         &tester_provider,
     );
     let kailua_treasury_address = kailua_game_implementation
         .KAILUA_TREASURY()
         .stall_with_context(context.clone(), "KailuaGame::KAILUA_TREASURY")
-        .await
-        ._0;
+        .await;
     let kailua_treasury_instance = KailuaTreasury::new(kailua_treasury_address, &tester_provider);
 
     // load constants
@@ -121,13 +118,11 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .PROPOSAL_OUTPUT_COUNT()
         .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_OUTPUT_COUNT")
         .await
-        ._0
         .to();
     let output_block_span: u64 = kailua_game_implementation
         .OUTPUT_BLOCK_SPAN()
         .stall_with_context(context.clone(), "KailuaGame::OUTPUT_BLOCK_SPAN")
         .await
-        ._0
         .to();
     let proposal_block_count = proposal_output_count * output_block_span;
 
@@ -135,8 +130,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let games_count = dispute_game_factory
         .gameCount()
         .stall_with_context(context.clone(), "DisputeGameFactory::gameCount")
-        .await
-        .gameCount_;
+        .await;
     let parent_game_address = dispute_game_factory
         .gameAtIndex(U256::from(args.fault_parent))
         .stall_with_context(context.clone(), "DisputeGameFactory::gameAtIndex")
@@ -147,7 +141,6 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .l2BlockNumber()
         .stall_with_context(context.clone(), "KailuaTournament::l2BlockNumber")
         .await
-        .l2BlockNumber_
         .to();
     // Prepare faulty proposal
     let faulty_block_number = parent_block_number + args.fault_offset * output_block_span;
@@ -224,13 +217,11 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let bond_value = kailua_treasury_instance
         .participationBond()
         .stall_with_context(context.clone(), "KailuaTreasury::participationBond")
-        .await
-        ._0;
+        .await;
     let paid_in = kailua_treasury_instance
         .paidBonds(tester_address)
         .stall_with_context(context.clone(), "KailuaTreasury::paidBonds")
-        .await
-        ._0;
+        .await;
     let owed_collateral = bond_value.saturating_sub(paid_in);
 
     let mut transaction =

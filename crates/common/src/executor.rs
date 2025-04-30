@@ -14,7 +14,9 @@
 
 use crate::client::log;
 use crate::config::safe_default;
-use crate::rkyv::{B256Def, ExecutionArtifactsRkyv, OpPayloadAttributesRkyv};
+use crate::rkyv::optimism::OpPayloadAttributesRkyv;
+use crate::rkyv::primitives::B256Def;
+use crate::rkyv::BlockBuildingOutcomeRkyv;
 use alloy_consensus::Header;
 use alloy_eips::eip4895::Withdrawal;
 use alloy_eips::Encodable2718;
@@ -22,7 +24,7 @@ use alloy_primitives::{Bytes, Sealed, B256, B64};
 use anyhow::Context;
 use async_trait::async_trait;
 use kona_driver::{Executor, PipelineCursor, TipCursor};
-use kona_executor::ExecutionArtifacts;
+use kona_executor::BlockBuildingOutcome;
 use kona_genesis::RollupConfig;
 use kona_mpt::ordered_trie_with_encoder;
 use kona_preimage::CommsClient;
@@ -37,7 +39,7 @@ use spin::RwLock;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
-#[derive(Clone, Debug, Default, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Execution {
     /// Output root prior to execution
     #[rkyv(with = B256Def)]
@@ -46,8 +48,8 @@ pub struct Execution {
     #[rkyv(with = OpPayloadAttributesRkyv)]
     pub attributes: OpPayloadAttributes,
     /// Output block from execution
-    #[rkyv(with = ExecutionArtifactsRkyv)]
-    pub artifacts: ExecutionArtifacts,
+    #[rkyv(with = BlockBuildingOutcomeRkyv)]
+    pub artifacts: BlockBuildingOutcome,
     /// Output root after execution
     #[rkyv(with = B256Def)]
     pub claimed_output: B256,
@@ -75,7 +77,7 @@ impl<E: Executor + Send + Sync + Debug> Executor for CachedExecutor<E> {
     async fn execute_payload(
         &mut self,
         attributes: OpPayloadAttributes,
-    ) -> Result<ExecutionArtifacts, Self::Error> {
+    ) -> Result<BlockBuildingOutcome, Self::Error> {
         let agreed_output = self.compute_output_root()?;
         if self
             .cache
@@ -84,8 +86,8 @@ impl<E: Executor + Send + Sync + Debug> Executor for CachedExecutor<E> {
             .unwrap_or(Ok(false))?
         {
             let artifacts = self.cache.pop().unwrap().artifacts.clone();
-            log(&format!("CACHE {}", artifacts.block_header.number));
-            self.update_safe_head(artifacts.block_header.clone());
+            log(&format!("CACHE {}", artifacts.header.number));
+            self.update_safe_head(artifacts.header.clone());
             return Ok(artifacts);
         }
         if let Some(collection_target) = &self.collection_target {
@@ -221,7 +223,7 @@ pub fn exec_precondition_hash(executions: &[Arc<Execution>]) -> B256 {
                 attributes_hash(&e.attributes)
                     .expect("Unhashable attributes.")
                     .0,
-                e.artifacts.block_header.hash().0,
+                e.artifacts.header.hash().0,
                 e.claimed_output.0,
             ]
             .concat()

@@ -59,7 +59,6 @@ kona-protocol.workspace = true
 kona-providers-alloy.workspace = true
 
 bonsai-sdk.workspace = true
-risc0-ethereum-contracts.workspace = true
 risc0-zkvm.workspace = true
 
 [dev-dependencies]

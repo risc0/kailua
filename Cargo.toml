@@ -17,7 +17,7 @@ members = [
 ]
 
 [workspace.dependencies]
-anyhow = "1.0.86"
+anyhow = "1.0.98"
 async-channel = "2.3.1"
 async-trait = "0.1.88"
 aws-config = "1.5.15"
@@ -26,9 +26,9 @@ bincode = "1.3.3"
 bytemuck = "1.12"
 bytes = "1.7.2"
 clap = { version = "4.5.21", features = ["derive", "env"] }
-c-kzg = "=1.0.3"
+c-kzg = "2.1.0"
 foundry-compilers = "0.11.0"
-gcloud-sdk = { version = "0.26.3", features = ["google-cloud-kms-v1"] }
+gcloud-sdk = { version = "0.27.0", features = ["google-cloud-kms-v1"] }
 hashbrown = { version = "0.15.0", features = ["rayon"] }
 hex = "0.4.3"
 human_bytes = "0.4.3"
@@ -63,21 +63,22 @@ tracing-opentelemetry = "0.28.0"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Alloy
-alloy = { version = "0.12.6", default-features = false, features = ["json"] }
-alloy-chains = "0.1.46"
-alloy-consensus = { version = "0.12.6", default-features = false, features = ["serde"] }
-alloy-eips = { version = "0.12.6", default-features = false, features = ["kzg"] }
-alloy-provider = { version = "0.12.6" }
+alloy = { version = "0.15.6", default-features = false, features = ["json"] }
+alloy-chains = "0.2.0"
+alloy-consensus = { version = "0.15.6", default-features = false, features = ["serde"] }
+alloy-eips = { version = "0.15.6", default-features = false, features = ["kzg"] }
+alloy-evm = { version = "0.6.0", default-features = false, features = ["op"] }
+alloy-op-evm = { version = "0.6.0", default-features = false }
+alloy-provider = { version = "0.15.6" }
 alloy-rlp = "0.3.11"
-alloy-primitives = { version = "0.8.24", default-features = false, features = ["map-hashbrown"] }
-alloy-rpc-types-beacon = "0.12.6"
-alloy-rpc-types-engine = { version = "0.12.6", default-features = false }
-alloy-sol-types = { version = "0.8.24", features = ["json"] }
+alloy-primitives = { version = "1.0.0", default-features = false, features = ["map-hashbrown"] }
+alloy-rpc-types-beacon = "0.15.6"
+alloy-rpc-types-engine = { version = "0.15.6", default-features = false }
+alloy-sol-types = { version = "1.0.0", features = ["json"] }
 
 # OP Alloy
-op-alloy-consensus = { version = "=0.11.4", default-features = false, features = ["serde"] }
-op-alloy-flz = { version = "=0.11.4", default-features = false }
-op-alloy-rpc-types-engine = { version = "=0.11.4", default-features = false, features = ["serde"] }
+op-alloy-consensus = { version = "0.15.1", default-features = false, features = ["serde"] }
+op-alloy-rpc-types-engine = { version = "0.15.1", default-features = false, features = ["serde"] }
 
 # Kailua
 kailua-build = { path = "build/risczero" }
@@ -87,28 +88,27 @@ kailua-contracts = { path = "crates/contracts" }
 kailua-host = { path = "bin/host" }
 
 # Kona
-kona-cli = { git = "https://github.com/op-rs/kona", rev = "1d4c2fca60b75e2418239358e86b9e2e09b1035d", default-features = false }
-kona-client = { git = "https://github.com/op-rs/kona", rev = "1d4c2fca60b75e2418239358e86b9e2e09b1035d", default-features = false }
-kona-derive = { git = "https://github.com/op-rs/kona", rev = "1d4c2fca60b75e2418239358e86b9e2e09b1035d", default-features = false, features = ["serde"] }
-kona-driver = { git = "https://github.com/op-rs/kona", rev = "1d4c2fca60b75e2418239358e86b9e2e09b1035d" }
-kona-executor = { git = "https://github.com/op-rs/kona", rev = "1d4c2fca60b75e2418239358e86b9e2e09b1035d" }
-kona-genesis = { git = "https://github.com/op-rs/kona", rev = "1d4c2fca60b75e2418239358e86b9e2e09b1035d" }
-kona-host = { git = "https://github.com/op-rs/kona", rev = "1d4c2fca60b75e2418239358e86b9e2e09b1035d", default-features = false, features = ["single"] }
-kona-mpt = { git = "https://github.com/op-rs/kona", rev = "1d4c2fca60b75e2418239358e86b9e2e09b1035d", features = ["serde"] }
-kona-rpc = { git = "https://github.com/op-rs/kona", rev = "1d4c2fca60b75e2418239358e86b9e2e09b1035d" }
-kona-preimage = { git = "https://github.com/op-rs/kona", rev = "1d4c2fca60b75e2418239358e86b9e2e09b1035d", features = ["serde", "rkyv", "std"] }
-kona-proof = { git = "https://github.com/op-rs/kona", rev = "1d4c2fca60b75e2418239358e86b9e2e09b1035d" }
-kona-protocol = { git = "https://github.com/op-rs/kona", rev = "1d4c2fca60b75e2418239358e86b9e2e09b1035d" }
-kona-providers-alloy = { git = "https://github.com/op-rs/kona", rev = "1d4c2fca60b75e2418239358e86b9e2e09b1035d" }
-kona-registry = { git = "https://github.com/op-rs/kona", rev = "1d4c2fca60b75e2418239358e86b9e2e09b1035d" }
-kona-std-fpvm = { git = "https://github.com/op-rs/kona", rev = "1d4c2fca60b75e2418239358e86b9e2e09b1035d" }
+kona-cli = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b", default-features = false }
+kona-client = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b", default-features = false }
+kona-derive = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b", default-features = false, features = ["serde"] }
+kona-driver = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
+kona-executor = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
+kona-genesis = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
+kona-host = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b", default-features = false, features = ["single"] }
+kona-mpt = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b", features = ["serde"] }
+kona-rpc = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
+kona-preimage = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b", features = ["serde", "rkyv", "std"] }
+kona-proof = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
+kona-protocol = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
+kona-providers-alloy = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
+kona-registry = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
+kona-std-fpvm = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
 
 # Boundless
 bonsai-sdk = { version = "1.4.0", features = ["non_blocking"] }
 
 # RISC Zero
 risc0-build = { version = "2.1.1", features = ["unstable"] }
-risc0-ethereum-contracts = { version = "2.0.2", features = ["unstable"] }
 risc0-zkvm = { version = "2.0.2", features = ["heap-embedded-alloc", "unstable"] }
 
 [profile.dev]

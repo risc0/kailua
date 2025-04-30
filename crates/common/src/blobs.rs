@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::client::log;
-use crate::rkyv::{BlobDef, Bytes48Def};
+use crate::rkyv::kzg::{BlobDef, Bytes48Def};
 use alloy_eips::eip4844::{
     kzg_to_versioned_hash, Blob, IndexedBlobHash, BLS_MODULUS, FIELD_ELEMENTS_PER_BLOB,
 };
@@ -56,13 +56,13 @@ impl From<BlobWitnessData> for PreloadedBlobProvider {
             .into_iter()
             .map(|b| c_kzg::Blob::new(b.0))
             .collect::<Vec<_>>();
-        c_kzg::KzgProof::verify_blob_kzg_proof_batch(
-            blobs.as_slice(),
-            value.commitments.as_slice(),
-            value.proofs.as_slice(),
-            ethereum_kzg_settings(),
-        )
-        .expect("Failed to batch validate kzg proofs");
+        ethereum_kzg_settings(0)
+            .verify_blob_kzg_proof_batch(
+                blobs.as_slice(),
+                value.commitments.as_slice(),
+                value.proofs.as_slice(),
+            )
+            .expect("Failed to batch validate kzg proofs");
         let hashes = value
             .commitments
             .iter()

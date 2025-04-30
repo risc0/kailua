@@ -42,18 +42,17 @@ impl<T: BlobProvider + Send> BlobProvider for BlobWitnessProvider<T> {
         blob_hashes: &[IndexedBlobHash],
     ) -> Result<Vec<Box<Blob>>, Self::Error> {
         let blobs = self.provider.get_blobs(block_ref, blob_hashes).await?;
+        let settings = alloy::consensus::EnvKzgSettings::default();
         for blob in &blobs {
             let c_kzg_blob = c_kzg::Blob::from_bytes(blob.as_slice()).unwrap();
-            let settings = alloy::consensus::EnvKzgSettings::default();
-            let commitment =
-                c_kzg::KzgCommitment::blob_to_kzg_commitment(&c_kzg_blob, settings.get())
-                    .expect("Failed to convert blob to commitment");
-            let proof = c_kzg::KzgProof::compute_blob_kzg_proof(
-                &c_kzg_blob,
-                &commitment.to_bytes(),
-                settings.get(),
-            )
-            .unwrap();
+            let commitment = settings
+                .get()
+                .blob_to_kzg_commitment(&c_kzg_blob)
+                .expect("Failed to convert blob to commitment");
+            let proof = settings
+                .get()
+                .compute_blob_kzg_proof(&c_kzg_blob, &commitment.to_bytes())
+                .unwrap();
             let mut witness = self.witness.lock().unwrap();
             witness.blobs.push(Blob::from(*c_kzg_blob));
             witness.commitments.push(commitment.to_bytes());

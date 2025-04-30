@@ -60,19 +60,20 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
     debug!("{config:?}");
     let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
 
-    let eth_rpc_provider = ProviderBuilder::new().on_http(args.eth_rpc_url.as_str().try_into()?);
+    let eth_rpc_provider =
+        ProviderBuilder::new().connect_http(args.eth_rpc_url.as_str().try_into()?);
     // load system config
     let system_config = SystemConfig::new(config.l1_system_config_address, &eth_rpc_provider);
     let portal_address = system_config
         .optimismPortal()
         .stall_with_context(context.clone(), "SystemConfig::optimismPortal")
         .await
-        .addr_;
+        .0;
     let dgf_address = system_config
         .disputeGameFactory()
         .stall_with_context(context.clone(), "SystemConfig::disputeGameFactory")
         .await
-        .addr_;
+        .0;
 
     // report risc0 version
     println!("RISC0_VERSION: {}", risc0_zkvm::get_version()?);

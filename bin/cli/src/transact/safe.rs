@@ -19,9 +19,9 @@ use alloy::primitives::{Address, Uint, U256};
 use alloy_provider::Provider;
 use anyhow::Context;
 
-pub async fn exec_safe_txn<T, P1: Provider<N>, P2: Provider<N>, C, N: Network>(
-    txn: SolCallBuilder<T, P1, C, N>,
-    safe: &kailua_contracts::Safe::SafeInstance<(), P2, N>,
+pub async fn exec_safe_txn<P1: Provider<N>, P2: Provider<N>, C, N: Network>(
+    txn: SolCallBuilder<P1, C, N>,
+    safe: &kailua_contracts::Safe::SafeInstance<P2, N>,
     from: Address,
 ) -> anyhow::Result<()> {
     let req = txn.into_transaction_request();

@@ -125,13 +125,11 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     let portal_address = system_config
         .optimismPortal()
         .stall_with_context(context.clone(), "SystemConfig::optimismPortal")
-        .await
-        .addr_;
+        .await;
     let dgf_address = system_config
         .disputeGameFactory()
         .stall_with_context(context.clone(), "SystemConfig::disputeGameFactory")
-        .await
-        .addr_;
+        .await;
 
     // initialize owner wallet
     info!("Initializing owner wallet.");
@@ -145,7 +143,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         .txn_args
         .premium_provider::<Ethereum>()
         .wallet(&owner_wallet)
-        .on_http(args.eth_rpc_url.as_str().try_into()?);
+        .connect_http(args.eth_rpc_url.as_str().try_into()?);
 
     // Init factory contract
     let dispute_game_factory = IDisputeGameFactory::new(dgf_address, &owner_provider);
@@ -153,22 +151,19 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     let game_count = dispute_game_factory
         .gameCount()
         .stall_with_context(context.clone(), "DisputeGameFactory::gameCount")
-        .await
-        .gameCount_;
+        .await;
     info!("There have been {game_count} games created using DisputeGameFactory");
     let dispute_game_factory_ownable = OwnableUpgradeable::new(dgf_address, &owner_provider);
     let factory_owner_address = dispute_game_factory_ownable
         .owner()
         .stall_with_context(context.clone(), "DisputeGameFactory::owner")
-        .await
-        ._0;
+        .await;
     let factory_owner_safe = Safe::new(factory_owner_address, &owner_provider);
     info!("Safe({:?})", factory_owner_safe.address());
     let safe_owners = factory_owner_safe
         .getOwners()
         .stall_with_context(context.clone(), "Safe::getOwners")
-        .await
-        ._0;
+        .await;
     info!("Safe::owners({:?})", &safe_owners);
     let owner_address = owner_wallet.default_signer().address();
     if safe_owners.first().unwrap() != &owner_address {
@@ -189,7 +184,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         .txn_args
         .premium_provider::<Ethereum>()
         .wallet(&deployer_wallet)
-        .on_http(args.eth_rpc_url.as_str().try_into()?);
+        .connect_http(args.eth_rpc_url.as_str().try_into()?);
 
     // Deploy or reuse existing RISCZeroVerifier contracts
     let verifier_contract_address = match &args.verifier_contract {
@@ -248,8 +243,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         dispute_game_factory
             .gameImpls(KAILUA_GAME_TYPE)
             .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
-            .await
-            .impl_,
+            .await,
         kailua_treasury_impl_addr
     );
 
@@ -257,7 +251,6 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         .initBonds(KAILUA_GAME_TYPE)
         .stall_with_context(context.clone(), "DisputeGameFactory::initBonds")
         .await
-        .bond_
         .is_zero()
     {
         info!("Setting KailuaTreasury initialization bond value in DisputeGameFactory to zero.");
@@ -275,8 +268,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
             dispute_game_factory
                 .initBonds(KAILUA_GAME_TYPE)
                 .stall_with_context(context.clone(), "DisputeGameFactory::initBonds")
-                .await
-                .bond_,
+                .await,
             U256::ZERO
         );
     }
@@ -310,8 +302,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     let status = kailua_treasury_instance
         .status()
         .stall_with_context(context.clone(), "KailuaTreasury::status")
-        .await
-        ._0;
+        .await;
     if status == 0 {
         info!("Resolving KailuaTreasury instance");
         await_tel_res!(
@@ -348,8 +339,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         kailua_treasury_implementation
             .participationBond()
             .stall_with_context(context.clone(), "KailuaTreasury::participationBond")
-            .await
-            ._0,
+            .await,
         bond_value
     );
 
@@ -424,13 +414,12 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
             .txn_args
             .premium_provider::<Ethereum>()
             .wallet(&guardian_wallet)
-            .on_http(args.eth_rpc_url.as_str().try_into()?);
+            .connect_http(args.eth_rpc_url.as_str().try_into()?);
         let optimism_portal = OptimismPortal2::new(portal_address, &guardian_provider);
         let portal_guardian_address = optimism_portal
             .guardian()
             .stall_with_context(context.clone(), "OptimismPortal2::guardian")
-            .await
-            ._0;
+            .await;
         if portal_guardian_address != guardian_address {
             bail!("OptimismPortal2 Guardian is {portal_guardian_address}. Provided private key has account address {guardian_address}.");
         }
@@ -492,8 +481,7 @@ pub async fn deploy_verifier<P1: Provider<N>, P2: Provider<N>, N: Network>(
     let selector = groth16_verifier_contract
         .SELECTOR()
         .stall_with_context(context.clone(), "RiscZeroGroth16Verifier::SELECTOR")
-        .await
-        ._0;
+        .await;
     info!("Adding RiscZeroGroth16Verifier contract to RiscZeroVerifierRouter.");
     let receipt = verifier_contract
         .addVerifier(selector, *groth16_verifier_contract.address())

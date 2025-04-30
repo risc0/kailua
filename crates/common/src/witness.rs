@@ -16,7 +16,7 @@ use crate::blobs::BlobWitnessData;
 use crate::executor::Execution;
 use crate::journal::ProofJournal;
 use crate::oracle::vec::VecOracle;
-use crate::rkyv::{AddressDef, B256Def};
+use crate::rkyv::primitives::{AddressDef, B256Def};
 use alloy_primitives::{Address, B256};
 use kona_preimage::{CommsClient, PreimageKey};
 use kona_proof::FlushableCache;

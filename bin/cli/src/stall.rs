@@ -36,8 +36,8 @@ pub trait Stall<R> {
 }
 
 #[async_trait]
-impl<'coder, T: Sync + Send + 'static, P: Provider<N>, C: SolCall + 'static + Sync, N: Network>
-    Stall<C::Return> for SolCallBuilder<T, P, C, N>
+impl<'coder, P: Provider<N>, C: SolCall + 'static + Sync, N: Network> Stall<C::Return>
+    for SolCallBuilder<P, C, N>
 where
     EthCall<'coder, PhantomData<C>, N>: IntoFuture,
     C::Return: Send,
@@ -52,7 +52,7 @@ where
                 .into_future()
                 .with_context(context.with_span(tracer.start_with_context("call_raw", &context)))
                 .await
-                .and_then(|raw_result| self.decode_output(raw_result, true))
+                .and_then(|raw_result| self.decode_output(raw_result))
             {
                 Ok(res) => break res,
                 Err(error) => {

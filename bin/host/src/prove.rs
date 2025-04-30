@@ -162,7 +162,7 @@ pub async fn compute_fpvm_proof(
         // Require additional proof
         num_proofs += 1;
         let executed_blocks = oneshot_result.cached.stitched_executions[0].clone();
-        let starting_block = executed_blocks[0].artifacts.block_header.number - 1;
+        let starting_block = executed_blocks[0].artifacts.header.number - 1;
         let num_blocks = oneshot_result.cached.args.kona.claimed_l2_block_number - starting_block;
         let force_attempt = num_blocks == 1;
         // divide or bail out on error
@@ -193,7 +193,7 @@ pub async fn compute_fpvm_proof(
         let mid_point = starting_block + num_blocks / 2;
         let mid_exec = executed_blocks
             .iter()
-            .find(|e| e.artifacts.block_header.number == mid_point)
+            .find(|e| e.artifacts.header.number == mid_point)
             .expect("Failed to find the midpoint of execution.");
         let mid_output = mid_exec.claimed_output;
 
@@ -217,7 +217,7 @@ pub async fn compute_fpvm_proof(
         // upper half workload starts after midpoint
         let mut upper_job_args = oneshot_result.cached.args;
         upper_job_args.kona.agreed_l2_output_root = mid_output;
-        upper_job_args.kona.agreed_l2_head_hash = mid_exec.artifacts.block_header.hash();
+        upper_job_args.kona.agreed_l2_head_hash = mid_exec.artifacts.header.hash();
         task_sender
             .send(Oneshot {
                 cached_task: create_cached_execution_task(
@@ -285,7 +285,7 @@ pub fn create_cached_execution_task(
         .find(|e| e.agreed_output == args.kona.agreed_l2_output_root)
         .expect("Failed to find the first execution.")
         .artifacts
-        .block_header
+        .header
         .number
         - 1;
     let num_blocks = args.kona.claimed_l2_block_number - starting_block;
@@ -297,7 +297,7 @@ pub fn create_cached_execution_task(
     let executed_blocks = execution_cache
         .iter()
         .filter(|e| {
-            let executed_block_number = e.artifacts.block_header.number;
+            let executed_block_number = e.artifacts.header.number;
 
             starting_block < executed_block_number
                 && executed_block_number <= args.kona.claimed_l2_block_number
