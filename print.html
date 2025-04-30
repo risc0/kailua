@@ -825,7 +825,7 @@ If the command does not yet support your configuration, you'll need to follow th
 <tr><td style="text-align: left">RiscZeroGroth16Verifier</td><td style="text-align: left">deploy</td><td style="text-align: right">1,300K</td><td></td></tr>
 <tr><td style="text-align: left">RiscZeroMockVerifier</td><td style="text-align: left">deploy</td><td style="text-align: right">615K</td><td></td></tr>
 <tr><td style="text-align: left">KailuaTreasury</td><td style="text-align: left">deploy</td><td style="text-align: right">5,200K</td><td></td></tr>
-<tr><td style="text-align: left">KailuaTreasury</td><td style="text-align: left">propose</td><td style="text-align: right">420K</td><td></td></tr>
+<tr><td style="text-align: left">KailuaTreasury</td><td style="text-align: left">propose</td><td style="text-align: right">400K</td><td>1 blob</td></tr>
 <tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">deploy</td><td style="text-align: right">5,000K</td><td></td></tr>
 <tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">proveValidity</td><td style="text-align: right">375K</td><td>Groth16 proof</td></tr>
 <tr><td style="text-align: left">KailuaGame</td><td style="text-align: left">proveOutputFault</td><td style="text-align: right">415K</td><td>Groth16 + 1 KZG proofs</td></tr>
@@ -1653,7 +1653,10 @@ It also attempts to resolve any finalizeable proposals.</p>
   --op-geth-url [YOUR_OP_GETH_URL] \
   --op-node-url [YOUR_OP_NODE_URL] \
   --data-dir [YOUR_PROPOSER_DATA_CACHE_PATH] \
-  --proposer-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY]
+  --proposer-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY] \
+  --txn-timeout [YOUR_TRANSACTION_TIMEOUT_SECONDS] \
+  --exec-gas-premium [YOUR_EXECUTION_GAS_PREMIUM_PERCENTAGE] \
+  --blob-gas-premium [YOUR_BLOB_GAS_PREMIUM_PERCENTAGE]
 </code></pre>
 <div id="admonition-tip" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-title">
 <div class="admonition-title">
@@ -1712,6 +1715,14 @@ This allows it to restart quickly without requesting a lot of old on-chain data 
 You must keep your proposer's wallet well funded to guarantee the safety and liveness of your rollup.</p>
 </div>
 </div>
+<h3 id="transactions"><a class="header" href="#transactions">Transactions</a></h3>
+<p>You can control transaction publication through the three following parameters:</p>
+<ul>
+<li><code>txn-timeout</code>: A timeout in seconds for transaction broadcast (default 120)</li>
+<li><code>exec-gas-premium</code>: An added premium percentage to estimated execution gas fees (Default 25)</li>
+<li><code>blob-gas-premium</code>: An added premium percentage to estimated blob gas fees (Default 25).</li>
+</ul>
+<p>The premium parameters increase the internally estimated fees by the specified percentage.</p>
 <h3 id="upgrades"><a class="header" href="#upgrades">Upgrades</a></h3>
 <p>If you re-deploy the KailuaTreasury/KailuaGame contracts to upgrade your fault proof system, you will need to restart
 your proposer (and validator).
@@ -1779,7 +1790,9 @@ Node software other than <code>op-geth</code> is not as reliable for the necessa
   --op-node-url [YOUR_OP_NODE_URL] \
   --kailua-host [YOUR_KAILUA_HOST_BINARY_PATH] \
   --validator-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY] \
-  --payout-recipient-address [YOUR_FAULT_PROOF_PAYOUT_RECIPIENT]
+  --payout-recipient-address [YOUR_FAULT_PROOF_PAYOUT_RECIPIENT] \
+  --txn-timeout [YOUR_TRANSACTION_TIMEOUT_SECONDS] \
+  --exec-gas-premium [YOUR_EXECUTION_GAS_PREMIUM_PERCENTAGE]
 </code></pre>
 <div id="admonition-tip" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-title">
 <div class="admonition-title">
@@ -1846,6 +1859,13 @@ from delaying the finality of honest sequencing proposals.</p>
 <p>Running <code>kailua-cli validate</code> should monitor your rollup for any disputes and generate the required proofs!</p>
 </div>
 </div>
+<h3 id="transactions-1"><a class="header" href="#transactions-1">Transactions</a></h3>
+<p>You can control transaction publication through the two following parameters:</p>
+<ul>
+<li><code>txn-timeout</code>: A timeout in seconds for transaction broadcast (default 120)</li>
+<li><code>exec-gas-premium</code>: An added premium percentage to estimated execution gas fees (Default 25)</li>
+</ul>
+<p>The premium parameter increases the internally estimated fees by the specified percentage.</p>
 <h3 id="upgrades-1"><a class="header" href="#upgrades-1">Upgrades</a></h3>
 <p>If you re-deploy the KailuaTreasury/KailuaGame contracts to upgrade your fault proof system, you will need to restart
 your validator (and proposer).
