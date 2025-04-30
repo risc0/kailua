@@ -107,9 +107,9 @@ kona-std-fpvm = { git = "https://github.com/op-rs/kona", rev = "1d4c2fca60b75e24
 bonsai-sdk = { version = "1.4.0", features = ["non_blocking"] }
 
 # RISC Zero
-risc0-build = { version = "2.1.0", features = ["unstable"] }
-risc0-ethereum-contracts = { git = "https://github.com/risc0/risc0-ethereum", tag = "v2.0.2", features = ["unstable"] }
-risc0-zkvm = { version = "2.0.1", features = ["heap-embedded-alloc", "unstable"] }
+risc0-build = { version = "2.1.1", features = ["unstable"] }
+risc0-ethereum-contracts = { version = "2.0.2", features = ["unstable"] }
+risc0-zkvm = { version = "2.0.2", features = ["heap-embedded-alloc", "unstable"] }
 
 [profile.dev]
 opt-level = 3
