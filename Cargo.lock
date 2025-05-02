@@ -4515,7 +4515,7 @@ dependencies = [
 
 [[package]]
 name = "kailua-build"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "risc0-build",
 ]
@@ -4615,7 +4615,7 @@ dependencies = [
 
 [[package]]
 name = "kailua-common"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 0.15.6",
