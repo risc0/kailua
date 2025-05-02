@@ -69,3 +69,8 @@ disable-dev-mode = [
 rebuild-fpvm = [
     "kailua-build/rebuild-fpvm"
 ]
+eigen-da = [
+    "kailua-build/eigen-da",
+    "kailua-client/eigen-da",
+    "kailua-common/eigen-da"
+]

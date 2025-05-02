@@ -111,6 +111,15 @@ bonsai-sdk = { version = "1.4.0", features = ["non_blocking"] }
 risc0-build = { version = "2.1.1", features = ["unstable"] }
 risc0-zkvm = { version = "2.0.2", features = ["heap-embedded-alloc", "unstable"] }
 
+# Hokulea
+ark-bn254 = { version = "0.5.0", default-features = false }
+ark-ff = { version = "0.5.0", default-features = false }
+eigenda-v2-struct = { git = "https://github.com/Layr-Labs/hokulea", rev = "593d2f67ef34a157868edea679980ab998f2f4c5" }
+rust-kzg-bn254-primitives = { version = "0.1.2", default-features = false }
+rust-kzg-bn254-verifier = { version = "0.1.2", default-features = false }
+rust-kzg-bn254-prover = { version = "0.1.1", default-features = false }
+
+
 [profile.dev]
 opt-level = 3
 

@@ -24,6 +24,8 @@ devnet-build +ARGS="-F devnet -F prove": (build ARGS)
 
 devnet-build-fpvm +ARGS="-F devnet -F prove -F rebuild-fpvm": (build ARGS)
 
+devnet-build-fpvm-eigen +ARGS="-F devnet -F prove -F rebuild-fpvm -F eigen-da": (build ARGS)
+
 devnet-up:
   make -C optimism devnet-up > devnet.log
 

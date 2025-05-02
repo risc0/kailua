@@ -20,6 +20,7 @@ use crate::precondition;
 use alloy_op_evm::OpEvmFactory;
 use alloy_primitives::{Sealed, B256};
 use anyhow::{bail, Context};
+use kona_derive::prelude::EthereumDataSource;
 use kona_derive::traits::BlobProvider;
 use kona_driver::{Driver, Executor};
 use kona_executor::TrieDBProvider;
@@ -184,7 +185,7 @@ where
             rollup_config.clone(),
             cursor.clone(),
             oracle.clone(),
-            beacon,
+            EthereumDataSource::new_from_parts(l1_provider.clone(), beacon, &rollup_config),
             l1_provider.clone(),
             l2_provider.clone(),
         )

@@ -17,6 +17,7 @@ risc0-build.workspace = true
 methods = ["fpvm"]
 
 [features]
+eigen-da = []
 debug-guest-build = []
 disable-dev-mode = []
 rebuild-fpvm = []

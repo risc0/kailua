@@ -15,6 +15,8 @@
 pub mod blobs;
 pub mod client;
 pub mod config;
+#[cfg(feature = "eigen-da")]
+pub mod eigenda;
 pub mod executor;
 pub mod journal;
 pub mod kona;

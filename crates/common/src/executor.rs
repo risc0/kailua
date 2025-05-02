@@ -14,9 +14,9 @@
 
 use crate::client::log;
 use crate::config::safe_default;
+use crate::rkyv::kona::BlockBuildingOutcomeRkyv;
 use crate::rkyv::optimism::OpPayloadAttributesRkyv;
 use crate::rkyv::primitives::B256Def;
-use crate::rkyv::BlockBuildingOutcomeRkyv;
 use alloy_consensus::Header;
 use alloy_eips::eip4895::Withdrawal;
 use alloy_eips::Encodable2718;

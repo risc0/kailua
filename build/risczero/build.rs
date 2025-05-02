@@ -48,6 +48,13 @@ fn main() {
                     opts.features.push(String::from("disable-dev-mode"));
                     opts
                 };
+                // Enable eigen-da feature
+                #[cfg(feature = "eigen-da")]
+                let opts = {
+                    let mut opts = opts;
+                    opts.features.push(String::from("eigen-da"));
+                    opts
+                };
                 opts
             })])
         };

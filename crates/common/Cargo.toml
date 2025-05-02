@@ -10,6 +10,15 @@ repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+[features]
+eigen-da = [
+    "dep:ark-bn254",
+    "dep:ark-ff",
+    "dep:eigenda-v2-struct",
+    "dep:rust-kzg-bn254-primitives",
+    "dep:rust-kzg-bn254-verifier"
+]
+
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
@@ -22,6 +31,9 @@ lru.workspace = true
 pot.workspace = true
 rkyv.workspace = true
 spin.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
 
 alloy-consensus.workspace = true
 alloy-eips.workspace = true
@@ -47,5 +59,8 @@ kona-protocol.workspace = true
 
 risc0-zkvm.workspace = true
 
-serde.workspace = true
-tracing.workspace = true
+ark-bn254 = { workspace = true, optional = true }
+ark-ff = { workspace = true, optional = true }
+eigenda-v2-struct = { workspace = true, optional = true }
+rust-kzg-bn254-primitives = { workspace = true, optional = true }
+rust-kzg-bn254-verifier = { workspace = true, optional = true }
