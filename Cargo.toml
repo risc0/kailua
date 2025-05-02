@@ -88,21 +88,21 @@ kailua-contracts = { path = "crates/contracts" }
 kailua-host = { path = "bin/host" }
 
 # Kona
-kona-cli = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b", default-features = false }
-kona-client = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b", default-features = false }
-kona-derive = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b", default-features = false, features = ["serde"] }
-kona-driver = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
-kona-executor = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
-kona-genesis = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
-kona-host = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b", default-features = false, features = ["single"] }
-kona-mpt = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b", features = ["serde"] }
-kona-rpc = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
-kona-preimage = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b", features = ["serde", "rkyv", "std"] }
-kona-proof = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
-kona-protocol = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
-kona-providers-alloy = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
-kona-registry = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
-kona-std-fpvm = { git = "https://github.com/op-rs/kona", rev = "f9c03f220640d89a0019066c36ff620fd6f3112b" }
+kona-cli = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0", default-features = false }
+kona-client = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0", default-features = false }
+kona-derive = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0", default-features = false, features = ["serde"] }
+kona-driver = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
+kona-executor = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
+kona-genesis = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
+kona-host = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0", default-features = false, features = ["single"] }
+kona-mpt = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0", features = ["serde"] }
+kona-rpc = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
+kona-preimage = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0", features = ["serde", "rkyv", "std"] }
+kona-proof = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
+kona-protocol = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
+kona-providers-alloy = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
+kona-registry = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
+kona-std-fpvm = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
 
 # Boundless
 bonsai-sdk = { version = "1.4.0", features = ["non_blocking"] }

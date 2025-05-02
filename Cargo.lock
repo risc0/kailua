@@ -4721,7 +4721,7 @@ dependencies = [
 [[package]]
 name = "kona-cli"
 version = "0.2.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#1d4c2fca60b75e2418239358e86b9e2e09b1035d"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "clap",
  "libc",
@@ -4732,8 +4732,8 @@ dependencies = [
 
 [[package]]
 name = "kona-client"
-version = "0.1.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+version = "1.0.0"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 0.15.6",
@@ -4772,7 +4772,7 @@ dependencies = [
 [[package]]
 name = "kona-derive"
 version = "0.3.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 0.15.6",
@@ -4792,7 +4792,7 @@ dependencies = [
 [[package]]
 name = "kona-driver"
 version = "0.3.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloy-consensus",
  "alloy-evm",
@@ -4814,7 +4814,7 @@ dependencies = [
 [[package]]
 name = "kona-executor"
 version = "0.3.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 0.15.6",
@@ -4838,7 +4838,7 @@ dependencies = [
 [[package]]
 name = "kona-genesis"
 version = "0.3.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 0.15.6",
@@ -4857,7 +4857,7 @@ dependencies = [
 [[package]]
 name = "kona-hardforks"
 version = "0.3.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloy-eips 0.15.6",
  "alloy-primitives 1.0.0",
@@ -4867,8 +4867,8 @@ dependencies = [
 
 [[package]]
 name = "kona-host"
-version = "0.1.1"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+version = "1.0.0"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 0.15.6",
@@ -4917,7 +4917,7 @@ dependencies = [
 [[package]]
 name = "kona-interop"
 version = "0.3.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 0.15.6",
@@ -4938,7 +4938,7 @@ dependencies = [
 [[package]]
 name = "kona-mpt"
 version = "0.2.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloy-primitives 1.0.0",
  "alloy-rlp",
@@ -4951,7 +4951,7 @@ dependencies = [
 [[package]]
 name = "kona-preimage"
 version = "0.3.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloy-primitives 1.0.0",
  "async-channel",
@@ -4965,7 +4965,7 @@ dependencies = [
 [[package]]
 name = "kona-proof"
 version = "0.3.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 0.15.6",
@@ -5002,7 +5002,7 @@ dependencies = [
 [[package]]
 name = "kona-proof-interop"
 version = "0.2.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 0.15.6",
@@ -5031,7 +5031,7 @@ dependencies = [
 [[package]]
 name = "kona-protocol"
 version = "0.3.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloc-no-stdlib",
  "alloy-consensus",
@@ -5059,7 +5059,7 @@ dependencies = [
 [[package]]
 name = "kona-providers-alloy"
 version = "0.2.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloy-consensus",
  "alloy-eips 0.15.6",
@@ -5089,7 +5089,7 @@ dependencies = [
 [[package]]
 name = "kona-registry"
 version = "0.3.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloy-chains",
  "alloy-primitives 1.0.0",
@@ -5103,7 +5103,7 @@ dependencies = [
 [[package]]
 name = "kona-rpc"
 version = "0.2.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloy-eips 0.15.6",
  "alloy-primitives 1.0.0",
@@ -5117,7 +5117,7 @@ dependencies = [
 [[package]]
 name = "kona-serde"
 version = "0.2.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "alloy-primitives 1.0.0",
  "serde",
@@ -5127,7 +5127,7 @@ dependencies = [
 [[package]]
 name = "kona-std-fpvm"
 version = "0.2.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "async-trait",
  "buddy_system_allocator",
@@ -5139,7 +5139,7 @@ dependencies = [
 [[package]]
 name = "kona-std-fpvm-proc"
 version = "0.2.0"
-source = "git+https://github.com/op-rs/kona?rev=f9c03f220640d89a0019066c36ff620fd6f3112b#f9c03f220640d89a0019066c36ff620fd6f3112b"
+source = "git+https://github.com/op-rs/kona?tag=kona-client%2Fv1.0.0#a1172e46a743c63c9f0a0f13a444144e38d29355"
 dependencies = [
  "cfg-if",
  "kona-std-fpvm",
@@ -5592,9 +5592,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-exporter-prometheus"
-version = "0.16.2"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd7399781913e5393588a8d8c6a2867bf85fb38eaf2502fdce465aad2dc6f034"
+checksum = "df88858cd28baaaf2cfc894e37789ed4184be0e1351157aec7bf3c2266c793fd"
 dependencies = [
  "base64 0.22.1",
  "http-body-util",
@@ -5605,7 +5605,7 @@ dependencies = [
  "metrics",
  "metrics-util",
  "quanta",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tokio",
  "tracing",
 ]
