@@ -34,8 +34,58 @@ use std::sync::{Arc, Mutex};
 pub mod stateless;
 pub mod stitching;
 
-/// Executes the Kona client to compute a list of subsequent outputs.
-/// Modified to validate the Kailua Fault/Validity/Execution preconditions.
+/// Runs the Kailua client to process rollup operations, including block derivation,
+/// precondition validation, safe head fetching, execution caching, and pipeline execution.
+///
+/// # Type Parameters
+/// * `O` - Represents a communication client implementing `CommsClient` and `FlushableCache`.
+/// * `B` - Represents a blob provider implementing `BlobProvider`.
+///
+/// # Arguments
+/// * `precondition_validation_data_hash` - A 256-bit hash used for precondition validation.
+/// * `oracle` - An atomic reference-counted (`Arc`) wrapper around the communication client.
+/// * `stream` - An atomic reference-counted (`Arc`) wrapper around the communication stream client.
+/// * `beacon` - An instance of the blob provider, cloning a data source for beacon usage.
+/// * `execution_cache` - A vector of cached executions.
+/// * `collection_target` - An optional, thread-safe, target to dump uncached executions.
+///
+/// # Returns
+/// Returns a result containing a tuple (`BootInfo`, `B256`) upon success, or an error of type `anyhow::Error`.
+///
+/// `BootInfo` contains essential configuration information for bootstrapping the rollup client.
+/// `B256` represents a 256-bit hash of the results or preconditions, dependent on the actions performed.
+///
+/// # Errors
+/// This function can return an error in any of the following cases:
+/// * Failure to load `BootInfo`.
+/// * Invalid `claimed_l2_block_number` value compared to the safe L2 head number.
+/// * Assertion failures during execution trace validation, block derivations, and outputs validation.
+/// * Insufficient L1 data to derive L2 output roots for the claimed block height.
+///
+/// # Workflow
+///
+/// ## 1. Bootstrapping & Safe Head Validation
+/// - Loads `BootInfo` from the oracle.
+/// - Fetches the safe head hash and constructs chain providers for both L1 and L2.
+/// - Validates that the claimed L2 block number is greater than or equal to the L2 safe head.
+///
+/// ## 2. Execution Caching
+/// - If the L1 head is a zero hash, the function operates in "execution only" mode:
+///     - Initializes the execution cursor and uses a `KonaExecutor` for execution validation.
+///     - Validates the consistency of execution traces against the expected results derived from `execution_cache`.
+///
+/// ## 3. Derivation and Execution
+/// - Loads precondition data based on the provided hash, if any.
+/// - Initializes the pipeline cursor and an `OraclePipeline`.
+/// - Combines execution caching with pipeline-driven iteration to derive L2 outputs incrementally until the claimed L2 height:
+///     - Validates outputs, ensuring sufficient L1 data exists for subsequent derivations.
+///     - Adjusts the executor state for consecutive computation and output production.
+///     - Logs the progress and appends derived output roots.
+///
+/// ## 4. Final Validation & Output
+/// - Verifies the computed outputs:
+///     - Ensures the final output hash matches the claimed L2 output root.
+///     - Handles insufficient data to derive output roots by returning a matching zero hash.
 pub fn run_kailua_client<
     O: CommsClient + FlushableCache + Send + Sync + Debug,
     B: BlobProvider + Send + Sync + Debug + Clone,
@@ -298,6 +348,16 @@ where
         .map_err(OracleProviderError::SliceConversion)
 }
 
+/// Logs a given message under different logging mechanisms based on the target operating system.
+///
+/// # Parameters
+/// - `msg`: A string slice representing the message to be logged.
+///
+/// # Platform-specific Behavior
+/// - On a `zkvm` target operating system:
+///   - Logs the message using the RISC Zero zkVM environment's logging mechanism (`risc0_zkvm::guest::env::log`).
+/// - On other target operating systems:
+///   - Logs the message using the `tracing` crate's `info!` macro.
 pub fn log(msg: &str) {
     #[cfg(target_os = "zkvm")]
     risc0_zkvm::guest::env::log(msg);

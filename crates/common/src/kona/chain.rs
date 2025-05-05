@@ -73,6 +73,32 @@ impl<T: CommsClient> OracleL1ChainProvider<T> {
 impl<T: CommsClient + Sync + Send> ChainProvider for OracleL1ChainProvider<T> {
     type Error = OracleProviderError;
 
+    /// Retrieves and returns a block header by its hash.
+    ///
+    /// This function attempts to retrieve a block header by its hash (`hash`),
+    /// prioritizing locally cached headers to minimize the need for external requests.
+    /// If the header is not found in the cache, it fetches the data using the
+    /// connected oracle.
+    ///
+    /// # Parameters
+    /// - `hash`: The hash (`[u8; 32]` format, wrapped in `B256`) identifying the block header.
+    ///
+    /// # Returns
+    /// - `Ok(Header)`: The successfully retrieved and decoded block header.
+    /// - `Err(Self::Error)`: An error that occurred during the retrieval or decoding process.
+    ///
+    /// # Process
+    /// 1. Check if the header is cached in `self.headers_map`. If found, it is fetched
+    ///    from local storage, unsealed, and returned.
+    /// 2. If not cached, the function sends a request (using a `HintType`) for the
+    ///    header data via the oracle.
+    /// 3. Retrieves the header's RLP data from the oracle using `PreimageKey::new_keccak256`.
+    /// 4. Decodes the RLP-encoded header into a `Header` structure.
+    /// 5. Returns the decoded `Header` or an error if decoding fails.
+    ///
+    /// # Errors
+    /// - Returns a `Self::Error` if the oracle request, response retrieval, or
+    ///   RLP decoding fails.
     async fn header_by_hash(&mut self, hash: B256) -> Result<Header, Self::Error> {
         // Use cached headers
         if let Some(index) = self.headers_map.get(&hash) {
@@ -90,6 +116,41 @@ impl<T: CommsClient + Sync + Send> ChainProvider for OracleL1ChainProvider<T> {
         Header::decode(&mut header_rlp.as_slice()).map_err(OracleProviderError::Rlp)
     }
 
+    /// Retrieves block information for a specific block number asynchronously.
+    ///
+    /// This function attempts to retrieve information about a block specified by its number. It works
+    /// by navigating the blockchain headers stored in memory, accessing the required block's details,
+    /// and constructing a `BlockInfo` structure with relevant data such as hash, number, parent hash,
+    /// and timestamp.
+    ///
+    /// # Arguments
+    /// * `block_number` - A `u64` representing the block number whose information is being retrieved.
+    ///
+    /// # Returns
+    /// Returns a `Result` which:
+    /// - On success, contains a `BlockInfo` struct with the requested block's details.
+    /// - On failure, contains an error of type `Self::Error`, such as `OracleProviderError`.
+    ///
+    /// # Errors
+    /// - Returns `OracleProviderError::BlockNumberPastHead` if the requested `block_number` is greater
+    ///   than the number of the current "head" block.
+    /// - Returns other errors propagated from asynchronous operations such as fetching a header based
+    ///   on its hash.
+    ///
+    /// # Behavior
+    /// 1. First, checks if the block number is greater than the head block's number. If true,
+    ///    returns an error.
+    /// 2. Calculates the index of the requested block in the local header cache.
+    /// 3. Iteratively walks back through cached blockchain headers if the desired block is not yet
+    ///    cached, fetching additional parent headers as needed via `header_by_hash`.
+    /// 4. Constructs and returns a `BlockInfo` struct containing the required block's hash, number,
+    ///    parent hash, and timestamp.
+    ///
+    /// # Notes
+    /// - This method assumes the blockchain headers are stored in a specific order within the `headers`
+    ///   field, where `headers[0]` represents the latest (head) block.
+    /// - The `header_by_hash` function is invoked to fetch missing headers based on their hash when
+    ///   traversing backward through the chain.
     async fn block_info_by_number(&mut self, block_number: u64) -> Result<BlockInfo, Self::Error> {
         // Check if the block number is in range. If not, we can fail early.
         if block_number > self.headers[0].number {

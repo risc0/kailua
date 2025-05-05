@@ -41,7 +41,7 @@ use kailua_common::blobs::hash_to_fe;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::config::config_hash;
 use kailua_common::journal::ProofJournal;
-use kailua_common::precondition::{equivalence_precondition_hash, PreconditionValidationData};
+use kailua_common::precondition::{validity_precondition_hash, PreconditionValidationData};
 use kailua_contracts::*;
 use kailua_host::channel::AsyncChannel;
 use kailua_host::config::fetch_rollup_config;
@@ -715,7 +715,7 @@ pub async fn handle_proposals(
                     } else {
                         info!("Blobs hash {} confirmed", contract_blobs_hash);
                     }
-                    let precondition_hash = equivalence_precondition_hash(
+                    let precondition_hash = validity_precondition_hash(
                         &parent.output_block_number,
                         &kailua_db.config.proposal_output_count,
                         &kailua_db.config.output_block_span,

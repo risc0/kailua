@@ -19,9 +19,10 @@ use kona_proof::BootInfo;
 use risc0_zkvm::Receipt;
 use serde::{Deserialize, Serialize};
 
+/// Represents a (provable) state transition of a rollup ledger.
 #[derive(PartialEq, Eq, Ord, PartialOrd, Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct ProofJournal {
-    /// The recipient address for the payout
+    /// The recipient address for the proof payout
     pub payout_recipient: Address,
     /// The hash of the precondition for validating this proof
     pub precondition_hash: B256,
@@ -40,6 +41,7 @@ pub struct ProofJournal {
 }
 
 impl ProofJournal {
+    /// Constructs a new stand-alone instance.
     pub fn new(
         fpvm_image_id: B256,
         payout_recipient: Address,
@@ -58,27 +60,47 @@ impl ProofJournal {
         }
     }
 
+    /// Constructs a new intance used for stitching separate continuous journals together.
     pub fn new_stitched(
         fpvm_image_id: B256,
         payout_recipient: Address,
         precondition_output: B256,
         config_hash: B256,
-        boot_info: &StitchedBootInfo,
+        stitched_boot_info: &StitchedBootInfo,
     ) -> Self {
         Self {
             fpvm_image_id,
             payout_recipient,
             precondition_hash: precondition_output,
-            l1_head: boot_info.l1_head,
-            agreed_l2_output_root: boot_info.agreed_l2_output_root,
-            claimed_l2_output_root: boot_info.claimed_l2_output_root,
-            claimed_l2_block_number: boot_info.claimed_l2_block_number,
+            l1_head: stitched_boot_info.l1_head,
+            agreed_l2_output_root: stitched_boot_info.agreed_l2_output_root,
+            claimed_l2_output_root: stitched_boot_info.claimed_l2_output_root,
+            claimed_l2_block_number: stitched_boot_info.claimed_l2_block_number,
             config_hash,
         }
     }
 }
 
 impl ProofJournal {
+    /// This function concatenates the fields of the struct into a contiguous byte vector
+    /// to create a packed representation of the data. Each field is converted or sliced into
+    /// a byte representation, and then the resulting slices are concatenated.
+    ///
+    /// ### Returns:
+    /// - A `Vec<u8>` containing the concatenated byte representation of the included fields.
+    ///
+    /// ### Notes:
+    /// - The method relies on the assumption that all involved fields have compatible
+    ///   byte slice representations.
+    /// - Ensure the individual lengths of fields do not exceed the intended size constraint
+    ///   for the packed data.
+    ///
+    /// ### Performance:
+    /// - This method performs a single allocation for the concatenated byte vector
+    ///   and avoids intermediate allocations for individual slices.
+    ///
+    /// ### Usage:
+    /// - Useful when creating a compact serialization for network transmission or cryptographic operations.
     pub fn encode_packed(&self) -> Vec<u8> {
         [
             self.payout_recipient.as_slice(),
@@ -93,6 +115,41 @@ impl ProofJournal {
         .concat()
     }
 
+    /// Decodes a byte slice representing a packed `ProofJournal` structure into its constituent fields.
+    ///
+    /// The method extracts fixed-width byte segments from the provided input slice, interprets them
+    /// as the respective fields of `ProofJournal`, and validates the integrity of the input.
+    ///
+    /// # Arguments
+    ///
+    /// * `encoded` - A byte slice containing the serialized representation of the `ProofJournal` fields in order.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Self)` - A successfully decoded `ProofJournal` instance when the input is valid.
+    /// * `Err(anyhow::Error)` - An error indicating a failure to decode or validate the input.
+    ///
+    /// # Expected Encoding Layout
+    ///
+    /// The `encoded` byte slice is expected to follow this layout:
+    ///
+    /// - Bytes `[0..20]`: `payout_recipient` (20 bytes)
+    /// - Bytes `[20..52]`: `precondition_hash` (32 bytes)
+    /// - Bytes `[52..84]`: `l1_head` (32 bytes)
+    /// - Bytes `[84..116]`: `agreed_l2_output_root` (32 bytes)
+    /// - Bytes `[116..148]`: `claimed_l2_output_root` (32 bytes)
+    /// - Bytes `[148..156]`: `claimed_l2_block_number` (8 bytes - `u64` in big-endian format)
+    /// - Bytes `[156..188]`: `config_hash` (32 bytes)
+    /// - Bytes `[188..220]`: `fpvm_image_id` (32 bytes)
+    ///
+    /// # Errors
+    ///
+    /// This method returns errors in the following cases:
+    /// 1. The slice is too short to extract the required fields.
+    /// 2. Conversion operations (`try_into`) on the byte segments fail due to mismatched lengths.
+    /// 3. Context-specific decoding errors such as invalid values in certain fields.
+    ///
+    /// Each error includes a context string describing the field that caused the failure.
     pub fn decode_packed(encoded: &[u8]) -> Result<Self, anyhow::Error> {
         Ok(ProofJournal {
             payout_recipient: encoded[..20].try_into().context("payout_recipient")?,
@@ -116,6 +173,21 @@ impl ProofJournal {
 }
 
 impl From<&Receipt> for ProofJournal {
+    /// Converts a `Receipt` reference into the implementing type by decoding its packed journal.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - A reference to a `Receipt` object. The function uses the `journal` field of the `Receipt`
+    ///   to decode and derive the desired type.
+    ///
+    /// # Returns
+    ///
+    /// The decoded type, obtained by unpacking the journal field of the given `Receipt`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the decoding of the packed journal fails. Ensure that the `journal`
+    /// field in the `Receipt` contains valid encoded data before calling this method.
     fn from(value: &Receipt) -> Self {
         Self::decode_packed(value.journal.as_ref()).unwrap()
     }

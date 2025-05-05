@@ -23,6 +23,41 @@ pub const CONTROL_ROOT: B256 =
 pub const BN254_CONTROL_ID: B256 =
     b256!("04446e66d300eb7fb45c9726bb53c793dda407a62e9601618bb43c5c14657ac0");
 
+/// Returns a value based on the provided `Option` and a default value, with safety checks.
+///
+/// This function takes an optional value `opt` and a default value `default`.
+/// If `opt` contains a value, it checks whether it is equal to the default value.
+/// If they are equal, an error is returned indicating an unsafe condition.
+/// Otherwise, the value inside `opt` is returned. If `opt` is `None`, the default value is returned.
+///
+/// # Type Parameters
+/// - `V`: The type of the values, which must implement the `Debug` and `Eq` traits.
+///
+/// # Arguments
+/// - `opt`: An `Option<V>` which may or may not contain a value.
+/// - `default`: A default value of type `V` to use if `opt` is `None`.
+///
+/// # Returns
+/// - `Ok(V)`: The value inside `opt` if it is present and not equal to the default value,
+///   or the `default` value if `opt` is `None`.
+/// - `Err(anyhow::Error)`: An error if `opt` contains a value that is equal to `default`.
+///
+/// # Errors
+/// Returns an `anyhow::Error` if the optional value is present and equal to the default value.
+///
+/// # Examples
+/// ```
+/// use anyhow::Result;
+///
+/// let value = safe_default(Some(42), 0);
+/// assert_eq!(value.unwrap(), 42);
+///
+/// let value = safe_default(None, 100);
+/// assert_eq!(value.unwrap(), 100);
+///
+/// let err = safe_default(Some(10), 10);
+/// assert!(err.is_err());
+/// ```
 pub fn safe_default<V: Debug + Eq>(opt: Option<V>, default: V) -> anyhow::Result<V> {
     if let Some(v) = opt {
         if v == default {
@@ -34,8 +69,47 @@ pub fn safe_default<V: Debug + Eq>(opt: Option<V>, default: V) -> anyhow::Result
     }
 }
 
+/// Computes the hash of a RollupConfig, which summarizes various rollup configuration settings
+/// into a single 32-byte hash value. This function utilizes components from the RollupConfig
+/// struct, including genesis properties, system configuration details, and hardfork timings.
+///
+/// The hash is computed by serializing the relevant fields of RollupConfig and its sub-structures
+/// into a contiguous byte array, then hashing the result using the SHA-256 algorithm.
+///
+/// # Arguments
+///
+/// * `rollup_config` - A reference to the `RollupConfig` struct, containing all configuration
+///   parameters for a rollup.
+///
+/// # Returns
+///
+/// * `anyhow::Result<[u8; 32]>` - On success, returns a 32-byte array representing the hash of
+///   the rollup configuration. If errors are encountered during field processing or conversions,
+///   an error wrapped in `anyhow::Error` is returned.
+///
+/// # Errors
+///
+/// The function may return an error in the following scenarios:
+/// * Parsing errors from the `safe_default` utility while processing optional fields, such as
+///   `base_fee_scalar`, `blob_base_fee_scalar`, etc.
+/// * Conversion failures when converting slices or numbers to their byte representations.
+///
+/// # Behavior
+///
+/// 1. Computes a `system_config_hash` from the system configuration settings in `rollup_config.genesis`.
+///    If the system configuration is absent, a default zeroed 32-byte array is used.
+/// 2. Serializes various fields of `RollupConfig`, including genesis information, block time settings,
+///    protocol parameters, hardfork timings, and address-specific fields. These fields are concatenated
+///    into a single byte array.
+/// 3. The resulting byte array is hashed using SHA-256 to produce a 32-byte digest.
+/// 4. Returns the computed hash if all operations succeed.
+///
+/// # Notes
+///
+/// * `safe_default` is used extensively to provide fallback values for optional configuration
+///   fields, ensuring robust handling of missing or invalid data.
+/// * All numeric values are serialized in big-endian format for consistency.
 pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
-    // todo: check whether we need to include this, or if it is loaded from the config address
     let system_config_hash: [u8; 32] = rollup_config
         .genesis
         .system_config
