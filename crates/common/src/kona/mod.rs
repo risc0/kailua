@@ -13,5 +13,3 @@
 // limitations under the License.
 
 pub mod chain;
-pub mod pipeline;
-pub mod sync;

@@ -24,12 +24,12 @@ use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 ///
 /// # Parameters
 /// - `key_type`: A reference to a `PreimageKeyType` enum variant that specifies the type of key
-/// involved.
+///   involved.
 ///
 /// # Returns
 /// - `true` if the `key_type` requires validation.
 /// - `false` if the `key_type` is either `PreimageKeyType::Local` or `PreimageKeyType::GlobalGeneric`,
-/// as these types do not require validation.
+///   as these types do not require validation.
 pub fn needs_validation(key_type: &PreimageKeyType) -> bool {
     !matches!(
         key_type,

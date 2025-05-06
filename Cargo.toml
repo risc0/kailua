@@ -71,7 +71,7 @@ alloy-evm = { version = "0.6.0", default-features = false, features = ["op"] }
 alloy-op-evm = { version = "0.6.0", default-features = false }
 alloy-provider = { version = "0.15.6" }
 alloy-rlp = "0.3.11"
-alloy-primitives = { version = "1.0.0", default-features = false, features = ["map-hashbrown"] }
+alloy-primitives = { version = "1.1.0", default-features = false, features = ["map-hashbrown"] }
 alloy-rpc-types-beacon = "0.15.6"
 alloy-rpc-types-engine = { version = "0.15.6", default-features = false }
 alloy-sol-types = { version = "1.0.0", features = ["json"] }
@@ -87,22 +87,22 @@ kailua-common = { path = "crates/common" }
 kailua-contracts = { path = "crates/contracts" }
 kailua-host = { path = "bin/host" }
 
-# Kona
-kona-cli = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0", default-features = false }
-kona-client = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0", default-features = false }
-kona-derive = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0", default-features = false, features = ["serde"] }
-kona-driver = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
-kona-executor = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
-kona-genesis = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
-kona-host = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0", default-features = false, features = ["single"] }
-kona-mpt = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0", features = ["serde"] }
-kona-rpc = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
-kona-preimage = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0", features = ["serde", "rkyv", "std"] }
-kona-proof = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
-kona-protocol = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
-kona-providers-alloy = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
-kona-registry = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
-kona-std-fpvm = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0" }
+# Kona git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0"
+kona-cli = { git = "https://github.com/risc0/kona", branch="rkhalil/general-pipeline", default-features = false }
+kona-client = { git = "https://github.com/risc0/kona", branch="rkhalil/general-pipeline", default-features = false }
+kona-derive = { git = "https://github.com/risc0/kona", branch="rkhalil/general-pipeline", default-features = false, features = ["serde"] }
+kona-driver = { git = "https://github.com/risc0/kona", branch="rkhalil/general-pipeline" }
+kona-executor = { git = "https://github.com/risc0/kona", branch="rkhalil/general-pipeline" }
+kona-genesis = { git = "https://github.com/risc0/kona", branch="rkhalil/general-pipeline" }
+kona-host = { git = "https://github.com/risc0/kona", branch="rkhalil/general-pipeline", default-features = false, features = ["single"] }
+kona-mpt = { git = "https://github.com/risc0/kona", branch="rkhalil/general-pipeline", features = ["serde"] }
+kona-rpc = { git = "https://github.com/risc0/kona", branch="rkhalil/general-pipeline" }
+kona-preimage = { git = "https://github.com/risc0/kona", branch="rkhalil/general-pipeline", features = ["serde", "rkyv", "std"] }
+kona-proof = { git = "https://github.com/risc0/kona", branch="rkhalil/general-pipeline" }
+kona-protocol = { git = "https://github.com/risc0/kona", branch="rkhalil/general-pipeline" }
+kona-providers-alloy = { git = "https://github.com/risc0/kona", branch="rkhalil/general-pipeline" }
+kona-registry = { git = "https://github.com/risc0/kona", branch="rkhalil/general-pipeline" }
+kona-std-fpvm = { git = "https://github.com/risc0/kona", branch="rkhalil/general-pipeline" }
 
 # Boundless
 bonsai-sdk = { version = "1.4.0", features = ["non_blocking"] }

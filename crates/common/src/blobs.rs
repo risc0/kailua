@@ -109,9 +109,9 @@ pub struct BlobWitnessData {
     ///
     /// # Attributes
     /// - `commitments`: A `Vec<Bytes48>` which represents a collection of `Bytes48` values.
-    /// This field uses the `rkyv` attribute for zero-copy serialization and deserialization.
-    /// Specifically, it applies the custom serialization handler `Map<Bytes48Def>` for the `Bytes48` type,
-    /// allowing for efficient archiving and retrieval of data.
+    ///   This field uses the `rkyv` attribute for zero-copy serialization and deserialization.
+    ///   Specifically, it applies the custom serialization handler `Map<Bytes48Def>` for the `Bytes48` type,
+    ///   allowing for efficient archiving and retrieval of data.
     #[rkyv(with = rkyv::with::Map<Bytes48Def>)]
     pub commitments: Vec<Bytes48>,
     /// A structure to hold proofs, where each proof is represented as a `Bytes48` instance.

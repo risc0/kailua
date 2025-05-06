@@ -14,19 +14,20 @@
 
 use crate::executor::{exec_precondition_hash, new_execution_cursor, CachedExecutor, Execution};
 use crate::kona::chain::OracleL1ChainProvider;
-use crate::kona::pipeline::OraclePipeline;
-use crate::kona::sync::new_pipeline_cursor;
 use crate::precondition;
 use alloy_op_evm::OpEvmFactory;
 use alloy_primitives::{Sealed, B256};
 use anyhow::{bail, Context};
+use kona_derive::sources::EthereumDataSource;
 use kona_derive::traits::BlobProvider;
 use kona_driver::{Driver, Executor};
 use kona_executor::TrieDBProvider;
 use kona_preimage::{CommsClient, PreimageKey};
 use kona_proof::errors::OracleProviderError;
 use kona_proof::executor::KonaExecutor;
+use kona_proof::l1::OraclePipeline;
 use kona_proof::l2::OracleL2ChainProvider;
+use kona_proof::sync::new_oracle_pipeline_cursor;
 use kona_proof::{BootInfo, FlushableCache, HintType};
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
@@ -221,7 +222,7 @@ where
 
         log("DERIVATION & EXECUTION");
         // Create a new derivation driver with the given boot information and oracle.
-        let cursor = new_pipeline_cursor(
+        let cursor = new_oracle_pipeline_cursor(
             rollup_config.as_ref(),
             safe_head,
             &mut l1_provider,
@@ -230,11 +231,13 @@ where
         .await?;
         l2_provider.set_cursor(cursor.clone());
 
+        let da_provider =
+            EthereumDataSource::new_from_parts(l1_provider.clone(), beacon, &rollup_config);
         let pipeline = OraclePipeline::new(
             rollup_config.clone(),
             cursor.clone(),
             oracle.clone(),
-            beacon,
+            da_provider,
             l1_provider.clone(),
             l2_provider.clone(),
         )
