@@ -13,14 +13,12 @@
 // limitations under the License.
 
 use crate::blobs::BlobWitnessData;
+use crate::boot::StitchedBootInfo;
 use crate::executor::Execution;
-use crate::journal::ProofJournal;
 use crate::oracle::vec::VecOracle;
+use crate::oracle::WitnessOracle;
 use crate::rkyv::primitives::{AddressDef, B256Def};
 use alloy_primitives::{Address, B256};
-use kona_preimage::{CommsClient, PreimageKey};
-use kona_proof::FlushableCache;
-use risc0_zkvm::Receipt;
 use std::fmt::Debug;
 
 /// Represents the complete structure of a `Witness`, which is used to hold
@@ -118,83 +116,5 @@ impl Witness<VecOracle> {
         cloned_with_arc.oracle_witness = cloned_with_arc.oracle_witness.deep_clone();
         cloned_with_arc.stream_witness = cloned_with_arc.stream_witness.deep_clone();
         cloned_with_arc
-    }
-}
-
-/// A trait representing a Witness Oracle which manages and validates cryptographic preimages.
-///
-/// The `WitnessOracle` trait provides functionality to interact with and manage preimages.
-/// Preimages are key-value pairs where the key is typically an identifier for the data,
-/// and the value is the data itself stored as a `Vec<u8>`. This trait incorporates several features
-/// including validation, insertion, count retrieval, and finalization of the stored preimages.
-///
-/// # Provided Methods
-/// - `preimage_count`: Retrieve the number of preimages stored.
-/// - `validate_preimages`: Validates that all stored preimages satisfy predefined constraints.
-/// - `insert_preimage`: Inserts a new preimage into the oracle.
-/// - `finalize_preimages`: Prepares the oracle's preimages for use under defined shard size and validation settings.
-pub trait WitnessOracle: CommsClient + FlushableCache + Send + Sync + Debug + Default {
-    /// Returns the count of preimages stored in the oracle.
-    fn preimage_count(&self) -> usize;
-
-    /// Ensures that the preimages stored in the oracle meet the required criteria or constraints
-    /// defined by each `PreimageKeyType`. If the validation fails, an error is returned.
-    fn validate_preimages(&self) -> anyhow::Result<()>;
-
-    /// Inserts a preimage into the oracle.
-    fn insert_preimage(&mut self, key: PreimageKey, value: Vec<u8>);
-
-    /// This method finalizes the process of preparing the oracle preimages for a specific shard
-    /// size and optional validation cache.
-    fn finalize_preimages(&mut self, shard_size: usize, with_validation_cache: bool);
-}
-
-/// Represents the stitched boot information, primarily containing data relevant to the safe L2 chain
-/// and associated output roots in a blockchain context.
-///
-/// Note:
-/// - Each `B256` field uses the custom serialization handling provided by `B256Def` to ensure proper
-///   serialization/deserialization behavior.
-#[derive(
-    Clone,
-    Copy,
-    Debug,
-    Default,
-    serde::Serialize,
-    serde::Deserialize,
-    rkyv::Archive,
-    rkyv::Serialize,
-    rkyv::Deserialize,
-)]
-pub struct StitchedBootInfo {
-    /// The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
-    #[rkyv(with = B256Def)]
-    pub l1_head: B256,
-    /// The agreed upon safe L2 output root.
-    #[rkyv(with = B256Def)]
-    pub agreed_l2_output_root: B256,
-    /// The L2 output root claim.
-    #[rkyv(with = B256Def)]
-    pub claimed_l2_output_root: B256,
-    /// The L2 claim block number.
-    pub claimed_l2_block_number: u64,
-}
-
-impl From<ProofJournal> for StitchedBootInfo {
-    /// Converts a `ProofJournal` into a `StitchedBootInfo` by transferring its values.
-    fn from(value: ProofJournal) -> Self {
-        Self {
-            l1_head: value.l1_head,
-            agreed_l2_output_root: value.agreed_l2_output_root,
-            claimed_l2_output_root: value.claimed_l2_output_root,
-            claimed_l2_block_number: value.claimed_l2_block_number,
-        }
-    }
-}
-
-impl From<&Receipt> for StitchedBootInfo {
-    /// Converts a `Receipt` reference into the calling type by leveraging the intermediate conversion to `ProofJournal`.
-    fn from(value: &Receipt) -> Self {
-        Self::from(ProofJournal::from(value))
     }
 }

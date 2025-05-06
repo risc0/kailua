@@ -15,7 +15,8 @@
 use crate::blobs::PreloadedBlobProvider;
 use crate::client::log;
 use crate::journal::ProofJournal;
-use crate::witness::{Witness, WitnessOracle};
+use crate::oracle::WitnessOracle;
+use crate::witness::Witness;
 use std::sync::Arc;
 use tracing::log::warn;
 

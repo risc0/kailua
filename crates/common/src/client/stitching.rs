@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::boot::StitchedBootInfo;
 use crate::client::log;
 use crate::executor::Execution;
 use crate::journal::ProofJournal;
-use crate::witness::StitchedBootInfo;
 use alloy_primitives::map::HashSet;
 use alloy_primitives::{Address, B256};
 use kona_derive::prelude::BlobProvider;

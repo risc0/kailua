@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub mod blobs;
+pub mod boot;
 pub mod client;
 pub mod config;
 pub mod executor;

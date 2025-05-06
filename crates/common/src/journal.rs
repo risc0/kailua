@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::witness::StitchedBootInfo;
+use crate::boot::StitchedBootInfo;
 use alloy_primitives::{Address, B256};
 use anyhow::Context;
 use kona_proof::BootInfo;
@@ -190,5 +190,86 @@ impl From<&Receipt> for ProofJournal {
     /// field in the `Receipt` contains valid encoded data before calling this method.
     fn from(value: &Receipt) -> Self {
         Self::decode_packed(value.journal.as_ref()).unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_primitives::{Address, B256};
+
+    #[test]
+    fn test_proof_journal_encoding_decoding() {
+        // Create test data
+        let payout_recipient = Address::from([0x11; 20]);
+        let precondition_hash = B256::from([0x22; 32]);
+        let l1_head = B256::from([0x33; 32]);
+        let agreed_l2_output_root = B256::from([0x44; 32]);
+        let claimed_l2_output_root = B256::from([0x55; 32]);
+        let claimed_l2_block_number = 12345u64;
+        let config_hash = B256::from([0x66; 32]);
+        let fpvm_image_id = B256::from([0x77; 32]);
+
+        let stitched_boot_info = StitchedBootInfo {
+            l1_head,
+            agreed_l2_output_root,
+            claimed_l2_output_root,
+            claimed_l2_block_number,
+        };
+
+        let journal = ProofJournal::new_stitched(
+            fpvm_image_id,
+            payout_recipient,
+            precondition_hash,
+            config_hash,
+            &stitched_boot_info,
+        );
+
+        // Test encoding and decoding
+        let encoded = journal.encode_packed();
+        let decoded = ProofJournal::decode_packed(&encoded).unwrap();
+
+        assert_eq!(journal, decoded);
+    }
+
+    #[test]
+    fn test_constructors() {
+        // Create test data
+        let payout_recipient = Address::from([0x11; 20]);
+        let precondition_hash = B256::from([0x22; 32]);
+        let l1_head = B256::from([0x33; 32]);
+        let agreed_l2_output_root = B256::from([0x44; 32]);
+        let claimed_l2_output_root = B256::from([0x55; 32]);
+        let claimed_l2_block_number = 12345u64;
+        let fpvm_image_id = B256::from([0x66; 32]);
+
+        let boot_info = BootInfo {
+            l1_head,
+            agreed_l2_output_root,
+            claimed_l2_output_root,
+            claimed_l2_block_number,
+            chain_id: 0,
+            rollup_config: Default::default(),
+        };
+
+        let journal = ProofJournal::new(
+            fpvm_image_id,
+            payout_recipient,
+            precondition_hash,
+            &boot_info,
+        );
+
+        // Verify the journal matches expected values
+        assert_eq!(journal.fpvm_image_id, fpvm_image_id);
+        assert_eq!(journal.payout_recipient, payout_recipient);
+        assert_eq!(journal.precondition_hash, precondition_hash);
+        assert_eq!(journal.l1_head, l1_head);
+        assert_eq!(journal.agreed_l2_output_root, agreed_l2_output_root);
+        assert_eq!(journal.claimed_l2_output_root, claimed_l2_output_root);
+        assert_eq!(journal.claimed_l2_block_number, claimed_l2_block_number);
+        assert_eq!(
+            journal.config_hash,
+            B256::from(crate::config::config_hash(&boot_info.rollup_config).unwrap())
+        );
     }
 }

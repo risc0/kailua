@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::oracle::validate_preimage;
-use crate::witness::WitnessOracle;
+use crate::oracle::WitnessOracle;
 use alloy_primitives::map::HashMap;
 use async_trait::async_trait;
 use kona_preimage::errors::PreimageOracleResult;

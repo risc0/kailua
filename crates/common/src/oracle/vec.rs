@@ -18,9 +18,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::oracle::WitnessOracle;
 use crate::oracle::{needs_validation, validate_preimage};
 use crate::rkyv::vec::PreimageVecStoreRkyv;
-use crate::witness::WitnessOracle;
 use alloy_primitives::map::HashMap;
 use anyhow::bail;
 use async_trait::async_trait;
