@@ -62,3 +62,68 @@ where
         Ok(Arc::new(Mutex::new(raw_vec)))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{from_bytes_with, to_bytes_with};
+    use kona_preimage::{PreimageKey, PreimageKeyType};
+
+    #[test]
+    fn test_serialize_empty_store() {
+        let store = PreimageVecStore::default();
+        let bytes = to_bytes_with!(PreimageVecStoreRkyv, &store);
+        assert!(!bytes.is_empty());
+    }
+
+    #[test]
+    fn test_serialize_with_entries() {
+        let store = Arc::new(Mutex::new(vec![
+            vec![(
+                PreimageKey::new([0x11; 32], PreimageKeyType::Keccak256),
+                vec![0x22u8; 32],
+                Some((0usize, 1usize)),
+            )],
+            vec![(
+                PreimageKey::new([0x33; 32], PreimageKeyType::Keccak256),
+                vec![0x44u8; 32],
+                Some((2usize, 3usize)),
+            )],
+        ]));
+        let bytes = to_bytes_with!(PreimageVecStoreRkyv, &store);
+        assert!(!bytes.is_empty());
+    }
+
+    #[test]
+    fn test_round_trip() {
+        let original = Arc::new(Mutex::new(vec![
+            vec![(
+                PreimageKey::new([0x11; 32], PreimageKeyType::Keccak256),
+                vec![0x22u8; 32],
+                Some((0usize, 1usize)),
+            )],
+            vec![(
+                PreimageKey::new([0x33; 32], PreimageKeyType::Keccak256),
+                vec![0x44u8; 32],
+                Some((2usize, 3usize)),
+            )],
+            vec![(
+                PreimageKey::new([0x11; 32], PreimageKeyType::Keccak256),
+                vec![0x22u8; 32],
+                Some((0usize, 1usize)),
+            )],
+            vec![(
+                PreimageKey::new([0x33; 32], PreimageKeyType::Keccak256),
+                vec![0x44u8; 32],
+                Some((2usize, 3usize)),
+            )],
+        ]));
+
+        let bytes = to_bytes_with!(PreimageVecStoreRkyv, &original);
+        let deserialized = from_bytes_with!(PreimageVecStoreRkyv, PreimageVecStore, &bytes);
+
+        let original_vec = original.lock().unwrap();
+        let deserialized_vec = deserialized.lock().unwrap();
+        assert_eq!(*original_vec, *deserialized_vec);
+    }
+}

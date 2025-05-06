@@ -146,3 +146,67 @@ where
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{from_bytes_with, to_bytes_with};
+    use alloy_primitives::{bytes, Address, Bloom, B256, B64, U256};
+
+    #[test]
+    fn test_block_building_outcome_rkyv() {
+        let header = Header {
+            parent_hash: B256::from([0x11; 32]),
+            ommers_hash: B256::from([0x22; 32]),
+            beneficiary: Address::from([0x33; 20]),
+            state_root: B256::from([0x44; 32]),
+            transactions_root: B256::from([0x55; 32]),
+            receipts_root: B256::from([0x66; 32]),
+            logs_bloom: Bloom::from([0x77; 256]),
+            difficulty: U256::from_be_bytes([0x88; 32]),
+            number: 0x99,
+            gas_limit: 0xaa,
+            gas_used: 0xbb,
+            timestamp: 0xcc,
+            extra_data: bytes!("0xdd"),
+            mix_hash: B256::from([0xee; 32]),
+            nonce: B64::from([0xff; 8]),
+            base_fee_per_gas: Some(u64::from_be_bytes([0x01; 8])),
+            withdrawals_root: Some(B256::from([0x02; 32])),
+            blob_gas_used: Some(u64::from_be_bytes([0x03; 8])),
+            excess_blob_gas: Some(u64::from_be_bytes([0x04; 8])),
+            parent_beacon_block_root: Some(B256::from([0x05; 32])),
+            requests_hash: Some(B256::from([0x06; 32])),
+        }
+        .seal_slow();
+
+        let execution_result = BlockExecutionResult {
+            receipts: vec![],
+            requests: Requests::default(),
+            gas_used: header.gas_used,
+        };
+
+        let outcome = BlockBuildingOutcome {
+            header,
+            execution_result,
+        };
+
+        let serialized = to_bytes_with!(BlockBuildingOutcomeRkyv, &outcome);
+        let deserialized =
+            from_bytes_with!(BlockBuildingOutcomeRkyv, BlockBuildingOutcome, &serialized);
+
+        assert_eq!(outcome.header, deserialized.header);
+        assert_eq!(
+            outcome.execution_result.gas_used,
+            deserialized.execution_result.gas_used
+        );
+        assert_eq!(
+            outcome.execution_result.receipts,
+            deserialized.execution_result.receipts
+        );
+        assert_eq!(
+            outcome.execution_result.requests.take(),
+            deserialized.execution_result.requests.take()
+        );
+    }
+}

@@ -123,3 +123,61 @@ where
         Ok(OpPayloadAttributes::from(field))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{from_bytes_with, to_bytes_with};
+    use alloy_eips::eip4895::Withdrawal;
+    use alloy_primitives::bytes;
+    use std::str::FromStr;
+
+    fn create_test_payload() -> OpPayloadAttributes {
+        OpPayloadAttributes {
+            payload_attributes: PayloadAttributes {
+                timestamp: 1234567890,
+                prev_randao: B256::from_str(
+                    "0x1234567890123456789012345678901234567890123456789012345678901234",
+                )
+                .unwrap(),
+                suggested_fee_recipient: Address::from_str(
+                    "0x1234567890123456789012345678901234567890",
+                )
+                .unwrap(),
+                withdrawals: Some(vec![Withdrawal {
+                    index: 0,
+                    validator_index: 1,
+                    address: Address::from_str("0x1234567890123400000012345678901234567890")
+                        .unwrap(),
+                    amount: 2,
+                }]),
+                parent_beacon_block_root: Some(
+                    B256::from_str(
+                        "0x4321432143214321432143214321432143214321432143214321432143214321",
+                    )
+                    .unwrap(),
+                ),
+            },
+            transactions: Some(vec![bytes!("0xabcdef"), bytes!("0x123456")]),
+            no_tx_pool: Some(true),
+            gas_limit: Some(1000000),
+            eip_1559_params: Some(B64::from_str("0x0011223344556677").unwrap()),
+        }
+    }
+
+    #[test]
+    fn test_serialization_roundtrip() {
+        let original = create_test_payload();
+        let bytes = to_bytes_with!(OpPayloadAttributesRkyv, &original);
+        let deserialized = from_bytes_with!(OpPayloadAttributesRkyv, OpPayloadAttributes, &bytes);
+        assert_eq!(original, deserialized);
+    }
+
+    #[test]
+    fn test_from_conversions() {
+        let original = create_test_payload();
+        let rkyv = OpPayloadAttributesRkyv::from(&original);
+        let converted_back = OpPayloadAttributes::from(rkyv);
+        assert_eq!(original, converted_back);
+    }
+}
