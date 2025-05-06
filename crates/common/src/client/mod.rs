@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::executor::{exec_precondition_hash, new_execution_cursor, CachedExecutor, Execution};
-use crate::kona::chain::OracleL1ChainProvider;
+use crate::kona::OracleL1ChainProvider;
 use crate::precondition;
 use alloy_op_evm::OpEvmFactory;
 use alloy_primitives::{Sealed, B256};
