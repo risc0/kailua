@@ -4642,6 +4642,7 @@ dependencies = [
  "rkyv",
  "serde",
  "spin 0.10.0",
+ "tokio",
  "tracing",
 ]
 

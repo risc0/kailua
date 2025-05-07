@@ -49,3 +49,6 @@ risc0-zkvm.workspace = true
 
 serde.workspace = true
 tracing.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

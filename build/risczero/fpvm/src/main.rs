@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use kailua_common::client::stateless::run_stateless_client;
-use kailua_common::oracle::vec::{read_shard, VecOracle};
+use kailua_common::oracle::vec::VecOracle;
 use kailua_common::{client::log, witness::Witness};
 use risc0_zkvm::guest::env;
 use rkyv::rancor::Error;
@@ -40,7 +40,8 @@ fn main() {
             continue;
         }
         log(&format!("DESERIALIZE SHARD {i}"));
-        let _ = core::mem::replace(entry, read_shard());
+        #[cfg(target_os = "zkvm")]
+        let _ = core::mem::replace(entry, kailua_common::oracle::vec::read_shard());
     }
 
     // Run client using witness

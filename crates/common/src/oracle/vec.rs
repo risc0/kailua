@@ -22,8 +22,6 @@ use kona_preimage::errors::PreimageOracleResult;
 use kona_preimage::{HintWriterClient, PreimageKey, PreimageOracleClient};
 use kona_proof::FlushableCache;
 use lazy_static::lazy_static;
-use risc0_zkvm::guest::env;
-use rkyv::rancor::Error;
 use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
@@ -262,7 +260,7 @@ impl WitnessOracle for VecOracle {
         let mut sharded_vec = vec![vec![]];
         let mut last_shard_size = 0;
         for value in flat_vec {
-            if value.1.len() + last_shard_size > shard_size {
+            if value.1.len() + last_shard_size > shard_size && last_shard_size > 0 {
                 sharded_vec.push(vec![]);
                 last_shard_size = 0;
             }
@@ -457,7 +455,329 @@ impl HintWriterClient for VecOracle {
 ///
 /// Ensure that the environment contains valid binary data for a `PreimageVecEntry` structure before
 /// calling this function.
+#[cfg(target_os = "zkvm")]
 pub fn read_shard() -> PreimageVecEntry {
-    let shard_data = env::read_frame();
-    rkyv::from_bytes::<PreimageVecEntry, Error>(&shard_data).expect("Failed to deserialize shard")
+    let shard_data = risc0_zkvm::guest::env::read_frame();
+    rkyv::from_bytes::<PreimageVecEntry, rkyv::rancor::Error>(&shard_data)
+        .expect("Failed to deserialize shard")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_primitives::keccak256;
+    use kona_preimage::PreimageKeyType;
+    use kona_proof::block_on;
+    use risc0_zkvm::sha::{Impl as SHA2, Sha256};
+    use rkyv::rancor::Error;
+    use std::collections::HashSet;
+
+    fn prepare_vec_oracle(value_count: usize, copies: usize) -> (VecOracle, Vec<Vec<u8>>) {
+        let mut oracle = VecOracle::default();
+        assert_eq!(oracle.preimage_count(), 0);
+
+        let values = (0..value_count)
+            .map(|i| format!("{i} test {i} value {i}").as_bytes().to_vec())
+            .collect::<Vec<_>>();
+        // insert sha3 keys
+        for value in &values {
+            let sha3_key = PreimageKey::new_keccak256(keccak256(value).0);
+            for _ in 0..copies {
+                oracle.insert_preimage(sha3_key, value.clone());
+            }
+        }
+        oracle.validate_preimages().unwrap();
+        assert_eq!(oracle.preimage_count(), values.len() * copies);
+        // insert sha2 keys
+        for value in &values {
+            let sha2_key = PreimageKey::new(
+                SHA2::hash_bytes(value).as_bytes().try_into().unwrap(),
+                PreimageKeyType::Sha256,
+            );
+            for _ in 0..copies {
+                oracle.insert_preimage(sha2_key, value.clone());
+            }
+        }
+        oracle.validate_preimages().unwrap();
+        assert_eq!(oracle.preimage_count(), values.len() * copies * 2);
+
+        (oracle, values)
+    }
+
+    async fn exhaust_vec_oracle(copies: usize, oracle: VecOracle, values: Vec<Vec<u8>>) {
+        let initial_size = oracle.preimage_count();
+        for value in values.iter().rev() {
+            let sha3_key = PreimageKey::new_keccak256(keccak256(value).0);
+            let sha2_key = PreimageKey::new(
+                SHA2::hash_bytes(value).as_bytes().try_into().unwrap(),
+                PreimageKeyType::Sha256,
+            );
+            for _ in 0..copies {
+                let mut sha3_val = vec![0u8; value.len()];
+                oracle.get_exact(sha3_key, &mut sha3_val).await.unwrap();
+                let mut sha2_val = vec![0u8; value.len()];
+                oracle.get_exact(sha2_key, &mut sha2_val).await.unwrap();
+                assert_eq!(sha3_val, sha2_val);
+            }
+        }
+        // ensure exhaustion
+        assert_eq!(
+            oracle.preimage_count(),
+            initial_size - 2 * copies * values.len()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_deep_clone() {
+        let (mut oracle, values) = prepare_vec_oracle(1024, 3);
+        oracle.insert_preimage(
+            PreimageKey::new([0xff; 32], PreimageKeyType::Local),
+            vec![0xff; 32],
+        );
+        oracle.finalize_preimages(1, true);
+        oracle.validate_preimages().unwrap();
+        // assert initial equivalence
+        let size = oracle.preimage_count();
+        let cloned = oracle.deep_clone();
+        assert_eq!(size, cloned.preimage_count());
+        // regular cloning vs deep cloning
+        exhaust_vec_oracle(3, oracle.clone(), values).await;
+        assert_eq!(oracle.preimage_count(), 1);
+        assert_eq!(size, cloned.preimage_count());
+    }
+
+    #[tokio::test]
+    async fn test_vec_oracle_sharded() {
+        let (mut oracle, values) = prepare_vec_oracle(1024, 1);
+        // one key per shard
+        oracle.finalize_preimages(1, true);
+        oracle.validate_preimages().unwrap();
+        // serde
+        let oracle = rkyv::from_bytes::<VecOracle, Error>(
+            rkyv::to_bytes::<Error>(&oracle).unwrap().as_ref(),
+        )
+        .unwrap();
+        // validate
+        {
+            let preimage_vecs = oracle.preimages.lock().unwrap();
+            assert_eq!(preimage_vecs.len(), values.len() * 2);
+            for preimages in preimage_vecs.iter() {
+                assert_eq!(preimages.len(), 1);
+                for preimage in preimages.iter() {
+                    assert_eq!(preimage.2, None);
+                }
+            }
+        }
+        // retrieve keys
+        exhaust_vec_oracle(1, oracle, values).await;
+    }
+
+    #[tokio::test]
+    async fn test_vec_oracle_unsharded() {
+        let (mut oracle, values) = prepare_vec_oracle(1024, 1);
+        // one shard for all keys
+        oracle.finalize_preimages(usize::MAX, true);
+        oracle.validate_preimages().unwrap();
+        // serde
+        let oracle = rkyv::from_bytes::<VecOracle, Error>(
+            rkyv::to_bytes::<Error>(&oracle).unwrap().as_ref(),
+        )
+        .unwrap();
+        // validate
+        {
+            let preimage_vecs = oracle.preimages.lock().unwrap();
+            assert_eq!(preimage_vecs.len(), 1);
+            for preimages in preimage_vecs.iter() {
+                assert_eq!(preimages.len(), values.len() * 2);
+                for preimage in preimages.iter() {
+                    assert_eq!(preimage.2, None);
+                }
+            }
+        }
+        // retrieve keys
+        exhaust_vec_oracle(1, oracle, values).await;
+    }
+
+    #[tokio::test]
+    async fn test_vec_oracle_duplicates_sharded() {
+        let (mut oracle, values) = prepare_vec_oracle(1024, 2);
+        // one key per shard
+        oracle.finalize_preimages(1, true);
+        oracle.validate_preimages().unwrap();
+        // serde
+        let oracle = rkyv::from_bytes::<VecOracle, Error>(
+            rkyv::to_bytes::<Error>(&oracle).unwrap().as_ref(),
+        )
+        .unwrap();
+        // validate
+        {
+            let preimage_vecs = oracle.preimages.lock().unwrap();
+            assert_eq!(preimage_vecs.len(), values.len() * 2 * 2);
+            let mut seen_keys = HashSet::new();
+            for preimages in preimage_vecs.iter() {
+                assert_eq!(preimages.len(), 1);
+                for preimage in preimages.iter() {
+                    if seen_keys.contains(&preimage.0) {
+                        let ptr = preimage.2.unwrap();
+                        assert_eq!(&preimage_vecs[ptr.0][ptr.1].0, &preimage.0);
+                    } else {
+                        assert!(preimage.2.is_none());
+                        seen_keys.insert(preimage.0);
+                    }
+                }
+            }
+        }
+        // retrieve keys
+        exhaust_vec_oracle(2, oracle, values).await;
+    }
+
+    #[tokio::test]
+    async fn test_vec_oracle_duplicates_unsharded() {
+        let (mut oracle, values) = prepare_vec_oracle(1024, 2);
+        // one shard
+        oracle.finalize_preimages(usize::MAX, true);
+        oracle.validate_preimages().unwrap();
+        // serde
+        let oracle = rkyv::from_bytes::<VecOracle, Error>(
+            rkyv::to_bytes::<Error>(&oracle).unwrap().as_ref(),
+        )
+        .unwrap();
+        // validate
+        {
+            let preimage_vecs = oracle.preimages.lock().unwrap();
+            assert_eq!(preimage_vecs.len(), 1);
+            let mut seen_keys = HashSet::new();
+            for preimages in preimage_vecs.iter() {
+                assert_eq!(preimages.len(), values.len() * 2 * 2);
+                for preimage in preimages.iter() {
+                    if seen_keys.contains(&preimage.0) {
+                        let ptr = preimage.2.unwrap();
+                        assert_eq!(&preimage_vecs[ptr.0][ptr.1].0, &preimage.0);
+                    } else {
+                        assert!(preimage.2.is_none());
+                        seen_keys.insert(preimage.0);
+                    }
+                }
+            }
+        }
+        // retrieve keys
+        exhaust_vec_oracle(2, oracle, values).await;
+    }
+
+    #[tokio::test]
+    async fn test_vec_oracle_duplicates_unsharded_no_cache() {
+        let (mut oracle, values) = prepare_vec_oracle(1024, 2);
+        // one shard
+        oracle.finalize_preimages(usize::MAX, false);
+        oracle.validate_preimages().unwrap();
+        // serde
+        let oracle = rkyv::from_bytes::<VecOracle, Error>(
+            rkyv::to_bytes::<Error>(&oracle).unwrap().as_ref(),
+        )
+        .unwrap();
+        // validate
+        {
+            let preimage_vecs = oracle.preimages.lock().unwrap();
+            assert_eq!(preimage_vecs.len(), 1);
+            for preimages in preimage_vecs.iter() {
+                assert_eq!(preimages.len(), values.len() * 2 * 2);
+                for preimage in preimages.iter() {
+                    assert!(preimage.2.is_none());
+                }
+            }
+        }
+        // retrieve keys
+        exhaust_vec_oracle(2, oracle, values).await;
+    }
+
+    #[test]
+    fn test_vec_oracle_tamper() {
+        let (mut oracle, _) = prepare_vec_oracle(1, 4);
+        // one key pre shard
+        oracle.finalize_preimages(1, true);
+        oracle.validate_preimages().unwrap();
+
+        // point first entry to future entry
+        {
+            let oracle = oracle.deep_clone();
+            {
+                let mut preimages = oracle.preimages.lock().unwrap();
+                let preimage_vec = preimages.first_mut().unwrap();
+                let preimage = preimage_vec.first_mut().unwrap();
+                preimage.2 = Some((1, 0));
+            }
+            // fail to validate
+            let result = oracle.validate_preimages().unwrap_err();
+            assert!(result.to_string().contains("future vec entry"));
+        }
+        // point first entry to self
+        {
+            let oracle = oracle.deep_clone();
+            {
+                let mut preimages = oracle.preimages.lock().unwrap();
+                let preimage_vec = preimages.first_mut().unwrap();
+                let preimage = preimage_vec.first_mut().unwrap();
+                preimage.2 = Some((0, 0));
+            }
+            // fail to validate
+            let result = oracle.validate_preimages().unwrap_err();
+            assert!(result.to_string().contains("future preimage"));
+        }
+        // invalidate key
+        {
+            let oracle = oracle.deep_clone();
+            {
+                let mut preimages = oracle.preimages.lock().unwrap();
+                let preimage_vec = preimages.first_mut().unwrap();
+                let preimage = preimage_vec.first_mut().unwrap();
+                preimage.0 = PreimageKey::new([0xff; 32], PreimageKeyType::Local);
+            }
+            // fail to validate
+            let result = oracle.validate_preimages().unwrap_err();
+            assert!(result.to_string().contains("key comparison failed"));
+        }
+        // invalidate value
+        {
+            let oracle = oracle.deep_clone();
+            {
+                let mut preimages = oracle.preimages.lock().unwrap();
+                let preimage_vec = preimages.last_mut().unwrap();
+                let preimage = preimage_vec.first_mut().unwrap();
+                preimage.1 = vec![0xff; 32];
+            }
+            // fail to validate
+            let result = oracle.validate_preimages().unwrap_err();
+            assert!(result.to_string().contains("value comparison failed"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_exhaustion() {
+        let (mut oracle, values) = prepare_vec_oracle(1, 1);
+        oracle.finalize_preimages(usize::MAX, true);
+        oracle.validate_preimages().unwrap();
+        // fail to refetch key after exhaustion
+        let only_key = oracle
+            .preimages
+            .lock()
+            .unwrap()
+            .first()
+            .unwrap()
+            .first()
+            .unwrap()
+            .0;
+        exhaust_vec_oracle(1, oracle.clone(), values).await;
+        assert!(std::panic::catch_unwind(|| block_on(oracle.get(only_key))).is_err());
+        // clear position state
+        assert!(oracle.preimages.is_poisoned());
+        QUEUE.clear_poison();
+    }
+
+    #[tokio::test]
+    async fn test_noop() {
+        let oracle = VecOracle::default();
+        oracle.write("noop").await.unwrap();
+        oracle.flush();
+        assert_eq!(oracle.preimage_count(), 0);
+    }
 }
