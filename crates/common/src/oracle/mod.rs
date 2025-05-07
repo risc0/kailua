@@ -126,3 +126,64 @@ pub trait WitnessOracle: CommsClient + FlushableCache + Send + Sync + Debug + De
     /// size and optional validation cache.
     fn finalize_preimages(&mut self, shard_size: usize, with_validation_cache: bool);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_preimage() {
+        // Test Keccak256
+        let key = PreimageKey::new(keccak256(b"test").0, PreimageKeyType::Keccak256);
+        let value = b"test";
+        assert!(validate_preimage(&key, value).is_ok());
+
+        // Test invalid Keccak256
+        let invalid_key = PreimageKey::new(keccak256(b"wrong").0, PreimageKeyType::Keccak256);
+        assert!(validate_preimage(&invalid_key, value).is_err());
+
+        // Test Sha256
+        let sha_value = b"test";
+        let sha_key = PreimageKey::new(
+            SHA2::hash_bytes(sha_value).as_bytes().try_into().unwrap(),
+            PreimageKeyType::Sha256,
+        );
+        assert!(validate_preimage(&sha_key, sha_value).is_ok());
+
+        // Test invalid Sha256
+        let invalid_sha_key = PreimageKey::new(
+            SHA2::hash_bytes(b"wrong").as_bytes().try_into().unwrap(),
+            PreimageKeyType::Sha256,
+        );
+        assert!(validate_preimage(&invalid_sha_key, sha_value).is_err());
+
+        // Test Local (no validation)
+        let local_key = PreimageKey::new([0u8; 32], PreimageKeyType::Local);
+        assert!(validate_preimage(&local_key, b"any value").is_ok());
+
+        // Test GlobalGeneric (no validation)
+        let global_key = PreimageKey::new([0u8; 32], PreimageKeyType::GlobalGeneric);
+        assert!(validate_preimage(&global_key, b"any value").is_ok());
+
+        // Test Precompile (should panic)
+        let precompile_key = PreimageKey::new([0u8; 32], PreimageKeyType::Precompile);
+        let result = std::panic::catch_unwind(|| validate_preimage(&precompile_key, b"test"));
+        assert!(result.is_err());
+
+        // Test Blob (should panic)
+        let blob_key = PreimageKey::new([0u8; 32], PreimageKeyType::Blob);
+        let result = std::panic::catch_unwind(|| validate_preimage(&blob_key, b"test"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_needs_validation() {
+        // Test all PreimageKeyType variants
+        assert!(needs_validation(&PreimageKeyType::Keccak256));
+        assert!(needs_validation(&PreimageKeyType::Sha256));
+        assert!(needs_validation(&PreimageKeyType::Precompile));
+        assert!(needs_validation(&PreimageKeyType::Blob));
+        assert!(!needs_validation(&PreimageKeyType::Local));
+        assert!(!needs_validation(&PreimageKeyType::GlobalGeneric));
+    }
+}

@@ -1,10 +1,4 @@
-//! A type alias representing an indexed preimage entry.
-//!
-//! Each entry consists of:
-//! - `PreimageKey`: The key associated with the preimage.
-//! - `Vec<u8>`: The actual preimage data as a byte vector.
-//! - `Option<(usize, usize)>`: An optional tuple indicating the indices
-//!   (i.e., entry index and position within the entry) used for validation.
+// Copyright 2024, 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.

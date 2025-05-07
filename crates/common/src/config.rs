@@ -111,7 +111,7 @@ pub fn safe_default<V: Debug + Eq>(opt: Option<V>, default: V) -> anyhow::Result
 ///   fields, ensuring robust handling of missing or invalid data.
 /// * All numeric values are serialized in big-endian format for consistency.
 pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
-    let system_config_hash: [u8; 32] = rollup_config
+    let genesis_system_config_hash: [u8; 32] = rollup_config
         .genesis
         .system_config
         .as_ref()
@@ -137,6 +137,41 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
                     .context("eip1559_elasticity")?
                     .to_be_bytes()
                     .as_slice(),
+                safe_default(system_config.operator_fee_scalar, u32::MAX)
+                    .context("operator_fee_scalar")?
+                    .to_be_bytes()
+                    .as_slice(),
+                safe_default(system_config.operator_fee_constant, u64::MAX)
+                    .context("operator_fee_constant")?
+                    .to_be_bytes()
+                    .as_slice(),
+            ]
+            .concat();
+            let digest = SHA2::hash_bytes(fields.as_slice());
+
+            Ok::<[u8; 32], anyhow::Error>(digest.as_bytes().try_into()?)
+        })
+        .unwrap_or(Ok([0u8; 32]))?;
+    let alt_da_config_hash: [u8; 32] = rollup_config
+        .alt_da_config
+        .as_ref()
+        .map(|alt_da_config| {
+            let fields = [
+                safe_default(alt_da_config.da_challenge_address, Address::ZERO)
+                    .context("da_challenge_address")?
+                    .0
+                    .as_slice(),
+                safe_default(alt_da_config.da_challenge_window, u64::MAX)
+                    .context("da_challenge_window")?
+                    .to_be_bytes()
+                    .as_slice(),
+                safe_default(alt_da_config.da_resolve_window, u64::MAX)
+                    .context("da_resolve_window")?
+                    .to_be_bytes()
+                    .as_slice(),
+                safe_default(alt_da_config.da_commitment_type.clone(), String::new())
+                    .context("da_commitment_type")?
+                    .as_bytes(),
             ]
             .concat();
             let digest = SHA2::hash_bytes(fields.as_slice());
@@ -145,37 +180,31 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
         })
         .unwrap_or(Ok([0u8; 32]))?;
     let rollup_config_bytes = [
+        // genesis
         rollup_config.genesis.l1.hash.0.as_slice(),
         rollup_config.genesis.l1.number.to_be_bytes().as_slice(),
         rollup_config.genesis.l2.hash.0.as_slice(),
         rollup_config.genesis.l2.number.to_be_bytes().as_slice(),
         rollup_config.genesis.l2_time.to_be_bytes().as_slice(),
-        system_config_hash.as_slice(),
+        genesis_system_config_hash.as_slice(),
+        // block_time
         rollup_config.block_time.to_be_bytes().as_slice(),
+        // max_sequencer_drift
         rollup_config.max_sequencer_drift.to_be_bytes().as_slice(),
+        // seq_window_size
         rollup_config.seq_window_size.to_be_bytes().as_slice(),
+        // channel_timeout
         rollup_config.channel_timeout.to_be_bytes().as_slice(),
+        // granite_channel_timeout
         rollup_config
             .granite_channel_timeout
             .to_be_bytes()
             .as_slice(),
+        // l1_chain_id
         rollup_config.l1_chain_id.to_be_bytes().as_slice(),
+        // l2_chain_id
         rollup_config.l2_chain_id.to_be_bytes().as_slice(),
-        rollup_config
-            .chain_op_config
-            .eip1559_denominator
-            .to_be_bytes()
-            .as_slice(),
-        rollup_config
-            .chain_op_config
-            .eip1559_elasticity
-            .to_be_bytes()
-            .as_slice(),
-        rollup_config
-            .chain_op_config
-            .eip1559_denominator_canyon
-            .to_be_bytes()
-            .as_slice(),
+        // hardforks
         safe_default(rollup_config.hardforks.regolith_time, u64::MAX)
             .context("regolith_time")?
             .to_be_bytes()
@@ -212,24 +241,303 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
             .context("interop_time")?
             .to_be_bytes()
             .as_slice(),
+        safe_default(rollup_config.hardforks.pectra_blob_schedule_time, u64::MAX)
+            .context("pectra_blob_schedule_time")?
+            .to_be_bytes()
+            .as_slice(),
+        // batch_inbox_address
         rollup_config.batch_inbox_address.0.as_slice(),
+        // deposit_contract_address
         rollup_config.deposit_contract_address.0.as_slice(),
+        // l1_system_config_address
         rollup_config.l1_system_config_address.0.as_slice(),
+        // protocol_versions_address
         rollup_config.protocol_versions_address.0.as_slice(),
+        // superchain_config_address
         safe_default(rollup_config.superchain_config_address, Address::ZERO)
             .context("superchain_config_address")?
             .0
             .as_slice(),
+        // blobs_enabled_l1_timestamp
         safe_default(rollup_config.blobs_enabled_l1_timestamp, u64::MAX)
-            .context("blobs_enabled_timestamp")?
+            .context("blobs_enabled_l1_timestamp")?
             .to_be_bytes()
             .as_slice(),
+        // da_challenge_address
         safe_default(rollup_config.da_challenge_address, Address::ZERO)
             .context("da_challenge_address")?
             .0
+            .as_slice(),
+        // interop_message_expiry_window
+        rollup_config
+            .interop_message_expiry_window
+            .to_be_bytes()
+            .as_slice(),
+        // alt_da_config
+        alt_da_config_hash.as_slice(),
+        // chain_op_config
+        rollup_config
+            .chain_op_config
+            .eip1559_denominator
+            .to_be_bytes()
+            .as_slice(),
+        rollup_config
+            .chain_op_config
+            .eip1559_elasticity
+            .to_be_bytes()
+            .as_slice(),
+        rollup_config
+            .chain_op_config
+            .eip1559_denominator_canyon
+            .to_be_bytes()
             .as_slice(),
     ]
     .concat();
     let digest = SHA2::hash_bytes(rollup_config_bytes.as_slice());
     Ok::<[u8; 32], anyhow::Error>(digest.as_bytes().try_into()?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_eips::BlockNumHash;
+    use std::collections::HashSet;
+
+    use alloy_primitives::U256;
+    use kona_genesis::{AltDAConfig, BaseFeeConfig, ChainGenesis, HardForkConfig, SystemConfig};
+
+    #[test]
+    fn test_safe_default() {
+        assert_eq!(safe_default(Some(42), 0).unwrap(), 42);
+        assert_eq!(safe_default(None, 100).unwrap(), 100);
+        assert!(safe_default(Some(10), 10).is_err());
+    }
+
+    #[test]
+    fn test_config_hash() {
+        let mut rollup_config = RollupConfig {
+            genesis: ChainGenesis {
+                l1: BlockNumHash {
+                    hash: B256::ZERO,
+                    number: 0,
+                },
+                l2: BlockNumHash {
+                    hash: B256::ZERO,
+                    number: 0,
+                },
+                l2_time: 0,
+                system_config: Some(SystemConfig {
+                    batcher_address: Address::ZERO,
+                    overhead: U256::ZERO,
+                    scalar: U256::ZERO,
+                    gas_limit: 0,
+                    base_fee_scalar: Some(0),
+                    blob_base_fee_scalar: Some(0),
+                    eip1559_denominator: Some(0),
+                    eip1559_elasticity: Some(0),
+                    operator_fee_scalar: Some(0),
+                    operator_fee_constant: Some(0),
+                }),
+            },
+            block_time: 0,
+            max_sequencer_drift: 0,
+            seq_window_size: 0,
+            channel_timeout: 0,
+            granite_channel_timeout: 0,
+            l1_chain_id: 0,
+            l2_chain_id: 0,
+            chain_op_config: BaseFeeConfig {
+                eip1559_denominator: 0,
+                eip1559_elasticity: 0,
+                eip1559_denominator_canyon: 0,
+            },
+            hardforks: HardForkConfig {
+                regolith_time: Some(0),
+                canyon_time: Some(0),
+                delta_time: Some(0),
+                ecotone_time: Some(0),
+                fjord_time: Some(0),
+                granite_time: Some(0),
+                holocene_time: Some(0),
+                isthmus_time: Some(0),
+                interop_time: Some(0),
+                pectra_blob_schedule_time: Some(0),
+            },
+            batch_inbox_address: Address::ZERO,
+            deposit_contract_address: Address::ZERO,
+            l1_system_config_address: Address::ZERO,
+            protocol_versions_address: Address::ZERO,
+            superchain_config_address: Some(Address::from([0xff; 20])),
+            blobs_enabled_l1_timestamp: Some(0),
+            da_challenge_address: Some(Address::from([0xff; 20])),
+            interop_message_expiry_window: 0,
+            alt_da_config: Some(AltDAConfig {
+                da_challenge_address: Some(Address::from([0xff; 20])),
+                da_challenge_window: Some(0),
+                da_resolve_window: Some(0),
+                da_commitment_type: Some("_".to_string()),
+            }),
+        };
+
+        let mut hashes: HashSet<[u8; 32]> = vec![config_hash(&rollup_config).unwrap()]
+            .into_iter()
+            .collect();
+
+        rollup_config.genesis.l1.hash = B256::from([0x01; 32]);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.genesis.l1.number = 1;
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.genesis.l2.hash = B256::from([0x01; 32]);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.genesis.l2.number = 1;
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.genesis.l2_time = 1;
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config
+            .genesis
+            .system_config
+            .as_mut()
+            .unwrap()
+            .batcher_address = Address::from([0x01; 20]);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config
+            .genesis
+            .system_config
+            .as_mut()
+            .unwrap()
+            .overhead = U256::from_be_bytes([0x01; 32]);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.genesis.system_config.as_mut().unwrap().scalar =
+            U256::from_be_bytes([0x01; 32]);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config
+            .genesis
+            .system_config
+            .as_mut()
+            .unwrap()
+            .gas_limit = 1;
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config
+            .genesis
+            .system_config
+            .as_mut()
+            .unwrap()
+            .base_fee_scalar = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config
+            .genesis
+            .system_config
+            .as_mut()
+            .unwrap()
+            .blob_base_fee_scalar = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config
+            .genesis
+            .system_config
+            .as_mut()
+            .unwrap()
+            .eip1559_denominator = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config
+            .genesis
+            .system_config
+            .as_mut()
+            .unwrap()
+            .eip1559_elasticity = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config
+            .genesis
+            .system_config
+            .as_mut()
+            .unwrap()
+            .operator_fee_scalar = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config
+            .genesis
+            .system_config
+            .as_mut()
+            .unwrap()
+            .operator_fee_constant = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.block_time = 1;
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.max_sequencer_drift = 1;
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.seq_window_size = 1;
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.channel_timeout = 1;
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.granite_channel_timeout = 1;
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.l1_chain_id = 1;
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.l2_chain_id = 1;
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.chain_op_config.eip1559_denominator = 1;
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.chain_op_config.eip1559_elasticity = 1;
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.chain_op_config.eip1559_denominator_canyon = 1;
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.hardforks.regolith_time = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.hardforks.canyon_time = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.hardforks.delta_time = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.hardforks.ecotone_time = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.hardforks.fjord_time = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.hardforks.granite_time = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.hardforks.holocene_time = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.hardforks.isthmus_time = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.hardforks.interop_time = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.hardforks.pectra_blob_schedule_time = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.batch_inbox_address = Address::from([0x01; 20]);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.deposit_contract_address = Address::from([0x01; 20]);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.l1_system_config_address = Address::from([0x01; 20]);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.protocol_versions_address = Address::from([0x01; 20]);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.superchain_config_address = Some(Address::from([0x01; 20]));
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.blobs_enabled_l1_timestamp = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.da_challenge_address = Some(Address::from([0x02; 20]));
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config.interop_message_expiry_window = 1;
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config
+            .alt_da_config
+            .as_mut()
+            .unwrap()
+            .da_challenge_address = Some(Address::from([0x01; 20]));
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config
+            .alt_da_config
+            .as_mut()
+            .unwrap()
+            .da_challenge_window = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config
+            .alt_da_config
+            .as_mut()
+            .unwrap()
+            .da_resolve_window = Some(1);
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+        rollup_config
+            .alt_da_config
+            .as_mut()
+            .unwrap()
+            .da_commitment_type = Some("aa".to_string());
+        assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
+    }
 }
