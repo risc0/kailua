@@ -131,6 +131,55 @@ pub struct BlobWitnessData {
     pub proofs: Vec<Bytes48>,
 }
 
+impl<T: Into<Blob>> From<Vec<T>> for BlobWitnessData {
+    /// Converts a vector of blobs into a `BlobWitnessData` instance by processing each blob and
+    /// generating corresponding KZG commitments and proofs.
+    ///
+    /// This function performs the following steps for each blob in the input vector:
+    /// 1. Converts the blob into the required c-kzg crate `Blob` structure.
+    /// 2. Uses the alloy-eips `EnvKzgSettings` to compute a KZG commitment for the blob.
+    /// 3. Computes the KZG proof corresponding to the blob and its commitment.
+    /// 4. Stores the processed blob, commitment, and proof in the resulting instance.
+    ///
+    /// ## Parameters
+    /// - `blobs`: A vector of elements of type `T` which hold the blob data to be processed. These
+    ///   will be converted into `Blob` objects for KZG commitment and proof generation.
+    ///
+    /// ## Returns
+    /// - Returns an instance of `Self` containing:
+    ///   - The processed blobs.
+    ///   - Their corresponding KZG commitments.
+    ///   - Their corresponding KZG proofs.
+    ///
+    /// ## Assumptions
+    /// - The implementation assumes that `Blob::from` and `Blob.into` facilitate the conversion
+    ///   between the input data type and the required KZG-compatible `Blob` structure.
+    ///
+    /// ## Panics
+    /// - This function panics if the conversion of a blob to a KZG commitment fails.
+    /// - Panics if proof computation fails.
+    fn from(blobs: Vec<T>) -> Self {
+        let mut result = Self::default();
+        let settings = alloy_eips::eip4844::env_settings::EnvKzgSettings::default();
+        let settings_ref = settings.get();
+        for blob in blobs {
+            let blob: Blob = blob.into();
+            let c_kzg_blob = c_kzg::Blob::new(blob.0);
+            let commitment = settings_ref
+                .blob_to_kzg_commitment(&c_kzg_blob)
+                .expect("Failed to convert blob to commitment");
+            let proof = settings_ref
+                .compute_blob_kzg_proof(&c_kzg_blob, &commitment.to_bytes())
+                .unwrap();
+            // save values
+            result.blobs.push(Blob::from(*c_kzg_blob));
+            result.commitments.push(commitment.to_bytes());
+            result.proofs.push(proof.to_bytes());
+        }
+        result
+    }
+}
+
 /// A struct that provides preloaded blobs and their corresponding identifiers.
 ///
 /// The `PreloadedBlobProvider` manages a collection of blobs, each identified by a unique hash.
@@ -177,13 +226,13 @@ impl From<BlobWitnessData> for PreloadedBlobProvider {
             .into_iter()
             .map(|b| c_kzg::Blob::new(b.0))
             .collect::<Vec<_>>();
-        ethereum_kzg_settings(0)
+        assert!(ethereum_kzg_settings(0)
             .verify_blob_kzg_proof_batch(
                 blobs.as_slice(),
                 value.commitments.as_slice(),
                 value.proofs.as_slice(),
             )
-            .expect("Failed to batch validate kzg proofs");
+            .expect("Failed to batch validate kzg proofs"));
         let hashes = value
             .commitments
             .iter()
@@ -254,10 +303,28 @@ impl BlobProvider for PreloadedBlobProvider {
     }
 }
 
+/// Computes intermediate outputs from the provided blob data.
+///
+/// This function takes a reference to `BlobData` and a specified number of blocks
+/// and computes the intermediate outputs as a vector of `U256` field elements.
+///
+/// # Arguments
+///
+/// * `blob_data` - A reference to the `BlobData` structure containing the data to process.
+/// * `blocks` - The number of blocks to use for computation.
 pub fn intermediate_outputs(blob_data: &BlobData, blocks: usize) -> anyhow::Result<Vec<U256>> {
     field_elements(blob_data, 0..blocks)
 }
 
+/// Extracts a vector of field elements from the provided blob data within a specific range.
+///
+/// This function retrieves `FIELD_ELEMENTS_PER_BLOB` - `blocks` field elements from the given blob
+/// data by extracting elements starting from the `blocks` index through the end of the blob data.
+///
+/// # Arguments
+///
+/// * `blob_data` - A reference to a `BlobData` structure containing the data to extract field elements from.
+/// * `blocks` - The starting index for the extraction from the blob data.
 pub fn trail_data(blob_data: &BlobData, blocks: usize) -> anyhow::Result<Vec<U256>> {
     field_elements(blob_data, blocks..FIELD_ELEMENTS_PER_BLOB as usize)
 }
@@ -315,4 +382,144 @@ pub fn field_elements(
 /// - It then reduces the resultant number modulo `BLS_MODULUS` to ensure it falls within the desired field range.
 pub fn hash_to_fe(hash: B256) -> U256 {
     U256::from_be_bytes(hash.0).reduce_mod(BLS_MODULUS)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_eips::eip4844::{BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF};
+    use alloy_primitives::keccak256;
+    use rayon::prelude::*;
+    use rkyv::rancor::Error;
+
+    fn gen_blobs(count: usize) -> Vec<Blob> {
+        (0..count)
+            .map(|i| {
+                (0..FIELD_ELEMENTS_PER_BLOB)
+                    .map(|j| {
+                        hash_to_fe(keccak256(format!("gen_blobs {i} {j}"))).to_be_bytes::<32>()
+                    })
+                    .collect::<Vec<_>>()
+                    .concat()
+                    .as_slice()
+                    .try_into()
+                    .unwrap()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_hash_to_fe() {
+        for i in 0..1024 {
+            let hash = keccak256(format!("test_hash_to_fe hash {i}"));
+            let fe = hash_to_fe(hash);
+            assert_eq!(fe, hash_to_fe(fe.to_be_bytes().into()));
+        }
+    }
+
+    #[test]
+    fn test_field_elements() {
+        let blobs = gen_blobs(64);
+        for (i, blob) in blobs.into_iter().enumerate() {
+            let blob_data = BlobData {
+                index: 0,
+                blob: Box::new(blob),
+                kzg_commitment: Default::default(),
+                kzg_proof: Default::default(),
+                signed_block_header: Default::default(),
+                kzg_commitment_inclusion_proof: vec![],
+            };
+            let blocks = 64 * i;
+            let recovered_bytes = [
+                intermediate_outputs(&blob_data, blocks).unwrap(),
+                trail_data(&blob_data, blocks).unwrap(),
+            ]
+            .concat()
+            .into_iter()
+            .map(|e| e.to_be_bytes::<32>())
+            .collect::<Vec<_>>()
+            .concat();
+            assert_eq!(blob.0.as_slice(), recovered_bytes.as_slice());
+        }
+    }
+
+    #[test]
+    fn test_preloaded_blob_provider_tampering() {
+        let witness_data = BlobWitnessData::from(gen_blobs(1));
+        // Fail if any bit is wrong
+        for i in 0..witness_data.blobs.len() {
+            // Tamper with blob data
+            (0..BYTES_PER_BLOB).into_par_iter().for_each(|j| {
+                let mut tampered_witness_data = witness_data.clone();
+                tampered_witness_data.blobs[i].0[j] ^= 1;
+
+                assert_ne!(witness_data.blobs[i], tampered_witness_data.blobs[i]);
+                let result =
+                    std::panic::catch_unwind(|| PreloadedBlobProvider::from(tampered_witness_data));
+                assert!(result.is_err());
+            });
+            // Tamper with commitment
+            (0..BYTES_PER_COMMITMENT).into_par_iter().for_each(|j| {
+                (0..8usize).into_par_iter().for_each(|k| {
+                    let mut tampered_witness_data = witness_data.clone();
+                    tampered_witness_data.commitments[i][j] ^= 1 << k;
+
+                    assert_ne!(
+                        witness_data.commitments[i],
+                        tampered_witness_data.commitments[i]
+                    );
+                    let result = std::panic::catch_unwind(|| {
+                        PreloadedBlobProvider::from(tampered_witness_data)
+                    });
+                    assert!(result.is_err());
+                });
+            });
+            // Tamper with proof
+            (0..BYTES_PER_PROOF).into_par_iter().for_each(|j| {
+                (0..8usize).into_par_iter().for_each(|k| {
+                    let mut tampered_witness_data = witness_data.clone();
+                    tampered_witness_data.proofs[i][j] ^= 1 << k;
+
+                    assert_ne!(witness_data.proofs[i], tampered_witness_data.proofs[i]);
+                    let result = std::panic::catch_unwind(|| {
+                        PreloadedBlobProvider::from(tampered_witness_data)
+                    });
+                    assert!(result.is_err());
+                });
+            });
+        }
+        // Succeed on genuine data
+        let _ = PreloadedBlobProvider::from(witness_data);
+    }
+
+    #[tokio::test]
+    async fn test_blob_provider() {
+        let blobs = gen_blobs(32);
+        let blob_witness_data = BlobWitnessData::from(blobs.clone());
+        // serde
+        let blob_witness_data = rkyv::from_bytes::<BlobWitnessData, Error>(
+            rkyv::to_bytes::<Error>(&blob_witness_data)
+                .unwrap()
+                .as_ref(),
+        )
+        .unwrap();
+        let indexed_hashes = blob_witness_data
+            .commitments
+            .iter()
+            .map(|c| IndexedBlobHash {
+                index: 0,
+                hash: kzg_to_versioned_hash(c.as_slice()),
+            })
+            .collect::<Vec<_>>();
+        let mut blob_provider = PreloadedBlobProvider::from(blob_witness_data);
+        let retrieved = blob_provider
+            .get_blobs(&Default::default(), &indexed_hashes)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|b| *b)
+            .collect::<Vec<_>>();
+
+        assert_eq!(blobs, retrieved);
+    }
 }

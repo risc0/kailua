@@ -4638,6 +4638,7 @@ dependencies = [
  "op-alloy-consensus",
  "op-alloy-rpc-types-engine",
  "pot",
+ "rayon",
  "risc0-zkvm",
  "rkyv",
  "serde",

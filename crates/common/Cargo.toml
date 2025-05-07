@@ -51,4 +51,5 @@ serde.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+rayon.workspace = true
 tokio.workspace = true
