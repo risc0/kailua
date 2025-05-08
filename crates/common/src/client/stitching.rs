@@ -392,7 +392,7 @@ pub fn stitch_executions(
         for execution in execution_trace {
             assert_eq!(
                 execution.artifacts.header.receipts_root,
-                crate::executor::compute_receipts_root(
+                kona_executor::compute_receipts_root(
                     execution.artifacts.execution_result.receipts.as_slice(),
                     &boot.rollup_config,
                     execution.attributes.payload_attributes.timestamp

@@ -118,3 +118,32 @@ impl Witness<VecOracle> {
         cloned_with_arc
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::blobs::tests::gen_blobs;
+    use crate::boot::tests::gen_boot_infos;
+    use crate::oracle::vec::tests::prepare_vec_oracle;
+    use alloy_primitives::keccak256;
+
+    pub fn create_test_witness() -> (Witness<VecOracle>, Vec<Vec<u8>>) {
+        let (vec_oracle, values) = prepare_vec_oracle(512, 1);
+        let blobs_witness = BlobWitnessData::from(gen_blobs(10));
+        let witness = Witness {
+            oracle_witness: vec_oracle.clone(),
+            stream_witness: vec_oracle.clone(),
+            blobs_witness,
+            payout_recipient_address: Address::from([0xb0; 20]),
+            precondition_validation_data_hash: keccak256(b"precondition_validation_data_hash"),
+            stitched_executions: vec![],
+            stitched_boot_info: gen_boot_infos(32, 128),
+            fpvm_image_id: keccak256(b"fpvm_image_id"),
+        };
+
+        (witness, values)
+    }
+
+    #[test]
+    pub fn test_witness() {}
+}

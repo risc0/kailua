@@ -385,14 +385,14 @@ pub fn hash_to_fe(hash: B256) -> U256 {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use alloy_eips::eip4844::{BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF};
     use alloy_primitives::keccak256;
     use rayon::prelude::*;
     use rkyv::rancor::Error;
 
-    fn gen_blobs(count: usize) -> Vec<Blob> {
+    pub fn gen_blobs(count: usize) -> Vec<Blob> {
         (0..count)
             .map(|i| {
                 (0..FIELD_ELEMENTS_PER_BLOB)

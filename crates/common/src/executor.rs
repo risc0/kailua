@@ -19,20 +19,17 @@ use crate::rkyv::optimism::OpPayloadAttributesRkyv;
 use crate::rkyv::primitives::B256Def;
 use alloy_consensus::Header;
 use alloy_eips::eip4895::Withdrawal;
-use alloy_eips::Encodable2718;
 use alloy_primitives::{Bytes, Sealed, B256, B64};
 use anyhow::Context;
 use async_trait::async_trait;
 use kona_driver::{Executor, PipelineCursor, TipCursor};
 use kona_executor::BlockBuildingOutcome;
 use kona_genesis::RollupConfig;
-use kona_mpt::ordered_trie_with_encoder;
 use kona_preimage::CommsClient;
 use kona_proof::errors::OracleProviderError;
 use kona_proof::l2::OracleL2ChainProvider;
 use kona_proof::FlushableCache;
 use kona_protocol::{BatchValidationProvider, BlockInfo};
-use op_alloy_consensus::OpReceiptEnvelope;
 use op_alloy_rpc_types_engine::OpPayloadAttributes;
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use spin::RwLock;
@@ -548,74 +545,4 @@ pub fn exec_precondition_hash(executions: &[Arc<Execution>]) -> B256 {
         .try_into()
         .unwrap();
     digest.into()
-}
-
-/// Computes the receipts root based on the provided receipts, rollup configuration, and timestamp.
-///
-/// This function calculates the receipts root using an ordered Merkle trie with a specified encoder.
-/// There is a special handling for the Regolith hardfork due to a known issue in `op-geth` and
-/// `op-erigon`, where the receipt root calculation does not include the deposit nonce in the receipt
-/// encoding. If the Regolith hardfork is active, the deposit nonce is stripped from the receipt
-/// encoding in order to match the receipt root calculation. If the subsequent Canyon hardfork is active,
-/// the normal processing logic applies.
-///
-/// # Parameters
-///
-/// * `receipts` - A slice of `OpReceiptEnvelope` containing the receipts to be included in the
-///   receipts root calculation.
-/// * `config` - A reference to the `RollupConfig` used to determine the active hardforks and their
-///   timestamps.
-/// * `timestamp` - A `u64` timestamp indicating the time at which the computation is being performed,
-///   used to determine the active hardfork.
-///
-/// # Returns
-///
-/// Returns a `B256`, which is the computed hash root of the receipts.
-///
-/// # Special Behavior
-///
-/// * **Regolith Hardfork Active and Canyon Hardfork Inactive**:
-///   When this condition is true, the deposit nonce is stripped from all deposit receipts before
-///   encoding and calculating the Merkle trie root.
-/// * **Normal Case**:
-///   If the Regolith hardfork is not active or the Canyon hardfork is active, the receipts are
-///   processed normally without modifying the deposit nonce.
-///
-/// # Notes
-///
-/// It is important to ensure the provided `RollupConfig` correctly reflects the system's current
-/// hardfork states, as this impacts the calculation logic applied.
-///
-/// # Caveats
-///
-/// - The function's behavior is tailored for Regolith-specific issues in `op-geth` and `op-erigon`. Changes in rollup or Ethereum standards may necessitate updates to this logic.
-pub fn compute_receipts_root(
-    receipts: &[OpReceiptEnvelope],
-    config: &RollupConfig,
-    timestamp: u64,
-) -> B256 {
-    // There is a minor bug in op-geth and op-erigon where in the Regolith hardfork,
-    // the receipt root calculation does not inclide the deposit nonce in the
-    // receipt encoding. In the Regolith hardfork, we must strip the deposit nonce
-    // from the receipt encoding to match the receipt root calculation.
-    if config.is_regolith_active(timestamp) && !config.is_canyon_active(timestamp) {
-        let receipts = receipts
-            .iter()
-            .cloned()
-            .map(|receipt| match receipt {
-                OpReceiptEnvelope::Deposit(mut deposit_receipt) => {
-                    deposit_receipt.receipt.deposit_nonce = None;
-                    OpReceiptEnvelope::Deposit(deposit_receipt)
-                }
-                _ => receipt,
-            })
-            .collect::<Vec<_>>();
-
-        ordered_trie_with_encoder(receipts.as_ref(), |receipt, mut buf| {
-            receipt.encode_2718(&mut buf)
-        })
-        .root()
-    } else {
-        ordered_trie_with_encoder(receipts, |receipt, mut buf| receipt.encode_2718(&mut buf)).root()
-    }
 }

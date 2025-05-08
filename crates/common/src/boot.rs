@@ -28,6 +28,10 @@ use risc0_zkvm::Receipt;
     Copy,
     Debug,
     Default,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
     serde::Serialize,
     serde::Deserialize,
     rkyv::Archive,
@@ -64,5 +68,73 @@ impl From<&Receipt> for StitchedBootInfo {
     /// Converts a `Receipt` reference into the calling type by leveraging the intermediate conversion to `ProofJournal`.
     fn from(value: &Receipt) -> Self {
         Self::from(ProofJournal::from(value))
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::journal::tests::{gen_proof_journals, to_fake_receipt};
+    use alloy_primitives::keccak256;
+    use rkyv::rancor::Error;
+
+    pub fn gen_boot_infos(count: usize, gap: u64) -> Vec<StitchedBootInfo> {
+        let l1_head = keccak256(b"l1_head");
+        (0..count)
+            .map(|i| StitchedBootInfo {
+                l1_head,
+                agreed_l2_output_root: keccak256(format!("l2_output_root {i}")),
+                claimed_l2_output_root: keccak256(format!("l2_output_root {}", i + 1)),
+                claimed_l2_block_number: i as u64 * gap,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_stitched_boot_info() {
+        // test serde
+        for info in gen_boot_infos(12, 64) {
+            let recoded = rkyv::from_bytes::<StitchedBootInfo, Error>(
+                rkyv::to_bytes::<Error>(&info).unwrap().as_ref(),
+            )
+            .unwrap();
+            assert_eq!(info, recoded);
+        }
+    }
+
+    #[test]
+    fn test_stitched_boot_info_conversion() {
+        for proof_journal in gen_proof_journals(12, 64, keccak256(b"config_hash")) {
+            // from proof journal
+            let from_journal = StitchedBootInfo::from(proof_journal);
+            assert_eq!(from_journal.l1_head, proof_journal.l1_head);
+            assert_eq!(
+                from_journal.agreed_l2_output_root,
+                proof_journal.agreed_l2_output_root
+            );
+            assert_eq!(
+                from_journal.claimed_l2_output_root,
+                proof_journal.claimed_l2_output_root
+            );
+            assert_eq!(
+                from_journal.claimed_l2_block_number,
+                proof_journal.claimed_l2_block_number
+            );
+            // from risc0 receipt
+            let from_receipt = StitchedBootInfo::from(&to_fake_receipt(&proof_journal));
+            assert_eq!(from_receipt.l1_head, proof_journal.l1_head);
+            assert_eq!(
+                from_receipt.agreed_l2_output_root,
+                proof_journal.agreed_l2_output_root
+            );
+            assert_eq!(
+                from_receipt.claimed_l2_output_root,
+                proof_journal.claimed_l2_output_root
+            );
+            assert_eq!(
+                from_receipt.claimed_l2_block_number,
+                proof_journal.claimed_l2_block_number
+            );
+        }
     }
 }

@@ -194,82 +194,85 @@ impl From<&Receipt> for ProofJournal {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
-    use alloy_primitives::{Address, B256};
+    use crate::boot::tests::gen_boot_infos;
+    use alloy_primitives::{keccak256, Address, B256};
+    use kona_genesis::RollupConfig;
+    use risc0_zkvm::{FakeReceipt, InnerReceipt, ReceiptClaim};
 
-    #[test]
-    fn test_proof_journal_encoding_decoding() {
-        // Create test data
-        let payout_recipient = Address::from([0x11; 20]);
-        let precondition_hash = B256::from([0x22; 32]);
-        let l1_head = B256::from([0x33; 32]);
-        let agreed_l2_output_root = B256::from([0x44; 32]);
-        let claimed_l2_output_root = B256::from([0x55; 32]);
-        let claimed_l2_block_number = 12345u64;
-        let config_hash = B256::from([0x66; 32]);
-        let fpvm_image_id = B256::from([0x77; 32]);
+    pub fn gen_proof_journals(count: usize, gap: u64, config_hash: B256) -> Vec<ProofJournal> {
+        let payout_recipient = Address::from([0xb0; 20]);
+        let precondition_hash = keccak256(b"precondition_hash");
+        let fpvm_image_id = keccak256(b"fpvm_image_id");
 
-        let stitched_boot_info = StitchedBootInfo {
-            l1_head,
-            agreed_l2_output_root,
-            claimed_l2_output_root,
-            claimed_l2_block_number,
-        };
+        gen_boot_infos(count, gap)
+            .into_iter()
+            .map(|b| {
+                ProofJournal::new_stitched(
+                    fpvm_image_id,
+                    payout_recipient,
+                    precondition_hash,
+                    config_hash,
+                    &b,
+                )
+            })
+            .collect()
+    }
 
-        let journal = ProofJournal::new_stitched(
-            fpvm_image_id,
-            payout_recipient,
-            precondition_hash,
-            config_hash,
-            &stitched_boot_info,
-        );
-
-        // Test encoding and decoding
-        let encoded = journal.encode_packed();
-        let decoded = ProofJournal::decode_packed(&encoded).unwrap();
-
-        assert_eq!(journal, decoded);
+    pub fn to_fake_receipt(proof_journal: &ProofJournal) -> Receipt {
+        let encoded = proof_journal.encode_packed();
+        Receipt::new(
+            InnerReceipt::Fake(FakeReceipt::new(ReceiptClaim::ok(
+                proof_journal.fpvm_image_id.0,
+                encoded.clone(),
+            ))),
+            encoded,
+        )
     }
 
     #[test]
-    fn test_constructors() {
-        // Create test data
-        let payout_recipient = Address::from([0x11; 20]);
-        let precondition_hash = B256::from([0x22; 32]);
-        let l1_head = B256::from([0x33; 32]);
-        let agreed_l2_output_root = B256::from([0x44; 32]);
-        let claimed_l2_output_root = B256::from([0x55; 32]);
-        let claimed_l2_block_number = 12345u64;
-        let fpvm_image_id = B256::from([0x66; 32]);
+    fn test_proof_journal_coding() {
+        let proof_journals = gen_proof_journals(512, 64, keccak256(b"config_hash"));
+        // test serde
+        for journal in proof_journals {
+            let encoded = journal.encode_packed();
+            let decoded = ProofJournal::decode_packed(&encoded).unwrap();
+            assert_eq!(journal, decoded);
+        }
+    }
 
-        let boot_info = BootInfo {
-            l1_head,
-            agreed_l2_output_root,
-            claimed_l2_output_root,
-            claimed_l2_block_number,
-            chain_id: 0,
-            rollup_config: Default::default(),
-        };
+    #[test]
+    fn test_proof_journal_constructor() {
+        let config_hash = B256::from(crate::config::config_hash(&RollupConfig::default()).unwrap());
+        let proof_journals = gen_proof_journals(512, 64, config_hash);
+        // Test constructor
+        for journal in proof_journals {
+            let boot_info = BootInfo {
+                l1_head: journal.l1_head,
+                agreed_l2_output_root: journal.agreed_l2_output_root,
+                claimed_l2_output_root: journal.claimed_l2_output_root,
+                claimed_l2_block_number: journal.claimed_l2_block_number,
+                chain_id: 0,
+                rollup_config: Default::default(),
+            };
+            let new_journal = ProofJournal::new(
+                journal.fpvm_image_id,
+                journal.payout_recipient,
+                journal.precondition_hash,
+                &boot_info,
+            );
+            assert_eq!(new_journal, journal);
+        }
+    }
 
-        let journal = ProofJournal::new(
-            fpvm_image_id,
-            payout_recipient,
-            precondition_hash,
-            &boot_info,
-        );
-
-        // Verify the journal matches expected values
-        assert_eq!(journal.fpvm_image_id, fpvm_image_id);
-        assert_eq!(journal.payout_recipient, payout_recipient);
-        assert_eq!(journal.precondition_hash, precondition_hash);
-        assert_eq!(journal.l1_head, l1_head);
-        assert_eq!(journal.agreed_l2_output_root, agreed_l2_output_root);
-        assert_eq!(journal.claimed_l2_output_root, claimed_l2_output_root);
-        assert_eq!(journal.claimed_l2_block_number, claimed_l2_block_number);
-        assert_eq!(
-            journal.config_hash,
-            B256::from(crate::config::config_hash(&boot_info.rollup_config).unwrap())
-        );
+    #[test]
+    fn test_receipt_conversion() {
+        let proof_journals = gen_proof_journals(512, 64, keccak256(b"config_hash"));
+        // Test conversion
+        for proof_journal in proof_journals {
+            let receipt = to_fake_receipt(&proof_journal);
+            assert_eq!(proof_journal, (&receipt).into());
+        }
     }
 }

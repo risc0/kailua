@@ -148,65 +148,101 @@ where
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use crate::{from_bytes_with, to_bytes_with};
-    use alloy_primitives::{bytes, Address, Bloom, B256, B64, U256};
+    use alloy_primitives::{keccak256, Address, Bloom, B64, U256};
+    use op_alloy_consensus::OpTxType;
+
+    pub fn gen_execution_results(count: usize) -> Vec<BlockExecutionResult<OpReceiptEnvelope>> {
+        (0..count)
+            .map(|i| BlockExecutionResult {
+                receipts: (0..128)
+                    .map(|j| {
+                        OpReceiptEnvelope::from_parts(
+                            j % 2 == 1,
+                            21000 + 100 * j,
+                            vec![],
+                            OpTxType::Legacy,
+                            None,
+                            None,
+                        )
+                    })
+                    .collect(),
+                requests: Requests::new(
+                    (0..32)
+                        .map(|j| {
+                            format!("gen_execution_results requests {i} {j}")
+                                .into_bytes()
+                                .into()
+                        })
+                        .collect(),
+                ),
+                gas_used: U256::from_be_bytes(
+                    keccak256(format!("gen_execution_results gas_used {i}")).0,
+                )
+                .reduce_mod(U256::from(1u128 << 64))
+                .to(),
+            })
+            .collect()
+    }
+
+    pub fn gen_execution_outcomes(count: usize) -> Vec<BlockBuildingOutcome> {
+        gen_execution_results(count)
+            .into_iter()
+            .enumerate()
+            .map(|(i, execution_result)| BlockBuildingOutcome {
+                execution_result,
+                header: Header {
+                    parent_hash: keccak256(format!("parent_hash {i}")),
+                    ommers_hash: keccak256(format!("ommers_hash {i}")),
+                    beneficiary: Address::from([0x33; 20]),
+                    state_root: keccak256(format!("sate_root {i}")),
+                    transactions_root: keccak256(format!("transactions_root {i}")),
+                    receipts_root: keccak256(format!("receipts_root {i}")),
+                    logs_bloom: Bloom::from([0x77; 256]),
+                    difficulty: U256::from_be_bytes(keccak256(format!("difficulty {i}")).0),
+                    number: 0x99,
+                    gas_limit: 0xaa,
+                    gas_used: 0xbb,
+                    timestamp: 0xcc,
+                    extra_data: format!("extra_data {i}").into_bytes().into(),
+                    mix_hash: keccak256(format!("mix_hash {i}")),
+                    nonce: B64::from([0xff; 8]),
+                    base_fee_per_gas: Some(u64::from_be_bytes([0x01; 8])),
+                    withdrawals_root: Some(keccak256(format!("withdrawals_root {i}"))),
+                    blob_gas_used: Some(u64::from_be_bytes([0x03; 8])),
+                    excess_blob_gas: Some(u64::from_be_bytes([0x04; 8])),
+                    parent_beacon_block_root: Some(keccak256(format!(
+                        "parent_beacon_block_root {i}"
+                    ))),
+                    requests_hash: Some(keccak256(format!("requests_hash {i}"))),
+                }
+                .seal_slow(),
+            })
+            .collect()
+    }
 
     #[test]
     fn test_block_building_outcome_rkyv() {
-        let header = Header {
-            parent_hash: B256::from([0x11; 32]),
-            ommers_hash: B256::from([0x22; 32]),
-            beneficiary: Address::from([0x33; 20]),
-            state_root: B256::from([0x44; 32]),
-            transactions_root: B256::from([0x55; 32]),
-            receipts_root: B256::from([0x66; 32]),
-            logs_bloom: Bloom::from([0x77; 256]),
-            difficulty: U256::from_be_bytes([0x88; 32]),
-            number: 0x99,
-            gas_limit: 0xaa,
-            gas_used: 0xbb,
-            timestamp: 0xcc,
-            extra_data: bytes!("0xdd"),
-            mix_hash: B256::from([0xee; 32]),
-            nonce: B64::from([0xff; 8]),
-            base_fee_per_gas: Some(u64::from_be_bytes([0x01; 8])),
-            withdrawals_root: Some(B256::from([0x02; 32])),
-            blob_gas_used: Some(u64::from_be_bytes([0x03; 8])),
-            excess_blob_gas: Some(u64::from_be_bytes([0x04; 8])),
-            parent_beacon_block_root: Some(B256::from([0x05; 32])),
-            requests_hash: Some(B256::from([0x06; 32])),
+        for outcome in gen_execution_outcomes(128) {
+            let serialized = to_bytes_with!(BlockBuildingOutcomeRkyv, &outcome);
+            let deserialized =
+                from_bytes_with!(BlockBuildingOutcomeRkyv, BlockBuildingOutcome, &serialized);
+
+            assert_eq!(outcome.header, deserialized.header);
+            assert_eq!(
+                outcome.execution_result.gas_used,
+                deserialized.execution_result.gas_used
+            );
+            assert_eq!(
+                outcome.execution_result.receipts,
+                deserialized.execution_result.receipts
+            );
+            assert_eq!(
+                outcome.execution_result.requests.take(),
+                deserialized.execution_result.requests.take()
+            );
         }
-        .seal_slow();
-
-        let execution_result = BlockExecutionResult {
-            receipts: vec![],
-            requests: Requests::default(),
-            gas_used: header.gas_used,
-        };
-
-        let outcome = BlockBuildingOutcome {
-            header,
-            execution_result,
-        };
-
-        let serialized = to_bytes_with!(BlockBuildingOutcomeRkyv, &outcome);
-        let deserialized =
-            from_bytes_with!(BlockBuildingOutcomeRkyv, BlockBuildingOutcome, &serialized);
-
-        assert_eq!(outcome.header, deserialized.header);
-        assert_eq!(
-            outcome.execution_result.gas_used,
-            deserialized.execution_result.gas_used
-        );
-        assert_eq!(
-            outcome.execution_result.receipts,
-            deserialized.execution_result.receipts
-        );
-        assert_eq!(
-            outcome.execution_result.requests.take(),
-            deserialized.execution_result.requests.take()
-        );
     }
 }

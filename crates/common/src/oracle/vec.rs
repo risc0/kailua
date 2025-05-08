@@ -463,7 +463,7 @@ pub fn read_shard() -> PreimageVecEntry {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use alloy_primitives::keccak256;
     use kona_preimage::PreimageKeyType;
@@ -472,7 +472,7 @@ mod tests {
     use rkyv::rancor::Error;
     use std::collections::HashSet;
 
-    fn prepare_vec_oracle(value_count: usize, copies: usize) -> (VecOracle, Vec<Vec<u8>>) {
+    pub fn prepare_vec_oracle(value_count: usize, copies: usize) -> (VecOracle, Vec<Vec<u8>>) {
         let mut oracle = VecOracle::default();
         assert_eq!(oracle.preimage_count(), 0);
 
