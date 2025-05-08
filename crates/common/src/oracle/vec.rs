@@ -504,7 +504,7 @@ pub mod tests {
         (oracle, values)
     }
 
-    async fn exhaust_vec_oracle(copies: usize, oracle: VecOracle, values: Vec<Vec<u8>>) {
+    pub async fn exhaust_vec_oracle(copies: usize, oracle: VecOracle, values: Vec<Vec<u8>>) {
         let initial_size = oracle.preimage_count();
         for value in values.iter().rev() {
             let sha3_key = PreimageKey::new_keccak256(keccak256(value).0);

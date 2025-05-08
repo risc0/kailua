@@ -31,14 +31,18 @@ use std::sync::Arc;
 ///
 /// - `Validity`:
 ///   Contains information required to verify a validity proof for a proposal:
-///   - `u64`: Represents the block height of the starting l2 root of the proposal.
-///   - `u64`: Represents the number of output roots expected in the proposal.
-///   - `u64`: Represents the number of blocks covered by each output root.
-///   - `Vec<BlobFetchRequest>`: A list of `BlobFetchRequest` instances,
-///         one for each blob published in the proposal.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+///   - `proposal_l2_head_number`: Represents the block height of the starting l2 root of the proposal.
+///   - `proposal_output_count`: Represents the number of output roots expected in the proposal.
+///   - `output_block_span`: Represents the number of blocks covered by each output root.
+///   - `blob_hashes`: A list of `BlobFetchRequest` instances, one for each blob published in the proposal.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PreconditionValidationData {
-    Validity(u64, u64, u64, Vec<BlobFetchRequest>),
+    Validity {
+        proposal_l2_head_number: u64,
+        proposal_output_count: u64,
+        output_block_span: u64,
+        blob_hashes: Vec<BlobFetchRequest>,
+    },
 }
 
 impl PreconditionValidationData {
@@ -85,7 +89,12 @@ impl PreconditionValidationData {
     /// `PreconditionValidationData` other than `Validity`.
     pub fn blob_fetch_requests(&self) -> &[BlobFetchRequest] {
         match self {
-            PreconditionValidationData::Validity(_, _, _, requests) => requests.as_slice(),
+            PreconditionValidationData::Validity {
+                proposal_l2_head_number: _,
+                proposal_output_count: _,
+                output_block_span: _,
+                blob_hashes: requests,
+            } => requests.as_slice(),
         }
     }
 
@@ -119,12 +128,12 @@ impl PreconditionValidationData {
     /// variants are expected or added, this function will only operate on the relevant data structure.
     pub fn precondition_hash(&self) -> B256 {
         match self {
-            PreconditionValidationData::Validity(
+            PreconditionValidationData::Validity {
                 proposal_l2_head_number,
                 proposal_output_count,
                 output_block_span,
-                blobs,
-            ) => validity_precondition_hash(
+                blob_hashes: blobs,
+            } => validity_precondition_hash(
                 proposal_l2_head_number,
                 proposal_output_count,
                 output_block_span,
@@ -385,12 +394,12 @@ pub fn validate_precondition(
 ) -> anyhow::Result<B256> {
     let precondition_hash = precondition_validation_data.precondition_hash();
     match precondition_validation_data {
-        PreconditionValidationData::Validity(
+        PreconditionValidationData::Validity {
             proposal_l2_head_number,
             proposal_output_count,
             output_block_span,
-            _,
-        ) => {
+            blob_hashes: _,
+        } => {
             // Ensure local and global block ranges match
             if proposal_l2_head_number > proof_l2_head_number {
                 bail!(
@@ -410,17 +419,18 @@ pub fn validate_precondition(
                 if output_block_number > max_block_number {
                     // We should not derive outputs beyond the proposal root claim
                     bail!("Output block #{output_block_number} > max block #{max_block_number}.");
-                } else if output_block_number % output_block_span != 0 {
+                }
+                let offset = output_block_number - proposal_l2_head_number;
+                if offset % output_block_span != 0 {
                     // We only check equivalence every output_block_span blocks
                     continue;
                 }
-                let output_offset =
-                    ((output_block_number - proposal_l2_head_number) / output_block_span) - 1;
-                let blob_index = (output_offset / FIELD_ELEMENTS_PER_BLOB) as usize;
-                let fe_position = (output_offset % FIELD_ELEMENTS_PER_BLOB) as usize;
+                let intermediate_output_offset = (offset / output_block_span) - 1;
+                let blob_index = (intermediate_output_offset / FIELD_ELEMENTS_PER_BLOB) as usize;
+                let fe_position = (intermediate_output_offset % FIELD_ELEMENTS_PER_BLOB) as usize;
                 let blob_fe_index = 32 * fe_position;
                 // Verify fe equivalence to computed outputs for all but last output
-                match output_offset.cmp(&(proposal_output_count - 1)) {
+                match intermediate_output_offset.cmp(&(proposal_output_count - 1)) {
                     Ordering::Less => {
                         // verify equivalence to blob
                         let blob_fe_slice = &blobs[blob_index][blob_fe_index..blob_fe_index + 32];
@@ -445,14 +455,14 @@ pub fn validate_precondition(
                                 blobs.len()
                             );
                         } else if blobs[blob_index][blob_fe_index..].iter().any(|b| b != &0u8) {
-                            bail!("Found non-zero trail data in blob {blob_index}");
+                            bail!("Found non-zero trail data in blob {blob_index} after {blob_fe_index}");
                         }
                     }
                     Ordering::Greater => {
                         // (output_block_number <= max_block_number) implies:
                         // (output_offset <= proposal_output_count)
                         unreachable!(
-                            "Output offset {output_offset} > output count {proposal_output_count}."
+                            "Output offset {intermediate_output_offset} > output count {proposal_output_count}."
                         );
                     }
                 }
@@ -461,4 +471,70 @@ pub fn validate_precondition(
     }
     // Return the precondition hash
     Ok(precondition_hash)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::blobs::tests::gen_blobs;
+    use crate::blobs::BlobWitnessData;
+    use alloy_eips::eip4844::{kzg_to_versioned_hash, IndexedBlobHash, BYTES_PER_BLOB};
+
+    #[test]
+    fn test_validate_precondition() {
+        let mut blobs = gen_blobs(1);
+        for i in 3 * 32..BYTES_PER_BLOB {
+            blobs[0][i] = 0;
+        }
+        let blobs_witness = BlobWitnessData::from(blobs);
+        let blobs_hashes = blobs_witness
+            .commitments
+            .iter()
+            .map(|c| kzg_to_versioned_hash(c.as_slice()))
+            .collect::<Vec<_>>();
+        let blobs_fetch_requests = blobs_hashes
+            .iter()
+            .copied()
+            .map(|hash| BlobFetchRequest {
+                block_ref: Default::default(),
+                blob_hash: IndexedBlobHash { index: 0, hash },
+            })
+            .collect::<Vec<_>>();
+
+        let precondition_validation_data = PreconditionValidationData::Validity {
+            proposal_l2_head_number: 1,
+            proposal_output_count: 4,
+            output_block_span: 4,
+            blob_hashes: blobs_fetch_requests,
+        };
+
+        // test serde
+        {
+            let recoded =
+                pot::from_slice(precondition_validation_data.to_vec().as_slice()).unwrap();
+            assert_eq!(precondition_validation_data, recoded);
+        }
+
+        let output_roots: Vec<B256> = (0..3)
+            .flat_map(|i| {
+                vec![
+                    blobs_witness.blobs[0][i * 32..(i + 1) * 32]
+                        .try_into()
+                        .unwrap();
+                    4
+                ]
+            })
+            .collect();
+
+        assert_eq!(
+            precondition_validation_data.precondition_hash(),
+            validate_precondition(
+                precondition_validation_data,
+                blobs_witness.blobs,
+                1,
+                &output_roots
+            )
+            .unwrap()
+        );
+    }
 }

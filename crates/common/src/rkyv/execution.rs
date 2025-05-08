@@ -202,7 +202,7 @@ pub mod tests {
                     receipts_root: keccak256(format!("receipts_root {i}")),
                     logs_bloom: Bloom::from([0x77; 256]),
                     difficulty: U256::from_be_bytes(keccak256(format!("difficulty {i}")).0),
-                    number: 0x99,
+                    number: i as u64,
                     gas_limit: 0xaa,
                     gas_used: 0xbb,
                     timestamp: 0xcc,

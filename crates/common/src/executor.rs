@@ -546,3 +546,222 @@ pub fn exec_precondition_hash(executions: &[Arc<Execution>]) -> B256 {
         .unwrap();
     digest.into()
 }
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::rkyv::execution::tests::gen_execution_outcomes;
+    use alloy_primitives::{keccak256, Address};
+    use alloy_rpc_types_engine::PayloadAttributes;
+    use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+    use rkyv::rancor::Error;
+    use std::collections::HashSet;
+
+    pub fn gen_executions(count: usize) -> Vec<Arc<Execution>> {
+        gen_execution_outcomes(count)
+            .into_iter()
+            .enumerate()
+            .map(|(i, artifacts)| {
+                Arc::new(Execution {
+                    agreed_output: keccak256(format!("output {i}")),
+                    attributes: OpPayloadAttributes {
+                        payload_attributes: PayloadAttributes {
+                            timestamp: i as u64 * 1024,
+                            prev_randao: keccak256(format!("prev_randao {i}")),
+                            suggested_fee_recipient: Address::from_slice(&[0xf1; 20]),
+                            withdrawals: Some(vec![Withdrawal {
+                                index: 0,
+                                validator_index: 0,
+                                address: Address::from_slice(&[0xf2; 20]),
+                                amount: i as u64 * 1024,
+                            }]),
+                            parent_beacon_block_root: Some(keccak256(format!(
+                                "parent_beacon_block_root {i}"
+                            ))),
+                        },
+                        transactions: Some(vec![format!("transactions {i}")
+                            .as_bytes()
+                            .to_vec()
+                            .into()]),
+                        no_tx_pool: Some(true),
+                        gas_limit: Some(u64::MAX / 2),
+                        eip_1559_params: Some(B64::new([0xb0; 8])),
+                    },
+                    artifacts,
+                    claimed_output: keccak256(format!("output {}", i + 1)),
+                })
+            })
+            .collect()
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct TestExecutor {
+        pub outcomes: Vec<BlockBuildingOutcome>,
+        pub output_roots: Vec<B256>,
+    }
+
+    #[async_trait]
+    impl Executor for TestExecutor {
+        type Error = kona_executor::ExecutorError;
+
+        async fn wait_until_ready(&mut self) {}
+
+        fn update_safe_head(&mut self, _header: Sealed<Header>) {}
+
+        async fn execute_payload(
+            &mut self,
+            _attributes: OpPayloadAttributes,
+        ) -> Result<BlockBuildingOutcome, Self::Error> {
+            self.outcomes
+                .pop()
+                .ok_or(kona_executor::ExecutorError::MissingExecutor)
+        }
+
+        fn compute_output_root(&mut self) -> Result<B256, Self::Error> {
+            self.output_roots
+                .pop()
+                .ok_or(kona_executor::ExecutorError::MissingExecutor)
+        }
+    }
+
+    #[test]
+    fn test_exec_precondition_hash() {
+        let executions = gen_executions(16);
+        // check hash uniqueness over all subsequences
+        let hashes = Arc::new(Mutex::new(HashSet::new()));
+        rayon::scope(|_| {
+            (0..executions.len()).into_par_iter().for_each(|i| {
+                ((i + 1)..executions.len()).into_par_iter().for_each(|j| {
+                    // test hashing uniqueness
+                    let hash = exec_precondition_hash(&executions[i..j]);
+                    {
+                        assert!(hashes.lock().unwrap().insert(hash));
+                    }
+                    // test serde
+                    let trace = executions[i..j].to_vec();
+                    let recoded = rkyv::from_bytes::<Vec<Arc<Execution>>, Error>(
+                        rkyv::to_bytes::<Error>(&trace).unwrap().as_ref(),
+                    )
+                    .unwrap();
+                    assert_eq!(hash, exec_precondition_hash(&recoded));
+                });
+            });
+        });
+    }
+
+    #[tokio::test]
+    async fn test_cached_executor() {
+        let executions = gen_executions(128);
+        let (outcomes, mut output_roots): (Vec<_>, Vec<_>) = executions
+            .iter()
+            .rev()
+            .map(|e| (e.artifacts.clone(), e.claimed_output))
+            .unzip();
+        output_roots.push(keccak256(String::from("output 0")));
+        let test_executor = TestExecutor {
+            outcomes,
+            output_roots,
+        };
+
+        // test without cache or collection target
+        let mut cached_executor = CachedExecutor {
+            cache: vec![],
+            executor: test_executor.clone(),
+            collection_target: None,
+        };
+        for execution in &executions {
+            assert_eq!(
+                cached_executor
+                    .execute_payload(execution.attributes.clone())
+                    .await
+                    .unwrap()
+                    .header,
+                execution.artifacts.header.clone()
+            );
+            cached_executor.wait_until_ready().await;
+            cached_executor.update_safe_head(execution.artifacts.header.clone());
+        }
+
+        // test with collection target
+        let collection_target = Arc::new(Mutex::new(vec![]));
+        let mut cached_executor = CachedExecutor {
+            cache: vec![],
+            executor: test_executor.clone(),
+            collection_target: Some(collection_target.clone()),
+        };
+        for execution in &executions {
+            assert_eq!(
+                cached_executor
+                    .execute_payload(execution.attributes.clone())
+                    .await
+                    .unwrap()
+                    .header,
+                execution.artifacts.header.clone()
+            );
+            {
+                let collected = collection_target.lock().unwrap();
+                assert_eq!(
+                    collected.last().unwrap().artifacts.header,
+                    execution.artifacts.header.clone()
+                );
+            }
+            cached_executor.wait_until_ready().await;
+            cached_executor.update_safe_head(execution.artifacts.header.clone());
+        }
+
+        // test with caching
+        let collection_target = Arc::new(Mutex::new(vec![]));
+        let cache = {
+            let mut cache = executions.clone();
+            cache.reverse();
+            cache
+        };
+        let mut cached_executor = CachedExecutor {
+            cache,
+            executor: test_executor.clone(),
+            collection_target: Some(collection_target.clone()),
+        };
+        for execution in &executions {
+            assert_eq!(
+                cached_executor
+                    .execute_payload(execution.attributes.clone())
+                    .await
+                    .unwrap()
+                    .header,
+                execution.artifacts.header.clone()
+            );
+            {
+                let collected = collection_target.lock().unwrap();
+                assert!(collected.is_empty());
+            }
+            cached_executor.wait_until_ready().await;
+            cached_executor.update_safe_head(execution.artifacts.header.clone());
+        }
+
+        // test with faulty caching
+        let collection_target = Arc::new(Mutex::new(vec![]));
+        let cache = executions.clone();
+        let mut cached_executor = CachedExecutor {
+            cache,
+            executor: test_executor.clone(),
+            collection_target: Some(collection_target.clone()),
+        };
+        for execution in &executions {
+            assert_eq!(
+                cached_executor
+                    .execute_payload(execution.attributes.clone())
+                    .await
+                    .unwrap()
+                    .header,
+                execution.artifacts.header.clone()
+            );
+            cached_executor.wait_until_ready().await;
+            cached_executor.update_safe_head(execution.artifacts.header.clone());
+        }
+        // only the last execution was a cache hit
+        assert_eq!(
+            collection_target.lock().unwrap().len(),
+            executions.len() - 1
+        );
+    }
+}

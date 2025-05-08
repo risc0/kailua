@@ -49,7 +49,7 @@ use serde::{Deserialize, Serialize};
 /// - `Debug`: Implements formatting for debugging purposes.
 /// - `Serialize`: Enables serialization of the struct into formats such as JSON.
 /// - `Deserialize`: Enables deserialization of the struct from serialized formats like JSON.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BlobFetchRequest {
     /// Contains the block height, hash, timestamp, and parent hash.
     pub block_ref: BlockInfo,
@@ -90,7 +90,16 @@ pub struct BlobFetchRequest {
 ///   - Serialized and deserialized using the `rkyv::with::Map` wrapper for `Bytes48Def`.
 ///   - **Usage**: Useful for storing verification proofs efficiently in performance-critical systems.
 #[derive(
-    Clone, Debug, Default, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
+    Clone,
+    Debug,
+    Default,
+    Eq,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
 )]
 pub struct BlobWitnessData {
     /// A collection of `Blob` objects serialized with `rkyv` using the `Map` wrapper for
@@ -521,5 +530,28 @@ pub mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(blobs, retrieved);
+    }
+
+    #[tokio::test]
+    async fn test_blob_provider_bad_query() {
+        let blobs = gen_blobs(32);
+        let blob_witness_data = BlobWitnessData::from(blobs.clone());
+        // exhaust the provider and find nothing
+        let indexed_hashes = blob_witness_data
+            .commitments
+            .iter()
+            .map(|c| IndexedBlobHash {
+                index: 0,
+                hash: !kzg_to_versioned_hash(c.as_slice()), // invert the expected hash
+            })
+            .collect::<Vec<_>>();
+        let mut blob_provider = PreloadedBlobProvider::from(blob_witness_data);
+        let retrieved = blob_provider
+            .get_blobs(&Default::default(), &indexed_hashes)
+            .await
+            .unwrap();
+
+        assert!(retrieved.is_empty());
+        assert!(blob_provider.entries.is_empty());
     }
 }

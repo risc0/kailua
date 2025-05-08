@@ -124,19 +124,24 @@ pub mod tests {
     use super::*;
     use crate::blobs::tests::gen_blobs;
     use crate::boot::tests::gen_boot_infos;
-    use crate::oracle::vec::tests::prepare_vec_oracle;
+    use crate::executor::tests::gen_executions;
+    use crate::oracle::vec::tests::{exhaust_vec_oracle, prepare_vec_oracle};
     use alloy_primitives::keccak256;
+    use std::ops::Deref;
 
     pub fn create_test_witness() -> (Witness<VecOracle>, Vec<Vec<u8>>) {
         let (vec_oracle, values) = prepare_vec_oracle(512, 1);
         let blobs_witness = BlobWitnessData::from(gen_blobs(10));
         let witness = Witness {
-            oracle_witness: vec_oracle.clone(),
-            stream_witness: vec_oracle.clone(),
+            oracle_witness: vec_oracle.deep_clone(),
+            stream_witness: vec_oracle.deep_clone(),
             blobs_witness,
             payout_recipient_address: Address::from([0xb0; 20]),
             precondition_validation_data_hash: keccak256(b"precondition_validation_data_hash"),
-            stitched_executions: vec![],
+            stitched_executions: vec![gen_executions(64)
+                .into_iter()
+                .map(|e| e.deref().clone())
+                .collect()],
             stitched_boot_info: gen_boot_infos(32, 128),
             fpvm_image_id: keccak256(b"fpvm_image_id"),
         };
@@ -144,6 +149,41 @@ pub mod tests {
         (witness, values)
     }
 
-    #[test]
-    pub fn test_witness() {}
+    #[tokio::test]
+    pub async fn test_witness() {
+        let (witness, values) = create_test_witness();
+        // test serde
+        {
+            let recoded = rkyv::from_bytes::<Witness<VecOracle>, rkyv::rancor::Error>(
+                &rkyv::to_bytes::<rkyv::rancor::Error>(&witness).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(
+                witness.oracle_witness.preimages.lock().unwrap().to_vec(),
+                recoded.oracle_witness.preimages.lock().unwrap().to_vec()
+            );
+            assert_eq!(
+                witness.stream_witness.preimages.lock().unwrap().to_vec(),
+                recoded.stream_witness.preimages.lock().unwrap().to_vec()
+            );
+            assert_eq!(witness.blobs_witness, recoded.blobs_witness);
+            assert_eq!(
+                witness.payout_recipient_address,
+                recoded.payout_recipient_address
+            );
+            assert_eq!(
+                witness.precondition_validation_data_hash,
+                recoded.precondition_validation_data_hash
+            );
+            assert_eq!(witness.stitched_boot_info, recoded.stitched_boot_info);
+            assert_eq!(witness.fpvm_image_id, recoded.fpvm_image_id);
+        }
+        // test deep clone
+        let regular_clone = witness.clone();
+        let deep_clone = witness.deep_clone();
+        let preimage_count = regular_clone.oracle_witness.preimage_count();
+        exhaust_vec_oracle(1, witness.oracle_witness, values).await;
+        assert_eq!(regular_clone.oracle_witness.preimage_count(), 0);
+        assert_eq!(deep_clone.oracle_witness.preimage_count(), preimage_count);
+    }
 }

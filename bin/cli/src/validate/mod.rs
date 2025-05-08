@@ -1374,12 +1374,12 @@ async fn request_validity_proof(
             })
         }
         debug_assert!(!validated_blobs.is_empty());
-        Some(PreconditionValidationData::Validity(
-            parent.output_block_number,
-            config.proposal_output_count,
-            config.output_block_span,
-            validated_blobs,
-        ))
+        Some(PreconditionValidationData::Validity {
+            proposal_l2_head_number: parent.output_block_number,
+            proposal_output_count: config.proposal_output_count,
+            output_block_span: config.output_block_span,
+            blob_hashes: validated_blobs,
+        })
     } else {
         None
     };
