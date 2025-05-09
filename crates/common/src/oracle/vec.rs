@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::client::log;
 use crate::oracle::WitnessOracle;
 use crate::oracle::{needs_validation, validate_preimage};
 use crate::rkyv::vec::PreimageVecStoreRkyv;
@@ -25,7 +26,7 @@ use lazy_static::lazy_static;
 use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
-use tracing::{info, warn};
+use tracing::info;
 
 /// A type alias representing an indexed preimage.
 ///
@@ -333,7 +334,7 @@ impl PreimageOracleClient for VecOracle {
     ///
     /// - Any variations in memory access operations or hashing requirements related to hash
     ///   maps are carefully handled, ensuring correctness and avoiding runtime errors.
-    /// - The `warn!` macro is triggered when the temporary queue is non-empty to inform about
+    /// - Logging is triggered when the temporary queue is non-empty to inform about
     ///   queued elements.
     /// - If deserialization or validation operations fail on `zkvm` targets, the function
     ///   panics to notify an error in streamed shard processing.
@@ -379,7 +380,7 @@ impl PreimageOracleClient for VecOracle {
 
                 if key == last_key {
                     if !queue.is_empty() {
-                        warn!("VecOracle temp queue has {} elements", queue.len());
+                        log(&format!("TEMP ELEMENTS: {}", queue.len()));
                         entry.extend(core::mem::take(queue.deref_mut()));
                     }
 

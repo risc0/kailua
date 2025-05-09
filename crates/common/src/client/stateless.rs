@@ -18,7 +18,6 @@ use crate::journal::ProofJournal;
 use crate::oracle::WitnessOracle;
 use crate::witness::Witness;
 use std::sync::Arc;
-use tracing::log::warn;
 
 /// Executes a stateless client workflow by validating witness data, and running the stitching
 /// client to produce a unified proof journal.
@@ -81,10 +80,7 @@ pub fn run_stateless_client<O: WitnessOracle>(witness: Witness<O>) -> ProofJourn
     );
 
     if oracle.preimage_count() > 0 {
-        warn!(
-            "Found {} extra preimages in witness",
-            oracle.preimage_count()
-        );
+        log(&format!("EXTRA PREIMAGES: {}", oracle.preimage_count()));
     }
 
     proof_journal
