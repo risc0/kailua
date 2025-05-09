@@ -400,10 +400,18 @@ pub fn validate_precondition(
             output_block_span,
             blob_hashes: _,
         } => {
+            let max_block_number =
+                proposal_l2_head_number + proposal_output_count * output_block_span;
             // Ensure local and global block ranges match
-            if proposal_l2_head_number > proof_l2_head_number {
+            if proof_l2_head_number < proposal_l2_head_number {
                 bail!(
                     "Validity precondition proposal starting block #{} > proof agreed l2 head #{}",
+                    proposal_l2_head_number,
+                    proof_l2_head_number
+                )
+            } else if max_block_number <= proof_l2_head_number {
+                bail!(
+                    "Validity precondition proposal ending block #{} <= proof agreed l2 head #{}",
                     proposal_l2_head_number,
                     proof_l2_head_number
                 )
@@ -412,8 +420,6 @@ pub fn validate_precondition(
                 return Ok(precondition_hash);
             }
             // Calculate blob index pointer
-            let max_block_number =
-                proposal_l2_head_number + proposal_output_count * output_block_span;
             for (i, output_hash) in output_roots.iter().enumerate() {
                 let output_block_number = proof_l2_head_number + i as u64 + 1;
                 if output_block_number > max_block_number {
@@ -477,64 +483,288 @@ pub fn validate_precondition(
 mod tests {
     use super::*;
     use crate::blobs::tests::gen_blobs;
-    use crate::blobs::BlobWitnessData;
+    use crate::blobs::{intermediate_outputs, BlobWitnessData, PreloadedBlobProvider};
+    use crate::oracle::vec::VecOracle;
+    use crate::oracle::WitnessOracle;
     use alloy_eips::eip4844::{kzg_to_versioned_hash, IndexedBlobHash, BYTES_PER_BLOB};
+    use kona_proof::block_on;
+    use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
-    #[test]
-    fn test_validate_precondition() {
-        let mut blobs = gen_blobs(1);
-        for i in 3 * 32..BYTES_PER_BLOB {
-            blobs[0][i] = 0;
-        }
+    pub fn gen_blobs_requests(blobs: Vec<Blob>) -> Vec<BlobFetchRequest> {
         let blobs_witness = BlobWitnessData::from(blobs);
         let blobs_hashes = blobs_witness
             .commitments
             .iter()
             .map(|c| kzg_to_versioned_hash(c.as_slice()))
             .collect::<Vec<_>>();
-        let blobs_fetch_requests = blobs_hashes
+        blobs_hashes
             .iter()
             .copied()
             .map(|hash| BlobFetchRequest {
                 block_ref: Default::default(),
                 blob_hash: IndexedBlobHash { index: 0, hash },
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+    }
 
-        let precondition_validation_data = PreconditionValidationData::Validity {
-            proposal_l2_head_number: 1,
-            proposal_output_count: 4,
-            output_block_span: 4,
-            blob_hashes: blobs_fetch_requests,
-        };
+    #[tokio::test]
+    async fn test_load_precondition_data() {
+        let max_blobs = 6;
+        (1..=max_blobs).into_par_iter().for_each(|n| {
+            // println!("Testing with {n} blobs");
+            let blobs = gen_blobs(n);
+            // create remaining dummy data
+            let blobs_witness = BlobWitnessData::from(blobs);
+            let blobs_hashes = blobs_witness
+                .commitments
+                .iter()
+                .map(|c| kzg_to_versioned_hash(c.as_slice()))
+                .collect::<Vec<_>>();
+            let beacon = PreloadedBlobProvider::from(blobs_witness);
+            let blobs_fetch_requests = blobs_hashes
+                .iter()
+                .copied()
+                .map(|hash| BlobFetchRequest {
+                    block_ref: Default::default(),
+                    blob_hash: IndexedBlobHash { index: 0, hash },
+                })
+                .collect::<Vec<_>>();
+            // The number of outputs published is the root claim + non-zero blob elements
+            let proposal_output_count =
+                1 + (n as u64) * FIELD_ELEMENTS_PER_BLOB - FIELD_ELEMENTS_PER_BLOB / 2;
+            // Test over different configurations
+            for proposal_l2_head_number in [1, 2, 5, 7, proposal_output_count] {
+                // println!("Testing with {proposal_l2_head_number} L2 head");
+                for output_block_span in [1, 2, 7, 11, 13] {
+                    // println!("Testing with {output_block_span} output block span");
+                    let precondition_validation_data = PreconditionValidationData::Validity {
+                        proposal_l2_head_number,
+                        proposal_output_count,
+                        output_block_span,
+                        blob_hashes: blobs_fetch_requests.clone(),
+                    };
+                    // test data loading
+                    let precondition_data_hash = precondition_validation_data.hash();
+                    let mut oracle = VecOracle::default();
+                    oracle.insert_preimage(
+                        PreimageKey::new(precondition_data_hash.0, PreimageKeyType::Sha256),
+                        precondition_validation_data.to_vec(),
+                    );
+                    let oracle = Arc::new(oracle);
+                    // load nothing when hash is zero
+                    assert!(block_on(load_precondition_data(
+                        B256::ZERO,
+                        oracle.clone(),
+                        &mut beacon.clone(),
+                    ))
+                    .unwrap()
+                    .is_none());
+                    // successfully load with proper hash
+                    let reloaded = block_on(load_precondition_data(
+                        precondition_data_hash,
+                        oracle.clone(),
+                        &mut beacon.clone(),
+                    ))
+                    .unwrap()
+                    .unwrap()
+                    .0;
+                    assert_eq!(reloaded, precondition_validation_data);
+                }
+            }
+        });
+    }
 
-        // test serde
-        {
-            let recoded =
-                pot::from_slice(precondition_validation_data.to_vec().as_slice()).unwrap();
-            assert_eq!(precondition_validation_data, recoded);
-        }
+    #[test]
+    fn test_validate_precondition_bad_start() {
+        assert!(validate_precondition(
+            PreconditionValidationData::Validity {
+                proposal_l2_head_number: 100,
+                proposal_output_count: 100,
+                output_block_span: 1,
+                blob_hashes: vec![],
+            },
+            vec![],
+            1,
+            &[]
+        )
+        .is_err_and(|e| e
+            .to_string()
+            .contains("proposal starting block #100 > proof agreed l2 head #1")));
+    }
 
-        let output_roots: Vec<B256> = (0..3)
-            .flat_map(|i| {
-                vec![
-                    blobs_witness.blobs[0][i * 32..(i + 1) * 32]
-                        .try_into()
-                        .unwrap();
-                    4
-                ]
-            })
-            .collect();
-
-        assert_eq!(
-            precondition_validation_data.precondition_hash(),
-            validate_precondition(
-                precondition_validation_data,
-                blobs_witness.blobs,
-                1,
-                &output_roots
-            )
+    #[test]
+    fn test_validate_precondition_tamper() {
+        let blobs = gen_blobs(2);
+        let blobs_fetch_requests = gen_blobs_requests(blobs.clone());
+        // fail to validate trail with too many blobs
+        let output_roots = intermediate_outputs(Box::new(blobs[0]), 1024)
             .unwrap()
+            .into_iter()
+            .map(|fe| B256::from(fe.to_be_bytes::<32>()))
+            .collect::<Vec<_>>();
+        let result = validate_precondition(
+            PreconditionValidationData::Validity {
+                proposal_l2_head_number: 1,
+                proposal_output_count: 1024,
+                output_block_span: 1,
+                blob_hashes: blobs_fetch_requests.clone(),
+            },
+            blobs.clone(),
+            1,
+            &output_roots,
         );
+        assert!(result.is_err_and(|e| e
+            .to_string()
+            .contains("Expected trail data to begin at blob 0/2")));
+        // fail to validate non-zero trail data after 1023 * 32 = 32768 bytes
+        let result = validate_precondition(
+            PreconditionValidationData::Validity {
+                proposal_l2_head_number: 1,
+                proposal_output_count: 1024,
+                output_block_span: 1,
+                blob_hashes: blobs_fetch_requests[..1].to_vec(),
+            },
+            blobs[..1].to_vec(),
+            1,
+            &output_roots,
+        );
+        assert!(result.is_err_and(|e| e
+            .to_string()
+            .contains("Found non-zero trail data in blob 0 after 32736")));
+        // fail to validate extra output roots
+        let mut blobs = blobs[..1].to_vec();
+        let blobs_fetch_requests = gen_blobs_requests(blobs.clone());
+        for i in 500 * 32..501 * 32 {
+            blobs[0][i] = !blobs[0][i];
+        }
+        let result = validate_precondition(
+            PreconditionValidationData::Validity {
+                proposal_l2_head_number: 1,
+                proposal_output_count: 1024,
+                output_block_span: 1,
+                blob_hashes: blobs_fetch_requests,
+            },
+            blobs,
+            1,
+            &output_roots,
+        );
+        assert!(result.is_err_and(|e| e
+            .to_string()
+            .contains("Bad fe #500 in blob 0 for block #502")));
+    }
+
+    #[tokio::test]
+    async fn test_validate_precondition() {
+        let m = BYTES_PER_BLOB / 2;
+        // test for various blob counts
+        let max_blobs = 6;
+        (1..=max_blobs).into_par_iter().for_each(|n| {
+            // println!("Testing with {n} blobs");
+            let mut blobs = gen_blobs(n);
+            // Zero out the last half of the last blob
+            for i in m..BYTES_PER_BLOB {
+                blobs[n - 1][i] = 0;
+            }
+            // create remaining dummy data
+            let blobs_fetch_requests = gen_blobs_requests(blobs.clone());
+            // The number of outputs published is the root claim + non-zero blob elements
+            let proposal_output_count =
+                1 + (n as u64) * FIELD_ELEMENTS_PER_BLOB - FIELD_ELEMENTS_PER_BLOB / 2;
+            // Test over different configurations
+            for proposal_l2_head_number in [1, 2, 5, 7, proposal_output_count] {
+                // println!("Testing with {proposal_l2_head_number} L2 head");
+                for output_block_span in [1, 2, 7, 11, 13] {
+                    // println!("Testing with {output_block_span} output block span");
+                    let precondition_validation_data = PreconditionValidationData::Validity {
+                        proposal_l2_head_number,
+                        proposal_output_count,
+                        output_block_span,
+                        blob_hashes: blobs_fetch_requests.clone(),
+                    };
+                    // check requests referencing
+                    assert_eq!(
+                        precondition_validation_data.blob_fetch_requests(),
+                        blobs_fetch_requests.as_slice()
+                    );
+                    // test serde
+                    {
+                        let recoded =
+                            pot::from_slice(precondition_validation_data.to_vec().as_slice())
+                                .unwrap();
+                        assert_eq!(precondition_validation_data, recoded);
+                    }
+                    // check hashing
+                    let precondition_hash = validity_precondition_hash(
+                        &proposal_l2_head_number,
+                        &proposal_output_count,
+                        &output_block_span,
+                        precondition_validation_data.blobs_hash(),
+                    );
+                    assert_eq!(
+                        precondition_hash,
+                        precondition_validation_data.precondition_hash()
+                    );
+                    // test over different subsequences
+                    let max_offset = (n as u64) * FIELD_ELEMENTS_PER_BLOB;
+                    let starting_points = (0..max_blobs as u64)
+                        .flat_map(|i| {
+                            vec![
+                                i * FIELD_ELEMENTS_PER_BLOB,
+                                i * FIELD_ELEMENTS_PER_BLOB + FIELD_ELEMENTS_PER_BLOB / 2,
+                            ]
+                        })
+                        .collect::<Vec<_>>();
+                    for starting_offset in starting_points {
+                        let ending_points = (0..n as u64)
+                            .flat_map(|i| {
+                                vec![
+                                    i * FIELD_ELEMENTS_PER_BLOB,
+                                    i * FIELD_ELEMENTS_PER_BLOB + FIELD_ELEMENTS_PER_BLOB / 2,
+                                ]
+                            })
+                            .map(|p| p + starting_offset)
+                            .collect::<Vec<_>>();
+                        for ending_offset in ending_points {
+                            let output_roots: Vec<B256> = (starting_offset..ending_offset)
+                                .filter(|i| *i < max_offset)
+                                .flat_map(|i| {
+                                    let bi = (i / FIELD_ELEMENTS_PER_BLOB) as usize;
+                                    let fi = (i % FIELD_ELEMENTS_PER_BLOB) as usize;
+                                    // replicate the target output as needed
+                                    vec![
+                                        blobs[bi][fi * 32..(fi + 1) * 32].try_into().unwrap();
+                                        output_block_span as usize
+                                    ]
+                                })
+                                .collect();
+
+                            let proof_l2_head_number =
+                                proposal_l2_head_number + starting_offset * output_block_span;
+                            let result = validate_precondition(
+                                precondition_validation_data.clone(),
+                                blobs.clone(),
+                                proof_l2_head_number,
+                                &output_roots,
+                            );
+                            if starting_offset < max_offset && ending_offset < max_offset {
+                                // println!("Testing starting offset {starting_offset} ending offset {ending_offset}");
+                                // check correct validation
+                                assert_eq!(precondition_hash, result.unwrap());
+                            } else if starting_offset < max_offset {
+                                // fail the attempt to continue validating beyond max block
+                                assert!(
+                                    result.is_err_and(|e| e.to_string().contains("> max block"))
+                                );
+                            } else {
+                                // fail the attempt to start validating beyond max block
+                                assert!(result.is_err_and(|e| e
+                                    .to_string()
+                                    .contains("<= proof agreed l2 head")));
+                            }
+                        }
+                    }
+                }
+            }
+        });
     }
 }

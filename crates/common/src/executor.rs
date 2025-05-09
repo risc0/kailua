@@ -550,9 +550,13 @@ pub fn exec_precondition_hash(executions: &[Arc<Execution>]) -> B256 {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::oracle::vec::VecOracle;
+    use crate::oracle::WitnessOracle;
     use crate::rkyv::execution::tests::gen_execution_outcomes;
-    use alloy_primitives::{keccak256, Address};
+    use alloy_primitives::{keccak256, Address, Sealable};
     use alloy_rpc_types_engine::PayloadAttributes;
+    use kona_mpt::TrieNode;
+    use kona_preimage::PreimageKey;
     use rayon::prelude::{IntoParallelIterator, ParallelIterator};
     use rkyv::rancor::Error;
     use std::collections::HashSet;
@@ -763,5 +767,39 @@ pub mod tests {
             collection_target.lock().unwrap().len(),
             executions.len() - 1
         );
+    }
+
+    #[tokio::test]
+    pub async fn test_execution_cursor() {
+        // prepare oracle data
+        let mut vec_oracle = VecOracle::default();
+        let safe_head = Header {
+            number: 0,
+            ..Default::default()
+        };
+        let safe_head_hash = safe_head.hash_slow();
+        vec_oracle.insert_preimage(
+            PreimageKey::new_keccak256(safe_head_hash.0),
+            alloy_rlp::encode(&safe_head),
+        );
+        vec_oracle.insert_preimage(
+            PreimageKey::new_keccak256(TrieNode::Empty.blind().0),
+            alloy_rlp::encode(&TrieNode::Empty),
+        );
+        vec_oracle.insert_preimage(
+            PreimageKey::new_keccak256(safe_head_hash.0),
+            alloy_rlp::encode(&safe_head),
+        );
+        // create cursor
+        let rollup_config = Arc::new({
+            let mut config = RollupConfig::default();
+            config.genesis.l2.hash = safe_head_hash;
+            config
+        });
+        let mut provider =
+            OracleL2ChainProvider::new(safe_head_hash, rollup_config.clone(), Arc::new(vec_oracle));
+        new_execution_cursor(rollup_config.as_ref(), safe_head.seal_slow(), &mut provider)
+            .await
+            .unwrap();
     }
 }

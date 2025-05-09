@@ -18,7 +18,6 @@ use alloy_eips::eip4844::{
     kzg_to_versioned_hash, Blob, IndexedBlobHash, BLS_MODULUS, FIELD_ELEMENTS_PER_BLOB,
 };
 use alloy_primitives::{B256, U256};
-use alloy_rpc_types_beacon::sidecar::BlobData;
 use async_trait::async_trait;
 use c_kzg::{ethereum_kzg_settings, Bytes48};
 use kona_derive::errors::BlobProviderError;
@@ -319,10 +318,10 @@ impl BlobProvider for PreloadedBlobProvider {
 ///
 /// # Arguments
 ///
-/// * `blob_data` - A reference to the `BlobData` structure containing the data to process.
+/// * `blob` - A reference to the `Blob` structure containing the data to process.
 /// * `blocks` - The number of blocks to use for computation.
-pub fn intermediate_outputs(blob_data: &BlobData, blocks: usize) -> anyhow::Result<Vec<U256>> {
-    field_elements(blob_data, 0..blocks)
+pub fn intermediate_outputs(blob: impl AsRef<Blob>, blocks: usize) -> anyhow::Result<Vec<U256>> {
+    field_elements(blob, 0..blocks)
 }
 
 /// Extracts a vector of field elements from the provided blob data within a specific range.
@@ -334,8 +333,8 @@ pub fn intermediate_outputs(blob_data: &BlobData, blocks: usize) -> anyhow::Resu
 ///
 /// * `blob_data` - A reference to a `BlobData` structure containing the data to extract field elements from.
 /// * `blocks` - The starting index for the extraction from the blob data.
-pub fn trail_data(blob_data: &BlobData, blocks: usize) -> anyhow::Result<Vec<U256>> {
-    field_elements(blob_data, blocks..FIELD_ELEMENTS_PER_BLOB as usize)
+pub fn trail_data(blob: impl AsRef<Blob>, blocks: usize) -> anyhow::Result<Vec<U256>> {
+    field_elements(blob, blocks..FIELD_ELEMENTS_PER_BLOB as usize)
 }
 
 /// Extracts field elements from a given blob using specified indices.
@@ -367,12 +366,12 @@ pub fn trail_data(blob_data: &BlobData, blocks: usize) -> anyhow::Result<Vec<U25
 /// - The index calculated by `32 * i` exceeds the bounds of `blob_data.blob.0`.
 /// - The underlying slice operation fails to produce a valid 32-byte array.
 pub fn field_elements(
-    blob_data: &BlobData,
+    blob: impl AsRef<Blob>,
     iterator: impl Iterator<Item = usize>,
 ) -> anyhow::Result<Vec<U256>> {
     let mut field_elements = vec![];
     for index in iterator.map(|i| 32 * i) {
-        let bytes: [u8; 32] = blob_data.blob.0[index..index + 32].try_into()?;
+        let bytes: [u8; 32] = blob.as_ref().0[index..index + 32].try_into()?;
         field_elements.push(U256::from_be_bytes(bytes));
     }
     Ok(field_elements)
@@ -398,6 +397,7 @@ pub mod tests {
     use super::*;
     use alloy_eips::eip4844::{BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF};
     use alloy_primitives::keccak256;
+    use alloy_rpc_types_beacon::sidecar::BlobData;
     use rayon::prelude::*;
     use rkyv::rancor::Error;
 
@@ -440,8 +440,8 @@ pub mod tests {
             };
             let blocks = 64 * i;
             let recovered_bytes = [
-                intermediate_outputs(&blob_data, blocks).unwrap(),
-                trail_data(&blob_data, blocks).unwrap(),
+                intermediate_outputs(&blob_data.blob, blocks).unwrap(),
+                trail_data(&blob_data.blob, blocks).unwrap(),
             ]
             .concat()
             .into_iter()
