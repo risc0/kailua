@@ -85,21 +85,21 @@ kailua-common = { path = "crates/common" }
 kailua-contracts = { path = "crates/contracts" }
 kailua-host = { path = "bin/host" }
 
-# Kona git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.0"
-kona-cli = { git = "https://github.com/risc0/kona", branch="rkhalil/compute-receipts-root", default-features = false }
-kona-client = { git = "https://github.com/risc0/kona", branch="rkhalil/compute-receipts-root", default-features = false }
-kona-derive = { git = "https://github.com/risc0/kona", branch="rkhalil/compute-receipts-root", default-features = false, features = ["serde"] }
-kona-driver = { git = "https://github.com/risc0/kona", branch="rkhalil/compute-receipts-root" }
-kona-executor = { git = "https://github.com/risc0/kona", branch="rkhalil/compute-receipts-root" }
-kona-genesis = { git = "https://github.com/risc0/kona", branch="rkhalil/compute-receipts-root" }
-kona-host = { git = "https://github.com/risc0/kona", branch="rkhalil/compute-receipts-root", default-features = false, features = ["single"] }
-kona-mpt = { git = "https://github.com/risc0/kona", branch="rkhalil/compute-receipts-root", features = ["serde"] }
-kona-preimage = { git = "https://github.com/risc0/kona", branch="rkhalil/compute-receipts-root", features = ["serde", "rkyv", "std"] }
-kona-proof = { git = "https://github.com/risc0/kona", branch="rkhalil/compute-receipts-root" }
-kona-protocol = { git = "https://github.com/risc0/kona", branch="rkhalil/compute-receipts-root" }
-kona-providers-alloy = { git = "https://github.com/risc0/kona", branch="rkhalil/compute-receipts-root" }
-kona-registry = { git = "https://github.com/risc0/kona", branch="rkhalil/compute-receipts-root" }
-kona-std-fpvm = { git = "https://github.com/risc0/kona", branch="rkhalil/compute-receipts-root" }
+# Kona git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1"
+kona-cli = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1", default-features = false }
+kona-client = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1", default-features = false }
+kona-derive = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1", default-features = false, features = ["serde"] }
+kona-driver = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
+kona-executor = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
+kona-genesis = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
+kona-host = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1", default-features = false, features = ["single"] }
+kona-mpt = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1", features = ["serde"] }
+kona-preimage = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1", features = ["serde", "rkyv", "std"] }
+kona-proof = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
+kona-protocol = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
+kona-providers-alloy = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
+kona-registry = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
+kona-std-fpvm = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
 
 # Boundless
 bonsai-sdk = { version = "1.4.0", features = ["non_blocking"] }
