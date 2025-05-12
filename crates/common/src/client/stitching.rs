@@ -99,7 +99,7 @@ pub struct StitchedData {
 /// - **Execution Queueing:** Precomputed executions are split into direct executables and cache components
 ///   for intermediate processing.
 /// - **Output Validation:** Computes the output hash of the target block using a helper method
-///   (`run_kailua_client`) and validates the precondition against the provided hash.
+///   (`run_core_client`) and validates the precondition against the provided hash.
 /// - **Proof Loading (Conditional):** For zero-knowledge validations (`zkvm`), loads previously
 ///   proven FPVM journals to maintain composability and recursive proof validation.
 /// - **Execution Stitching:** Merges the precomputed execution proofs into a single verifiable
@@ -116,13 +116,13 @@ pub struct StitchedData {
 /// # Panics
 ///
 /// This function will panic if:
-/// - The output hash computation (`run_kailua_client`) fails.
+/// - The output hash computation (`run_core_client`) fails.
 ///
 /// # Dependencies
 ///
 /// This operation relies on external functions such as:
 /// - `split_executions` for precomputing execution splits.
-/// - `run_kailua_client` for output hash computation.
+/// - `run_core_client` for output hash computation.
 /// - `load_stitching_journals` (conditionally) for loading proven journals.
 /// - `stitch_executions` and `stitch_boot_info` for stitching different components of proof data.
 ///
@@ -154,7 +154,7 @@ where
 
     // Attempt to recompute the output hash at the target block number using kona
     log("RUN");
-    let (boot, precondition_hash) = crate::client::run_kailua_client(
+    let (boot, precondition_hash) = crate::client::core::run_core_client(
         precondition_validation_data_hash,
         oracle,
         stream,

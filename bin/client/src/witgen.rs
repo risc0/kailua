@@ -62,7 +62,7 @@ where
     };
     // Run client
     let collection_target = Arc::new(Mutex::new(Vec::new()));
-    let (boot, precondition_hash) = kailua_common::client::run_kailua_client(
+    let (boot, precondition_hash) = kailua_common::client::core::run_core_client(
         precondition_validation_data_hash,
         oracle,
         stream,

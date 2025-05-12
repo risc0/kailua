@@ -234,13 +234,17 @@ impl From<BlobWitnessData> for PreloadedBlobProvider {
             .into_iter()
             .map(|b| c_kzg::Blob::new(b.0))
             .collect::<Vec<_>>();
-        assert!(ethereum_kzg_settings(0)
-            .verify_blob_kzg_proof_batch(
-                blobs.as_slice(),
-                value.commitments.as_slice(),
-                value.proofs.as_slice(),
-            )
-            .expect("Failed to batch validate kzg proofs"));
+        assert!(
+            ethereum_kzg_settings(0)
+                .verify_blob_kzg_proof_batch(
+                    blobs.as_slice(),
+                    value.commitments.as_slice(),
+                    value.proofs.as_slice(),
+                )
+                .expect("Failed to batch validate kzg proofs"),
+            "Blob KZG proof batch verification failed"
+        );
+
         let hashes = value
             .commitments
             .iter()

@@ -836,7 +836,8 @@ dependencies = [
 [[package]]
 name = "blst"
 version = "0.3.14"
-source = "git+https://github.com/risc0/blst?tag=blst%2Fv0.3.14-risczero.0#4bb7133be362fce47525dc0c877e058e5a6db5ac"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47c79a94619fade3c0b887670333513a67ac28a6a7e653eb260bf0d4103db38d"
 dependencies = [
  "cc",
  "glob",
@@ -2151,7 +2152,7 @@ dependencies = [
  "cfg-if",
  "ecdsa",
  "elliptic-curve",
- "risc0-bigint2 1.2.3",
+ "risc0-bigint2 1.4.2",
  "serdect",
  "sha2",
 ]
@@ -3528,9 +3529,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-bigint2"
-version = "1.2.3"
+version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d35dd8c534a739099bfb3e5ccfb40ab6e104865205fc3863448cd1e97af6a594"
+checksum = "921e2d3d07a327750f657c0d42cf9437024583b218ad05b24b91a557f5d01979"
 dependencies = [
  "include_bytes_aligned",
  "stability",
