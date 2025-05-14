@@ -401,7 +401,7 @@ pub fn validate_precondition(
             output_block_span,
             blob_hashes: _,
         } => {
-            let max_block_number =
+            let proposal_root_claim_block_number =
                 proposal_l2_head_number + proposal_output_count * output_block_span;
             // Ensure local and global block ranges match
             if proof_l2_head_number < proposal_l2_head_number {
@@ -410,9 +410,9 @@ pub fn validate_precondition(
                     proposal_l2_head_number,
                     proof_l2_head_number
                 )
-            } else if max_block_number <= proof_l2_head_number {
+            } else if proposal_root_claim_block_number < proof_l2_head_number {
                 bail!(
-                    "Validity precondition proposal ending block #{} <= proof agreed l2 head #{}",
+                    "Validity precondition proposal ending block #{} < proof agreed l2 head #{}",
                     proposal_l2_head_number,
                     proof_l2_head_number
                 )
@@ -423,9 +423,9 @@ pub fn validate_precondition(
             // Calculate blob index pointer
             for (i, output_hash) in output_roots.iter().enumerate() {
                 let output_block_number = proof_l2_head_number + i as u64 + 1;
-                if output_block_number > max_block_number {
+                if output_block_number > proposal_root_claim_block_number {
                     // We should not derive outputs beyond the proposal root claim
-                    bail!("Output block #{output_block_number} > max block #{max_block_number}.");
+                    bail!("Output block #{output_block_number} > max block #{proposal_root_claim_block_number}.");
                 }
                 let offset = output_block_number - proposal_l2_head_number;
                 if offset % output_block_span != 0 {
@@ -762,7 +762,7 @@ mod tests {
                                 // fail the attempt to start validating beyond max block
                                 assert!(result.is_err_and(|e| e
                                     .to_string()
-                                    .contains("<= proof agreed l2 head")));
+                                    .contains("< proof agreed l2 head")));
                             }
                         }
                     }

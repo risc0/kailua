@@ -51,6 +51,21 @@ pub mod tests {
     use tokio::sync::RwLock;
     use tokio::task::block_in_place;
 
+    #[test]
+    fn test_oracle_cloning() {
+        let oracle = TestOracle::new(BootInfo {
+            l1_head: Default::default(),
+            agreed_l2_output_root: Default::default(),
+            claimed_l2_output_root: Default::default(),
+            claimed_l2_block_number: 0,
+            chain_id: 0,
+            rollup_config: Default::default(),
+        });
+        let cloned = oracle.clone();
+        // avoid double dropping
+        assert!(cloned.temp_dir.is_none());
+    }
+
     #[derive(Debug)]
     pub struct TestOracle<T: KeyValueStore + Send + Sync> {
         pub kv: Arc<RwLock<T>>,

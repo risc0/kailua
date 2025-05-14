@@ -16,53 +16,22 @@ use crate::boot::StitchedBootInfo;
 use crate::client::log;
 use crate::executor::Execution;
 use crate::journal::ProofJournal;
-use alloy_primitives::map::HashSet;
 use alloy_primitives::{Address, B256};
 use kona_derive::prelude::BlobProvider;
 use kona_preimage::CommsClient;
 use kona_proof::{BootInfo, FlushableCache};
-use risc0_zkvm::serde::Deserializer;
-use risc0_zkvm::sha::{Digest, Digestible};
-use risc0_zkvm::Receipt;
-use serde::Deserialize;
 use std::fmt::Debug;
 use std::sync::Arc;
-
-/// A data structure representing stitched information, including executions,
-/// boot information, and proofs, intended for caching, combining, and validation.
-///
-/// # Fields
-///
-/// * `stitched_executions (Vec<Vec<Execution>>)`
-///   - A collection of execution traces, organized into groups, which serve as a cache
-///     of recorded execution sequences. Each `Vec<Execution>` represents a single group
-///     of executions.
-///
-/// * `stitched_boot_info (Vec<StitchedBootInfo>)`
-///   - A list of continuous bootstrap information objects, which are combined
-///     to support a unified bootstrapping record.
-///
-/// * `stitched_proofs (Vec<Receipt>)`
-///   - A collection of receipt objects used for validation.
-///     This field is marked with `rkyv::with::Skip` to avoid including it
-///     during serialization or deserialization when using the `rkyv` library.
-///
-/// # Usage
-///
-/// This struct can be used in scenarios where execution traces and boot information
-/// need to be aggregated and later validated using proofs. Its efficient structure
-/// and support for serialization/deserialization facilitates its use in contexts
-/// requiring storage, transport, and archival.
-#[derive(Clone, Debug, Default, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
-pub struct StitchedData {
-    /// Collection of execution traces to use as a cache
-    pub stitched_executions: Vec<Vec<Execution>>,
-    /// List of contiguous bootstrap information to combine
-    pub stitched_boot_info: Vec<StitchedBootInfo>,
-    /// Collection of receipts to validate
-    #[rkyv(with = rkyv::with::Skip)]
-    pub stitched_proofs: Vec<Receipt>,
-}
+#[cfg(target_os = "zkvm")]
+use {
+    alloy_primitives::map::HashSet,
+    risc0_zkvm::{
+        serde::Deserializer,
+        sha::{Digest, Digestible},
+        Receipt,
+    },
+    serde::Deserialize,
+};
 
 /// Executes the primary operation of stitching together execution and boot information for a client,
 /// while maintaining composable proofs for validation in a zero-knowledge environment.
@@ -228,6 +197,7 @@ where
 ///   receipts.
 /// - This function is designed for environments where proofs generated externally are verified
 ///   within the FPVM.
+#[cfg(target_os = "zkvm")]
 pub fn load_stitching_journals(fpvm_image_id: B256) -> HashSet<Digest> {
     log("VERIFY");
 
@@ -536,4 +506,399 @@ pub fn stitch_boot_info(
     }
 
     stitched_journal
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::client::core::tests::test_derivation;
+    use crate::client::tests::TestOracle;
+    use crate::precondition::PreconditionValidationData;
+    use alloy_primitives::b256;
+    use anyhow::Context;
+    use kona_proof::l1::OracleBlobProvider;
+    use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+    use tracing_subscriber::EnvFilter;
+
+    fn setup() {
+        let _ = kona_cli::init_tracing_subscriber(1, None::<EnvFilter>);
+    }
+
+    fn validate_proof_journal(
+        proof_journal: ProofJournal,
+        boot_info: BootInfo,
+        precondition_hash: Option<B256>,
+    ) {
+        assert_eq!(proof_journal.l1_head, boot_info.l1_head);
+        assert_eq!(
+            proof_journal.agreed_l2_output_root,
+            boot_info.agreed_l2_output_root
+        );
+        assert_eq!(
+            proof_journal.claimed_l2_output_root,
+            boot_info.claimed_l2_output_root
+        );
+        assert_eq!(
+            proof_journal.claimed_l2_block_number,
+            boot_info.claimed_l2_block_number
+        );
+        if let Some(expected_precondition_hash) = precondition_hash {
+            assert_eq!(proof_journal.precondition_hash, expected_precondition_hash);
+        }
+        assert!(proof_journal.payout_recipient.is_zero());
+        assert!(proof_journal.fpvm_image_id.is_zero());
+    }
+
+    pub fn test_stitching(
+        boot_info: BootInfo,
+        precondition_validation_data: Option<PreconditionValidationData>,
+        stitched_executions: Vec<Vec<Execution>>,
+        stitched_boot_info: Vec<StitchedBootInfo>,
+    ) {
+        let precondition_hash = precondition_validation_data
+            .as_ref()
+            .map(|d| d.precondition_hash());
+        let proof_journal = test_stitching_client(
+            boot_info.clone(),
+            precondition_validation_data,
+            stitched_executions,
+            stitched_boot_info,
+        );
+        validate_proof_journal(proof_journal, boot_info, precondition_hash);
+    }
+
+    pub fn test_stitching_client(
+        boot_info: BootInfo,
+        precondition_validation_data: Option<PreconditionValidationData>,
+        stitched_executions: Vec<Vec<Execution>>,
+        stitched_boot_info: Vec<StitchedBootInfo>,
+    ) -> ProofJournal {
+        let oracle = Arc::new(TestOracle::new(boot_info.clone()));
+        let precondition_validation_data_hash = match precondition_validation_data {
+            None => B256::ZERO,
+            Some(data) => oracle.add_precondition_data(data),
+        };
+        run_stitching_client(
+            precondition_validation_data_hash,
+            oracle.clone(),
+            oracle.clone(),
+            OracleBlobProvider::new(oracle.clone()),
+            B256::ZERO,
+            Address::ZERO,
+            stitched_executions,
+            stitched_boot_info,
+        )
+    }
+
+    pub fn test_stitching_boots(
+        boot_info: BootInfo,
+        precondition_validation_data: Option<PreconditionValidationData>,
+    ) -> anyhow::Result<()> {
+        let stitched_executions =
+            test_derivation(boot_info.clone(), precondition_validation_data.clone())
+                .context("test_derivation")?
+                .into_iter()
+                .map(|e| e.as_ref().clone())
+                .collect::<Vec<_>>();
+        let stitched_boot_info = stitched_executions
+            .iter()
+            .map(|e| StitchedBootInfo {
+                l1_head: boot_info.l1_head,
+                agreed_l2_output_root: e.agreed_output,
+                claimed_l2_output_root: e.claimed_output,
+                claimed_l2_block_number: e.artifacts.header.number,
+            })
+            .collect::<Vec<_>>();
+        let precondition_hash = precondition_validation_data
+            .as_ref()
+            .map(|d| d.precondition_hash());
+        // forward stitching pass
+        let starting_block_number = stitched_executions
+            .first()
+            .map(|e| e.artifacts.header.number - 1)
+            .unwrap_or(boot_info.claimed_l2_block_number);
+        let proof_journal = test_stitching_client(
+            BootInfo {
+                l1_head: boot_info.l1_head,
+                agreed_l2_output_root: boot_info.agreed_l2_output_root,
+                claimed_l2_output_root: boot_info.agreed_l2_output_root,
+                claimed_l2_block_number: starting_block_number,
+                chain_id: boot_info.chain_id,
+                rollup_config: boot_info.rollup_config.clone(),
+            },
+            precondition_validation_data.clone(),
+            vec![],
+            stitched_boot_info.clone(),
+        );
+        validate_proof_journal(proof_journal, boot_info.clone(), precondition_hash);
+        // backward stitching pass
+        let ending_block_number = stitched_executions
+            .last()
+            .map(|e| e.artifacts.header.number)
+            .unwrap_or(boot_info.claimed_l2_block_number);
+        let proof_journal = test_stitching_client(
+            BootInfo {
+                l1_head: boot_info.l1_head,
+                agreed_l2_output_root: boot_info.claimed_l2_output_root,
+                claimed_l2_output_root: boot_info.claimed_l2_output_root,
+                claimed_l2_block_number: ending_block_number,
+                chain_id: boot_info.chain_id,
+                rollup_config: boot_info.rollup_config.clone(),
+            },
+            precondition_validation_data.clone(),
+            vec![],
+            stitched_boot_info.clone().into_iter().rev().collect(),
+        );
+        validate_proof_journal(proof_journal, boot_info.clone(), precondition_hash);
+        // fail out of order stitching
+        let n = stitched_executions.len();
+        (0..n).into_par_iter().for_each(|i| {
+            (i + 1..n).into_par_iter().for_each(|j| {
+                let mut stitched_boot_info = stitched_boot_info.clone();
+                stitched_boot_info.swap(i, j);
+                let result = std::panic::catch_unwind(|| {
+                    test_stitching_client(
+                        BootInfo {
+                            l1_head: boot_info.l1_head,
+                            agreed_l2_output_root: boot_info.claimed_l2_output_root,
+                            claimed_l2_output_root: boot_info.claimed_l2_output_root,
+                            claimed_l2_block_number: ending_block_number,
+                            chain_id: boot_info.chain_id,
+                            rollup_config: boot_info.rollup_config.clone(),
+                        },
+                        precondition_validation_data.clone(),
+                        vec![],
+                        stitched_boot_info.clone().into_iter().rev().collect(),
+                    )
+                });
+                assert!(result.is_err());
+            })
+        });
+
+        Ok(())
+    }
+
+    pub fn test_stitching_executions(
+        boot_info: BootInfo,
+        precondition_validation_data: Option<PreconditionValidationData>,
+    ) -> anyhow::Result<()> {
+        let stitched_executions =
+            test_derivation(boot_info.clone(), precondition_validation_data.clone())
+                .context("test_derivation")?
+                .into_iter()
+                .map(|e| e.as_ref().clone())
+                .collect::<Vec<_>>();
+        // flat pass
+        test_stitching(
+            boot_info.clone(),
+            precondition_validation_data.clone(),
+            vec![stitched_executions.clone()],
+            vec![],
+        );
+        let n = stitched_executions.len();
+        // don't test exec trace stitching if unnecessary or exec only mode
+        if n == 1 {
+            return Ok(());
+        }
+        // split pass
+        let (left, right) = stitched_executions.split_at(n / 2);
+        test_stitching(
+            boot_info.clone(),
+            precondition_validation_data.clone(),
+            vec![left.to_vec(), right.to_vec()],
+            vec![],
+        );
+        // fully fragmented pass
+        test_stitching(
+            boot_info.clone(),
+            precondition_validation_data.clone(),
+            stitched_executions.into_iter().map(|e| vec![e]).collect(),
+            vec![],
+        );
+        Ok(())
+    }
+
+    pub fn test_stitching_execution_only(
+        mut boot_info: BootInfo,
+        precondition_validation_data: Option<PreconditionValidationData>,
+        stitched_boot_info: Vec<StitchedBootInfo>,
+    ) -> anyhow::Result<()> {
+        let stitched_executions =
+            test_derivation(boot_info.clone(), precondition_validation_data.clone())
+                .context("test_derivation")?
+                .into_iter()
+                .map(|e| e.as_ref().clone())
+                .collect::<Vec<_>>();
+        // flat pass
+        boot_info.l1_head = B256::ZERO;
+        test_stitching(
+            boot_info.clone(),
+            precondition_validation_data.clone(),
+            vec![stitched_executions.clone()],
+            stitched_boot_info.clone(),
+        );
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    pub async fn test_op_sepolia_16491249_16491250() {
+        setup();
+
+        test_stitching(
+            BootInfo {
+                l1_head: b256!(
+                    "0x417ffee9dd1ccbd35755770dd8c73dbdcd96ba843c532788850465bdd08ea495"
+                ),
+                agreed_l2_output_root: b256!(
+                    "0x82da7204148ba4d8d59e587b6b3fdde5561dc31d9e726220f7974bf9f2158d75"
+                ),
+                claimed_l2_output_root: b256!(
+                    "0xa130fbfa315391b28668609252e4c09c3df3b77562281b996af30bf056cbb2c1"
+                ),
+                claimed_l2_block_number: 16491250,
+                chain_id: 11155420,
+                rollup_config: Default::default(),
+            },
+            None,
+            vec![],
+            vec![],
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    pub async fn test_op_sepolia_16491249_16491250_stitched_execution() {
+        setup();
+
+        test_stitching_executions(
+            BootInfo {
+                l1_head: b256!(
+                    "0x417ffee9dd1ccbd35755770dd8c73dbdcd96ba843c532788850465bdd08ea495"
+                ),
+                agreed_l2_output_root: b256!(
+                    "0x82da7204148ba4d8d59e587b6b3fdde5561dc31d9e726220f7974bf9f2158d75"
+                ),
+                claimed_l2_output_root: b256!(
+                    "0xa130fbfa315391b28668609252e4c09c3df3b77562281b996af30bf056cbb2c1"
+                ),
+                claimed_l2_block_number: 16491250,
+                chain_id: 11155420,
+                rollup_config: Default::default(),
+            },
+            None,
+        )
+        .unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    pub async fn test_op_sepolia_16491249_16491349() {
+        setup();
+
+        test_stitching(
+            BootInfo {
+                l1_head: b256!(
+                    "0x417ffee9dd1ccbd35755770dd8c73dbdcd96ba843c532788850465bdd08ea495"
+                ),
+                agreed_l2_output_root: b256!(
+                    "0x82da7204148ba4d8d59e587b6b3fdde5561dc31d9e726220f7974bf9f2158d75"
+                ),
+                claimed_l2_output_root: b256!(
+                    "0x6984e5ae4d025562c8a571949b985692d80e364ddab46d5c8af5b36a20f611d1"
+                ),
+                claimed_l2_block_number: 16491349,
+                chain_id: 11155420,
+                rollup_config: Default::default(),
+            },
+            Some(PreconditionValidationData::Validity {
+                proposal_l2_head_number: 16491249,
+                proposal_output_count: 1,
+                output_block_span: 100,
+                blob_hashes: vec![],
+            }),
+            vec![],
+            vec![],
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    pub async fn test_op_sepolia_16491249_16491349_stitched_executions() {
+        setup();
+
+        test_stitching_executions(
+            BootInfo {
+                l1_head: b256!(
+                    "0x417ffee9dd1ccbd35755770dd8c73dbdcd96ba843c532788850465bdd08ea495"
+                ),
+                agreed_l2_output_root: b256!(
+                    "0x82da7204148ba4d8d59e587b6b3fdde5561dc31d9e726220f7974bf9f2158d75"
+                ),
+                claimed_l2_output_root: b256!(
+                    "0x6984e5ae4d025562c8a571949b985692d80e364ddab46d5c8af5b36a20f611d1"
+                ),
+                claimed_l2_block_number: 16491349,
+                chain_id: 11155420,
+                rollup_config: Default::default(),
+            },
+            Some(PreconditionValidationData::Validity {
+                proposal_l2_head_number: 16491249,
+                proposal_output_count: 1,
+                output_block_span: 100,
+                blob_hashes: vec![],
+            }),
+        )
+        .unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    pub async fn test_op_sepolia_16491249_16491349_execution_only() {
+        setup();
+
+        test_stitching_execution_only(
+            BootInfo {
+                l1_head: b256!(
+                    "0x417ffee9dd1ccbd35755770dd8c73dbdcd96ba843c532788850465bdd08ea495"
+                ),
+                agreed_l2_output_root: b256!(
+                    "0x82da7204148ba4d8d59e587b6b3fdde5561dc31d9e726220f7974bf9f2158d75"
+                ),
+                claimed_l2_output_root: b256!(
+                    "0x6984e5ae4d025562c8a571949b985692d80e364ddab46d5c8af5b36a20f611d1"
+                ),
+                claimed_l2_block_number: 16491349,
+                chain_id: 11155420,
+                rollup_config: Default::default(),
+            },
+            None,
+            vec![],
+        )
+        .unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    pub async fn test_op_sepolia_16491249_16491349_stitched_boots() {
+        setup();
+
+        test_stitching_boots(
+            BootInfo {
+                l1_head: b256!(
+                    "0x417ffee9dd1ccbd35755770dd8c73dbdcd96ba843c532788850465bdd08ea495"
+                ),
+                agreed_l2_output_root: b256!(
+                    "0x82da7204148ba4d8d59e587b6b3fdde5561dc31d9e726220f7974bf9f2158d75"
+                ),
+                claimed_l2_output_root: b256!(
+                    "0x6984e5ae4d025562c8a571949b985692d80e364ddab46d5c8af5b36a20f611d1"
+                ),
+                claimed_l2_block_number: 16491349,
+                chain_id: 11155420,
+                rollup_config: Default::default(),
+            },
+            Some(PreconditionValidationData::Validity {
+                proposal_l2_head_number: 16491249,
+                proposal_output_count: 1,
+                output_block_span: 100,
+                blob_hashes: vec![],
+            }),
+        )
+        .unwrap();
+    }
 }

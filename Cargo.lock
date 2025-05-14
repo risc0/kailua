@@ -4631,6 +4631,7 @@ dependencies = [
  "async-trait",
  "c-kzg",
  "copy_dir",
+ "kona-cli",
  "kona-derive",
  "kona-driver",
  "kona-executor",
@@ -4652,6 +4653,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+ "tracing-subscriber 0.3.19",
 ]
 
 [[package]]

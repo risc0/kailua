@@ -118,6 +118,17 @@ pub struct CachedExecutor<E: Executor + Send + Sync + Debug> {
     pub collection_target: Option<Arc<Mutex<Vec<Execution>>>>,
 }
 
+impl<E: Executor + Send + Sync + Debug> Drop for CachedExecutor<E> {
+    fn drop(&mut self) {
+        if !self.cache.is_empty() {
+            #[cfg(target_os = "zkvm")]
+            log(&format!("EXEC CACHE UNUSED: {}", self.cache.len()));
+            #[cfg(not(target_os = "zkvm"))]
+            tracing::error!("EXEC CACHE UNUSED: {}", self.cache.len());
+        }
+    }
+}
+
 #[async_trait]
 impl<E: Executor + Send + Sync + Debug> Executor for CachedExecutor<E> {
     type Error = <E as Executor>::Error;

@@ -371,16 +371,17 @@ pub mod tests {
     use kona_proof::BootInfo;
     use std::sync::{Arc, Mutex};
 
-    fn test_derivation(
+    pub fn test_derivation(
         boot_info: BootInfo,
         precondition_validation_data: Option<PreconditionValidationData>,
-    ) -> anyhow::Result<(B256, Vec<Arc<Execution>>)> {
+    ) -> anyhow::Result<Vec<Arc<Execution>>> {
         let oracle = Arc::new(TestOracle::new(boot_info.clone()));
-        let precondition_validation_data_hash = if let Some(data) = precondition_validation_data {
-            oracle.add_precondition_data(data)
-        } else {
-            B256::ZERO
-        };
+        let (expected_precondition_hash, precondition_validation_data_hash) =
+            if let Some(data) = precondition_validation_data {
+                (data.precondition_hash(), oracle.add_precondition_data(data))
+            } else {
+                Default::default()
+            };
         let collection_target = Arc::new(Mutex::new(Vec::new()));
         let (result_boot_info, precondition_hash) = run_core_client(
             precondition_validation_data_hash,
@@ -407,13 +408,15 @@ pub mod tests {
         );
         assert_eq!(result_boot_info.chain_id, boot_info.chain_id);
 
+        assert_eq!(expected_precondition_hash, precondition_hash);
+
         let execution_cache =
             recover_collected_executions(collection_target, boot_info.claimed_l2_output_root);
 
-        Ok((precondition_hash, execution_cache))
+        Ok(execution_cache)
     }
 
-    fn test_execution(
+    pub fn test_execution(
         boot_info: BootInfo,
         execution_cache: Vec<Arc<Execution>>,
     ) -> anyhow::Result<B256> {
@@ -453,7 +456,7 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     pub async fn test_op_sepolia_16491249_16491250() {
-        let (precondition_hash, _) = test_derivation(
+        test_derivation(
             BootInfo {
                 l1_head: b256!(
                     "0x417ffee9dd1ccbd35755770dd8c73dbdcd96ba843c532788850465bdd08ea495"
@@ -471,13 +474,11 @@ pub mod tests {
             None,
         )
         .unwrap();
-
-        assert!(precondition_hash.is_zero());
     }
 
     #[tokio::test(flavor = "multi_thread")]
     pub async fn test_op_sepolia_16491249_16491349() {
-        let (precondition_hash, executions) = test_derivation(
+        let executions = test_derivation(
             BootInfo {
                 l1_head: b256!(
                     "0x417ffee9dd1ccbd35755770dd8c73dbdcd96ba843c532788850465bdd08ea495"
@@ -495,7 +496,6 @@ pub mod tests {
             None,
         )
         .unwrap();
-        assert!(precondition_hash.is_zero());
         let _ = test_execution(
             BootInfo {
                 l1_head: B256::ZERO,
@@ -516,14 +516,7 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     pub async fn test_op_sepolia_16491249_16491349_validity() {
-        let precondition_validation_data = PreconditionValidationData::Validity {
-            proposal_l2_head_number: 16491249,
-            proposal_output_count: 1,
-            output_block_span: 100,
-            blob_hashes: vec![],
-        };
-        let expected_precondition_hash = precondition_validation_data.precondition_hash();
-        let (precondition_hash, _) = test_derivation(
+        test_derivation(
             BootInfo {
                 l1_head: b256!(
                     "0x417ffee9dd1ccbd35755770dd8c73dbdcd96ba843c532788850465bdd08ea495"
@@ -538,16 +531,20 @@ pub mod tests {
                 chain_id: 11155420,
                 rollup_config: Default::default(),
             },
-            Some(precondition_validation_data),
+            Some(PreconditionValidationData::Validity {
+                proposal_l2_head_number: 16491249,
+                proposal_output_count: 1,
+                output_block_span: 100,
+                blob_hashes: vec![],
+            }),
         )
         .unwrap();
-        assert_eq!(precondition_hash, expected_precondition_hash);
     }
 
     #[tokio::test(flavor = "multi_thread")]
     pub async fn test_op_sepolia_16491249_16491349_insufficient() {
         // data wasn't published at l1 origin
-        let (precondition_hash, _) = test_derivation(
+        test_derivation(
             BootInfo {
                 l1_head: b256!(
                     "0x78228b4f2d59ae1820b8b8986a875630cb32d88b298d78d0f25bcac8f3bdfbf3"
@@ -563,7 +560,6 @@ pub mod tests {
             None,
         )
         .unwrap();
-        assert!(precondition_hash.is_zero());
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -590,7 +586,7 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     pub async fn test_op_sepolia_16491249_16491249() {
-        let (precondition_hash, executions) = test_derivation(
+        let executions = test_derivation(
             BootInfo {
                 l1_head: b256!(
                     "0x417ffee9dd1ccbd35755770dd8c73dbdcd96ba843c532788850465bdd08ea495"
@@ -608,7 +604,6 @@ pub mod tests {
             None,
         )
         .unwrap();
-        assert!(precondition_hash.is_zero());
         assert!(executions.is_empty());
     }
 }
