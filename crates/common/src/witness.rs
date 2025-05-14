@@ -120,6 +120,7 @@ impl Witness<VecOracle> {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
     use crate::blobs::tests::gen_blobs;

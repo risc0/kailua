@@ -509,6 +509,7 @@ pub fn stitch_boot_info(
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
     use crate::client::core::tests::test_derivation;

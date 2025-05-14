@@ -72,6 +72,7 @@ impl From<&Receipt> for StitchedBootInfo {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
     use crate::journal::tests::{gen_proof_journals, to_fake_receipt};

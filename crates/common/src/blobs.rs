@@ -397,6 +397,7 @@ pub fn hash_to_fe(hash: B256) -> U256 {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
     use alloy_eips::eip4844::{BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF};

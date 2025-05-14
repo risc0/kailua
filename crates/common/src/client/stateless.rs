@@ -85,3 +85,52 @@ pub fn run_stateless_client<O: WitnessOracle>(witness: Witness<O>) -> ProofJourn
 
     proof_journal
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub mod tests {
+    use super::*;
+    use crate::client::core::tests::test_derivation;
+    use crate::client::tests::TestOracle;
+    use alloy_primitives::{b256, B256};
+    use anyhow::Context;
+    use kona_proof::BootInfo;
+
+    #[test]
+    fn test_stateless_client() -> anyhow::Result<()> {
+        let mut boot_info = BootInfo {
+            l1_head: b256!("0x417ffee9dd1ccbd35755770dd8c73dbdcd96ba843c532788850465bdd08ea495"),
+            agreed_l2_output_root: b256!(
+                "0x82da7204148ba4d8d59e587b6b3fdde5561dc31d9e726220f7974bf9f2158d75"
+            ),
+            claimed_l2_output_root: b256!(
+                "0x6984e5ae4d025562c8a571949b985692d80e364ddab46d5c8af5b36a20f611d1"
+            ),
+            claimed_l2_block_number: 16491349,
+            chain_id: 11155420,
+            rollup_config: Default::default(),
+        };
+        let stitched_executions = test_derivation(boot_info.clone(), None)
+            .context("test_derivation")?
+            .into_iter()
+            .map(|e| e.as_ref().clone())
+            .collect::<Vec<_>>();
+        boot_info.l1_head = B256::ZERO;
+        let oracle_witness = TestOracle::new(boot_info.clone());
+        let stream_witness = oracle_witness.clone();
+        let witness = Witness {
+            oracle_witness,
+            stream_witness,
+            blobs_witness: Default::default(),
+            payout_recipient_address: Default::default(),
+            precondition_validation_data_hash: Default::default(),
+            stitched_executions: vec![stitched_executions],
+            stitched_boot_info: vec![],
+            fpvm_image_id: Default::default(),
+        };
+
+        run_stateless_client(witness);
+
+        Ok(())
+    }
+}

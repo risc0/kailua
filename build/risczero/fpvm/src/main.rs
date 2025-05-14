@@ -44,7 +44,7 @@ fn main() {
         let _ = core::mem::replace(entry, kailua_common::oracle::vec::read_shard());
     }
 
-    // Run client using witness
+    // Run client using witness data
     let proof_journal = run_stateless_client(witness);
     // Write the final stitched journal
     env::commit_slice(&proof_journal.encode_packed());

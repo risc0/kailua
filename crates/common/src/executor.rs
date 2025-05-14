@@ -559,6 +559,7 @@ pub fn exec_precondition_hash(executions: &[Arc<Execution>]) -> B256 {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
     use crate::oracle::vec::VecOracle;

@@ -464,6 +464,7 @@ pub fn read_shard() -> PreimageVecEntry {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
     use alloy_primitives::keccak256;

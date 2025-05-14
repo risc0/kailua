@@ -194,6 +194,7 @@ impl From<&Receipt> for ProofJournal {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
     use crate::boot::tests::gen_boot_infos;

@@ -64,6 +64,7 @@ where
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use crate::{from_bytes_with, to_bytes_with};

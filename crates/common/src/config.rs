@@ -379,6 +379,7 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use alloy_eips::BlockNumHash;

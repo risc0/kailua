@@ -263,6 +263,7 @@ impl<T: CommsClient> TrieProvider for OracleL1ChainProvider<T> {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
     use crate::oracle::vec::VecOracle;

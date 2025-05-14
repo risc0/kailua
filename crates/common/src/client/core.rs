@@ -362,6 +362,7 @@ pub fn recover_collected_executions(
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
     use crate::client::tests::TestOracle;

@@ -34,7 +34,9 @@ pub fn log(msg: &str) {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
+    use crate::oracle::WitnessOracle;
     use crate::precondition::PreconditionValidationData;
     use alloy_primitives::B256;
     use async_trait::async_trait;
@@ -46,6 +48,7 @@ pub mod tests {
         HintWriterClient, PreimageFetcher, PreimageKey, PreimageKeyType, PreimageOracleClient,
     };
     use kona_proof::{BootInfo, FlushableCache};
+    use std::fmt::Debug;
     use std::sync::Arc;
     use tempfile::{tempdir, TempDir};
     use tokio::sync::RwLock;
@@ -67,13 +70,40 @@ pub mod tests {
     }
 
     #[derive(Debug)]
-    pub struct TestOracle<T: KeyValueStore + Send + Sync> {
+    pub struct TestOracle<T: KeyValueStore + Send + Sync + Debug> {
         pub kv: Arc<RwLock<T>>,
         pub backend: OfflineHostBackend<T>,
         pub temp_dir: Option<TempDir>,
     }
 
-    impl Clone for TestOracle<TestKeyValueStore> {
+    impl Default for TestOracle<TestKeyValueStore> {
+        fn default() -> Self {
+            Self::new(BootInfo {
+                l1_head: Default::default(),
+                agreed_l2_output_root: Default::default(),
+                claimed_l2_output_root: Default::default(),
+                claimed_l2_block_number: 0,
+                chain_id: 0,
+                rollup_config: Default::default(),
+            })
+        }
+    }
+
+    impl WitnessOracle for TestOracle<TestKeyValueStore> {
+        fn preimage_count(&self) -> usize {
+            1
+        }
+
+        fn validate_preimages(&self) -> anyhow::Result<()> {
+            Ok(())
+        }
+
+        fn insert_preimage(&mut self, _key: PreimageKey, _value: Vec<u8>) {}
+
+        fn finalize_preimages(&mut self, _shard_size: usize, _with_validation_cache: bool) {}
+    }
+
+    impl<T: KeyValueStore + Send + Sync + Debug> Clone for TestOracle<T> {
         fn clone(&self) -> Self {
             Self {
                 kv: self.kv.clone(),
@@ -125,14 +155,14 @@ pub mod tests {
         }
     }
 
-    impl<T: KeyValueStore + Send + Sync> FlushableCache for TestOracle<T> {
+    impl<T: KeyValueStore + Send + Sync + Debug> FlushableCache for TestOracle<T> {
         fn flush(&self) {
             // noop
         }
     }
 
     #[async_trait]
-    impl<T: KeyValueStore + Send + Sync> PreimageOracleClient for TestOracle<T> {
+    impl<T: KeyValueStore + Send + Sync + Debug> PreimageOracleClient for TestOracle<T> {
         async fn get(&self, key: PreimageKey) -> PreimageOracleResult<Vec<u8>> {
             self.backend.get_preimage(key).await
         }
@@ -145,7 +175,7 @@ pub mod tests {
     }
 
     #[async_trait]
-    impl<T: KeyValueStore + Send + Sync> HintWriterClient for TestOracle<T> {
+    impl<T: KeyValueStore + Send + Sync + Debug> HintWriterClient for TestOracle<T> {
         async fn write(&self, _hint: &str) -> PreimageOracleResult<()> {
             // just hit the noop
             self.flush();
