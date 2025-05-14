@@ -158,7 +158,7 @@ prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data 
     --native
 
 # Show the input args for proving
-query block_number l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc:
+query block_number l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc seq_window="50":
   #!/usr/bin/env bash
 
   L1_NODE_ADDRESS="{{l1_rpc}}"
@@ -171,14 +171,15 @@ query block_number l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc:
   echo "Fetching data for block #$L2_BLOCK_NUMBER..."
   L1_ORIGIN_NUM=$(cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $((L2_BLOCK_NUMBER - 1))) | jq -r .blockRef.l1origin.number)
 
+  echo $L1_ORIGIN_NUM
+  # L1 head
+  cast block --rpc-url $L1_NODE_ADDRESS $((L1_ORIGIN_NUM + {{seq_window}})) --json | jq -r .hash
+  # L2 agreed output root
+  cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $((L2_BLOCK_NUMBER - 1))) | jq -r .outputRoot
   # L2 Claim
   cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $L2_BLOCK_NUMBER) | jq -r .outputRoot
-  # L2 output root
-  cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $((L2_BLOCK_NUMBER - 1))) | jq -r .outputRoot
   # L2 head
   cast block --rpc-url $L2_NODE_ADDRESS $((L2_BLOCK_NUMBER - 1)) --json | jq -r .hash
-  # L1 head
-  cast block --rpc-url $L1_NODE_ADDRESS $((L1_ORIGIN_NUM + 50)) --json | jq -r .hash
   # L2 chain id
   cast chain-id --rpc-url $L2_NODE_ADDRESS
 

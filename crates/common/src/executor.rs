@@ -769,7 +769,7 @@ pub mod tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     pub async fn test_execution_cursor() {
         // prepare oracle data
         let mut vec_oracle = VecOracle::default();

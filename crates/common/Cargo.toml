@@ -46,5 +46,8 @@ serde.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+copy_dir.workspace = true
+kona-host.workspace = true
 rayon.workspace = true
+tempfile.workspace = true
 tokio.workspace = true

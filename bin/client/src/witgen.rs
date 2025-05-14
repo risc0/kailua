@@ -71,6 +71,7 @@ where
         Some(collection_target.clone()),
     )?;
     // Fix claimed output of captured executions
+    // todo: use common::core::recover_collected_executions
     let mut executions = collection_target.lock().unwrap();
     for i in 1..executions.len() {
         executions[i - 1].claimed_output = executions[i].agreed_output;

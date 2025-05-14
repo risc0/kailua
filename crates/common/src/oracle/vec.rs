@@ -752,7 +752,7 @@ pub mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_exhaustion() {
         let (mut oracle, values) = prepare_vec_oracle(1, 1);
         oracle.finalize_preimages(usize::MAX, true);

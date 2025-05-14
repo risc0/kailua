@@ -272,7 +272,7 @@ pub mod tests {
     use alloy_primitives::{bytes, keccak256, Log, Signature, U256};
     use kona_mpt::{Nibbles, NoopTrieProvider};
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     pub async fn test_l1_chain_provider_trie_provider() {
         let mut vec_oracle = VecOracle::default();
         let node = TrieNode::Leaf {
@@ -288,7 +288,7 @@ pub mod tests {
         assert_eq!(provider.trie_node_by_hash(node_hash).unwrap(), node);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     pub async fn test_l1_chain_provider() {
         // prepare data
         let mut vec_oracle = VecOracle::default();
@@ -387,7 +387,7 @@ pub mod tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     pub async fn test_l1_chain_provider_block_info_by_number() {
         // prepare data
         let mut vec_oracle = VecOracle::default();
