@@ -308,6 +308,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         KailuaTournament contender = children[u];
         bytes32 contenderSignature = contender.signature();
 
+        // Ensure survivor decision finality after resolution
+        if (contender.status() == GameStatus.DEFENDER_WINS) {
+            return contender;
+        }
+
         // If the contender is invalid then we eliminate it and find the next viable contender using the opponent
         // pointer. This search could terminate early if the elimination limit is reached.
         // If the contender is valid and its proposer is not eliminated, this is skipped.
