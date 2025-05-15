@@ -525,6 +525,10 @@ pub mod tests {
         let _ = kona_cli::init_tracing_subscriber(1, None::<EnvFilter>);
     }
 
+    fn teardown() {
+        let _ = kona_cli::init_tracing_subscriber(0, None::<EnvFilter>);
+    }
+
     fn validate_proof_journal(
         proof_journal: ProofJournal,
         boot_info: BootInfo,
@@ -764,6 +768,8 @@ pub mod tests {
             vec![],
             vec![],
         );
+
+        teardown();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -788,6 +794,8 @@ pub mod tests {
             None,
         )
         .unwrap();
+
+        teardown();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -818,6 +826,8 @@ pub mod tests {
             vec![],
             vec![],
         );
+
+        teardown();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -847,6 +857,8 @@ pub mod tests {
             }),
         )
         .unwrap();
+
+        teardown();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -872,6 +884,8 @@ pub mod tests {
             vec![],
         )
         .unwrap();
+
+        teardown();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -901,5 +915,7 @@ pub mod tests {
             }),
         )
         .unwrap();
+
+        teardown();
     }
 }

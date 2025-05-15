@@ -836,7 +836,7 @@ dependencies = [
 [[package]]
 name = "blst"
 version = "0.3.14"
-source = "git+https://github.com/risc0/blst?branch=noinv#0fb1ae95d469e85336403b0394c07eed52fa9ba5"
+source = "git+https://github.com/risc0/blst?branch=wollac%2Ffix%2Fct_inverse_mod#1449f6ff61ab0c25d59856b9a69a35e3f39d0803"
 dependencies = [
  "cc",
  "glob",
