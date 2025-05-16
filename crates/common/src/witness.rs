@@ -23,39 +23,6 @@ use std::fmt::Debug;
 
 /// Represents the complete structure of a `Witness`, which is used to hold
 /// the necessary data for authenticating a rollup state transition in the FPVM.
-///
-/// This structure is designed to work with the `rkyv` framework for zero-copy (de)serialization
-/// and enables the Witness to archive, serialize, and deserialize its fields efficiently.
-///
-/// # Generics
-/// `O` - A type that implements the `WitnessOracle` trait, defining functionality for a witness oracle.
-///
-/// # Fields
-/// - `oracle_witness: O`
-///   The witness oracle that holds preloaded preimage data in memory.
-///
-/// - `stream_witness: O`
-///   The witness oracle for on-demand streamed preimage data.
-///
-/// - `blobs_witness: BlobWitnessData`
-///   Stores witness data specifically associated with blobs.
-///
-/// - `payout_recipient_address: Address`
-///   The address associated with the payout recipient of the proof execution.
-///   - Annotated with `#[rkyv(with = AddressDef)]` to define a custom serialization/deserialization process using the `AddressDef` configuration.
-///
-/// - `precondition_validation_data_hash: B256`
-///   A cryptographic hash value used for loading and validating preconditions before execution.
-///   - Annotated with `#[rkyv(with = B256Def)]` for customized handling via the `B256Def` serializer/deserializer in `rkyv`.
-///
-/// - `stitched_executions: Vec<Vec<Execution>>`
-///   A collection of stitched execution groups, represented as a two-dimensional vector.
-///   - The outer vector (`Vec`) groups multiple executions that are logically stitched together.
-///   - Each inner vector (`Vec<Execution>`) contains a continuous sequence of individual `Execution` instances, sorted properly.
-///
-/// - `stitched_boot_info: Vec<StitchedBootInfo>`
-///   A vector containing boot information to be stitched together from other proofs.
-///   - If no stitching is required, this vector can be empty.
 #[derive(Clone, Debug, Default, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Witness<O: WitnessOracle> {
     /// The witness oracle for preimage data preloaded in memory.
@@ -64,18 +31,10 @@ pub struct Witness<O: WitnessOracle> {
     pub stream_witness: O,
     /// Represents the witness data for blobs.
     pub blobs_witness: BlobWitnessData,
-    /// This field represents the address of the proof's payout recipient.
-    ///
-    /// # Attribute
-    /// - `#[rkyv(with = AddressDef)]`: Specifies a custom transformation or serialization
-    ///   logic for the `Address` field as defined in `AddressDef`.
+    /// Represents the address of the proof's payout recipient.
     #[rkyv(with = AddressDef)]
     pub payout_recipient_address: Address,
     /// Represents a hash value used for loading precondition validation data.
-    ///
-    /// # Attributes
-    /// - `#[rkyv(with = B256Def)]`: Indicates that the `precondition_validation_data_hash`
-    ///   field should use the `B256Def` serializer/deserializer for the `rkyv` framework during (de)serialization.
     #[rkyv(with = B256Def)]
     pub precondition_validation_data_hash: B256,
     /// A collection of stitched executions represented as a two-dimensional vector.
@@ -86,17 +45,11 @@ pub struct Witness<O: WitnessOracle> {
     ///   represent individual executions within a specific stitched group.
     ///
     /// # Notes:
-    /// - Ensure all individual `Execution` objects within the groups are properly sorted.
+    /// - Ensure all `Execution` objects within the groups are properly sorted.
     pub stitched_executions: Vec<Vec<Execution>>,
     /// A list of `StitchedBootInfo` instances to be stitched together from other proofs.
-    ///
-    /// # Notes
-    /// - The vector can be safely empty if no stitching is required.
     pub stitched_boot_info: Vec<StitchedBootInfo>,
-    /// A field representing the fault-proof virtual machine program image id.
-    /// # Attributes
-    /// - `#[rkyv(with = B256Def)]`: Indicates the use of the `B256Def` configuration for handling the `B256` type during
-    ///    rkyv (archive, serialize, and deserialize) operations.
+    /// Represents the fault-proof virtual machine program image id.
     #[rkyv(with = B256Def)]
     pub fpvm_image_id: B256,
 }

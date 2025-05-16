@@ -19,10 +19,6 @@ use risc0_zkvm::Receipt;
 
 /// Represents the stitched boot information, primarily containing data relevant to the safe L2 chain
 /// and associated output roots in a blockchain context.
-///
-/// Note:
-/// - Each `B256` field uses the custom serialization handling provided by `B256Def` to ensure proper
-///   serialization/deserialization behavior.
 #[derive(
     Clone,
     Copy,

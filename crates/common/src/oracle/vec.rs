@@ -52,20 +52,9 @@ pub type PreimageVecStore = Arc<Mutex<Vec<PreimageVecEntry>>>;
 /// This struct is equipped with the necessary implementations to support cloning, debugging,
 /// and (de)serialization using the `rkyv` crate. It defines a storage for preimages
 /// with additional serialization handling.
-///
-/// # Fields
-/// * `preimages` - A `PreimageVecStore` instance that contains the stored preimages.
-///   Serialization and deserialization of this field are handled using the `PreimageVecStoreRkyv` logic.
-///
-/// # Derives
-/// * `Clone` - Allows for the creation of duplicate instances of `VecOracle`.
-/// * `Debug` - Enables formatting of the structure for debugging purposes.
-/// * `Default` - Provides a default (empty) implementation of `VecOracle`.
-/// * `rkyv::Serialize` - Allows the struct to be serialized using `rkyv`.
-/// * `rkyv::Archive` - Marks the structure suitable for archiving in serialized form.
-/// * `rkyv::Deserialize` - Allows the deserialization of `VecOracle` from archived data.
 #[derive(Clone, Debug, Default, rkyv::Serialize, rkyv::Archive, rkyv::Deserialize)]
 pub struct VecOracle {
+    /// A `PreimageVecStore` instance that contains the stored preimages.
     #[rkyv(with = PreimageVecStoreRkyv)]
     pub preimages: PreimageVecStore,
 }
@@ -143,7 +132,6 @@ impl VecOracle {
     ///
     /// This function is part of a broader mechanism for ensuring data integrity in cryptographic or
     /// state-based systems relying on preimages for verification.
-    /// ```
     pub fn validate(preimages: &[PreimageVecEntry]) -> anyhow::Result<()> {
         for (e, entry) in preimages.iter().enumerate() {
             for (p, (key, value, prev)) in entry.iter().enumerate() {

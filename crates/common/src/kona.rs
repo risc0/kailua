@@ -11,7 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//! This file is a modified copy of kona_proof::l1::chain_provider
 
 use alloy_consensus::{Header, Receipt, ReceiptEnvelope, TxEnvelope};
 use alloy_eips::Decodable2718;
@@ -126,7 +125,7 @@ impl<T: CommsClient + Sync + Send> ChainProvider for OracleL1ChainProvider<T> {
     /// * `block_number` - A `u64` representing the block number whose information is being retrieved.
     ///
     /// # Returns
-    /// Returns a `Result` which:
+    /// A `Result` which:
     /// - On success, contains a `BlockInfo` struct with the requested block's details.
     /// - On failure, contains an error of type `Self::Error`, such as `OracleProviderError`.
     ///
@@ -144,12 +143,6 @@ impl<T: CommsClient + Sync + Send> ChainProvider for OracleL1ChainProvider<T> {
     ///    cached, fetching additional parent headers as needed via `header_by_hash`.
     /// 4. Constructs and returns a `BlockInfo` struct containing the required block's hash, number,
     ///    parent hash, and timestamp.
-    ///
-    /// # Notes
-    /// - This method assumes the blockchain headers are stored in a specific order within the `headers`
-    ///   field, where `headers[0]` represents the latest (head) block.
-    /// - The `header_by_hash` function is invoked to fetch missing headers based on their hash when
-    ///   traversing backward through the chain.
     async fn block_info_by_number(&mut self, block_number: u64) -> Result<BlockInfo, Self::Error> {
         // Check if the block number is in range. If not, we can fail early.
         if block_number > self.headers[0].number {

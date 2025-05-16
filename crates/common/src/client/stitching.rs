@@ -36,13 +36,6 @@ use {
 /// Executes the primary operation of stitching together execution and boot information for a client,
 /// while maintaining composable proofs for validation in a zero-knowledge environment.
 ///
-/// # Type Parameters
-///
-/// * `O`: Generic type parameter representing an Oracle that implements the `CommsClient`,
-///    `FlushableCache`, `Send`, `Sync`, and `Debug` traits.
-/// * `B`: Generic type parameter representing a BlobProvider that implements the `Send`, `Sync`,
-///    `Debug`, and `Clone` traits.
-///
 /// # Arguments
 ///
 /// * `precondition_validation_data_hash` - A `B256` hash used for precondition validation.
@@ -86,21 +79,6 @@ use {
 ///
 /// This function will panic if:
 /// - The output hash computation (`run_core_client`) fails.
-///
-/// # Dependencies
-///
-/// This operation relies on external functions such as:
-/// - `split_executions` for precomputing execution splits.
-/// - `run_core_client` for output hash computation.
-/// - `load_stitching_journals` (conditionally) for loading proven journals.
-/// - `stitch_executions` and `stitch_boot_info` for stitching different components of proof data.
-///
-/// # Notes
-///
-/// - The function is marked with `#[allow(clippy::too_many_arguments)]` due to the high number of input
-///   parameters required for its operations.
-/// - Supports compositional proof validation for complex systems such as zero-knowledge proofs and recursive
-///   proof aggregation.
 #[allow(clippy::too_many_arguments)]
 pub fn run_stitching_client<
     O: CommsClient + FlushableCache + Send + Sync + Debug,
@@ -249,11 +227,6 @@ pub fn load_stitching_journals(fpvm_image_id: B256) -> HashSet<Digest> {
 /// - If the verification process fails (i.e., the journal does not match the
 ///   expected criteria for verification), the function will panic with the message:
 ///   `"Failed to verify stitched journal assumption"`.
-///
-/// # Notes
-/// - This function contains conditional compilation code that is only executed when
-///   the target operating system is `zkvm`. If the target OS is not `zkvm`, the function
-///   does nothing.
 pub fn verify_stitching_journal(
     _fpvm_image_id: B256,
     _proof_journal: Vec<u8>,
@@ -289,15 +262,6 @@ pub fn verify_stitching_journal(
 /// A tuple containing:
 /// 1. A two-dimensional vector (`Vec<Vec<Arc<Execution>>>`) where each `Execution` is wrapped in an `Arc`.
 /// 2. A flattened vector (`Vec<Arc<Execution>>`) representing a cache of all `Execution` objects.
-///
-/// # Notes
-///
-/// * The use of `Arc` (atomic reference counting) ensures shared ownership of `Execution` objects,
-///   which is especially useful in concurrent contexts where multiple threads may need to access
-///   the same `Execution` objects.
-///
-/// * The function ensures that all `Execution` objects are wrapped in an `Arc` and cloned
-///   so that both the grouped and flattened structures can be used independently.
 pub fn split_executions(
     stitched_executions: Vec<Vec<Execution>>,
 ) -> (Vec<Vec<Arc<Execution>>>, Vec<Arc<Execution>>) {
@@ -337,12 +301,6 @@ pub fn split_executions(
 /// # Panics
 /// - When `boot.l1_head` is zero but the number of `stitched_executions` exceeds 1.
 /// - When an execution trace is empty (used in `.first()` or `.last()` calls without valid elements).
-///
-/// # Notes
-/// - This is a low-level function that performs key validation and proof journal creation for a batch of execution
-///   traces. It relies on multiple helpers like `config_hash`, `exec_precondition_hash`, `compute_receipts_root`,
-///   and `verify_stitching_journal`.
-/// - This function ensures that transitions between executions are provable and consistent.
 pub fn stitch_executions(
     boot: &BootInfo,
     fpvm_image_id: B256,

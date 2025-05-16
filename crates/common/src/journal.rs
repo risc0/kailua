@@ -86,21 +86,14 @@ impl ProofJournal {
     /// to create a packed representation of the data. Each field is converted or sliced into
     /// a byte representation, and then the resulting slices are concatenated.
     ///
-    /// ### Returns:
+    /// # Returns:
     /// - A `Vec<u8>` containing the concatenated byte representation of the included fields.
     ///
-    /// ### Notes:
+    /// # Notes:
     /// - The method relies on the assumption that all involved fields have compatible
     ///   byte slice representations.
     /// - Ensure the individual lengths of fields do not exceed the intended size constraint
     ///   for the packed data.
-    ///
-    /// ### Performance:
-    /// - This method performs a single allocation for the concatenated byte vector
-    ///   and avoids intermediate allocations for individual slices.
-    ///
-    /// ### Usage:
-    /// - Useful when creating a compact serialization for network transmission or cryptographic operations.
     pub fn encode_packed(&self) -> Vec<u8> {
         [
             self.payout_recipient.as_slice(),

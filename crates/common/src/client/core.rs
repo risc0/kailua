@@ -32,26 +32,20 @@ use std::fmt::Debug;
 use std::mem::take;
 use std::sync::{Arc, Mutex};
 
-/// Runs the Kailua client to process rollup operations, including block derivation,
-/// precondition validation, safe head fetching, execution caching, and pipeline execution.
-///
-/// # Type Parameters
-/// * `O` - Represents a communication client implementing `CommsClient` and `FlushableCache`.
-/// * `B` - Represents a blob provider implementing `BlobProvider`.
+/// Runs the Kailua client to drive rollup state transition derivation using Kona.
 ///
 /// # Arguments
-/// * `precondition_validation_data_hash` - A 256-bit hash used for precondition validation.
-/// * `oracle` - An atomic reference-counted (`Arc`) wrapper around the communication client.
-/// * `stream` - An atomic reference-counted (`Arc`) wrapper around the communication stream client.
-/// * `beacon` - An instance of the blob provider, cloning a data source for beacon usage.
-/// * `execution_cache` - A vector of cached executions.
-/// * `collection_target` - An optional, thread-safe, target to dump uncached executions.
+/// * `precondition_validation_data_hash` - A 256-bit hash used for fetching precondition data.
+/// * `oracle` - The client for communicating with the host environment.
+/// * `stream` - The client for streamed communication with the host.
+/// * `beacon` - An instance of the blob provider.
+/// * `execution_cache` - A vector of cached executions to reuse.
+/// * `collection_target` - An optional target to dump uncached executions.
 ///
 /// # Returns
-/// Returns a result containing a tuple (`BootInfo`, `B256`) upon success, or an error of type `anyhow::Error`.
-///
-/// `BootInfo` contains essential configuration information for bootstrapping the rollup client.
-/// `B256` represents a 256-bit hash of the results or preconditions, dependent on the actions performed.
+/// A result containing a tuple (`BootInfo`, `B256`) upon success, or an error of type `anyhow::Error`.
+/// - `BootInfo` contains essential configuration information for bootstrapping the rollup client.
+/// - `B256` represents a 256-bit hash of the computed output state.
 ///
 /// # Errors
 /// This function can return an error in any of the following cases:

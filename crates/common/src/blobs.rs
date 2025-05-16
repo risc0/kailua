@@ -29,25 +29,6 @@ use serde::{Deserialize, Serialize};
 ///
 /// The `BlobFetchRequest` is used to request a specific blob by providing both the unique identifier
 /// of the blob (`blob_hash`) and the block metadata (`block_ref`) it is associated with.
-///
-/// # Fields
-///
-/// * `block_ref` (`BlockInfo`):
-///   A reference to the block metadata that the requested blob is associated with. This includes
-///   relevant information about the block, ensuring the correct context for blob retrieval.
-///
-/// * `blob_hash` (`IndexedBlobHash`):
-///   A unique hash identifying the specific blob to be fetched. This ensures the exact blob can
-///   be located and retrieved.
-///
-/// # Derives
-///
-/// This struct derives the following traits:
-///
-/// - `Clone`: Allows creating a duplicate of `BlobFetchRequest`.
-/// - `Debug`: Implements formatting for debugging purposes.
-/// - `Serialize`: Enables serialization of the struct into formats such as JSON.
-/// - `Deserialize`: Enables deserialization of the struct from serialized formats like JSON.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BlobFetchRequest {
     /// Contains the block height, hash, timestamp, and parent hash.
@@ -58,36 +39,7 @@ pub struct BlobFetchRequest {
 
 /// The `BlobWitnessData` struct represents a data model for handling collections of blobs,
 /// commitments, and proofs with efficient serialization and deserialization using the `rkyv`
-/// framework. It leverages archive and map utilities from `rkyv` to optimize data storage and
-/// retrieval while maintaining a seamless transition between in-memory and archived states.
-///
-/// This struct is designed for scenarios that require zero-copy deserialization or performant
-/// serialization for complex or nested data types commonly used in distributed systems, blockchain
-/// applications, or other high-performance computing domains.
-///
-/// # Derives
-/// - `Clone`: Allows producing a copy of the `BlobWitnessData`.
-/// - `Debug`: Implements formatting for debugging purposes.
-/// - `Default`: Provides a default implementation for constructing an empty or zeroed `BlobWitnessData`.
-/// - `Serialize` and `Deserialize`: Enable standard serialization and deserialization.
-/// - `rkyv::Archive`, `rkyv::Serialize`, and `rkyv::Deserialize`: Optimize for archiving and
-///   zero-copy use cases with the `rkyv` library.
-///
-/// # Fields
-/// - `blobs`:
-///   - A vector (`Vec<Blob>`) containing `Blob` objects.
-///   - Serialized and deserialized using the `rkyv::with::Map` wrapper for `BlobDef`.
-///   - Provides efficient handling of transformation between in-memory and serialized states, even for
-///     complex nested types.
-///   - **Usage**: Optimized for high-performance applications requiring custom serialization logic.
-/// - `commitments`:
-///   - A vector (`Vec<Bytes48>`) containing 48-byte commitment values.
-///   - Serialized and deserialized using the `rkyv::with::Map` wrapper for `Bytes48Def`.
-///   - **Usage**: Designed for securely and efficiently storing cryptographic commitments.
-/// - `proofs`:
-///   - A vector (`Vec<Bytes48>`) containing 48-byte proof values.
-///   - Serialized and deserialized using the `rkyv::with::Map` wrapper for `Bytes48Def`.
-///   - **Usage**: Useful for storing verification proofs efficiently in performance-critical systems.
+/// framework.
 #[derive(
     Clone,
     Debug,
@@ -101,40 +53,13 @@ pub struct BlobFetchRequest {
     rkyv::Deserialize,
 )]
 pub struct BlobWitnessData {
-    /// A collection of `Blob` objects serialized with `rkyv` using the `Map` wrapper for
-    /// `BlobDef`. This configuration ensures that the `Blob` objects are serialized and
-    /// deserialized correctly, efficiently handling their transformation between in-memory
-    /// and archived states.
-    ///
-    /// # Attributes
-    /// - `#[rkyv(with = rkyv::with::Map<BlobDef>)]`: Specifies that the `blobs` field should
-    ///   be archived and deserialized with a specific mapping behavior, where `BlobDef` is
-    ///   mapped appropriately using the `rkyv` framework.
-    /// - `blobs`: A `Vec` (vector) containing instances of `Blob`.
+    /// A vector of `Blob` instances.
     #[rkyv(with = rkyv::with::Map<BlobDef>)]
     pub blobs: Vec<Blob>,
-    /// A vector of `Bytes48` elements that are archived using the `rkyv` crate.
-    ///
-    /// # Attributes
-    /// - `commitments`: A `Vec<Bytes48>` which represents a collection of `Bytes48` values.
-    ///   This field uses the `rkyv` attribute for zero-copy serialization and deserialization.
-    ///   Specifically, it applies the custom serialization handler `Map<Bytes48Def>` for the `Bytes48` type,
-    ///   allowing for efficient archiving and retrieval of data.
+    /// A vector of `Bytes48` elements representing KZG commitments for each blob instance.
     #[rkyv(with = rkyv::with::Map<Bytes48Def>)]
     pub commitments: Vec<Bytes48>,
-    /// A structure to hold proofs, where each proof is represented as a `Bytes48` instance.
-    ///
-    /// This field uses the `rkyv` crate for zero-copy serialization and deserialization,
-    /// applying the `rkyv::with` attribute with the `Map<Bytes48Def>` implementation to
-    /// customize how the `Vec<Bytes48>` is serialized and deserialized.
-    ///
-    /// The `Bytes48` type presumably represents a 48-byte fixed size binary data structure,
-    /// and the mapping allows for interoperability with the `rkyv` serialization framework.
-    ///
-    /// # Attributes
-    /// - `#[rkyv(with = rkyv::with::Map<Bytes48Def>)]`:
-    ///     Indicates that the `rkyv` crate will serialize or deserialize the `proofs` field
-    ///     using the `Map<Bytes48Def>` attribute for each element in the vector.
+    /// A vector of `Bytes48` instances representing KZG blob proofs for each blob instance.
     #[rkyv(with = rkyv::with::Map<Bytes48Def>)]
     pub proofs: Vec<Bytes48>,
 }
@@ -149,21 +74,15 @@ impl<T: Into<Blob>> From<Vec<T>> for BlobWitnessData {
     /// 3. Computes the KZG proof corresponding to the blob and its commitment.
     /// 4. Stores the processed blob, commitment, and proof in the resulting instance.
     ///
-    /// ## Parameters
+    /// # Parameters
     /// - `blobs`: A vector of elements of type `T` which hold the blob data to be processed. These
-    ///   will be converted into `Blob` objects for KZG commitment and proof generation.
+    ///   will be converted into `c_kzg::Blob` objects for KZG commitment and proof generation.
     ///
-    /// ## Returns
-    /// - Returns an instance of `Self` containing:
-    ///   - The processed blobs.
-    ///   - Their corresponding KZG commitments.
-    ///   - Their corresponding KZG proofs.
-    ///
-    /// ## Assumptions
+    /// # Assumptions
     /// - The implementation assumes that `Blob::from` and `Blob.into` facilitate the conversion
     ///   between the input data type and the required KZG-compatible `Blob` structure.
     ///
-    /// ## Panics
+    /// # Panics
     /// - This function panics if the conversion of a blob to a KZG commitment fails.
     /// - Panics if proof computation fails.
     fn from(blobs: Vec<T>) -> Self {
@@ -188,22 +107,10 @@ impl<T: Into<Blob>> From<Vec<T>> for BlobWitnessData {
     }
 }
 
-/// A struct that provides preloaded blobs and their corresponding identifiers.
-///
-/// The `PreloadedBlobProvider` manages a collection of blobs, each identified by a unique hash.
-/// It is useful when you want to preload a set of blobs in memory for quick access.
-///
-/// # Fields
-/// - `entries`: A vector of tuples where each tuple contains:
-///     - `B256`: The versioned hash that uniquely identifies the blob.
-///     - `Blob`: The blob data associated with the identifier.
-///
-/// # Derives
-/// - `Clone`: Allows the struct to be cloned.
-/// - `Debug`: Implements debugging support for the struct, enabling formatted debug output.
-/// - `Default`: Provides a default implementation that initializes an empty `entries` vector.
+/// Provides preloaded blobs and their corresponding identifiers.
 #[derive(Clone, Debug, Default)]
 pub struct PreloadedBlobProvider {
+    /// Pairs of blob hashes and their respective blob data.
     entries: Vec<(B256, Blob)>,
 }
 
@@ -225,9 +132,6 @@ impl From<BlobWitnessData> for PreloadedBlobProvider {
     ///    with the blobs, commitments, and proofs provided in the input.
     /// 3. Maps commitments into versioned hashes using `kzg_to_versioned_hash`.
     /// 4. Constructs entries by zipping the versioned hashes and blobs, then reverses the order of the resulting list.
-    ///
-    /// # Returns
-    /// A new instance of `Self`, containing the validated and processed entries.
     fn from(value: BlobWitnessData) -> Self {
         let blobs = value
             .blobs
@@ -269,10 +173,10 @@ impl BlobProvider for PreloadedBlobProvider {
     /// included in the response. The blobs are returned in the same order as the input hashes.
     ///
     /// # Parameters
-    /// - `&mut self`: A mutable reference to the current struct instance, which holds the
-    ///   internal state required for fetching blobs.
+    /// - `&mut self`: The internal state required for fetching blobs.
     /// - `_block_ref`: A reference to a `BlockInfo` structure, which can represent metadata or
-    ///   context for the operation. (Currently unused in this function.)
+    ///   context for the operation, but is unused in this function as the validation of the
+    ///   inclusion of the requested blobs in the designated slots is assumed to have been performed.
     /// - `blob_hashes`: A slice of `IndexedBlobHash` objects that represent the hashes identifying
     ///   the blobs to be retrieved.
     ///
@@ -284,19 +188,6 @@ impl BlobProvider for PreloadedBlobProvider {
     ///
     /// # Errors
     /// This function propagates the error of the implementing type if there is an issue during blob retrieval.
-    ///
-    /// # Notes
-    /// - This function assumes that `self.entries` contains blob data structured as pairs of
-    ///   `(blob_hash, blob)`. If the order or structure of entries changes, this function's
-    ///   behavior must be adapted accordingly.
-    /// - The `_block_ref` parameter is currently unused.
-    ///
-    /// # Performance
-    /// - The memory allocation for the `Vec` is optimized by pre-allocating the capacity based on
-    ///   the `blob_hashes.len()`.
-    /// - The current implementation uses a simple pattern of `pop()` from `self.entries`,
-    ///   which enforces a last-in-first-out (LIFO) approach that must be harmonized with
-    ///   upstream expectations.
     async fn get_blobs(
         &mut self,
         _block_ref: &BlockInfo,

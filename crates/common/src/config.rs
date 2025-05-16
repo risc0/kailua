@@ -30,9 +30,6 @@ pub const BN254_CONTROL_ID: B256 =
 /// If they are equal, an error is returned indicating an unsafe condition.
 /// Otherwise, the value inside `opt` is returned. If `opt` is `None`, the default value is returned.
 ///
-/// # Type Parameters
-/// - `V`: The type of the values, which must implement the `Debug` and `Eq` traits.
-///
 /// # Arguments
 /// - `opt`: An `Option<V>` which may or may not contain a value.
 /// - `default`: A default value of type `V` to use if `opt` is `None`.

@@ -102,14 +102,7 @@ pub fn validate_preimage(key: &PreimageKey, value: &[u8]) -> PreimageOracleResul
 ///
 /// The `WitnessOracle` trait provides functionality to interact with and manage preimages.
 /// Preimages are key-value pairs where the key is typically an identifier for the data,
-/// and the value is the data itself stored as a `Vec<u8>`. This trait incorporates several features
-/// including validation, insertion, count retrieval, and finalization of the stored preimages.
-///
-/// # Provided Methods
-/// - `preimage_count`: Retrieve the number of preimages stored.
-/// - `validate_preimages`: Validates that all stored preimages satisfy predefined constraints.
-/// - `insert_preimage`: Inserts a new preimage into the oracle.
-/// - `finalize_preimages`: Prepares the oracle's preimages for use under defined shard size and validation settings.
+/// and the value is the data itself stored as a `Vec<u8>`.
 pub trait WitnessOracle: CommsClient + FlushableCache + Send + Sync + Debug + Default {
     /// Returns the count of preimages stored in the oracle.
     fn preimage_count(&self) -> usize;

@@ -22,9 +22,6 @@ use std::sync::Arc;
 /// Executes a stateless client workflow by validating witness data, and running the stitching
 /// client to produce a unified proof journal.
 ///
-/// # Type Parameters
-/// * `O`: A type that implements the `WitnessOracle` trait, representing an oracle for the witness.
-///
 /// # Arguments
 /// * `witness`: A `Witness<O>` object that contains all the input data required to execute the stateless client.
 ///
