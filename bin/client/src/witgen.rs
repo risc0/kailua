@@ -16,9 +16,11 @@ use crate::witness::{BlobWitnessProvider, OracleWitnessProvider};
 use alloy_primitives::{Address, B256};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_common::blobs::BlobWitnessData;
+use kailua_common::boot::StitchedBootInfo;
 use kailua_common::executor::Execution;
 use kailua_common::journal::ProofJournal;
-use kailua_common::witness::{StitchedBootInfo, Witness, WitnessOracle};
+use kailua_common::oracle::WitnessOracle;
+use kailua_common::witness::Witness;
 use kona_derive::prelude::BlobProvider;
 use kona_preimage::CommsClient;
 use kona_proof::FlushableCache;
@@ -60,7 +62,7 @@ where
     };
     // Run client
     let collection_target = Arc::new(Mutex::new(Vec::new()));
-    let (boot, precondition_hash) = kailua_common::client::run_kailua_client(
+    let (boot, precondition_hash) = kailua_common::client::core::run_core_client(
         precondition_validation_data_hash,
         oracle,
         stream,
@@ -69,6 +71,7 @@ where
         Some(collection_target.clone()),
     )?;
     // Fix claimed output of captured executions
+    // todo: use common::core::recover_collected_executions
     let mut executions = collection_target.lock().unwrap();
     for i in 1..executions.len() {
         executions[i - 1].claimed_output = executions[i].agreed_output;

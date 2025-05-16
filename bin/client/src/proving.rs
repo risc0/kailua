@@ -17,11 +17,12 @@ use crate::{bonsai, proof, witgen, zkvm};
 use alloy_primitives::{Address, B256};
 use anyhow::anyhow;
 use clap::Parser;
+use kailua_common::boot::StitchedBootInfo;
 use kailua_common::client::stitching::split_executions;
 use kailua_common::executor::Execution;
 use kailua_common::journal::ProofJournal;
 use kailua_common::oracle::vec::{PreimageVecEntry, VecOracle};
-use kailua_common::witness::{StitchedBootInfo, Witness};
+use kailua_common::witness::Witness;
 use kona_preimage::{HintWriterClient, PreimageOracleClient};
 use kona_proof::l1::OracleBlobProvider;
 use kona_proof::CachingOracle;
@@ -99,7 +100,7 @@ where
     P: PreimageOracleClient + Send + Sync + Debug + Clone + 'static,
     H: HintWriterClient + Send + Sync + Debug + Clone + 'static,
 {
-    // preload all data natively into a hashmap
+    // preload all data into the vec oracle
     let (_, execution_cache) = split_executions(stitched_executions.clone());
     info!(
         "Running vec witgen client with {} cached executions ({} traces).",
@@ -130,6 +131,9 @@ where
 
     let execution_trace =
         core::mem::replace(&mut witness_vec.stitched_executions, stitched_executions);
+
+    // sanity check kzg proofs
+    let _ = kailua_common::blobs::PreloadedBlobProvider::from(witness_vec.blobs_witness.clone());
 
     // check if we can prove this workload
     let (main_witness_size, witness_size) = sum_witness_size(&witness_vec);

@@ -12,141 +12,77 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod execution;
 pub mod kzg;
 pub mod optimism;
 pub mod primitives;
 pub mod vec;
 
-use alloy_consensus::Header;
-use alloy_eips::eip7685::Requests;
-use alloy_evm::block::BlockExecutionResult;
-use alloy_primitives::Sealable;
-use kona_executor::BlockBuildingOutcome;
-use op_alloy_consensus::OpReceiptEnvelope;
-use rkyv::rancor::Fallible;
-use rkyv::with::{ArchiveWith, DeserializeWith, SerializeWith, With};
-use rkyv::{Archive, Archived, Place, Resolver};
-pub struct BlockBuildingOutcomeRkyv;
-
-impl ArchiveWith<BlockBuildingOutcome> for BlockBuildingOutcomeRkyv {
-    type Archived = Archived<(Vec<u8>, Vec<u8>)>;
-    type Resolver = Resolver<(Vec<u8>, Vec<u8>)>;
-
-    fn resolve_with(
-        field: &BlockBuildingOutcome,
-        resolver: Self::Resolver,
-        out: Place<Self::Archived>,
-    ) {
-        let block_header = alloy_rlp::encode(field.header.clone().unseal());
-        let execution_result =
-            rkyv::to_bytes::<rkyv::rancor::Error>(With::<_, BlockExecutionResultRkyv>::cast(
-                &field.execution_result,
-            ))
+/// A macro for serializing a given value into a `Vec<u8>` (byte vector) while applying a
+/// specified wrapper type for the serialization process.
+///
+/// This macro uses the `rkyv` library's serialization functionality and the `With` wrapper
+/// to allow for custom serialization contexts. The macro will immediately `unwrap` the
+/// result of the serialization, so it will panic if serialization fails. It is intended
+/// for cases where you are confident that serialization will not error in normal usage.
+///
+/// # Parameters
+///
+/// * `$with:ty` - The type of the wrapper that will be applied during serialization.
+/// * `$value:expr` - The value to be serialized using the specified wrapper.
+///
+/// # Returns
+///
+/// A `Vec<u8>` containing the serialized byte representation of the `$value`.
+///
+/// # Panics
+///
+/// This macro panics if the underlying serialization process returns an error or if
+/// the `unwrap()` call fails. Ensure that serialization cannot fail for the provided value
+/// and context.
+#[macro_export]
+macro_rules! to_bytes_with {
+    ($with:ty, $value:expr) => {
+        rkyv::to_bytes::<rkyv::rancor::Error>(rkyv::with::With::<_, $with>::cast($value))
             .unwrap()
-            .to_vec();
-        let field = (block_header, execution_result);
-        <(Vec<u8>, Vec<u8>) as Archive>::resolve(&field, resolver, out);
-    }
+            .to_vec()
+    };
 }
 
-impl<S> SerializeWith<BlockBuildingOutcome, S> for BlockBuildingOutcomeRkyv
-where
-    S: Fallible + rkyv::ser::Allocator + rkyv::ser::Writer + ?Sized,
-    <S as Fallible>::Error: rkyv::rancor::Source,
-{
-    fn serialize_with(
-        field: &BlockBuildingOutcome,
-        serializer: &mut S,
-    ) -> Result<Self::Resolver, S::Error> {
-        let header = alloy_rlp::encode(field.header.clone().unseal());
-        let execution_result =
-            rkyv::to_bytes::<rkyv::rancor::Error>(With::<_, BlockExecutionResultRkyv>::cast(
-                &field.execution_result,
-            ))
-            .unwrap()
-            .to_vec();
-        let field = (header, execution_result);
-        <(Vec<u8>, Vec<u8>) as rkyv::Serialize<S>>::serialize(&field, serializer)
-    }
-}
-
-impl<D: Fallible> DeserializeWith<Archived<(Vec<u8>, Vec<u8>)>, BlockBuildingOutcome, D>
-    for BlockBuildingOutcomeRkyv
-where
-    D: Fallible + ?Sized,
-    <D as Fallible>::Error: rkyv::rancor::Source,
-{
-    fn deserialize_with(
-        field: &Archived<(Vec<u8>, Vec<u8>)>,
-        deserializer: &mut D,
-    ) -> Result<BlockBuildingOutcome, D::Error> {
-        let field: (Vec<u8>, Vec<u8>) = rkyv::Deserialize::deserialize(field, deserializer)?;
-        let header = alloy_rlp::decode_exact::<Header>(field.0.as_slice())
-            .unwrap()
-            .seal_slow();
-        let execution_result = {
-            let access = rkyv::access(&field.1)?;
-            BlockExecutionResultRkyv::deserialize_with(access, deserializer)?
-        };
-        Ok(BlockBuildingOutcome {
-            header,
-            execution_result,
-        })
-    }
-}
-
-pub struct BlockExecutionResultRkyv;
-
-impl ArchiveWith<BlockExecutionResult<OpReceiptEnvelope>> for BlockExecutionResultRkyv {
-    type Archived = Archived<(Vec<u8>, Vec<u8>, u64)>;
-    type Resolver = Resolver<(Vec<u8>, Vec<u8>, u64)>;
-
-    fn resolve_with(
-        field: &BlockExecutionResult<OpReceiptEnvelope>,
-        resolver: Self::Resolver,
-        out: Place<Self::Archived>,
-    ) {
-        let receipts = alloy_rlp::encode(field.receipts.clone());
-        let requests = alloy_rlp::encode(field.requests.clone().take());
-        let field = (receipts, requests, field.gas_used);
-        <(Vec<u8>, Vec<u8>, u64) as Archive>::resolve(&field, resolver, out);
-    }
-}
-
-impl<S> SerializeWith<BlockExecutionResult<OpReceiptEnvelope>, S> for BlockExecutionResultRkyv
-where
-    S: Fallible + rkyv::ser::Allocator + rkyv::ser::Writer + ?Sized,
-    <S as Fallible>::Error: rkyv::rancor::Source,
-{
-    fn serialize_with(
-        field: &BlockExecutionResult<OpReceiptEnvelope>,
-        serializer: &mut S,
-    ) -> Result<Self::Resolver, S::Error> {
-        let receipts = alloy_rlp::encode(field.receipts.clone());
-        let requests = alloy_rlp::encode(field.requests.clone().take());
-        let field = (receipts, requests, field.gas_used);
-        <(Vec<u8>, Vec<u8>, u64) as rkyv::Serialize<S>>::serialize(&field, serializer)
-    }
-}
-
-impl<D: Fallible>
-    DeserializeWith<Archived<(Vec<u8>, Vec<u8>, u64)>, BlockExecutionResult<OpReceiptEnvelope>, D>
-    for BlockExecutionResultRkyv
-where
-    D: Fallible + ?Sized,
-    <D as Fallible>::Error: rkyv::rancor::Source,
-{
-    fn deserialize_with(
-        field: &Archived<(Vec<u8>, Vec<u8>, u64)>,
-        deserializer: &mut D,
-    ) -> Result<BlockExecutionResult<OpReceiptEnvelope>, D::Error> {
-        let field: (Vec<u8>, Vec<u8>, u64) = rkyv::Deserialize::deserialize(field, deserializer)?;
-        let receipts = alloy_rlp::decode_exact(field.0.as_slice()).unwrap();
-        let requests = alloy_rlp::decode_exact(field.1.as_slice()).unwrap();
-        Ok(BlockExecutionResult {
-            receipts,
-            requests: Requests::new(requests),
-            gas_used: field.2,
-        })
-    }
+/// A macro to deserialize a byte slice into a specific type using a custom `rkyv::with` implementation.
+///
+/// This macro is particularly useful when you want to deserialize archived data that requires a
+/// custom implementation of the `ArchiveWith` and `DeserializeWith` traits. It uses the `rkyv`
+/// crate to access a byte slice, and applies the provided wrapper trait for deserialization to the
+/// original type.
+///
+/// # Arguments
+///
+/// - `$with`: The custom type implementing the `rkyv::with::ArchiveWith` and
+///     `rkyv::with::DeserializeWith` traits.
+/// - `$orig`: The original type that the input will be deserialized into.
+/// - `$bytes`: A reference to the byte slice which contains the archived data to deserialize.
+///
+/// # Returns
+///
+/// - The deserialized value of type `$orig`.
+///
+/// # Panics
+///
+/// - This macro will panic if:
+///   - The byte slice does not contain valid archived data.
+///   - Deserialization fails.
+#[macro_export]
+macro_rules! from_bytes_with {
+    ($with:ty, $orig:ty, $bytes:expr) => {{
+        let archived = rkyv::access::<
+            <$with as rkyv::with::ArchiveWith<$orig>>::Archived,
+            rkyv::rancor::Error,
+        >($bytes)
+        .unwrap();
+        rkyv::deserialize::<$orig, rkyv::rancor::Error>(rkyv::with::With::<_, $with>::cast(
+            archived,
+        ))
+        .unwrap()
+    }};
 }

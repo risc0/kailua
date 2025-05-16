@@ -102,12 +102,12 @@ pub async fn fetch_precondition_data(
                 fetch_requests
                     .push(get_blob_fetch_request(&providers.l1, *block_hash, *blob_hash).await?);
             }
-            PreconditionValidationData::Validity(
-                cfg.precondition_params[0],
-                cfg.precondition_params[1],
-                cfg.precondition_params[2],
-                fetch_requests,
-            )
+            PreconditionValidationData::Validity {
+                proposal_l2_head_number: cfg.precondition_params[0],
+                proposal_output_count: cfg.precondition_params[1],
+                output_block_span: cfg.precondition_params[2],
+                blob_hashes: fetch_requests,
+            }
         } else {
             bail!("Too many precondition_params values provided");
         };

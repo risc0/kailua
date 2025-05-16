@@ -13,32 +13,57 @@
 // limitations under the License.
 
 use crate::blobs::BlobWitnessData;
+use crate::boot::StitchedBootInfo;
 use crate::executor::Execution;
-use crate::journal::ProofJournal;
 use crate::oracle::vec::VecOracle;
+use crate::oracle::WitnessOracle;
 use crate::rkyv::primitives::{AddressDef, B256Def};
 use alloy_primitives::{Address, B256};
-use kona_preimage::{CommsClient, PreimageKey};
-use kona_proof::FlushableCache;
-use risc0_zkvm::Receipt;
 use std::fmt::Debug;
 
+/// Represents the complete structure of a `Witness`, which is used to hold
+/// the necessary data for authenticating a rollup state transition in the FPVM.
 #[derive(Clone, Debug, Default, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Witness<O: WitnessOracle> {
+    /// The witness oracle for preimage data preloaded in memory.
     pub oracle_witness: O,
+    /// The witness oracle for preimage data streamed in on demand.
     pub stream_witness: O,
+    /// Represents the witness data for blobs.
     pub blobs_witness: BlobWitnessData,
+    /// Represents the address of the proof's payout recipient.
     #[rkyv(with = AddressDef)]
     pub payout_recipient_address: Address,
+    /// Represents a hash value used for loading precondition validation data.
     #[rkyv(with = B256Def)]
     pub precondition_validation_data_hash: B256,
+    /// A collection of stitched executions represented as a two-dimensional vector.
+    ///
+    /// # Structure:
+    /// - The outer `Vec` represents a collection of execution groups.
+    /// - Each inner `Vec<Execution>` contains a continuous series of `Execution` objects that
+    ///   represent individual executions within a specific stitched group.
+    ///
+    /// # Notes:
+    /// - Ensure all `Execution` objects within the groups are properly sorted.
     pub stitched_executions: Vec<Vec<Execution>>,
+    /// A list of `StitchedBootInfo` instances to be stitched together from other proofs.
     pub stitched_boot_info: Vec<StitchedBootInfo>,
+    /// Represents the fault-proof virtual machine program image id.
     #[rkyv(with = B256Def)]
     pub fpvm_image_id: B256,
 }
 
 impl Witness<VecOracle> {
+    /// Creates a deep copy of the current instance.
+    ///
+    /// This method performs a "deep clone" of the object by cloning all its fields,
+    /// including any nested fields that implement the `deep_clone` method.
+    /// This ensures that all references and internal data are duplicated,
+    /// rather than pointing to the same objects.
+    ///
+    /// # Returns
+    /// A new instance of the structure with all fields deeply cloned.
     pub fn deep_clone(&self) -> Self {
         let mut cloned_with_arc = self.clone();
         cloned_with_arc.oracle_witness = cloned_with_arc.oracle_witness.deep_clone();
@@ -47,51 +72,72 @@ impl Witness<VecOracle> {
     }
 }
 
-pub trait WitnessOracle: CommsClient + FlushableCache + Send + Sync + Debug + Default {
-    fn preimage_count(&self) -> usize;
-    fn validate_preimages(&self) -> anyhow::Result<()>;
-    fn insert_preimage(&mut self, key: PreimageKey, value: Vec<u8>);
-    fn finalize_preimages(&mut self, shard_size: usize, with_validation_cache: bool);
-}
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub mod tests {
+    use super::*;
+    use crate::blobs::tests::gen_blobs;
+    use crate::boot::tests::gen_boot_infos;
+    use crate::executor::tests::gen_executions;
+    use crate::oracle::vec::tests::{exhaust_vec_oracle, prepare_vec_oracle};
+    use alloy_primitives::keccak256;
+    use std::ops::Deref;
 
-#[derive(
-    Clone,
-    Copy,
-    Debug,
-    Default,
-    serde::Serialize,
-    serde::Deserialize,
-    rkyv::Archive,
-    rkyv::Serialize,
-    rkyv::Deserialize,
-)]
-pub struct StitchedBootInfo {
-    /// The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
-    #[rkyv(with = B256Def)]
-    pub l1_head: B256,
-    /// The agreed upon safe L2 output root.
-    #[rkyv(with = B256Def)]
-    pub agreed_l2_output_root: B256,
-    /// The L2 output root claim.
-    #[rkyv(with = B256Def)]
-    pub claimed_l2_output_root: B256,
-    /// The L2 claim block number.
-    pub claimed_l2_block_number: u64,
-}
+    pub fn create_test_witness() -> (Witness<VecOracle>, Vec<Vec<u8>>) {
+        let (vec_oracle, values) = prepare_vec_oracle(512, 1);
+        let blobs_witness = BlobWitnessData::from(gen_blobs(10));
+        let witness = Witness {
+            oracle_witness: vec_oracle.deep_clone(),
+            stream_witness: vec_oracle.deep_clone(),
+            blobs_witness,
+            payout_recipient_address: Address::from([0xb0; 20]),
+            precondition_validation_data_hash: keccak256(b"precondition_validation_data_hash"),
+            stitched_executions: vec![gen_executions(64)
+                .into_iter()
+                .map(|e| e.deref().clone())
+                .collect()],
+            stitched_boot_info: gen_boot_infos(32, 128),
+            fpvm_image_id: keccak256(b"fpvm_image_id"),
+        };
 
-impl From<ProofJournal> for StitchedBootInfo {
-    fn from(value: ProofJournal) -> Self {
-        Self {
-            l1_head: value.l1_head,
-            agreed_l2_output_root: value.agreed_l2_output_root,
-            claimed_l2_output_root: value.claimed_l2_output_root,
-            claimed_l2_block_number: value.claimed_l2_block_number,
-        }
+        (witness, values)
     }
-}
 
-impl From<&Receipt> for StitchedBootInfo {
-    fn from(value: &Receipt) -> Self {
-        Self::from(ProofJournal::from(value))
+    #[tokio::test]
+    pub async fn test_witness() {
+        let (witness, values) = create_test_witness();
+        // test serde
+        {
+            let recoded = rkyv::from_bytes::<Witness<VecOracle>, rkyv::rancor::Error>(
+                &rkyv::to_bytes::<rkyv::rancor::Error>(&witness).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(
+                witness.oracle_witness.preimages.lock().unwrap().to_vec(),
+                recoded.oracle_witness.preimages.lock().unwrap().to_vec()
+            );
+            assert_eq!(
+                witness.stream_witness.preimages.lock().unwrap().to_vec(),
+                recoded.stream_witness.preimages.lock().unwrap().to_vec()
+            );
+            assert_eq!(witness.blobs_witness, recoded.blobs_witness);
+            assert_eq!(
+                witness.payout_recipient_address,
+                recoded.payout_recipient_address
+            );
+            assert_eq!(
+                witness.precondition_validation_data_hash,
+                recoded.precondition_validation_data_hash
+            );
+            assert_eq!(witness.stitched_boot_info, recoded.stitched_boot_info);
+            assert_eq!(witness.fpvm_image_id, recoded.fpvm_image_id);
+        }
+        // test deep clone
+        let regular_clone = witness.clone();
+        let deep_clone = witness.deep_clone();
+        let preimage_count = regular_clone.oracle_witness.preimage_count();
+        exhaust_vec_oracle(1, witness.oracle_witness, values).await;
+        assert_eq!(regular_clone.oracle_witness.preimage_count(), 0);
+        assert_eq!(deep_clone.oracle_witness.preimage_count(), preimage_count);
     }
 }
