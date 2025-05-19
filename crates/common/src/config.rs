@@ -144,7 +144,7 @@ pub fn genesis_system_config_hash(system_config: &SystemConfig) -> anyhow::Resul
     .concat();
     let digest = SHA2::hash_bytes(fields.as_slice());
 
-    Ok(digest.as_bytes().try_into()?)
+    Ok(digest.as_bytes().try_into().expect("infallible"))
 }
 
 /// Generates a 32-byte configuration hash for an `AltDAConfig` instance.
@@ -192,7 +192,7 @@ pub fn alt_da_config_hash(alt_da_config: &AltDAConfig) -> anyhow::Result<[u8; 32
     .concat();
     let digest = SHA2::hash_bytes(fields.as_slice());
 
-    Ok(digest.as_bytes().try_into()?)
+    Ok(digest.as_bytes().try_into().expect("infallible"))
 }
 
 /// Computes the hash of a RollupConfig, which summarizes various rollup configuration settings
@@ -255,7 +255,7 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
             },
             [0u8; 32],
         )
-        .context("system_config")?
+        .expect("infallible")
         .as_slice(),
         // block_time
         rollup_config.block_time.to_be_bytes().as_slice(),
@@ -351,7 +351,7 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
             },
             [0u8; 32],
         )
-        .context("alt_da_config")?
+        .expect("infallible")
         .as_slice(),
         // chain_op_config
         rollup_config
@@ -372,7 +372,7 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
     ]
     .concat();
     let digest = SHA2::hash_bytes(rollup_config_bytes.as_slice());
-    Ok::<[u8; 32], anyhow::Error>(digest.as_bytes().try_into()?)
+    Ok::<[u8; 32], anyhow::Error>(digest.as_bytes().try_into().expect("infallible"))
 }
 
 #[cfg(test)]
@@ -620,10 +620,10 @@ mod tests {
         assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
     }
 
-    fn test_safe_default_err(rollup_config: &RollupConfig, closure: fn(&mut RollupConfig)) {
-        let mut rollup_config = rollup_config.clone();
-        closure(&mut rollup_config);
-        assert!(config_hash(&rollup_config).is_err());
+    fn test_safe_default_err(value: &RollupConfig, modifier: fn(&mut RollupConfig)) {
+        let mut value = value.clone();
+        modifier(&mut value);
+        assert!(config_hash(&value).is_err());
     }
 
     #[test]

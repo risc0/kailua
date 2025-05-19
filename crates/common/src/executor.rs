@@ -320,7 +320,7 @@ pub fn attributes_hash(attributes: &OpPayloadAttributes) -> anyhow::Result<B256>
                 .map(|wds| withdrawals_hash(wds.as_slice())),
             B256::ZERO,
         )
-        .context("safe_default withdrawals")?
+        .expect("infallible")
         .as_slice(),
         safe_default(
             attributes.payload_attributes.parent_beacon_block_root,
@@ -332,9 +332,9 @@ pub fn attributes_hash(attributes: &OpPayloadAttributes) -> anyhow::Result<B256>
             attributes.transactions.as_ref().map(transactions_hash),
             B256::ZERO,
         )
-        .context("safe_default transactions_hash")?
+        .expect("infallible")
         .as_slice(),
-        &[safe_default(attributes.no_tx_pool, false).context("safe_default no_tx_pool")? as u8],
+        &[safe_default(attributes.no_tx_pool.map(|b| b as u8), 0xff).expect("infallible")],
         safe_default(attributes.gas_limit, u64::MAX)
             .context("safe_default gas_limit")?
             .to_be_bytes()
@@ -512,6 +512,41 @@ pub mod tests {
     use rayon::prelude::{IntoParallelIterator, ParallelIterator};
     use rkyv::rancor::Error;
     use std::collections::HashSet;
+
+    fn test_safe_default_err(value: &OpPayloadAttributes, modifier: fn(&mut OpPayloadAttributes)) {
+        let mut value = value.clone();
+        modifier(&mut value);
+        assert!(attributes_hash(&value).is_err());
+    }
+
+    #[test]
+    fn test_attributes_hash_safe_defaults() {
+        let attributes = OpPayloadAttributes {
+            payload_attributes: PayloadAttributes {
+                timestamp: 0,
+                prev_randao: Default::default(),
+                suggested_fee_recipient: Default::default(),
+                withdrawals: None,
+                parent_beacon_block_root: None,
+            },
+            transactions: None,
+            no_tx_pool: None,
+            gas_limit: None,
+            eip_1559_params: None,
+        };
+
+        test_safe_default_err(&attributes, |a| {
+            a.payload_attributes.parent_beacon_block_root = Some(B256::ZERO);
+        });
+
+        test_safe_default_err(&attributes, |a| {
+            a.gas_limit = Some(u64::MAX);
+        });
+
+        test_safe_default_err(&attributes, |a| {
+            a.eip_1559_params = Some(B64::new([0xff; 8]));
+        });
+    }
 
     pub fn gen_executions(count: usize) -> Vec<Arc<Execution>> {
         gen_execution_outcomes(count)
