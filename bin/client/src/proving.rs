@@ -240,8 +240,7 @@ pub async fn seek_fpvm_proof(
 
 pub async fn save_proof_to_disk(proof: &Receipt) {
     // Save proof file to disk
-    let proof_journal =
-        ProofJournal::decode_packed(proof.journal.as_ref()).expect("Failed to decode proof output");
+    let proof_journal = ProofJournal::decode_packed(proof.journal.as_ref());
     let mut output_file = File::create(proof::proof_file_name(&proof_journal))
         .await
         .expect("Failed to create proof output file");

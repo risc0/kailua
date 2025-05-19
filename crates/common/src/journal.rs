@@ -14,7 +14,6 @@
 
 use crate::boot::StitchedBootInfo;
 use alloy_primitives::{Address, B256};
-use anyhow::Context;
 use kona_proof::BootInfo;
 use risc0_zkvm::Receipt;
 use serde::{Deserialize, Serialize};
@@ -143,25 +142,17 @@ impl ProofJournal {
     /// 3. Context-specific decoding errors such as invalid values in certain fields.
     ///
     /// Each error includes a context string describing the field that caused the failure.
-    pub fn decode_packed(encoded: &[u8]) -> Result<Self, anyhow::Error> {
-        Ok(ProofJournal {
-            payout_recipient: encoded[..20].try_into().context("payout_recipient")?,
-            precondition_hash: encoded[20..52].try_into().context("precondition_output")?,
-            l1_head: encoded[52..84].try_into().context("l1_head")?,
-            agreed_l2_output_root: encoded[84..116]
-                .try_into()
-                .context("agreed_l2_output_root")?,
-            claimed_l2_output_root: encoded[116..148]
-                .try_into()
-                .context("claimed_l2_output_root")?,
-            claimed_l2_block_number: u64::from_be_bytes(
-                encoded[148..156]
-                    .try_into()
-                    .context("claimed_l2_block_number")?,
-            ),
-            config_hash: encoded[156..188].try_into().context("config_hash")?,
-            fpvm_image_id: encoded[188..220].try_into().context("fpvm_image_id")?,
-        })
+    pub fn decode_packed(encoded: &[u8]) -> Self {
+        ProofJournal {
+            payout_recipient: encoded[..20].try_into().unwrap(),
+            precondition_hash: encoded[20..52].try_into().unwrap(),
+            l1_head: encoded[52..84].try_into().unwrap(),
+            agreed_l2_output_root: encoded[84..116].try_into().unwrap(),
+            claimed_l2_output_root: encoded[116..148].try_into().unwrap(),
+            claimed_l2_block_number: u64::from_be_bytes(encoded[148..156].try_into().unwrap()),
+            config_hash: encoded[156..188].try_into().unwrap(),
+            fpvm_image_id: encoded[188..220].try_into().unwrap(),
+        }
     }
 }
 
@@ -182,7 +173,7 @@ impl From<&Receipt> for ProofJournal {
     /// This function will panic if the decoding of the packed journal fails. Ensure that the `journal`
     /// field in the `Receipt` contains valid encoded data before calling this method.
     fn from(value: &Receipt) -> Self {
-        Self::decode_packed(value.journal.as_ref()).unwrap()
+        Self::decode_packed(value.journal.as_ref())
     }
 }
 
@@ -231,7 +222,7 @@ pub mod tests {
         // test serde
         for journal in proof_journals {
             let encoded = journal.encode_packed();
-            let decoded = ProofJournal::decode_packed(&encoded).unwrap();
+            let decoded = ProofJournal::decode_packed(&encoded);
             assert_eq!(journal, decoded);
         }
     }

@@ -681,7 +681,7 @@ pub async fn handle_proposals(
                 info!("Receipt validated.");
             }
             // Decode ProofJournal
-            let proof_journal = ProofJournal::decode_packed(receipt.journal.as_ref())?;
+            let proof_journal = ProofJournal::decode_packed(receipt.journal.as_ref());
             info!("Proof journal: {:?}", proof_journal);
             // encode seal data
             let encoded_seal = Bytes::from(encode_seal(&receipt)?);
