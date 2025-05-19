@@ -392,6 +392,17 @@ contract ClaimDisputeTest is KailuaTest {
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(128), parentIndex, uint64(1))
         );
+
+        // Fail to recover proposer bond due to hanging proposal
+        vm.expectRevert(GameNotResolved.selector);
+        treasury.claimProposerBond();
+
+        // Eliminate player
+        proposal_128_0.parentGame().pruneChildren(1);
+
+        // Fail to recover proposer bond due to elimination
+        vm.expectRevert(AlreadyEliminated.selector);
+        treasury.claimProposerBond();
     }
 
     function test_proveOutputFault_disputed() public {

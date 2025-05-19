@@ -270,10 +270,16 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
 
     /// @notice Pays the proposer back its bond
     function claimProposerBond() public nonReentrant {
+        // INVARIANT: Can only claim back bond if not eliminated
+        if (eliminationRound[msg.sender] != 0) {
+            revert AlreadyEliminated();
+        }
+
         // INVARIANT: Can only claim bond back if no pending proposals are left
         KailuaTournament previousGame = lastProposal[msg.sender];
         if (address(previousGame) != address(0x0)) {
-            if (previousGame.status() != GameStatus.DEFENDER_WINS) {
+            KailuaTournament lastTournament = previousGame.parentGame();
+            if (lastTournament.children(lastTournament.contenderIndex()).status() != GameStatus.DEFENDER_WINS) {
                 revert GameNotResolved();
             }
         }
