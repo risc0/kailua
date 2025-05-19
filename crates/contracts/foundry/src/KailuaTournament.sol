@@ -185,6 +185,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             revert InvalidParent();
         }
 
+        // INVARIANT: No longer accept proposals after resolution
+        if (contenderIndex < children.length && children[contenderIndex].status() == GameStatus.DEFENDER_WINS) {
+            revert ClaimAlreadyResolved();
+        }
+
         // Append new child to children list
         children.push(KailuaTournament(msg.sender));
     }
@@ -429,6 +434,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             revert AlreadyProven();
         }
 
+        // INVARIANT: No longer accept proofs after resolution
+        if (contenderIndex < children.length && children[contenderIndex].status() == GameStatus.DEFENDER_WINS) {
+            revert ClaimAlreadyResolved();
+        }
+
         // Calculate the expected precondition hash if blob data is necessary for proposal
         bytes32 preconditionHash = bytes32(0x0);
         if (PROPOSAL_OUTPUT_COUNT > 1) {
@@ -499,6 +509,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         // INVARIANT: Proofs can only be submitted once
         if (proofStatus[childSignature] != ProofStatus.NONE) {
             revert AlreadyProven();
+        }
+
+        // INVARIANT: No longer accept proofs after resolution
+        if (contenderIndex < children.length && children[contenderIndex].status() == GameStatus.DEFENDER_WINS) {
+            revert ClaimAlreadyResolved();
         }
 
         // INVARIANT: Proofs can only pertain to computed outputs
@@ -595,6 +610,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         // INVARIANT: Proofs can only be submitted once
         if (proofStatus[childSignature] != ProofStatus.NONE) {
             revert AlreadyProven();
+        }
+
+        // INVARIANT: No longer accept proofs after resolution
+        if (contenderIndex < children.length && children[contenderIndex].status() == GameStatus.DEFENDER_WINS) {
+            revert ClaimAlreadyResolved();
         }
 
         // INVARIANT: Proofs can only pertain to intermediate commitments
