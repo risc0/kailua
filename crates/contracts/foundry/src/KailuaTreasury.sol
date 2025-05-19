@@ -32,7 +32,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     /// @notice The initial root claim for the deployment
     Claim public immutable ROOT_CLAIM;
 
-    /// @notice The initial root claim for the deployment
+    /// @notice The L2 block number of the initial root claim for the deployment
     uint64 public immutable L2_BLOCK_NUMBER;
 
     constructor(
@@ -223,14 +223,14 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     /// @notice The last proposal made by each proposer
     mapping(address => KailuaTournament) public lastProposal;
 
-    /// @notice Boolean flag to prevent re-entrant calls
-    bool internal isLocked;
-
     /// @notice The leading proposer that can extend the proposal tree
     address public vanguard;
 
     /// @notice The duration for which the vanguard may lead
     Duration public vanguardAdvantage;
+
+    /// @notice Boolean flag to prevent re-entrant calls
+    bool internal isLocked;
 
     modifier nonReentrant() {
         require(!isLocked);

@@ -66,18 +66,6 @@ error NoConflict();
 /// @notice Thrown when proposing before the proposal gap timeout
 error ProposalGapRemaining(uint256 currentTime, uint256 minCreationTime);
 
-// 0x1ebb374b
-/// @notice Thrown when a game is created with a parent instance from another game type
-error GameTypeMismatch(GameType parentType, GameType expectedType);
-
-// 0xe5f91edd
-/// @notice Thrown when a game is initialized for more blocks than the maximum allowed
-error BlockCountExceeded(uint256 l2BlockNumber, uint256 rootBlockNumber);
-
-// 0x1844c87b
-/// @notice Thrown when an incorrect blob hash is provided
-error BlobHashMismatch(bytes32 found, bytes32 expected);
-
 // 0x1434391f
 /// @notice Thrown when a blob hash is missing
 error BlobHashMissing(uint256 index, uint256 count);
