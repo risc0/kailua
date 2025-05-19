@@ -619,4 +619,179 @@ mod tests {
             .da_commitment_type = Some("aa".to_string());
         assert!(hashes.insert(config_hash(&rollup_config).unwrap()));
     }
+
+    fn test_safe_default_err(rollup_config: &RollupConfig, closure: fn(&mut RollupConfig)) {
+        let mut rollup_config = rollup_config.clone();
+        closure(&mut rollup_config);
+        assert!(config_hash(&rollup_config).is_err());
+    }
+
+    #[test]
+    fn test_config_hash_safe_defaults() {
+        let rollup_config = RollupConfig {
+            genesis: ChainGenesis {
+                l1: BlockNumHash {
+                    hash: B256::ZERO,
+                    number: 0,
+                },
+                l2: BlockNumHash {
+                    hash: B256::ZERO,
+                    number: 0,
+                },
+                l2_time: 0,
+                system_config: Some(SystemConfig {
+                    batcher_address: Address::ZERO,
+                    overhead: U256::ZERO,
+                    scalar: U256::ZERO,
+                    gas_limit: 0,
+                    base_fee_scalar: Some(0),
+                    blob_base_fee_scalar: Some(0),
+                    eip1559_denominator: Some(0),
+                    eip1559_elasticity: Some(0),
+                    operator_fee_scalar: Some(0),
+                    operator_fee_constant: Some(0),
+                }),
+            },
+            block_time: 0,
+            max_sequencer_drift: 0,
+            seq_window_size: 0,
+            channel_timeout: 0,
+            granite_channel_timeout: 0,
+            l1_chain_id: 0,
+            l2_chain_id: 0,
+            chain_op_config: BaseFeeConfig {
+                eip1559_denominator: 0,
+                eip1559_elasticity: 0,
+                eip1559_denominator_canyon: 0,
+            },
+            hardforks: HardForkConfig {
+                regolith_time: Some(0),
+                canyon_time: Some(0),
+                delta_time: Some(0),
+                ecotone_time: Some(0),
+                fjord_time: Some(0),
+                granite_time: Some(0),
+                holocene_time: Some(0),
+                isthmus_time: Some(0),
+                interop_time: Some(0),
+                pectra_blob_schedule_time: Some(0),
+            },
+            batch_inbox_address: Address::ZERO,
+            deposit_contract_address: Address::ZERO,
+            l1_system_config_address: Address::ZERO,
+            protocol_versions_address: Address::ZERO,
+            superchain_config_address: Some(Address::from([0xff; 20])),
+            blobs_enabled_l1_timestamp: Some(0),
+            da_challenge_address: Some(Address::from([0xff; 20])),
+            interop_message_expiry_window: 0,
+            alt_da_config: Some(AltDAConfig {
+                da_challenge_address: Some(Address::from([0xff; 20])),
+                da_challenge_window: Some(0),
+                da_resolve_window: Some(0),
+                da_commitment_type: Some("_".to_string()),
+            }),
+        };
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.genesis.system_config.as_mut().unwrap().base_fee_scalar = Some(u64::MAX)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.genesis
+                .system_config
+                .as_mut()
+                .unwrap()
+                .blob_base_fee_scalar = Some(u64::MAX)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.genesis
+                .system_config
+                .as_mut()
+                .unwrap()
+                .eip1559_denominator = Some(u32::MAX)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.genesis.system_config.as_mut().unwrap().eip1559_elasticity = Some(u32::MAX)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.genesis
+                .system_config
+                .as_mut()
+                .unwrap()
+                .operator_fee_scalar = Some(u32::MAX)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.genesis
+                .system_config
+                .as_mut()
+                .unwrap()
+                .operator_fee_constant = Some(u64::MAX)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.hardforks.regolith_time = Some(u64::MAX)
+        });
+
+        test_safe_default_err(&rollup_config, |r| r.hardforks.canyon_time = Some(u64::MAX));
+
+        test_safe_default_err(&rollup_config, |r| r.hardforks.delta_time = Some(u64::MAX));
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.hardforks.ecotone_time = Some(u64::MAX)
+        });
+
+        test_safe_default_err(&rollup_config, |r| r.hardforks.fjord_time = Some(u64::MAX));
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.hardforks.granite_time = Some(u64::MAX)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.hardforks.holocene_time = Some(u64::MAX)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.hardforks.isthmus_time = Some(u64::MAX)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.hardforks.interop_time = Some(u64::MAX)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.hardforks.pectra_blob_schedule_time = Some(u64::MAX)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.superchain_config_address = Some(Address::ZERO)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.blobs_enabled_l1_timestamp = Some(u64::MAX)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.da_challenge_address = Some(Address::ZERO)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.alt_da_config.as_mut().unwrap().da_challenge_address = Some(Address::ZERO)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.alt_da_config.as_mut().unwrap().da_challenge_window = Some(u64::MAX)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.alt_da_config.as_mut().unwrap().da_resolve_window = Some(u64::MAX)
+        });
+
+        test_safe_default_err(&rollup_config, |r| {
+            r.alt_da_config.as_mut().unwrap().da_commitment_type = Some(String::new())
+        });
+    }
 }
