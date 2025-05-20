@@ -27,7 +27,7 @@ use kailua_common::witness::Witness;
 use kona_preimage::{HintWriterClient, PreimageOracleClient};
 use kona_proof::l1::OracleBlobProvider;
 use kona_proof::CachingOracle;
-use risc0_zkvm::Receipt;
+use risc0_zkvm::{is_dev_mode, Receipt};
 use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::fs::File;
@@ -47,6 +47,8 @@ pub struct ProvingArgs {
     pub max_witness_size: usize,
     #[clap(long, env, default_value_t = false)]
     pub skip_derivation_proof: bool,
+    #[clap(long, env, default_value_t = false)]
+    pub skip_await_proof: bool,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -226,9 +228,8 @@ pub async fn seek_fpvm_proof(
     prove_snark: bool,
 ) -> Result<(), ProvingError> {
     // compute the zkvm proof
-    // compute the zkvm proof
     let proof = match boundless.market {
-        Some(marked_provider_config) => {
+        Some(marked_provider_config) if !is_dev_mode() => {
             boundless::run_boundless_client(
                 marked_provider_config,
                 boundless.storage,
@@ -239,7 +240,7 @@ pub async fn seek_fpvm_proof(
             )
             .await?
         }
-        None => {
+        _ => {
             if bonsai::should_use_bonsai() {
                 bonsai::run_bonsai_client(witness_frames, stitched_proofs, prove_snark).await?
             } else {

@@ -76,6 +76,30 @@ pub struct MarketProviderConfig {
     #[clap(long, env)]
     #[arg(required = false, default_value_t = 5)]
     pub boundless_lookback: u32,
+    /// Starting price per megacycle of the proving order
+    #[clap(long, env)]
+    #[arg(required = false, default_value = "0.0001")]
+    pub boundless_order_min_price_eth: String,
+    /// Maximum price per megacycle of the proving order
+    #[clap(long, env)]
+    #[arg(required = false, default_value = "0.0002")]
+    pub boundless_order_max_price_eth: String,
+    /// Time in seconds before order pricing increases
+    #[clap(long, env)]
+    #[arg(required = false, default_value_t = 60)]
+    pub boundless_order_ramp_up_period: u32,
+    /// Multiplier for order fulfillment timeout after locking
+    #[clap(long, env)]
+    #[arg(required = false, default_value_t = 3)]
+    pub boundless_order_lock_timeout_factor: u32,
+    /// Multiplier for order expiry timeout after creation
+    #[clap(long, env)]
+    #[arg(required = false, default_value_t = 10)]
+    pub boundless_order_timeout_factor: u32,
+    /// Time in seconds between attempts to check order status
+    #[clap(long, env)]
+    #[arg(required = false, default_value_t = 12)]
+    pub boundless_order_check_interval: u64,
 }
 
 impl MarketProviderConfig {
@@ -93,6 +117,20 @@ impl MarketProviderConfig {
             self.boundless_set_verifier_address.to_string(),
             String::from("--boundless-market-address"),
             self.boundless_market_address.to_string(),
+            String::from("--boundless-lookback"),
+            self.boundless_lookback.to_string(),
+            String::from("--boundless-order-min-price-eth"),
+            self.boundless_order_min_price_eth.to_string(),
+            String::from("--boundless-order-max-price-eth"),
+            self.boundless_order_max_price_eth.to_string(),
+            String::from("--boundless-order-ramp-up-period"),
+            self.boundless_order_ramp_up_period.to_string(),
+            String::from("--boundless-order-lock-timeout-factor"),
+            self.boundless_order_lock_timeout_factor.to_string(),
+            String::from("--boundless-order-timeout-factor"),
+            self.boundless_order_timeout_factor.to_string(),
+            String::from("--boundless-order-check-interval"),
+            self.boundless_order_check_interval.to_string(),
         ]);
         if self.boundless_offchain {
             proving_args.push(String::from("--boundless-offchain"));
@@ -231,9 +269,14 @@ pub async fn run_boundless_client(
             continue;
         }
 
-        return retrieve_proof(boundless_client, request_id, request.expires_at())
-            .await
-            .map_err(|e| ProvingError::OtherError(anyhow!(e)));
+        return retrieve_proof(
+            boundless_client,
+            request_id,
+            args.boundless_order_check_interval,
+            request.expires_at(),
+        )
+        .await
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)));
     }
 
     // Preflight execution to get cycle count
@@ -306,15 +349,18 @@ pub async fn run_boundless_client(
         .with_offer(
             Offer::default()
                 .with_min_price_per_mcycle(
-                    parse_ether("0.001").map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
+                    parse_ether(&args.boundless_order_min_price_eth)
+                        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
                     mcycles_count,
                 )
                 .with_max_price_per_mcycle(
-                    parse_ether("0.002").map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
+                    parse_ether(&args.boundless_order_max_price_eth)
+                        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
                     mcycles_count,
                 )
-                .with_ramp_up_period(10)
-                .with_timeout(1500),
+                .with_ramp_up_period(args.boundless_order_ramp_up_period)
+                .with_lock_timeout(args.boundless_order_lock_timeout_factor * mcycles_count as u32)
+                .with_timeout(args.boundless_order_timeout_factor * mcycles_count as u32),
         )
         .with_request_id(RequestId::new(
             boundless_wallet_address,
@@ -330,20 +376,26 @@ pub async fn run_boundless_client(
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     info!("Boundless request 0x{request_id:x} submitted");
 
-    retrieve_proof(boundless_client, request_id, expires_at)
-        .await
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))
+    retrieve_proof(
+        boundless_client,
+        request_id,
+        args.boundless_order_check_interval,
+        expires_at,
+    )
+    .await
+    .map_err(|e| ProvingError::OtherError(anyhow!(e)))
 }
 
 pub async fn retrieve_proof<P: Provider<Ethereum> + 'static + Clone, S: StorageProvider>(
     boundless_client: Client<P, S>,
     request_id: U256,
+    interval: u64,
     expires_at: u64,
 ) -> anyhow::Result<Receipt> {
     // Wait for the request to be fulfilled by the market, returning the journal and seal.
     info!("Waiting for 0x{request_id:x} to be fulfilled");
     let (journal, seal) = boundless_client
-        .wait_for_request_fulfillment(request_id, Duration::from_secs(5), expires_at)
+        .wait_for_request_fulfillment(request_id, Duration::from_secs(interval), expires_at)
         .await?;
 
     let risc0_ethereum_contracts::receipt::Receipt::Base(receipt) =
