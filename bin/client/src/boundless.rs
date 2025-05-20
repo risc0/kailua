@@ -91,12 +91,12 @@ pub struct MarketProviderConfig {
     pub boundless_order_ramp_up_period: u32,
     /// Multiplier for order fulfillment timeout after locking
     #[clap(long, env)]
-    #[arg(required = false, default_value_t = 3)]
-    pub boundless_order_lock_timeout_factor: u32,
+    #[arg(required = false, default_value_t = 3.0)]
+    pub boundless_order_lock_timeout_factor: f64,
     /// Multiplier for order expiry timeout after creation
     #[clap(long, env)]
-    #[arg(required = false, default_value_t = 10)]
-    pub boundless_order_timeout_factor: u32,
+    #[arg(required = false, default_value_t = 10.0)]
+    pub boundless_order_timeout_factor: f64,
     /// Time in seconds between attempts to check order status
     #[clap(long, env)]
     #[arg(required = false, default_value_t = 12)]
@@ -368,8 +368,10 @@ pub async fn run_boundless_client(
                     mcycles_count,
                 )
                 .with_ramp_up_period(args.boundless_order_ramp_up_period)
-                .with_lock_timeout(args.boundless_order_lock_timeout_factor * mcycles_count as u32)
-                .with_timeout(args.boundless_order_timeout_factor * mcycles_count as u32),
+                .with_lock_timeout(
+                    (args.boundless_order_lock_timeout_factor * mcycles_count as f64) as u32,
+                )
+                .with_timeout((args.boundless_order_timeout_factor * mcycles_count as f64) as u32),
         )
         .with_request_id(RequestId::new(
             boundless_wallet_address,
