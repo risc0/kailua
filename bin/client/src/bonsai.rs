@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::proving::ProvingError;
 use crate::proving::{KailuaProveInfo, KailuaSessionStats};
+use crate::proving::{ProvingArgs, ProvingError};
 use anyhow::{anyhow, Context};
 use bonsai_sdk::non_blocking::Client;
 use human_bytes::human_bytes;
@@ -29,6 +29,7 @@ pub async fn run_bonsai_client(
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Receipt>,
     prove_snark: bool,
+    proving_args: &ProvingArgs,
 ) -> Result<Receipt, ProvingError> {
     info!("Running Bonsai client.");
     // Instantiate client
@@ -97,6 +98,11 @@ pub async fn run_bonsai_client(
         .await
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     info!("Bonsai proving SessionID: {}", session.uuid);
+
+    if proving_args.skip_await_proof {
+        warn!("Skipping awaiting proof on Bonsai and exiting process.");
+        std::process::exit(0);
+    }
 
     let polling_interval = if let Ok(ms) = std::env::var("BONSAI_POLL_INTERVAL_MS") {
         Duration::from_millis(

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::proving::ProvingError;
+use crate::proving::{ProvingArgs, ProvingError};
 use alloy::network::Ethereum;
 use alloy::transports::http::reqwest::Url;
 use alloy_primitives::utils::parse_ether;
@@ -31,6 +31,7 @@ use risc0_zkvm::sha::Digestible;
 use risc0_zkvm::{default_executor, ExecutorEnv, Journal, Receipt};
 use std::time::Duration;
 use tracing::info;
+use tracing::log::warn;
 
 #[derive(Parser, Clone, Debug)]
 pub struct BoundlessArgs {
@@ -204,7 +205,7 @@ pub async fn run_boundless_client(
     journal: ProofJournal,
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Receipt>,
-    segment_limit: u32,
+    proving_args: &ProvingArgs,
 ) -> Result<Receipt, ProvingError> {
     info!("Running boundless client.");
     let proof_journal = Journal::new(journal.encode_packed());
@@ -269,6 +270,13 @@ pub async fn run_boundless_client(
             continue;
         }
 
+        info!("Found matching request already submitted!");
+
+        if proving_args.skip_await_proof {
+            warn!("Skipping awaiting proof on Boundless and exiting process.");
+            std::process::exit(0);
+        }
+
         return retrieve_proof(
             boundless_client,
             request_id,
@@ -283,6 +291,7 @@ pub async fn run_boundless_client(
     info!("Preflighting execution.");
     let preflight_witness_frames = witness_frames.clone();
     let preflight_stitched_proofs = stitched_proofs.clone();
+    let segment_limit = proving_args.segment_limit;
     let session_info = tokio::task::spawn_blocking(move || {
         let mut builder = ExecutorEnv::builder();
         // Set segment po2
@@ -375,6 +384,11 @@ pub async fn run_boundless_client(
         .await
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     info!("Boundless request 0x{request_id:x} submitted");
+
+    if proving_args.skip_await_proof {
+        warn!("Skipping awaiting proof on Boundless and exiting process.");
+        std::process::exit(0);
+    }
 
     retrieve_proof(
         boundless_client,

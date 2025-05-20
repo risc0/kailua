@@ -236,13 +236,14 @@ pub async fn seek_fpvm_proof(
                 proof_journal,
                 witness_frames,
                 stitched_proofs,
-                proving.segment_limit,
+                proving,
             )
             .await?
         }
         _ => {
             if bonsai::should_use_bonsai() {
-                bonsai::run_bonsai_client(witness_frames, stitched_proofs, prove_snark).await?
+                bonsai::run_bonsai_client(witness_frames, stitched_proofs, prove_snark, proving)
+                    .await?
             } else {
                 zkvm::run_zkvm_client(
                     witness_frames,
