@@ -111,7 +111,7 @@ risc0-ethereum-contracts = "2.1.0"
 risc0-zkvm = { version = "2.0.2", features = ["heap-embedded-alloc", "unstable"] }
 
 # Boundless
-boundless-market = { git = "https://github.com/boundless-xyz/boundless.git", branch = "victor/bump-0.8.0" }
+boundless-market = "0.8.0"
 
 [profile.dev]
 opt-level = 3

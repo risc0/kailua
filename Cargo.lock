@@ -2573,7 +2573,8 @@ dependencies = [
 [[package]]
 name = "boundless-market"
 version = "0.8.0"
-source = "git+https://github.com/boundless-xyz/boundless.git?branch=victor%2Fbump-0.8.0#4346fe38de0208b05dfa71fd3b97029aa83f74d4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d936359169584120ced4ca5208231e9cc1845591d13d559e6240e14ed878d6a8"
 dependencies = [
  "alloy",
  "alloy-primitives 1.1.0",
