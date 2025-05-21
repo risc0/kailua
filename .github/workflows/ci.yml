@@ -105,6 +105,10 @@ jobs:
         with:
           submodules: recursive
       - uses: risc0/risc0/.github/actions/rustup@main
+      - name: Install nightly toolchain
+        uses: risc0/risc0/.github/actions/rustup@main
+        with:
+          toolchain: nightly
       - name: Install svm-rs
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
