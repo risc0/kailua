@@ -21,7 +21,9 @@ use anyhow::{anyhow, bail, Context};
 use boundless_market::alloy::providers::Provider;
 use boundless_market::alloy::signers::local::PrivateKeySigner;
 use boundless_market::client::{Client, ClientBuilder};
-use boundless_market::contracts::{Input, Offer, Predicate, ProofRequest, RequestId, Requirements};
+use boundless_market::contracts::{
+    Input, Offer, Predicate, ProofRequest, RequestId, RequestStatus, Requirements,
+};
 use boundless_market::input::InputBuilder;
 use boundless_market::storage::{StorageProvider, StorageProviderConfig, StorageProviderType};
 use clap::Parser;
@@ -264,6 +266,17 @@ pub async fn run_boundless_client(
             // No request for that nonce
             continue;
         };
+
+        let request_status = boundless_client
+            .boundless_market
+            .get_status(request_id, Some(request.expires_at()))
+            .await
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+
+        if matches!(request_status, RequestStatus::Expired) {
+            // We found a duplicate but it was expired
+            continue;
+        }
 
         // Skip unrelated request
         if request.requirements != requirements {
