@@ -371,6 +371,11 @@ pub async fn run_boundless_client(
                 .with_lock_timeout(
                     (args.boundless_order_lock_timeout_factor * mcycles_count as f64) as u32,
                 )
+                .with_lock_stake_per_mcycle(
+                    parse_ether(&args.boundless_order_max_price_eth)
+                        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
+                    mcycles_count,
+                )
                 .with_timeout((args.boundless_order_timeout_factor * mcycles_count as f64) as u32),
         )
         .with_request_id(RequestId::new(

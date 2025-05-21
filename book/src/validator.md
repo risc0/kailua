@@ -132,12 +132,12 @@ The following first set of parameters determine where/how requests are made:
 * `boundless-set-verifier-address`: The address of the RISC Zero verifier supporting aggregated proofs for order validation.
 * `boundless-market-address`: The address of the Boundless market contract.
 * `boundless-lookback`: (Defaults to `5`) The number of previous proof requests to inspect for duplicates before making a new proof request.
-* `boundless-order-min-price-eth`: (Defaults to `0.0001`) Starting price per megacycle of proving orders
-* `boundless-order-max-price-eth`: (Defaults to `0.0002`) Maximum price per megacycle of proving orders
-* `boundless-order-ramp-up-period`: (Defaults to `60`) Time in seconds before order pricing increases
-* `boundless-order-lock-timeout-factor`: (Defaults to `3`) Multiplier for order fulfillment timeout after locking
-* `boundless-order-timeout-factor`: (Defaults to `10`) Multiplier for order expiry timeout after creation
-* `boundless-order-check-interval`: (Defaults to `12`) Time in seconds between attempts to check order status
+* `boundless-order-min-price-eth`: (Defaults to `0.0001`) Starting price per megacycle of proving orders.
+* `boundless-order-max-price-eth`: (Defaults to `0.0002`) Maximum price per megacycle of proving orders.
+* `boundless-order-ramp-up-period`: (Defaults to `60`) Time in seconds before order pricing increases.
+* `boundless-order-lock-timeout-factor`: (Defaults to `3`) Multiplier for order fulfillment timeout after locking.
+* `boundless-order-timeout-factor`: (Defaults to `10`) Multiplier for order expiry timeout after creation.
+* `boundless-order-check-interval`: (Defaults to `12`) Time in seconds between attempts to check order status.
 
 ```admonish note
 Order timeouts are set by default to the number of megacycles in a proof request.
