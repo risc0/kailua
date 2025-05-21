@@ -185,6 +185,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             revert InvalidParent();
         }
 
+        // INVARIANT: No longer accept proposals after resolution
+        if (contenderIndex < children.length && children[contenderIndex].status() == GameStatus.DEFENDER_WINS) {
+            revert ClaimAlreadyResolved();
+        }
+
         // Append new child to children list
         children.push(KailuaTournament(msg.sender));
     }
@@ -278,7 +283,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     // ------------------------------
 
     /// @notice Eliminates children until at least one remains
-    function pruneChildren(uint256 eliminationLimit) external returns (KailuaTournament) {
+    function pruneChildren(uint256 stepLimit) external returns (KailuaTournament) {
         // INVARIANT: Only finalized proposals may prune tournaments
         if (status != GameStatus.DEFENDER_WINS) {
             revert GameNotResolved();
@@ -321,7 +326,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
             // Eliminate duplicates
             address payoutRecipient = getPayoutRecipient(contenderSignature);
-            for (uint256 i = contenderDuplicates.length; i > 0 && eliminationLimit > 0; (i--, eliminationLimit--)) {
+            for (uint256 i = contenderDuplicates.length; i > 0 && stepLimit > 0; (i--, stepLimit--)) {
                 KailuaTournament duplicate = children[contenderDuplicates[i - 1]];
                 if (!isChildEliminated(duplicate)) {
                     KAILUA_TREASURY.eliminate(address(duplicate), payoutRecipient);
@@ -330,7 +335,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             }
 
             // Abort if elimination allowance exhausted before eliminating all duplicate contenders
-            if (eliminationLimit == 0) {
+            if (stepLimit == 0) {
                 return KailuaTournament(address(0x0));
             }
 
@@ -338,12 +343,12 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             if (!isChildEliminated(contender)) {
                 KAILUA_TREASURY.eliminate(address(contender), payoutRecipient);
             }
-            eliminationLimit--;
+            stepLimit--;
 
             // Find next viable contender
             // INVARIANT: v > max(u, contenderDuplicates);
             u = v;
-            for (; u < children.length && eliminationLimit > 0; (u++, eliminationLimit--)) {
+            for (; u < children.length && stepLimit > 0; (u++, stepLimit--)) {
                 // Skip if previously eliminated
                 contender = children[u];
                 if (isChildEliminated(contender)) {
@@ -368,7 +373,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         // Eliminate faulty opponents if we've landed on a viable contender
         if (u < children.length && isViableSignature(children[u].signature())) {
             // Iterate over opponents to eliminate them
-            for (; v < children.length && eliminationLimit > 0; (v++, eliminationLimit--)) {
+            for (; v < children.length && stepLimit > 0; (v++, stepLimit--)) {
                 KailuaTournament opponent = children[v];
                 // If the contender hasn't been challenged for as long as the timeout, declare them winner
                 if (contender.getChallengerDuration(opponent.createdAt().raw()).raw() == 0) {
@@ -400,7 +405,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             opponentIndex = v;
 
             // Return the sole survivor if no more matches can be played
-            if (v == children.length || eliminationLimit > 0) {
+            if (v == children.length || stepLimit > 0) {
                 return contender;
             }
         }
@@ -432,6 +437,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         // INVARIANT: Proofs can only be submitted once
         if (provenAt[validChildSignature].raw() != 0) {
             revert AlreadyProven();
+        }
+
+        // INVARIANT: No longer accept proofs after resolution
+        if (contenderIndex < children.length && children[contenderIndex].status() == GameStatus.DEFENDER_WINS) {
+            revert ClaimAlreadyResolved();
         }
 
         // Calculate the expected precondition hash if blob data is necessary for proposal
@@ -504,6 +514,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         // INVARIANT: Proofs can only be submitted once
         if (proofStatus[childSignature] != ProofStatus.NONE) {
             revert AlreadyProven();
+        }
+
+        // INVARIANT: No longer accept proofs after resolution
+        if (contenderIndex < children.length && children[contenderIndex].status() == GameStatus.DEFENDER_WINS) {
+            revert ClaimAlreadyResolved();
         }
 
         // INVARIANT: Proofs can only pertain to computed outputs
@@ -600,6 +615,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         // INVARIANT: Proofs can only be submitted once
         if (proofStatus[childSignature] != ProofStatus.NONE) {
             revert AlreadyProven();
+        }
+
+        // INVARIANT: No longer accept proofs after resolution
+        if (contenderIndex < children.length && children[contenderIndex].status() == GameStatus.DEFENDER_WINS) {
+            revert ClaimAlreadyResolved();
         }
 
         // INVARIANT: Proofs can only pertain to intermediate commitments

@@ -263,48 +263,79 @@ contract ClaimDisputeTest is KailuaTest {
         proposal_256_0.resolve();
     }
 
-    function test_proveValidity_late() public {
+    function test_prove_resolved() public {
         vm.warp(
             game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
-        // bad proposal
-        vm.startPrank(address(0x01));
+        // honest proposal
         KailuaTournament proposal_128_0 = treasury.propose(
-            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
-            abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
-        );
-        vm.stopPrank();
-
-        vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
-        );
-        proposal_128_0.resolve();
-        vm.expectRevert(GameNotInProgress.selector);
-        proposal_128_0.getChallengerDuration(block.timestamp);
-
-        // late honest proposal
-        KailuaTournament proposal_128_1 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000100),
             abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
         );
 
+        vm.warp(
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
+        );
+        proposal_128_0.resolve();
+
+        // honest proposal
+        KailuaTournament proposal_256_0 = treasury.propose(
+            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000100),
+            abi.encodePacked(uint64(256), uint64(proposal_128_0.gameIndex()), uint64(0))
+        );
+
+        // bad proposal
+        vm.startPrank(address(0x01));
+        KailuaTournament proposal_256_1 = treasury.propose(
+            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
+            abi.encodePacked(uint64(256), uint64(proposal_128_0.gameIndex()), uint64(0))
+        );
+        vm.stopPrank();
+
         // Generate mock proof
         bytes memory proof = mockFaultProof(
             address(this),
-            proposal_128_1.l1Head().raw(),
-            anchor.rootClaim().raw(),
-            proposal_128_1.rootClaim().raw(),
-            uint64(proposal_128_1.l2BlockNumber())
+            proposal_256_0.l1Head().raw(),
+            proposal_128_0.rootClaim().raw(),
+            proposal_256_0.rootClaim().raw(),
+            uint64(proposal_256_0.l2BlockNumber())
         );
 
-        // Accept validity proof after resolution of bad proposal
-        anchor.proveValidity(address(this), uint64(1), proof);
+        // Accept validity proof
+        proposal_128_0.proveValidity(address(this), uint64(0), proof);
 
-        // Reject resolve for late honest proposal
-        vm.expectRevert(NotProven.selector);
-        proposal_128_1.resolve();
+        // Resolve honest proposal
+        proposal_256_0.resolve();
+        vm.expectRevert(GameNotInProgress.selector);
+        proposal_256_0.getChallengerDuration(block.timestamp);
+
+        // Reject output fault proof after resolution
+        bytes32 parentRoot = proposal_128_0.rootClaim().raw();
+        uint256 badRoot = KailuaKZGLib.hashToFe(proposal_256_1.rootClaim().raw());
+        bytes32 goodClaim = proposal_256_0.rootClaim().raw();
+        vm.expectRevert(ClaimAlreadyResolved.selector);
+        proposal_128_0.proveOutputFault(
+            address(this), [uint64(1), uint64(0)], proof, parentRoot, badRoot, goodClaim, new bytes[](0), new bytes[](0)
+        );
+
+        // Reject null fault proof after resolution
+        vm.expectRevert(ClaimAlreadyResolved.selector);
+        proposal_128_0.proveNullFault(address(this), [uint64(1), uint64(0)], 0, BLOB_ID_ELEM, BLOB_ID_ELEM);
+
+        // Mock validity proof
+        proof = mockFaultProof(
+            address(this),
+            proposal_256_1.l1Head().raw(),
+            proposal_128_0.rootClaim().raw(),
+            proposal_256_1.rootClaim().raw(),
+            uint64(proposal_256_1.l2BlockNumber())
+        );
+
+        // Reject validity proof after resolution
+        vm.expectRevert(ClaimAlreadyResolved.selector);
+        proposal_128_0.proveValidity(address(this), uint64(1), proof);
     }
 
     function test_proveOutputFault_range() public {
@@ -436,6 +467,17 @@ contract ClaimDisputeTest is KailuaTest {
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(128), parentIndex, uint64(1))
         );
+
+        // Fail to recover proposer bond due to hanging proposal
+        vm.expectRevert(GameNotResolved.selector);
+        treasury.claimProposerBond();
+
+        // Eliminate player
+        proposal_128_0.parentGame().pruneChildren(1);
+
+        // Fail to recover proposer bond due to elimination
+        vm.expectRevert(AlreadyEliminated.selector);
+        treasury.claimProposerBond();
     }
 
     function test_proveOutputFault_disputed() public {

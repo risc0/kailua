@@ -32,7 +32,7 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     /// @notice The initial root claim for the deployment
     Claim public immutable ROOT_CLAIM;
 
-    /// @notice The initial root claim for the deployment
+    /// @notice The L2 block number of the initial root claim for the deployment
     uint64 public immutable L2_BLOCK_NUMBER;
 
     constructor(
@@ -223,14 +223,14 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
     /// @notice The last proposal made by each proposer
     mapping(address => KailuaTournament) public lastProposal;
 
-    /// @notice Boolean flag to prevent re-entrant calls
-    bool internal isLocked;
-
     /// @notice The leading proposer that can extend the proposal tree
     address public vanguard;
 
     /// @notice The duration for which the vanguard may lead
     Duration public vanguardAdvantage;
+
+    /// @notice Boolean flag to prevent re-entrant calls
+    bool internal isLocked;
 
     modifier nonReentrant() {
         require(!isLocked);
@@ -270,10 +270,16 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
 
     /// @notice Pays the proposer back its bond
     function claimProposerBond() public nonReentrant {
+        // INVARIANT: Can only claim back bond if not eliminated
+        if (eliminationRound[msg.sender] != 0) {
+            revert AlreadyEliminated();
+        }
+
         // INVARIANT: Can only claim bond back if no pending proposals are left
         KailuaTournament previousGame = lastProposal[msg.sender];
         if (address(previousGame) != address(0x0)) {
-            if (previousGame.status() != GameStatus.DEFENDER_WINS) {
+            KailuaTournament lastTournament = previousGame.parentGame();
+            if (lastTournament.children(lastTournament.contenderIndex()).status() != GameStatus.DEFENDER_WINS) {
                 revert GameNotResolved();
             }
         }

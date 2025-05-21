@@ -155,7 +155,7 @@ contract ProposeTest is KailuaTest {
     function test_appendChild() public {
         vm.warp(
             game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 1
+                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
         // Succeed on fresh proposal
         uint64 anchorIndex = uint64(anchor.gameIndex());
@@ -163,9 +163,20 @@ contract ProposeTest is KailuaTest {
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(128), anchorIndex, uint64(0))
         );
-        // Fail to call append child
+
+        // Fail to call append child outside treasury
         vm.expectRevert(UnknownGame.selector);
         proposal_128_0.appendChild();
+
+        // Fail to append child after resolution
+        proposal_128_0.resolve();
+        vm.startPrank(address(0x0));
+        vm.expectRevert(ClaimAlreadyResolved.selector);
+        treasury.propose(
+            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
+            abi.encodePacked(uint64(128), anchorIndex, uint64(1))
+        );
+        vm.stopPrank();
     }
 
     function test_proposerOf() public {
