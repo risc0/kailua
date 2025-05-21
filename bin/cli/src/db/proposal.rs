@@ -232,8 +232,8 @@ impl Proposal {
             // save data
             let io_remaining = proposal_output_count - (io_field_elements.len() as u64) - 1;
             let io_in_blob = io_remaining.min(FIELD_ELEMENTS_PER_BLOB) as usize;
-            io_field_elements.extend(intermediate_outputs(&blob_data, io_in_blob)?);
-            trail_field_elements.extend(trail_data(&blob_data, io_in_blob)?);
+            io_field_elements.extend(intermediate_outputs(&blob_data.blob, io_in_blob)?);
+            trail_field_elements.extend(trail_data(&blob_data.blob, io_in_blob)?);
             io_blobs.push((blob_kzg_hash, blob_data));
         }
         // claim data

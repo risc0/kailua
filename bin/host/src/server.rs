@@ -17,8 +17,8 @@ use crate::kv::RWLKeyValueStore;
 use alloy_primitives::B256;
 use anyhow::anyhow;
 use kailua_client::proving::ProvingError;
+use kailua_common::boot::StitchedBootInfo;
 use kailua_common::executor::Execution;
-use kailua_common::witness::StitchedBootInfo;
 use kona_host::single::{SingleChainHintHandler, SingleChainHost, SingleChainLocalInputs};
 use kona_host::{
     DiskKeyValueStore, MemoryKeyValueStore, OfflineHostBackend, OnlineHostBackend, PreimageServer,

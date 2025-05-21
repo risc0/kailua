@@ -16,7 +16,7 @@ use alloy::consensus::Blob;
 use alloy::eips::eip4844::IndexedBlobHash;
 use async_trait::async_trait;
 use kailua_common::blobs::BlobWitnessData;
-use kailua_common::witness::WitnessOracle;
+use kailua_common::oracle::WitnessOracle;
 use kona_derive::prelude::BlobProvider;
 use kona_preimage::errors::PreimageOracleResult;
 use kona_preimage::{CommsClient, HintWriterClient, PreimageKey, PreimageOracleClient};

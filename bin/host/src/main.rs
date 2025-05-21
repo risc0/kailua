@@ -19,7 +19,7 @@ use anyhow::{anyhow, bail, Context};
 use clap::Parser;
 use kailua_client::provider::OpNodeProvider;
 use kailua_client::proving::ProvingError;
-use kailua_common::witness::StitchedBootInfo;
+use kailua_common::boot::StitchedBootInfo;
 use kailua_host::args::KailuaHostArgs;
 use kailua_host::channel::AsyncChannel;
 use kailua_host::config::generate_rollup_config;
