@@ -44,7 +44,7 @@ serde = { version = "1.0", features = ["derive", "alloc", "std"] }
 serde_json = "1.0.127"
 sha2 = "0.10.8"
 spin = { version = "0.10.0", features = ["mutex"] }
-tempfile = "3.19.1"
+tempfile = "3.20.0"
 thiserror = "2.0.12"
 tokio = { version = "1.39.1", features = ["full"] }
 tokio-retry = "0.3.0"
@@ -102,12 +102,16 @@ kona-providers-alloy = { git = "https://github.com/op-rs/kona", tag = "kona-clie
 kona-registry = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
 kona-std-fpvm = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
 
-# Boundless
+# Bonsai
 bonsai-sdk = { version = "1.4.0", features = ["non_blocking"] }
 
 # RISC Zero
 risc0-build = { version = "2.1.1", features = ["unstable"] }
+risc0-ethereum-contracts = "2.1.0"
 risc0-zkvm = { version = "2.0.2", features = ["heap-embedded-alloc", "unstable"] }
+
+# Boundless
+boundless-market = "0.8.0"
 
 [profile.dev]
 opt-level = 3

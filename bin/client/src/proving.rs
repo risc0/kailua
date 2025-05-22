@@ -13,7 +13,8 @@
 // limitations under the License.
 
 use crate::args::parse_address;
-use crate::{bonsai, proof, witgen, zkvm};
+use crate::boundless::BoundlessArgs;
+use crate::{bonsai, boundless, proof, witgen, zkvm};
 use alloy_primitives::{Address, B256};
 use anyhow::anyhow;
 use clap::Parser;
@@ -26,7 +27,7 @@ use kailua_common::witness::Witness;
 use kona_preimage::{HintWriterClient, PreimageOracleClient};
 use kona_proof::l1::OracleBlobProvider;
 use kona_proof::CachingOracle;
-use risc0_zkvm::Receipt;
+use risc0_zkvm::{is_dev_mode, Receipt};
 use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::fs::File;
@@ -46,6 +47,8 @@ pub struct ProvingArgs {
     pub max_witness_size: usize,
     #[clap(long, env, default_value_t = false)]
     pub skip_derivation_proof: bool,
+    #[clap(long, env, default_value_t = false)]
+    pub skip_await_proof: bool,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -86,6 +89,7 @@ pub struct KailuaProveInfo {
 #[allow(clippy::too_many_arguments)]
 pub async fn run_proving_client<P, H>(
     proving: ProvingArgs,
+    boundless: BoundlessArgs,
     oracle_client: P,
     hint_client: H,
     precondition_validation_data_hash: B256,
@@ -107,7 +111,7 @@ where
         execution_cache.len(),
         stitched_executions.len()
     );
-    let (_, mut witness_vec): (ProofJournal, Witness<VecOracle>) = {
+    let (proof_journal, mut witness_vec): (ProofJournal, Witness<VecOracle>) = {
         // Instantiate oracles
         let preimage_oracle = Arc::new(CachingOracle::new(
             ORACLE_LRU_SIZE,
@@ -162,6 +166,8 @@ where
         encode_witness_frames(witness_vec).expect("Failed to encode VecOracle");
     seek_fpvm_proof(
         &proving,
+        boundless,
+        proof_journal,
         [preloaded_frames, streamed_frames].concat(),
         stitched_proofs,
         prove_snark,
@@ -215,21 +221,39 @@ pub fn sum_witness_size(witness: &Witness<VecOracle>) -> (usize, usize) {
 }
 pub async fn seek_fpvm_proof(
     proving: &ProvingArgs,
+    boundless: BoundlessArgs,
+    proof_journal: ProofJournal,
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Receipt>,
     prove_snark: bool,
 ) -> Result<(), ProvingError> {
     // compute the zkvm proof
-    let proof = if bonsai::should_use_bonsai() {
-        bonsai::run_bonsai_client(witness_frames, stitched_proofs, prove_snark).await?
-    } else {
-        zkvm::run_zkvm_client(
-            witness_frames,
-            stitched_proofs,
-            prove_snark,
-            proving.segment_limit,
-        )
-        .await?
+    let proof = match boundless.market {
+        Some(marked_provider_config) if !is_dev_mode() => {
+            boundless::run_boundless_client(
+                marked_provider_config,
+                boundless.storage,
+                proof_journal,
+                witness_frames,
+                stitched_proofs,
+                proving,
+            )
+            .await?
+        }
+        _ => {
+            if bonsai::should_use_bonsai() {
+                bonsai::run_bonsai_client(witness_frames, stitched_proofs, prove_snark, proving)
+                    .await?
+            } else {
+                zkvm::run_zkvm_client(
+                    witness_frames,
+                    stitched_proofs,
+                    prove_snark,
+                    proving.segment_limit,
+                )
+                .await?
+            }
+        }
     };
 
     // Save proof file to disk

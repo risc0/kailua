@@ -33,6 +33,7 @@ use alloy::providers::RootProvider;
 use anyhow::{anyhow, bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_client::args::parse_address;
+use kailua_client::boundless::BoundlessArgs;
 use kailua_client::proof::{proof_file_name, read_proof_file};
 use kailua_client::provider::OpNodeProvider;
 use kailua_client::telemetry::TelemetryArgs;
@@ -87,6 +88,9 @@ pub struct ValidateArgs {
     /// Address of the KailuaGame implementation to use
     #[clap(long, env, value_parser = parse_address)]
     pub kailua_game_implementation: Option<Address>,
+
+    #[clap(flatten)]
+    pub boundless: BoundlessArgs,
 
     #[clap(flatten)]
     pub telemetry: TelemetryArgs,

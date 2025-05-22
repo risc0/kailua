@@ -15,6 +15,7 @@
 use alloy_primitives::B256;
 use clap::{ArgAction, Parser};
 use kailua_client::args::parse_b256;
+use kailua_client::boundless::BoundlessArgs;
 use kailua_client::proving::ProvingArgs;
 use kailua_client::telemetry::TelemetryArgs;
 use std::cmp::Ordering;
@@ -37,6 +38,8 @@ pub struct KailuaHostArgs {
 
     #[clap(flatten)]
     pub proving: ProvingArgs,
+    #[clap(flatten)]
+    pub boundless: BoundlessArgs,
     #[clap(long, env, default_value_t = false)]
     pub bypass_chain_registry: bool,
 
