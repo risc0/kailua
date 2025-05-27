@@ -381,13 +381,13 @@ pub async fn run_boundless_client(
                     mcycles_count,
                 )
                 .with_ramp_up_period(args.boundless_order_ramp_up_period)
-                .with_lock_timeout(
-                    (args.boundless_order_lock_timeout_factor * mcycles_count as f64) as u32,
-                )
                 .with_lock_stake_per_mcycle(
                     parse_ether(&args.boundless_order_max_price_eth)
                         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
                     mcycles_count,
+                )
+                .with_lock_timeout(
+                    (args.boundless_order_lock_timeout_factor * mcycles_count as f64) as u32,
                 )
                 .with_timeout((args.boundless_order_timeout_factor * mcycles_count as f64) as u32),
         )
