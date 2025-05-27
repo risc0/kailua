@@ -184,10 +184,7 @@ impl BlobProvider for PreloadedBlobProvider {
     /// - `Ok(Vec<Box<Blob>>)`:
     ///   A vector of boxed `Blob` instances if all blobs are successfully fetched and processed.
     /// - `Err(Self::Error)`:
-    ///   An error result in case of any failure specific to the implementation.
-    ///
-    /// # Errors
-    /// This function propagates the error of the implementing type if there is an issue during blob retrieval.
+    ///   An error result in case of any failure during blob retrieval.
     async fn get_blobs(
         &mut self,
         _block_ref: &BlockInfo,
@@ -259,7 +256,6 @@ pub fn trail_data(blob: impl AsRef<Blob>, blocks: usize) -> anyhow::Result<Vec<U
 ///
 /// This function will return an error in the following cases:
 /// - The index calculated by `32 * i` exceeds the bounds of `blob_data.blob.0`.
-/// - The underlying slice operation fails to produce a valid 32-byte array.
 pub fn field_elements(
     blob: impl AsRef<Blob>,
     iterator: impl Iterator<Item = usize>,

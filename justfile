@@ -7,6 +7,9 @@ default:
 build +ARGS="--release -F prove -F disable-dev-mode --locked":
   cargo build {{ARGS}}
 
+build-fpvm +ARGS="--release -F prove -F disable-dev-mode -F rebuild-fpvm --locked":
+  cargo build {{ARGS}}
+
 fmt:
   cargo fmt --all
 

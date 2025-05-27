@@ -836,7 +836,7 @@ dependencies = [
 [[package]]
 name = "blst"
 version = "0.3.14"
-source = "git+https://github.com/risc0/blst?branch=wollac%2Ffix%2Fct_inverse_mod#1449f6ff61ab0c25d59856b9a69a35e3f39d0803"
+source = "git+https://github.com/risc0/blst?tag=v0.3.14-risczero.2#ca5d6042fffe3cf599e4f10a7d9a6a63693b6d15"
 dependencies = [
  "cc",
  "glob",
@@ -967,7 +967,7 @@ dependencies = [
 [[package]]
 name = "c-kzg"
 version = "2.1.0"
-source = "git+https://github.com/risc0/c-kzg-4844.git?branch=p2.1.0#69340c5d9f882da7086a97e4d8267dfaa0dfb47d"
+source = "git+https://github.com/risc0/c-kzg-4844.git?tag=c-kzg%2Fv2.1.0-risczero.1#6ebb1f6b7861904e5020f142f8aba83fd623eb68"
 dependencies = [
  "arbitrary",
  "blst",

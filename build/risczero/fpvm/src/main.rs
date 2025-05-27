@@ -40,6 +40,7 @@ fn main() {
             continue;
         }
         log(&format!("DESERIALIZE SHARD {i}"));
+        // read_shard is undefined on non-zkvm platforms
         #[cfg(target_os = "zkvm")]
         let _ = core::mem::replace(entry, kailua_common::oracle::vec::read_shard());
     }
