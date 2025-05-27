@@ -43,6 +43,17 @@
         <script src="toc.js"></script>
     </head>
     <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
     <div id="body-container">
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script>
@@ -120,7 +131,7 @@
                             <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
                         </ul>
-                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
                             <i class="fa fa-search"></i>
                         </button>
                     </div>
@@ -521,14 +532,14 @@ parameters for your rollup instance:</p>
 </code></pre>
 <p>Running the above command against the respective Base mainnet endpoints should produce the following output:</p>
 <pre><code>RISC0_VERSION: 2.0.2
-FPVM_IMAGE_ID: 0xF602BE8B1A5555EB4BE20838C5315893B641592B999A7443BA2E1C3BEF2A8205
-FPVM_ELF_SIZE: 34211696
+FPVM_IMAGE_ID: 0x68C2900918FA2DD3FC2658080BE6F687502102416E283EFB0C6B79C6EB6CAE52
+FPVM_ELF_SIZE: 31825388
 CONTROL_ROOT: 0x539032186827B06719244873B17B2D4C122E2D02CFB1994FE958B2523B844576
 CONTROL_ID: 0x04446E66D300EB7FB45C9726BB53C793DDA407A62E9601618BB43C5C14657AC0
 RISC_ZERO_VERIFIER: 0x8EAB2D97DFCE405A1692A21B3FF3A172D593D319
 GENESIS_TIMESTAMP: 1686789347
 BLOCK_TIME: 2
-ROLLUP_CONFIG_HASH: 0xCBCE5809689F85CC2E3C4C17D09A7D6F477934623F4311C91A666A9C52EA0608
+ROLLUP_CONFIG_HASH: 0x0D2CFA12746085B0CBFCB344D7100F873BA380535218A0795F9F4DE43EA92AE7
 DISPUTE_GAME_FACTORY: 0x43EDB88C4B80FDD2ADFF2412A7BEBF9DF42CB40E
 OPTIMISM_PORTAL: 0x49048044D57E1C92A77F79988D21FA8FAF74E97E
 KAILUA_GAME_TYPE: 1337
