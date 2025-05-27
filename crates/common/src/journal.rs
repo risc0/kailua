@@ -116,11 +116,6 @@ impl ProofJournal {
     ///
     /// * `encoded` - A byte slice containing the serialized representation of the `ProofJournal` fields in order.
     ///
-    /// # Returns
-    ///
-    /// * `Ok(Self)` - A successfully decoded `ProofJournal` instance when the input is valid.
-    /// * `Err(anyhow::Error)` - An error indicating a failure to decode or validate the input.
-    ///
     /// # Expected Encoding Layout
     ///
     /// The `encoded` byte slice is expected to follow this layout:
@@ -133,15 +128,6 @@ impl ProofJournal {
     /// - Bytes `[148..156]`: `claimed_l2_block_number` (8 bytes - `u64` in big-endian format)
     /// - Bytes `[156..188]`: `config_hash` (32 bytes)
     /// - Bytes `[188..220]`: `fpvm_image_id` (32 bytes)
-    ///
-    /// # Errors
-    ///
-    /// This method returns errors in the following cases:
-    /// 1. The slice is too short to extract the required fields.
-    /// 2. Conversion operations (`try_into`) on the byte segments fail due to mismatched lengths.
-    /// 3. Context-specific decoding errors such as invalid values in certain fields.
-    ///
-    /// Each error includes a context string describing the field that caused the failure.
     pub fn decode_packed(encoded: &[u8]) -> Self {
         ProofJournal {
             payout_recipient: encoded[..20].try_into().unwrap(),
