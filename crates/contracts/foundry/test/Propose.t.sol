@@ -70,8 +70,11 @@ contract ProposeTest is KailuaTest {
             abi.encodePacked(uint64(256), uint64(factory.gameCount() - 1), uint64(0))
         );
         // Withdraw collateral
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         game_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(game_0));
         game_1.resolve();
+        vm.assertEq(treasury.lastResolved(), address(game_1));
         vm.assertEq(treasury.paidBonds(address(this)), treasury.participationBond());
         treasury.claimProposerBond();
         vm.assertEq(treasury.paidBonds(address(this)), 0);
@@ -111,9 +114,12 @@ contract ProposeTest is KailuaTest {
             abi.encodePacked(uint64(128), anchorIndex, uint64(0))
         );
         // Finalize
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
         vm.expectRevert();
         proposal_128_1.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
     }
 
     function test_duplication() public {
@@ -147,9 +153,12 @@ contract ProposeTest is KailuaTest {
         );
         vm.stopPrank();
         // Finalize
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
         vm.expectRevert();
         proposal_128_1.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
     }
 
     function test_appendChild() public {
@@ -169,7 +178,9 @@ contract ProposeTest is KailuaTest {
         proposal_128_0.appendChild();
 
         // Fail to append child after resolution
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
         vm.startPrank(address(0x0));
         vm.expectRevert(ClaimAlreadyResolved.selector);
         treasury.propose(
@@ -205,8 +216,11 @@ contract ProposeTest is KailuaTest {
         vm.expectRevert(AlreadyInitialized.selector);
         proposal_128_0.initialize();
 
-        // Finalize
+        // Fail to finalize
+        vm.assertEq(treasury.lastResolved(), address(anchor));
+        vm.expectRevert(NotProposed.selector);
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(anchor));
     }
 
     function test_nullClaim() public {
@@ -340,12 +354,18 @@ contract ProposeTest is KailuaTest {
         );
         vm.stopPrank();
         // Finalize
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
         vm.expectRevert();
         proposal_128_1.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
         proposal_256_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_256_0));
         proposal_384_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_384_0));
         proposal_512_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_512_0));
     }
 
     function test_minCreationTime() public {
@@ -381,7 +401,9 @@ contract ProposeTest is KailuaTest {
         vm.assertEq(proposal_128_0.minCreationTime().raw(), uint64(block.timestamp));
 
         // Finalize
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
     }
 
     function test_KailuaTreasury_extraData() public {
@@ -483,6 +505,7 @@ contract ProposeTest is KailuaTest {
 
             parentIndex = uint64(proposal.gameIndex());
         }
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         // Fail to resolve out of order
         (,, IDisputeGame lastGame) = factory.gameAtIndex(parentIndex);
         for (
@@ -504,9 +527,11 @@ contract ProposeTest is KailuaTest {
         ) {
             proposal.parentGame().pruneChildren(128);
             proposal.resolve();
+            vm.assertEq(treasury.lastResolved(), address(proposal));
         }
         // Resolve last game
         lastGame.resolve();
+        vm.assertEq(treasury.lastResolved(), address(lastGame));
         // Test nothing to prune
         vm.expectRevert(NotProposed.selector);
         KailuaTournament(address(lastGame)).pruneChildren(128);

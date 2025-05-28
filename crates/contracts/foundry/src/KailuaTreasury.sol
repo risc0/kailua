@@ -132,6 +132,9 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
 
         // Mark resolution timestamp
         resolvedAt = Timestamp.wrap(uint64(block.timestamp));
+
+        // Update lastResolved
+        KAILUA_TREASURY.updateLastResolved();
     }
 
     // ------------------------------
@@ -203,6 +206,19 @@ contract KailuaTreasury is KailuaTournament, IKailuaTreasury {
 
     /// @inheritdoc IKailuaTreasury
     bool public isProposing;
+
+    /// @inheritdoc IKailuaTreasury
+    address public lastResolved;
+
+    /// @inheritdoc IKailuaTreasury
+    function updateLastResolved() external {
+        // INVARIANT: Only known proposal contracts may call this function
+        if (proposerOf[msg.sender] == address(0x0)) {
+            revert NotProposed();
+        }
+
+        lastResolved = msg.sender;
+    }
 
     // ------------------------------
     // Treasury

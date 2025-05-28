@@ -105,8 +105,9 @@ contract KailuaGame is KailuaTournament {
         }
 
         // Do not initialize a game that does not cover the required number of l2 blocks
-        if (l2BlockNumber() != parentGame().l2BlockNumber() + PROPOSAL_OUTPUT_COUNT * OUTPUT_BLOCK_SPAN) {
-            revert BlockNumberMismatch(parentGame().l2BlockNumber(), l2BlockNumber());
+        KailuaTournament parentGame_ = parentGame();
+        if (l2BlockNumber() != parentGame_.l2BlockNumber() + PROPOSAL_OUTPUT_COUNT * OUTPUT_BLOCK_SPAN) {
+            revert BlockNumberMismatch(parentGame_.l2BlockNumber(), l2BlockNumber());
         }
 
         // Store the intermediate output blob hashes
@@ -119,7 +120,6 @@ contract KailuaGame is KailuaTournament {
         }
 
         // Verify that parent game is known by the treasury
-        KailuaTournament parentGame_ = parentGame();
         if (KAILUA_TREASURY.proposerOf(address(parentGame_)) == address(0x0)) {
             revert InvalidParent();
         }
@@ -186,6 +186,9 @@ contract KailuaGame is KailuaTournament {
 
         // Update the status and emit the resolved event, note that we're performing a storage update here.
         emit Resolved(status = status_ = GameStatus.DEFENDER_WINS);
+
+        // Update lastResolved
+        KAILUA_TREASURY.updateLastResolved();
     }
 
     // ------------------------------

@@ -110,7 +110,9 @@ contract BondTest is KailuaTest {
         treasury.claimProposerBond();
 
         // Finalize
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
 
         // Fail to receive payment
         revertFlag = true;
@@ -172,7 +174,9 @@ contract BondTest is KailuaTest {
         vm.stopPrank();
 
         // Finalize
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
 
         // Reclaim bond as duplicator
         vm.startPrank(address(0x01));
@@ -214,7 +218,9 @@ contract BondTest is KailuaTest {
         vm.stopPrank();
 
         // Finalize
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
 
         // Reclaim bond as duplicator
         vm.startPrank(address(0x01));

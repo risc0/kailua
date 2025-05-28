@@ -104,7 +104,13 @@ interface IKailuaTreasury {
     function eliminate(address child, address prover) external;
 
     /// @notice Returns true iff a proposal is currently being submitted
-    function isProposing() external returns (bool);
+    function isProposing() external view returns (bool);
+
+    /// @notice Returns the last resolved proposal contract address
+    function lastResolved() external view returns (address);
+
+    /// @notice Updates the last resolved contract address to that of the caller
+    function updateLastResolved() external;
 }
 
 library KailuaKZGLib {
