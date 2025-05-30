@@ -12,9 +12,95 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::stall::Stall;
+use crate::sync::deployment::SyncDeployment;
+use crate::sync::proposal::Proposal;
+use crate::sync::provider::SyncProvider;
+use alloy::primitives::Address;
+use anyhow::bail;
+use kailua_contracts::*;
+use opentelemetry::global::tracer;
+use opentelemetry::trace::{TraceContextExt, Tracer};
+use opentelemetry::Context;
+
 pub struct SyncCursor {
     pub canonical_proposal_tip: Option<u64>,
-    pub last_resolved_proposal: u64,
     pub next_factory_index: u64,
     pub last_output_index: u64,
+}
+
+impl SyncCursor {
+    pub async fn load(
+        deployment: &SyncDeployment,
+        provider: &SyncProvider,
+        starting_proposal: Option<Address>,
+    ) -> anyhow::Result<Self> {
+        let tracer = tracer("kailua");
+        let context = Context::current_with_span(tracer.start("SyncCursor::load"));
+
+        let anchor_address = match starting_proposal {
+            Some(address) => address,
+            None => {
+                KailuaTreasury::new(deployment.treasury, &provider.l1_provider)
+                    .lastResolved()
+                    .stall_with_context(context.clone(), "KailuaTreasury::lastResolved")
+                    .await
+            }
+        };
+
+        if anchor_address.is_zero() {
+            bail!("No resolved games found. Deployment has not been fully configured.");
+        }
+
+        let anchor = KailuaTournament::new(anchor_address, &provider.l1_provider);
+
+        let anchor_treasury = anchor
+            .KAILUA_TREASURY()
+            .stall_with_context(context.clone(), "KailuaTournament::KAILUA_TREASURY")
+            .await;
+        if anchor_treasury != deployment.treasury {
+            bail!("Anchor is not part of the correct deployment.");
+        }
+
+        let anchor_index: u64 = anchor
+            .gameIndex()
+            .stall_with_context(context.clone(), "KailuaTournament::gameIndex")
+            .await
+            .to();
+
+        let Some(true) = Proposal::parse_finality(
+            anchor
+                .status()
+                .stall_with_context(context.clone(), "KailuaTournament::status")
+                .await,
+        )?
+        else {
+            bail!("Anchor game is not finalized.");
+        };
+
+        let anchor_block_height: u64 = anchor
+            .l2BlockNumber()
+            .stall_with_context(context.clone(), "KailuaTournament::l2BlockNumber")
+            .await
+            .to();
+
+        let parent_address = anchor
+            .parentGame()
+            .stall_with_context(context.clone(), "KailuaTournament::parentGame")
+            .await;
+
+        let last_output_index = if parent_address == anchor_address {
+            // get block height of treasury instance
+            anchor_block_height
+        } else {
+            // get starting block height of game instance
+            anchor_block_height - deployment.proposal_output_count * deployment.output_block_span
+        };
+
+        Ok(SyncCursor {
+            canonical_proposal_tip: None,
+            next_factory_index: anchor_index,
+            last_output_index,
+        })
+    }
 }

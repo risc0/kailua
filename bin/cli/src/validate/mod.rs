@@ -71,6 +71,9 @@ pub struct ValidateArgs {
     /// Address of the KailuaGame implementation to use
     #[clap(long, env, value_parser = parse_address)]
     pub kailua_game_implementation: Option<Address>,
+    /// Address of the anchor proposal to start synchronization from
+    #[clap(long, env, value_parser = parse_address)]
+    pub kailua_anchor_address: Option<Address>,
 
     #[clap(flatten)]
     pub boundless: BoundlessArgs,

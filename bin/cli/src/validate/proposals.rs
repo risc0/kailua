@@ -60,7 +60,13 @@ pub async fn handle_proposals(
     let context = opentelemetry::Context::current_with_span(tracer.start("handle_proposals"));
 
     // initialize sync agent
-    let mut agent = SyncAgent::new(&args.core, data_dir, args.kailua_game_implementation).await?;
+    let mut agent = SyncAgent::new(
+        &args.core,
+        data_dir,
+        args.kailua_game_implementation,
+        args.kailua_anchor_address,
+    )
+    .await?;
     info!("KailuaTreasury({:?})", agent.deployment.treasury);
 
     // initialize validator wallet

@@ -66,6 +66,7 @@ impl SyncAgent {
         core_args: &CoreArgs,
         mut data_dir: PathBuf,
         game_impl_address: Option<Address>,
+        anchor_address: Option<Address>,
     ) -> anyhow::Result<Self> {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("SymcAgemt::new"));
@@ -91,6 +92,18 @@ impl SyncAgent {
             SyncDeployment::load(&provider, &config, game_impl_address),
             "Deployment::load"
         )?;
+        #[cfg(not(feature = "devnet"))]
+        {
+            let image_id: B256 =
+                bytemuck::cast::<[u32; 8], [u8; 32]>(kailua_build::KAILUA_FPVM_ID).into();
+            if deployment.image_id != image_id {
+                bail!(
+                    "Deployment image ID mismatch. Expected {:?}, got {:?}.",
+                    image_id,
+                    deployment.image_id
+                );
+            }
+        }
 
         // Initialize persistent DB
         data_dir.push(deployment.cfg_hash.to_string());
@@ -98,51 +111,11 @@ impl SyncAgent {
         let db = rocksdb::DB::open(&Self::db_options(), &data_dir).context("rocksdb::DB::open")?;
 
         // Create cursor
-        let treasury = KailuaTreasury::new(deployment.treasury, &provider.l1_provider);
-
-        let last_resolved_game_address = treasury
-            .lastResolved()
-            .stall_with_context(context.clone(), "KailuaTreasury::lastResolved")
-            .await;
-
-        if last_resolved_game_address.is_zero() {
-            bail!("No resolved games found. Deployment has not been fully configured.");
-        }
-
-        let last_resolved_game =
-            KailuaTournament::new(last_resolved_game_address, &provider.l1_provider);
-
-        let last_game_index: u64 = last_resolved_game
-            .gameIndex()
-            .stall_with_context(context.clone(), "KailuaTournament::gameIndex")
-            .await
-            .to();
-
-        let lrg_parent_address = last_resolved_game
-            .parentGame()
-            .stall_with_context(context.clone(), "KailuaTournament::parentGame")
-            .await;
-
-        let last_output_index: u64 = last_resolved_game
-            .l2BlockNumber()
-            .stall_with_context(context.clone(), "KailuaTournament::l2BlockNumber")
-            .await
-            .to();
-
-        let next_output_index = if lrg_parent_address == last_resolved_game_address {
-            // get block height of treasury instance
-            last_output_index
-        } else {
-            // get starting block height of game instance
-            last_output_index - deployment.proposal_output_count * deployment.output_block_span
-        };
-
-        let cursor = SyncCursor {
-            canonical_proposal_tip: None,
-            last_resolved_proposal: last_game_index,
-            next_factory_index: last_game_index,
-            last_output_index: next_output_index,
-        };
+        let cursor = await_tel_res!(
+            context,
+            SyncCursor::load(&deployment, &provider, anchor_address),
+            "SyncCursor::load"
+        )?;
 
         Ok(Self {
             provider,
@@ -175,17 +148,22 @@ impl SyncAgent {
             retry_with_context!(self.provider.op_provider.sync_status())
         )?;
         let output_block_number = sync_status["safe_l2"]["number"].as_u64().unwrap();
-        info!("Syncing with op-node until block {output_block_number}");
-        await_tel!(
-            context,
-            tracer,
-            "sync_outputs",
-            self.sync_outputs(
-                self.cursor.last_output_index,
-                output_block_number,
-                self.deployment.output_block_span
-            )
-        );
+        if self.cursor.last_output_index < output_block_number {
+            info!(
+                "Syncing with op-node from block {} until block {output_block_number}",
+                self.cursor.last_output_index
+            );
+            await_tel!(
+                context,
+                tracer,
+                "sync_outputs",
+                self.sync_outputs(
+                    self.cursor.last_output_index,
+                    output_block_number,
+                    self.deployment.output_block_span
+                )
+            );
+        }
 
         // load new proposals
         let dispute_game_factory =
@@ -227,8 +205,6 @@ impl SyncAgent {
             };
             // Update state according to proposal
             if let Some(proposal) = proposal {
-                // update next output index
-                self.cursor.last_output_index = proposal.output_block_number;
                 if let Some(true) = proposal.canonical {
                     // Update canonical chain tip
                     self.cursor.canonical_proposal_tip = Some(proposal.index);
@@ -303,8 +279,8 @@ impl SyncAgent {
         // Determine inherited correctness
         if self.cursor.last_output_index < proposal.output_block_number {
             info!(
-                "Syncing with op-node until block {}",
-                proposal.output_block_number
+                "Syncing with op-node from block {} until block {}",
+                self.cursor.last_output_index, proposal.output_block_number
             );
             await_tel!(
                 context,
@@ -508,24 +484,34 @@ impl SyncAgent {
         self.outputs.get(&block_number).cloned()
     }
 
-    pub async fn sync_outputs(&mut self, start: u64, end: u64, step: u64) {
-        let outputs = (start..=end)
-            .step_by(step as usize)
-            .filter(|i| !self.outputs.contains_key(i))
-            .map(|o| {
-                let provider = self.provider.op_provider.clone();
-                async move { (o, retry!(provider.output_at_block(o).await).await.unwrap()) }
-            })
-            .collect_vec();
-        let outputs = join_all(outputs).await;
+    pub async fn sync_outputs(&mut self, mut start: u64, end: u64, step: u64) {
+        while start <= end {
+            // perform at most 1024 tasks at a time
+            let end = end.min(start + 1024 * step);
 
-        if !outputs.is_empty() {
-            info!("Loaded {} outputs.", outputs.len());
-        }
-        // Store outputs in memory
-        for (i, output) in outputs.into_iter() {
-            self.outputs.insert(i, output);
-            self.cursor.last_output_index = i + step;
+            let outputs = (start..=end)
+                .step_by(step as usize)
+                .filter(|i| !self.outputs.contains_key(i))
+                .map(|o| {
+                    let provider = self.provider.op_provider.clone();
+                    async move { (o, retry!(provider.output_at_block(o).await).await.unwrap()) }
+                })
+                .collect_vec();
+            let outputs = join_all(outputs).await;
+
+            if !outputs.is_empty() {
+                info!("Loaded {} outputs.", outputs.len());
+            }
+            // Store outputs in memory
+            for (i, output) in outputs.into_iter() {
+                self.outputs.insert(i, output);
+                if self.cursor.last_output_index < i {
+                    self.cursor.last_output_index = i;
+                }
+            }
+
+            // jumpt forward
+            start = end + step;
         }
     }
 }
