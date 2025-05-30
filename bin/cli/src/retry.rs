@@ -15,10 +15,10 @@
 #[macro_export]
 macro_rules! retry {
     ($e:expr) => {
-        retry!(2, 1024, $e)
+        retry!(200, 1024, $e)
     };
     ($m:literal, $e:expr) => {
-        retry!(2, $m, $e)
+        retry!(200, $m, $e)
     };
     ($b:literal, $m:literal, $e:expr) => {
         tokio_retry::Retry::spawn(

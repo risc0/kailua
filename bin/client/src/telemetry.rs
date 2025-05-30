@@ -75,6 +75,9 @@ macro_rules! await_tel {
 
 #[macro_export]
 macro_rules! await_tel_res {
+    ($c:ident, $e:expr, $l:literal) => {
+        $crate::await_tel!($c, $e).context($l)
+    };
     ($c:ident, $t:ident, $l:literal, $e:expr) => {
         $crate::await_tel!($c, $t, $l, $e).context($l)
     };

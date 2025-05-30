@@ -24,6 +24,7 @@ pub mod fault;
 pub mod propose;
 pub mod retry;
 pub mod stall;
+pub mod sync;
 pub mod transact;
 pub mod validate;
 

@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod agent;
-pub mod cursor;
-pub mod deployment;
-pub mod fault;
-pub mod proposal;
-pub mod provider;
-pub mod telemetry;
+pub struct SyncCursor {
+    pub canonical_proposal_tip: Option<u64>,
+    pub last_resolved_proposal: u64,
+    pub next_factory_index: u64,
+    pub last_output_index: u64,
+}

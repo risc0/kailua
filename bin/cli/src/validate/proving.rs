@@ -12,13 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::validate::ValidateArgs;
+use crate::channel::DuplexChannel;
+use crate::retry_with_context;
+use crate::sync::agent::SyncAgent;
+use crate::sync::proposal::Proposal;
+use crate::transact::rpc::{get_block_by_number, get_next_block};
+use crate::validate::{Message, ValidateArgs};
+use alloy::eips::eip4844::IndexedBlobHash;
+use alloy::network::primitives::HeaderResponse;
+use alloy::network::BlockResponse;
 use alloy::primitives::{Address, B256};
-use anyhow::bail;
+use anyhow::{bail, Context};
+use kailua_client::{await_tel, await_tel_res};
+use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
+use kona_protocol::BlockInfo;
+use opentelemetry::global::tracer;
+use opentelemetry::trace::FutureExt;
+use opentelemetry::trace::{TraceContextExt, Tracer};
 use risc0_zkvm::sha::Digestible;
 use risc0_zkvm::InnerReceipt;
 use std::path::PathBuf;
+use tracing::{debug, error, info};
 
 #[derive(Debug, Clone)]
 pub struct Task {
@@ -198,4 +213,147 @@ pub fn encode_seal(receipt: &risc0_zkvm::Receipt) -> anyhow::Result<Vec<u8>> {
         // TODO(victor): Add set verifier seal here.
     };
     Ok(seal)
+}
+
+pub async fn request_fault_proof(
+    agent: &SyncAgent,
+    channel: &mut DuplexChannel<Message>,
+    parent: &Proposal,
+    proposal: &Proposal,
+) -> anyhow::Result<()> {
+    let tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(tracer.start("request_fault_proof"));
+
+    let Some(fault) = proposal.fault() else {
+        error!("Proposal {} does not diverge from canon.", proposal.index);
+        return Ok(());
+    };
+    let divergence_point = fault.divergence_point() as u64;
+
+    // Read additional data for Kona invocation
+    info!(
+        "Requesting fault proof for proposal {} at point {divergence_point}.",
+        proposal.index
+    );
+
+    // Set L2 Head Number: start from the last common transition
+    let agreed_l2_head_number =
+        parent.output_block_number + agent.deployment.output_block_span * divergence_point;
+    debug!("l2_head_number {:?}", &agreed_l2_head_number);
+
+    // Get L2 head hash
+    let agreed_l2_head_hash = await_tel!(
+        context,
+        get_block_by_number(&agent.provider.l2_provider, agreed_l2_head_number,)
+    )?
+    .header()
+    .hash();
+    debug!("l2_head {:?}", &agreed_l2_head_hash);
+
+    // Get L2 head output root
+    let agreed_l2_output_root = await_tel_res!(
+        context,
+        tracer,
+        "output_at_block",
+        retry_with_context!(agent
+            .provider
+            .op_provider
+            .output_at_block(agreed_l2_head_number))
+    )?;
+
+    // Prepare expected output commitment: target the first bad transition
+    let claimed_l2_block_number = agreed_l2_head_number + agent.deployment.output_block_span;
+    let claimed_l2_output_root = await_tel_res!(
+        context,
+        tracer,
+        "claimed_l2_output_root",
+        retry_with_context!(agent
+            .provider
+            .op_provider
+            .output_at_block(claimed_l2_block_number))
+    )?;
+
+    // Set appropriate L1 head
+    let l1_head = proposal.l1_head;
+
+    // Message proving task
+    channel
+        .sender
+        .send(Message::Proposal {
+            index: proposal.index,
+            precondition_validation_data: None,
+            l1_head,
+            agreed_l2_head_hash,
+            agreed_l2_output_root,
+            claimed_l2_block_number,
+            claimed_l2_output_root,
+        })
+        .await?;
+    Ok(())
+}
+
+pub async fn request_validity_proof(
+    agent: &SyncAgent,
+    channel: &mut DuplexChannel<Message>,
+    parent: &Proposal,
+    proposal: &Proposal,
+) -> anyhow::Result<()> {
+    let tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(tracer.start("request_validity_proof"));
+
+    let precondition_validation_data = if agent.deployment.proposal_output_count > 1 {
+        let mut validated_blobs = Vec::with_capacity(proposal.io_blobs.len());
+        debug_assert!(!proposal.io_blobs.is_empty());
+        for (blob_hash, blob) in &proposal.io_blobs {
+            let block = await_tel!(
+                context,
+                get_next_block(&agent.provider.l1_provider, proposal.l1_head)
+            )
+            .context("block")?;
+
+            validated_blobs.push(BlobFetchRequest {
+                block_ref: BlockInfo {
+                    hash: block.header.hash,
+                    number: block.header.number,
+                    parent_hash: block.header.parent_hash,
+                    timestamp: block.header.timestamp,
+                },
+                blob_hash: IndexedBlobHash {
+                    index: blob.index,
+                    hash: *blob_hash,
+                },
+            })
+        }
+        debug_assert!(!validated_blobs.is_empty());
+        Some(PreconditionValidationData::Validity {
+            proposal_l2_head_number: parent.output_block_number,
+            proposal_output_count: agent.deployment.proposal_output_count,
+            output_block_span: agent.deployment.output_block_span,
+            blob_hashes: validated_blobs,
+        })
+    } else {
+        None
+    };
+    // Get L2 head hash
+    let agreed_l2_head_hash = await_tel!(
+        context,
+        get_block_by_number(&agent.provider.l2_provider, parent.output_block_number)
+    )?
+    .header
+    .hash;
+    debug!("l2_head {:?}", &agreed_l2_head_hash);
+    // Message proving task
+    channel
+        .sender
+        .send(Message::Proposal {
+            index: proposal.index,
+            precondition_validation_data,
+            l1_head: proposal.l1_head,
+            agreed_l2_head_hash,
+            agreed_l2_output_root: parent.output_root,
+            claimed_l2_block_number: proposal.output_block_number,
+            claimed_l2_output_root: proposal.output_root,
+        })
+        .await?;
+    Ok(())
 }
