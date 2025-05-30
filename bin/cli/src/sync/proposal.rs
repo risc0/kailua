@@ -15,7 +15,8 @@
 use crate::db::proposal::ELIMINATIONS_LIMIT;
 use crate::stall::Stall;
 use crate::sync::fault::Fault;
-use crate::transact::blob::{blob_fe_proof, blob_sidecar, BlobProvider};
+use crate::sync::provider::SyncProvider;
+use crate::transact::blob::{blob_fe_proof, blob_sidecar};
 use crate::transact::rpc::get_block;
 use crate::transact::Transact;
 use crate::transact::TransactArgs;
@@ -31,10 +32,7 @@ use anyhow::{bail, Context};
 use kailua_client::{await_tel, await_tel_res};
 use kailua_common::blobs::{hash_to_fe, intermediate_outputs, trail_data};
 use kailua_common::precondition::blobs_hash;
-use kailua_contracts::{
-    KailuaGame::KailuaGameInstance, KailuaTournament::KailuaTournamentInstance,
-    KailuaTreasury::KailuaTreasuryInstance, *,
-};
+use kailua_contracts::{KailuaTournament::KailuaTournamentInstance, *};
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use serde::{Deserialize, Serialize};
@@ -97,97 +95,130 @@ pub struct Proposal {
 }
 
 impl Proposal {
-    pub async fn load<P: Provider<N>, N: Network>(
-        blob_provider: &BlobProvider,
-        tournament_instance: &KailuaTournamentInstance<P, N>,
-    ) -> anyhow::Result<Self> {
+    pub async fn load(provider: &SyncProvider, address: Address) -> anyhow::Result<Self> {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("Proposal::load"));
 
-        let instance_address = *tournament_instance.address();
+        let tournament_instance = KailuaTournament::new(address, &provider.l1_provider);
         let parent_address = tournament_instance
             .parentGame()
             .stall_with_context(context.clone(), "KailuaTournament::parentGame")
             .await;
-        if parent_address == instance_address {
+        if parent_address == address {
             info!("Loading KailuaTreasury instance");
-            await_tel!(
-                context,
-                Self::load_treasury(&KailuaTreasury::new(
-                    instance_address,
-                    tournament_instance.provider(),
-                ))
-            )
+            await_tel!(context, Self::load_treasury(provider, address))
         } else {
             info!("Loading KailuaGame with parent {parent_address}");
-            await_tel!(
-                context,
-                Self::load_game(
-                    blob_provider,
-                    &KailuaGame::new(instance_address, tournament_instance.provider()),
-                )
-            )
+            await_tel!(context, Self::load_game(provider, address))
         }
     }
 
-    async fn load_treasury<P: Provider<N>, N: Network>(
-        treasury_instance: &KailuaTreasuryInstance<P, N>,
-    ) -> anyhow::Result<Self> {
+    async fn load_treasury(provider: &SyncProvider, address: Address) -> anyhow::Result<Self> {
         let tracer = tracer("kailua");
         let context =
             opentelemetry::Context::current_with_span(tracer.start("Proposal::load_treasury"));
 
-        let treasury = treasury_instance
-            .KAILUA_TREASURY()
-            .stall_with_context(context.clone(), "KailuaGame::KAILUA_TREASURY")
-            .await;
-        let index = treasury_instance
-            .gameIndex()
-            .stall_with_context(context.clone(), "KailuaTreasury::gameIndex")
-            .await
-            .to();
-        let created_at = treasury_instance
-            .createdAt()
-            .stall_with_context(context.clone(), "KailuaTreasury::createdAt")
-            .await;
+        let treasury = tokio::task::spawn({
+            let context = context.clone();
+            let treasury_instance = KailuaTreasury::new(address, provider.l1_provider.clone());
+            async move {
+                treasury_instance
+                    .KAILUA_TREASURY()
+                    .stall_with_context(context, "KailuaGame::KAILUA_TREASURY")
+                    .await
+            }
+        });
+        let index = tokio::task::spawn({
+            let context = context.clone();
+            let treasury_instance = KailuaTreasury::new(address, provider.l1_provider.clone());
+            async move {
+                treasury_instance
+                    .gameIndex()
+                    .stall_with_context(context.clone(), "KailuaTreasury::gameIndex")
+                    .await
+                    .to()
+            }
+        });
+        let created_at = tokio::task::spawn({
+            let context = context.clone();
+            let treasury_instance = KailuaTreasury::new(address, provider.l1_provider.clone());
+            async move {
+                treasury_instance
+                    .createdAt()
+                    .stall_with_context(context.clone(), "KailuaTreasury::createdAt")
+                    .await
+            }
+        });
         // claim data
-        let output_root = treasury_instance
-            .rootClaim()
-            .stall_with_context(context.clone(), "KailuaTreasury::rootClaim")
-            .await
-            .0
-            .into();
-        let output_block_number = treasury_instance
-            .l2BlockNumber()
-            .stall_with_context(context.clone(), "KailuaTreasury::l2BlockNumber")
-            .await
-            .to();
-        let l1_head = treasury_instance
-            .l1Head()
-            .stall_with_context(context.clone(), "KailuaTreasury::l1Head")
-            .await;
-        let signature = treasury_instance
-            .signature()
-            .stall_with_context(context.clone(), "KailuaTreasury::signature")
-            .await;
-        let resolved_at = treasury_instance
-            .resolvedAt()
-            .stall_with_context(context.clone(), "KailuaTreasury::resolvedAt")
-            .await;
+        let output_root = tokio::task::spawn({
+            let context = context.clone();
+            let treasury_instance = KailuaTreasury::new(address, provider.l1_provider.clone());
+            async move {
+                treasury_instance
+                    .rootClaim()
+                    .stall_with_context(context.clone(), "KailuaTreasury::rootClaim")
+                    .await
+                    .0
+                    .into()
+            }
+        });
+        let output_block_number = tokio::task::spawn({
+            let context = context.clone();
+            let treasury_instance = KailuaTreasury::new(address, provider.l1_provider.clone());
+            async move {
+                treasury_instance
+                    .l2BlockNumber()
+                    .stall_with_context(context.clone(), "KailuaTreasury::l2BlockNumber")
+                    .await
+                    .to()
+            }
+        });
+        let l1_head = tokio::task::spawn({
+            let context = context.clone();
+            let treasury_instance = KailuaTreasury::new(address, provider.l1_provider.clone());
+            async move {
+                treasury_instance
+                    .l1Head()
+                    .stall_with_context(context.clone(), "KailuaTreasury::l1Head")
+                    .await
+            }
+        });
+        let signature = tokio::task::spawn({
+            let context = context.clone();
+            let treasury_instance = KailuaTreasury::new(address, provider.l1_provider.clone());
+            async move {
+                treasury_instance
+                    .signature()
+                    .stall_with_context(context.clone(), "KailuaTreasury::signature")
+                    .await
+            }
+        });
+        let resolved_at = tokio::task::spawn({
+            let context = context.clone();
+            let treasury_instance = KailuaTreasury::new(address, provider.l1_provider.clone());
+            async move {
+                treasury_instance
+                    .resolvedAt()
+                    .stall_with_context(context.clone(), "KailuaTreasury::resolvedAt")
+                    .await
+            }
+        });
+
+        let index = index.await?;
         Ok(Self {
-            contract: *treasury_instance.address(),
-            treasury,
+            contract: address,
+            treasury: treasury.await?,
             index,
             parent: index,
-            proposer: *treasury_instance.address(),
-            created_at,
+            proposer: address,
+            created_at: created_at.await?,
             io_blobs: vec![],
             io_field_elements: vec![],
             trail_field_elements: vec![],
-            output_root,
-            output_block_number,
-            l1_head,
-            signature,
+            output_root: output_root.await?,
+            output_block_number: output_block_number.await?,
+            l1_head: l1_head.await?,
+            signature: signature.await?,
             children: Default::default(),
             successor: None,
             correct_io: vec![],
@@ -195,60 +226,164 @@ impl Proposal {
             correct_claim: Some(true),
             correct_parent: Some(true),
             canonical: None,
-            resolved_at,
+            resolved_at: resolved_at.await?,
         })
     }
 
-    async fn load_game<P: Provider<N>, N: Network>(
-        blob_provider: &BlobProvider,
-        game_instance: &KailuaGameInstance<P, N>,
-    ) -> anyhow::Result<Self> {
+    async fn load_game(provider: &SyncProvider, address: Address) -> anyhow::Result<Self> {
         let tracer = tracer("kailua");
         let context =
             opentelemetry::Context::current_with_span(tracer.start("Proposal::load_game"));
 
-        let treasury = game_instance
-            .KAILUA_TREASURY()
-            .stall_with_context(context.clone(), "KailuaGame::KAILUA_TREASURY")
-            .await;
-        let index = game_instance
-            .gameIndex()
-            .stall_with_context(context.clone(), "KailuaGame::gameIndex")
-            .await
-            .to();
-        let parent = game_instance
-            .parentGameIndex()
-            .stall_with_context(context.clone(), "KailuaGame::parentGameIndex")
-            .await;
-        let proposer = game_instance
-            .proposer()
-            .stall_with_context(context.clone(), "KailuaGame::proposer")
-            .await;
-        let created_at = game_instance
-            .createdAt()
-            .stall_with_context(context.clone(), "KailuaGame::createdAt")
-            .await;
+        let treasury = tokio::task::spawn({
+            let context = context.clone();
+            let game_instance = KailuaGame::new(address, provider.l1_provider.clone());
+            async move {
+                game_instance
+                    .KAILUA_TREASURY()
+                    .stall_with_context(context, "KailuaGame::KAILUA_TREASURY")
+                    .await
+            }
+        });
+        let index = tokio::task::spawn({
+            let context = context.clone();
+            let game_instance = KailuaGame::new(address, provider.l1_provider.clone());
+            async move {
+                game_instance
+                    .gameIndex()
+                    .stall_with_context(context.clone(), "KailuaGame::gameIndex")
+                    .await
+                    .to()
+            }
+        });
+        let parent = tokio::task::spawn({
+            let context = context.clone();
+            let game_instance = KailuaGame::new(address, provider.l1_provider.clone());
+            async move {
+                game_instance
+                    .parentGameIndex()
+                    .stall_with_context(context.clone(), "KailuaGame::parentGameIndex")
+                    .await
+            }
+        });
+        let proposer = tokio::task::spawn({
+            let context = context.clone();
+            let game_instance = KailuaGame::new(address, provider.l1_provider.clone());
+            async move {
+                game_instance
+                    .proposer()
+                    .stall_with_context(context.clone(), "KailuaGame::proposer")
+                    .await
+            }
+        });
+        let created_at = tokio::task::spawn({
+            let context = context.clone();
+            let game_instance = KailuaGame::new(address, provider.l1_provider.clone());
+            async move {
+                game_instance
+                    .createdAt()
+                    .stall_with_context(context.clone(), "KailuaGame::createdAt")
+                    .await
+            }
+        });
+        // claim data
+        let output_root = tokio::task::spawn({
+            let context = context.clone();
+            let game_instance = KailuaGame::new(address, provider.l1_provider.clone());
+            async move {
+                game_instance
+                    .rootClaim()
+                    .stall_with_context(context.clone(), "KailuaGame::rootClaim")
+                    .await
+                    .0
+                    .into()
+            }
+        });
+        let output_block_number = tokio::task::spawn({
+            let context = context.clone();
+            let game_instance = KailuaGame::new(address, provider.l1_provider.clone());
+            async move {
+                game_instance
+                    .l2BlockNumber()
+                    .stall_with_context(context.clone(), "KailuaGame::l2BlockNumber")
+                    .await
+                    .to()
+            }
+        });
+        let l1_head = tokio::task::spawn({
+            let context = context.clone();
+            let game_instance = KailuaGame::new(address, provider.l1_provider.clone());
+            async move {
+                game_instance
+                    .l1Head()
+                    .stall_with_context(context.clone(), "KailuaGame::l1Head")
+                    .await
+                    .0
+                    .into()
+            }
+        });
+        let signature = tokio::task::spawn({
+            let context = context.clone();
+            let game_instance = KailuaGame::new(address, provider.l1_provider.clone());
+            async move {
+                game_instance
+                    .signature()
+                    .stall_with_context(context.clone(), "KailuaGame::signature")
+                    .await
+                    .0
+                    .into()
+            }
+        });
+        let resolved_at = tokio::task::spawn({
+            let context = context.clone();
+            let game_instance = KailuaGame::new(address, provider.l1_provider.clone());
+            async move {
+                game_instance
+                    .resolvedAt()
+                    .stall_with_context(context.clone(), "KailuaTreasury::resolvedAt")
+                    .await
+            }
+        });
         // fetch blob data
+        let proposal_blobs = tokio::task::spawn({
+            let context = context.clone();
+            let game_instance = KailuaGame::new(address, provider.l1_provider.clone());
+            async move {
+                game_instance
+                    .PROPOSAL_BLOBS()
+                    .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_BLOBS")
+                    .await
+                    .to()
+            }
+        });
+        let proposal_output_count = tokio::task::spawn({
+            let context = context.clone();
+            let game_instance = KailuaGame::new(address, provider.l1_provider.clone());
+            async move {
+                game_instance
+                    .PROPOSAL_OUTPUT_COUNT()
+                    .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_OUTPUT_COUNT")
+                    .await
+                    .to()
+            }
+        });
         let mut io_blobs = Vec::new();
         let mut io_field_elements = Vec::new();
         let mut trail_field_elements = Vec::new();
-        let proposal_blobs: u64 = game_instance
-            .PROPOSAL_BLOBS()
-            .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_BLOBS")
-            .await
-            .to();
-        let proposal_output_count: u64 = game_instance
-            .PROPOSAL_OUTPUT_COUNT()
-            .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_OUTPUT_COUNT")
-            .await
-            .to();
+        let created_at: u64 = created_at.await?;
+        let proposal_blobs: u64 = proposal_blobs.await?;
+        let proposal_output_count: u64 = proposal_output_count.await?;
+        let game_instance = KailuaGame::new(address, &provider.l1_provider);
         for _ in 0..proposal_blobs {
             let blob_kzg_hash = game_instance
                 .proposalBlobHashes(U256::from(io_blobs.len()))
                 .stall_with_context(context.clone(), "KailuaGame::proposalBlobHashes")
                 .await;
-            let blob_data = await_tel!(context, blob_provider.get_blob(created_at, blob_kzg_hash))
-                .context("get_blob")?;
+            let blob_data = await_tel!(
+                context,
+                provider.da_provider.get_blob(created_at, blob_kzg_hash)
+            )
+            .context("get_blob")?;
             // save data
             let io_remaining = proposal_output_count - (io_field_elements.len() as u64) - 1;
             let io_in_blob = io_remaining.min(FIELD_ELEMENTS_PER_BLOB) as usize;
@@ -256,49 +391,21 @@ impl Proposal {
             trail_field_elements.extend(trail_data(&blob_data.blob, io_in_blob)?);
             io_blobs.push((blob_kzg_hash, blob_data));
         }
-        // claim data
-        let output_root = game_instance
-            .rootClaim()
-            .stall_with_context(context.clone(), "KailuaGame::rootClaim")
-            .await
-            .0
-            .into();
-        let output_block_number: u64 = game_instance
-            .l2BlockNumber()
-            .stall_with_context(context.clone(), "KailuaGame::l2BlockNumber")
-            .await
-            .to();
-        let l1_head = game_instance
-            .l1Head()
-            .stall_with_context(context.clone(), "KailuaGame::l1Head")
-            .await
-            .0
-            .into();
-        let signature = game_instance
-            .signature()
-            .stall_with_context(context.clone(), "KailuaGame::signature")
-            .await
-            .0
-            .into();
         let trail_len = trail_field_elements.len();
-        let resolved_at = game_instance
-            .resolvedAt()
-            .stall_with_context(context.clone(), "KailuaTreasury::resolvedAt")
-            .await;
         Ok(Self {
-            contract: *game_instance.address(),
-            treasury,
-            index,
-            parent,
-            proposer,
+            contract: address,
+            treasury: treasury.await?,
+            index: index.await?,
+            parent: parent.await?,
+            proposer: proposer.await?,
             created_at,
             io_blobs,
             io_field_elements,
             trail_field_elements,
-            output_root,
-            output_block_number,
-            l1_head,
-            signature,
+            output_root: output_root.await?,
+            output_block_number: output_block_number.await?,
+            l1_head: l1_head.await?,
+            signature: signature.await?,
             children: Default::default(),
             successor: None,
             correct_io: repeat(None)
@@ -308,7 +415,7 @@ impl Proposal {
             correct_claim: None,
             correct_parent: None,
             canonical: None,
-            resolved_at,
+            resolved_at: resolved_at.await?,
         })
     }
 

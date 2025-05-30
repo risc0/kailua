@@ -268,9 +268,7 @@ impl SyncAgent {
             return Ok(false);
         }
         info!("Processing tournament {index} at {game_address}");
-        let tournament_instance =
-            KailuaTournament::new(game_address, dispute_game_factory.provider());
-        let mut proposal = Proposal::load(&self.provider.da_provider, &tournament_instance)
+        let mut proposal = Proposal::load(&self.provider, game_address)
             .with_context(context.clone())
             .await?;
         // Skip proposals unrelated to current run
@@ -531,7 +529,7 @@ impl SyncAgent {
                 }
             }
 
-            // jumpt forward
+            // jump forward
             start = end + step;
         }
     }
