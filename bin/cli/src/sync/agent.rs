@@ -23,6 +23,7 @@ use alloy::network::Network;
 use alloy::primitives::{Address, B256, U256};
 use alloy_provider::Provider;
 use anyhow::{anyhow, bail, Context};
+use futures::future::join_all;
 use itertools::Itertools;
 use kailua_client::{await_tel, await_tel_res};
 use kailua_common::blobs::hash_to_fe;
@@ -37,7 +38,6 @@ use opentelemetry::global::tracer;
 use opentelemetry::trace::FutureExt;
 use opentelemetry::trace::{TraceContextExt, Tracer};
 use opentelemetry::KeyValue;
-// use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -509,34 +509,21 @@ impl SyncAgent {
     }
 
     pub async fn sync_outputs(&mut self, start: u64, end: u64, step: u64) {
-        // todo: persistence to disk
-        // info!("Loading outputs from block {start} to block {end} with step {step}.");
         let outputs = (start..=end)
             .step_by(step as usize)
             .filter(|i| !self.outputs.contains_key(i))
-            // .collect_vec()
-            // .into_par_iter()
             .map(|o| {
-                (
-                    o,
-                    kona_proof::block_on(async {
-                        tracing::debug!("Loading output at block {o}");
-                        let res = retry!(self.provider.op_provider.output_at_block(o).await)
-                            .await
-                            .unwrap();
-                        tracing::debug!("Loaded output at block {o}: {res:?}");
-                        res
-                    }),
-                )
+                let provider = self.provider.op_provider.clone();
+                async move { (o, retry!(provider.output_at_block(o).await).await.unwrap()) }
             })
             .collect_vec();
-        // .collect_vec_list();
+        let outputs = join_all(outputs).await;
+
         if !outputs.is_empty() {
             info!("Loaded {} outputs.", outputs.len());
         }
         // Store outputs in memory
         for (i, output) in outputs.into_iter() {
-            // for (i, output) in outputs.into_iter().flatten() {
             self.outputs.insert(i, output);
             self.cursor.last_output_index = i + step;
         }

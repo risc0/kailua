@@ -5062,6 +5062,7 @@ dependencies = [
  "bytemuck",
  "c-kzg",
  "clap",
+ "futures",
  "gcloud-sdk",
  "hex",
  "itertools 0.14.0",
