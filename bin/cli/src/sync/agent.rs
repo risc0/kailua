@@ -41,6 +41,7 @@ use opentelemetry::KeyValue;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tracing::{error, info, warn};
 
 pub struct SyncAgent {
@@ -48,7 +49,7 @@ pub struct SyncAgent {
     pub telemetry: SyncTelemetry,
     pub config: RollupConfig,
     pub deployment: SyncDeployment,
-    pub db: rocksdb::DB,
+    pub db: Arc<rocksdb::DB>,
     pub cursor: SyncCursor,
     pub outputs: BTreeMap<u64, B256>,
     pub proposals: BTreeMap<u64, Proposal>,
@@ -108,7 +109,9 @@ impl SyncAgent {
         // Initialize persistent DB
         data_dir.push(deployment.cfg_hash.to_string());
         data_dir.push(deployment.treasury.to_string());
-        let db = rocksdb::DB::open(&Self::db_options(), &data_dir).context("rocksdb::DB::open")?;
+        let db = Arc::new(
+            rocksdb::DB::open(&Self::db_options(), &data_dir).context("rocksdb::DB::open")?,
+        );
 
         // Create cursor
         let cursor = await_tel_res!(
@@ -148,7 +151,7 @@ impl SyncAgent {
             retry_with_context!(self.provider.op_provider.sync_status())
         )?;
         let output_block_number = sync_status["safe_l2"]["number"].as_u64().unwrap();
-        if self.cursor.last_output_index < output_block_number {
+        if self.cursor.last_output_index + self.deployment.output_block_span < output_block_number {
             info!(
                 "Syncing with op-node from block {} until block {output_block_number}",
                 self.cursor.last_output_index
@@ -277,7 +280,9 @@ impl SyncAgent {
         }
 
         // Determine inherited correctness
-        if self.cursor.last_output_index < proposal.output_block_number {
+        if self.cursor.last_output_index + self.deployment.output_block_span
+            < proposal.output_block_number
+        {
             info!(
                 "Syncing with op-node from block {} until block {}",
                 self.cursor.last_output_index, proposal.output_block_number
@@ -489,22 +494,38 @@ impl SyncAgent {
             // perform at most 1024 tasks at a time
             let end = end.min(start + 1024 * step);
 
+            // check persisted data
+            for i in (start..=end).step_by(step as usize) {
+                if let Ok(Some(output)) = self.db.get(i.to_be_bytes()) {
+                    let output = B256::from_slice(&output);
+                    self.outputs.insert(i, output);
+                    if self.cursor.last_output_index < i {
+                        self.cursor.last_output_index = i;
+                    }
+                }
+            }
+
             let outputs = (start..=end)
                 .step_by(step as usize)
                 .filter(|i| !self.outputs.contains_key(i))
-                .map(|o| {
+                .map(|i| {
                     let provider = self.provider.op_provider.clone();
-                    async move { (o, retry!(provider.output_at_block(o).await).await.unwrap()) }
+                    Box::pin(async move {
+                        (i, retry!(provider.output_at_block(i).await).await.unwrap())
+                    })
                 })
                 .collect_vec();
             let outputs = join_all(outputs).await;
 
             if !outputs.is_empty() {
-                info!("Loaded {} outputs.", outputs.len());
+                info!("Fetched {} outputs.", outputs.len());
             }
-            // Store outputs in memory
+            // Store outputs in memory and database
             for (i, output) in outputs.into_iter() {
                 self.outputs.insert(i, output);
+                self.db
+                    .put(i.to_be_bytes(), output.0)
+                    .expect("Database error");
                 if self.cursor.last_output_index < i {
                     self.cursor.last_output_index = i;
                 }
