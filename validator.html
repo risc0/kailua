@@ -364,15 +364,60 @@ for every fault proof, a proof request is submitted to the network, where it goe
 your validator to settle a dispute.</p>
 <p>This functionality requires some additional parameters when starting the validator.
 These parameters can be passed in as CLI arguments or set as environment variables</p>
-<div id="admonition-todo" class="admonition admonish-info" role="note" aria-labelledby="admonition-todo-title">
+<h4 id="proof-requests"><a class="header" href="#proof-requests">Proof Requests</a></h4>
+<p>The following first set of parameters determine where/how requests are made:</p>
+<ul>
+<li><code>boundless-rpc-url</code>: The rpc endpoint of the L1 chain where the Boundless network is deployed.</li>
+<li><code>boundless-wallet-key</code>: The wallet private key to use to send proof request transactions.</li>
+<li><code>boundless-offchain</code>: (Optional) Flag instructing whether to submit proofs off-chain.</li>
+<li><code>boundless-order-stream-url</code>: (Optional) The URL to use for off-chain order submission.</li>
+<li><code>boundless-set-verifier-address</code>: The address of the RISC Zero verifier supporting aggregated proofs for order validation.</li>
+<li><code>boundless-market-address</code>: The address of the Boundless market contract.</li>
+<li><code>boundless-lookback</code>: (Defaults to <code>5</code>) The number of previous proof requests to inspect for duplicates before making a new proof request.</li>
+<li><code>boundless-order-min-price-eth</code>: (Defaults to <code>0.0001</code>) Starting price per megacycle of proving orders.</li>
+<li><code>boundless-order-max-price-eth</code>: (Defaults to <code>0.0002</code>) Maximum price per megacycle of proving orders.</li>
+<li><code>boundless-order-ramp-up-period</code>: (Defaults to <code>60</code>) Time in seconds before order pricing increases.</li>
+<li><code>boundless-order-lock-timeout-factor</code>: (Defaults to <code>3</code>) Multiplier for order fulfillment timeout after locking.</li>
+<li><code>boundless-order-timeout-factor</code>: (Defaults to <code>10</code>) Multiplier for order expiry timeout after creation.</li>
+<li><code>boundless-order-check-interval</code>: (Defaults to <code>12</code>) Time in seconds between attempts to check order status.</li>
+</ul>
+<div id="admonition-note-4" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-4-title">
 <div class="admonition-title">
-<div id="admonition-todo-title">
-<p>Todo</p>
+<div id="admonition-note-4-title">
+<p>Note</p>
 </div>
-<a class="admonition-anchor-link" href="#admonition-todo"></a>
+<a class="admonition-anchor-link" href="#admonition-note-4"></a>
 </div>
 <div>
-<p>Boundless support has been temporarily removed and will be reintegrated.</p>
+<p>Order timeouts are set by default to the number of megacycles in a proof request.
+The multipliers allow you to scale these timeouts according to your expected proving speeds.
+The default scale values give a 1 MHz prover 3x the amount of time it needs to fulfill a request once it's locked, and
+10x its expected proving time as overall timeout.</p>
+</div>
+</div>
+<h4 id="storage-provider"><a class="header" href="#storage-provider">Storage Provider</a></h4>
+<p>The below second set of parameters determine where the proven executable and its input are stored:</p>
+<ul>
+<li><code>storage-provider</code>: One of <code>s3</code>, <code>pinata</code>, or <code>file</code>.</li>
+<li><code>s3-access-key</code>: The <code>s3</code> access key.</li>
+<li><code>s3-secret-key</code>: The <code>s3</code> secret key.</li>
+<li><code>s3-bucket</code>: The <code>s3</code> bucket.</li>
+<li><code>s3-url</code>: The <code>s3</code> url.</li>
+<li><code>aws-region</code>: The <code>s3</code> region.</li>
+<li><code>pinata-jwt</code>: The private <code>pinata</code> jwt.</li>
+<li><code>pinata-api-url</code>: The <code>pinata</code> api URL.</li>
+<li><code>ipfs-gateway-url</code>: The <code>pinata</code> gateway URL.</li>
+<li><code>file-path</code>: The file storage provider path.</li>
+</ul>
+<div id="admonition-success-3" class="admonition admonish-success" role="note" aria-labelledby="admonition-success-3-title">
+<div class="admonition-title">
+<div id="admonition-success-3-title">
+<p>Success</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-success-3"></a>
+</div>
+<div>
+<p>Running <code>kailua-cli validate</code> with the above extra arguments should now delegate all validator proving to the <a href="https://docs.beboundless.xyz/">Boundless proving network</a>!</p>
 </div>
 </div>
 <h2 id="advanced-settings"><a class="header" href="#advanced-settings">Advanced Settings</a></h2>
