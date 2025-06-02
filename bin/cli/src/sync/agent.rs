@@ -277,7 +277,7 @@ impl SyncAgent {
             return Ok(false);
         }
 
-        // Determine inherited correctness
+        // Fetch any relevant data from op-node
         if self.cursor.last_output_index + self.deployment.output_block_span
             < proposal.output_block_number
         {
@@ -296,10 +296,26 @@ impl SyncAgent {
                 )
             );
         }
+
+        // Determine inherited correctness
         self.assess_correctness(&mut proposal)
             .with_context(context.clone())
             .await
             .context("Failed to determine proposal correctness")?;
+
+        // Check if the proposer elimination round is non-zero
+        if let Entry::Vacant(vacancy) = self.eliminations.entry(proposal.proposer) {
+            let treasury_contract =
+                KailuaTreasury::new(self.deployment.treasury, &self.provider.l1_provider);
+            let elimination_round: u64 = treasury_contract
+                .eliminationRound(proposal.proposer)
+                .stall_with_context(context.clone(), "KailuaTreasury::eliminationRound")
+                .await
+                .to();
+            if elimination_round > 0 {
+                vacancy.insert(elimination_round);
+            }
+        }
 
         // Determine whether to follow or eliminate proposer
         if self.determine_if_canonical(&mut proposal).is_none() {
