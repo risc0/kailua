@@ -150,7 +150,10 @@ impl SyncAgent {
             "sync_status",
             retry_with_context!(self.provider.op_provider.sync_status())
         )?;
-        let output_block_number = sync_status["safe_l2"]["number"].as_u64().unwrap();
+        let output_block_number = sync_status["safe_l2"]["number"]
+            .as_u64()
+            .unwrap()
+            .min(self.cursor.last_output_index + self.deployment.blocks_per_proposal());
         if self.cursor.last_output_index + self.deployment.output_block_span < output_block_number {
             info!(
                 "Syncing with op-node from block {} until block {output_block_number}",
@@ -278,7 +281,7 @@ impl SyncAgent {
         }
         // Skip dangling proposals
         if !self.proposals.is_empty() && !self.proposals.contains_key(&proposal.parent) {
-            info!("Skipping dangling proposal.");
+            warn!("Ignoring dangling proposal.");
             return Ok(false);
         }
 
