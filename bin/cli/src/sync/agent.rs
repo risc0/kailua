@@ -276,6 +276,11 @@ impl SyncAgent {
             info!("Skipping proposal for different deployment.");
             return Ok(false);
         }
+        // Skip dangling proposals
+        if !self.proposals.is_empty() && !self.proposals.contains_key(&proposal.parent) {
+            info!("Skipping dangling proposal.");
+            return Ok(false);
+        }
 
         // Fetch any relevant data from op-node
         if self.cursor.last_output_index + self.deployment.output_block_span

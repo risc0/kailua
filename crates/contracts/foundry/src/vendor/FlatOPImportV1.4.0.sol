@@ -4481,6 +4481,7 @@ error UnexpectedRootClaim(Claim rootClaim);
 /// @notice Thrown when a dispute game has already been initialized.
 error AlreadyInitialized();
 
+// 0x8620aa19
 /// @notice Thrown when a supplied bond is not equal to the required bond amount to cover the cost of the interaction.
 error IncorrectBondAmount();
 
@@ -4490,6 +4491,7 @@ error NoCreditToClaim();
 /// @notice Thrown when the transfer of credit to a recipient account reverts.
 error BondTransferFailed();
 
+// 0x9824bdab
 /// @notice Thrown when the `extraData` passed to the CWIA proxy is of improper length, or contains invalid information.
 error BadExtraData();
 
@@ -4518,6 +4520,7 @@ error ClockNotExpired();
 /// @notice Thrown when a move is attempted to be made at or greater than the max depth of the game.
 error GameDepthExceeded();
 
+// 0x5f53dd98
 /// @notice Thrown when a step is attempted above the maximum game depth.
 error InvalidParent();
 
@@ -4537,6 +4540,7 @@ error InvalidLocalIdent();
 /// @notice Thrown when resolving claims out of order.
 error OutOfOrderResolution();
 
+// 0xf1a94581
 /// @notice Thrown when resolving a claim that has already been resolved.
 error ClaimAlreadyResolved();
 
@@ -4578,6 +4582,7 @@ error L2BlockNumberChallenged();
 //              `PermissionedDisputeGame` Errors              //
 ////////////////////////////////////////////////////////////////
 
+// 0xd386ef3e
 /// @notice Thrown when an unauthorized address attempts to interact with the game.
 error BadAuth();
 
