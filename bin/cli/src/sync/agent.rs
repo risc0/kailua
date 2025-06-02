@@ -443,6 +443,12 @@ impl SyncAgent {
             .unwrap_or_default()
     }
 
+    pub fn canonical_tip(&self) -> Option<&Proposal> {
+        self.cursor
+            .canonical_proposal_tip
+            .map(|p| self.proposals.get(&p).unwrap())
+    }
+
     pub fn canonical_tip_height(&self) -> Option<u64> {
         self.cursor
             .canonical_proposal_tip

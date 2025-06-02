@@ -100,7 +100,7 @@ pub async fn handle_proposals(
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
         // fetch latest games
-        let loaded_proposals = await_tel!(context, agent.sync()).context("load_proposals")?;
+        let loaded_proposals = await_tel!(context, agent.sync()).context("SyncAgent::sync")?;
 
         // check new proposals for fault and queue potential responses
         for proposal_index in loaded_proposals {
