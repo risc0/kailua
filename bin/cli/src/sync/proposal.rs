@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::db::proposal::ELIMINATIONS_LIMIT;
 use crate::stall::Stall;
 use crate::sync::fault::Fault;
 use crate::sync::provider::SyncProvider;
@@ -42,6 +41,8 @@ use std::future::IntoFuture;
 use std::iter::repeat;
 use std::time::Duration;
 use tracing::{error, info};
+
+pub const ELIMINATIONS_LIMIT: u64 = 128;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Proposal {
@@ -644,6 +645,17 @@ impl Proposal {
                 .stall_with_context(context.clone(), "KailuaTournament::status")
                 .await,
         )
+    }
+
+    pub async fn fetch_resolved_at<P: Provider<N>, N: Network>(&self, provider: P) -> u64 {
+        let tracer = tracer("kailua");
+        let context =
+            opentelemetry::Context::current_with_span(tracer.start("Proposal::fetch_resolved_at"));
+
+        self.tournament_contract_instance(provider)
+            .resolvedAt()
+            .stall_with_context(context.clone(), "KailuaTournament::resolvedAt")
+            .await
     }
 
     pub fn parse_finality(game_status: u8) -> anyhow::Result<Option<bool>> {

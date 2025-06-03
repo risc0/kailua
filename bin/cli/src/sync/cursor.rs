@@ -24,9 +24,10 @@ use opentelemetry::trace::{TraceContextExt, Tracer};
 use opentelemetry::Context;
 
 pub struct SyncCursor {
-    pub canonical_proposal_tip: Option<u64>,
+    pub canonical_proposal_tip: u64,
     pub next_factory_index: u64,
     pub last_output_index: u64,
+    pub last_resolved_game: u64,
 }
 
 impl SyncCursor {
@@ -98,9 +99,10 @@ impl SyncCursor {
         };
 
         Ok(SyncCursor {
-            canonical_proposal_tip: None,
+            canonical_proposal_tip: anchor_index,
             next_factory_index: anchor_index,
             last_output_index,
+            last_resolved_game: anchor_index,
         })
     }
 }

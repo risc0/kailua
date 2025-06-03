@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::db::proposal::{Proposal, ELIMINATIONS_LIMIT};
 use crate::sync::agent::SyncAgent;
+use crate::sync::proposal::{Proposal, ELIMINATIONS_LIMIT};
 use crate::transact::provider::SafeProvider;
 use crate::transact::rpc::get_block;
 use crate::transact::signer::ProposerSignerArgs;
@@ -25,13 +25,14 @@ use alloy::network::{BlockResponse, Ethereum, TxSigner};
 use alloy::primitives::{Address, Bytes, U256};
 use alloy::providers::Provider;
 use alloy::sol_types::SolValue;
-use anyhow::Context;
+use anyhow::{bail, Context};
 use kailua_client::args::parse_address;
 use kailua_client::telemetry::TelemetryArgs;
 use kailua_client::{await_tel, await_tel_res};
 use kailua_common::blobs::hash_to_fe;
 use kailua_contracts::*;
 use opentelemetry::global::{meter, tracer};
+use opentelemetry::metrics::{Counter, Gauge};
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use opentelemetry::KeyValue;
 use std::future::IntoFuture;
@@ -131,242 +132,29 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             );
         }
 
-        // Stack unresolved ancestors
-        let mut unresolved_proposal_indices =
-            await_tel!(context, unresolved_canonical_proposals(&agent))
-                .context("unresolved_canonical_proposals")?;
-        // Resolve in reverse order
-        info!(
-            "Found {} unresolved proposals.",
-            unresolved_proposal_indices.len()
-        );
-        if !prioritize_proposing && !unresolved_proposal_indices.is_empty() {
-            info!(
-                "Attempting to resolve {} ancestors.",
-                unresolved_proposal_indices.len()
-            );
-            while let Some(proposal_index) = unresolved_proposal_indices.pop() {
-                let Some(proposal) = agent.proposals.get(&proposal_index) else {
-                    error!("Unresolved proposal {proposal_index} missing from database.");
-                    break;
-                };
-                let Some(parent) = agent.proposals.get(&proposal.parent) else {
-                    error!(
-                        "Unresolved proposal {proposal_index} parent {} missing from database.",
-                        proposal.parent
-                    );
-                    break;
-                };
-                let parent_contract =
-                    parent.tournament_contract_instance(&agent.provider.l1_provider);
-
-                // Skip resolved games
-                if await_tel!(
-                    context,
-                    proposal.fetch_finality(&agent.provider.l1_provider)
+        // Resolve one proposal per iteration
+        if !prioritize_proposing {
+            if let Err(err) = await_tel_res!(
+                context,
+                tracer,
+                "resolve_next_pending_proposal",
+                resolve_next_pending_proposal(
+                    &agent,
+                    &args.txn_args,
+                    &proposer_provider,
+                    &meter_prune_num,
+                    &meter_prune_fail,
+                    &meter_resolve_num,
+                    &meter_resolve_fail,
+                    &meter_resolve_last
                 )
-                .context("Proposal::fetch_finality")?
-                .unwrap_or_default()
-                {
-                    info!("Reached resolved ancestor proposal.");
-                    continue;
-                }
-
-                // Check for timeout and fast-forward status
-                let challenger_duration = await_tel!(
-                    context,
-                    proposal.fetch_current_challenger_duration(&agent.provider.l1_provider)
-                )
-                .context("challenger_duration")?;
-                let is_validity_proven = await_tel!(
-                    context,
-                    parent.fetch_is_successor_validity_proven(&agent.provider.l1_provider)
-                )
-                .context("is_validity_proven")?;
-                if !is_validity_proven && challenger_duration > 0 {
-                    info!("Waiting for {challenger_duration} more seconds before resolution.");
-                    break;
-                }
-
-                // Check if can prune next set of children in parent tournament
-                if proposal.has_parent() {
-                    let can_resolve = loop {
-                        let result = await_tel_res!(
-                            context,
-                            tracer,
-                            "KailuaTournament::pruneChildren",
-                            parent_contract
-                                .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
-                                .call()
-                                .into_future()
-                        );
-
-                        if let Err(err) = result {
-                            // Pruning failure means unresolved disputes
-                            debug!("pruneChildren: {err:?}");
-                            break false;
-                        };
-                        let result = result.unwrap();
-
-                        // Final prune will be during resolution
-                        if !result.0.is_zero() {
-                            break true;
-                        }
-
-                        // Prune next set of children
-                        info!("Eliminating {ELIMINATIONS_LIMIT} opponents before resolution.");
-                        match parent_contract
-                            .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
-                            .timed_transact_with_context(
-                                context.clone(),
-                                "KailuaTournament::pruneChildren",
-                                Some(Duration::from_secs(args.txn_args.txn_timeout)),
-                            )
-                            .await
-                            .context("KailuaTournament::pruneChildren transact")
-                        {
-                            Ok(receipt) => {
-                                info!("KailuaTournament::pruneChildren: {} gas", receipt.gas_used);
-                                meter_prune_num.add(
-                                    1,
-                                    &[
-                                        KeyValue::new(
-                                            "tournament",
-                                            parent_contract.address().to_string(),
-                                        ),
-                                        KeyValue::new(
-                                            "txn_hash",
-                                            receipt.transaction_hash.to_string(),
-                                        ),
-                                        KeyValue::new("txn_from", receipt.from.to_string()),
-                                        KeyValue::new(
-                                            "txn_to",
-                                            receipt.to.unwrap_or_default().to_string(),
-                                        ),
-                                        KeyValue::new("txn_gas_used", receipt.gas_used.to_string()),
-                                        KeyValue::new(
-                                            "txn_gas_price",
-                                            receipt.effective_gas_price.to_string(),
-                                        ),
-                                        KeyValue::new(
-                                            "txn_blob_gas_used",
-                                            receipt.blob_gas_used.unwrap_or_default().to_string(),
-                                        ),
-                                        KeyValue::new(
-                                            "txn_blob_gas_price",
-                                            receipt.blob_gas_price.unwrap_or_default().to_string(),
-                                        ),
-                                    ],
-                                );
-                            }
-                            Err(err) => {
-                                error!("KailuaTournament::pruneChildren: {err:?}");
-                                meter_prune_fail.add(
-                                    1,
-                                    &[
-                                        KeyValue::new(
-                                            "tournament",
-                                            parent_contract.address().to_string(),
-                                        ),
-                                        KeyValue::new("msg", err.to_string()),
-                                    ],
-                                );
-                                break false;
-                            }
-                        }
-                    };
-                    // Some disputes are still unresolved
-                    if !can_resolve {
-                        info!("Waiting for more proofs to resolve proposal.");
-                        break;
-                    }
-                }
-
-                // Check if claim won in tournament
-                if !await_tel!(
-                    context,
-                    proposal.fetch_parent_tournament_survivor_status(&agent.provider.l1_provider)
-                )
-                .unwrap_or_default()
-                .unwrap_or_default()
-                {
-                    error!(
-                        "Failed to determine proposal at {} as successor of proposal at {}.",
-                        proposal.contract, parent.contract
-                    );
-                    break;
-                }
-
-                // resolve
-                info!(
-                    "Resolving game at index {} and height {}.",
-                    proposal.index, proposal.output_block_number
-                );
-
-                match proposal
-                    .resolve(&proposer_provider, &args.txn_args)
-                    .await
-                    .context("KailuaTournament::resolve transact")
-                {
-                    Ok(receipt) => {
-                        info!("KailuaTournament::resolve: {} gas", receipt.gas_used);
-                        meter_resolve_num.add(
-                            1,
-                            &[
-                                KeyValue::new("proposal", proposal.contract.to_string()),
-                                KeyValue::new(
-                                    "l2_height",
-                                    proposal.output_block_number.to_string(),
-                                ),
-                                KeyValue::new("txn_hash", receipt.transaction_hash.to_string()),
-                                KeyValue::new("txn_from", receipt.from.to_string()),
-                                KeyValue::new("txn_to", receipt.to.unwrap_or_default().to_string()),
-                                KeyValue::new("txn_gas_used", receipt.gas_used.to_string()),
-                                KeyValue::new(
-                                    "txn_gas_price",
-                                    receipt.effective_gas_price.to_string(),
-                                ),
-                                KeyValue::new(
-                                    "txn_blob_gas_used",
-                                    receipt.blob_gas_used.unwrap_or_default().to_string(),
-                                ),
-                                KeyValue::new(
-                                    "txn_blob_gas_price",
-                                    receipt.blob_gas_price.unwrap_or_default().to_string(),
-                                ),
-                            ],
-                        );
-                        meter_resolve_last.record(
-                            proposal.index,
-                            &[
-                                KeyValue::new("proposal", proposal.contract.to_string()),
-                                KeyValue::new(
-                                    "l2_height",
-                                    proposal.output_block_number.to_string(),
-                                ),
-                            ],
-                        );
-                    }
-                    Err(err) => {
-                        error!("KailuaTournament::resolve: {err:?}");
-                        meter_resolve_fail.add(
-                            1,
-                            &[
-                                KeyValue::new("proposal", proposal.contract.to_string()),
-                                KeyValue::new(
-                                    "l2_height",
-                                    proposal.output_block_number.to_string(),
-                                ),
-                                KeyValue::new("msg", err.to_string()),
-                            ],
-                        );
-                        break;
-                    }
-                }
+            ) {
+                error!("Failed to resolve proposal: {err:?}");
             }
-        } else if !unresolved_proposal_indices.is_empty() {
+        } else {
             warn!("Skipping resolving to prioritize proposing.");
         }
+
         // Reset priority
         prioritize_proposing = false;
 
@@ -384,8 +172,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
 
         // Submit proposal to extend canonical chain
         let Some(canonical_tip) = agent.canonical_tip() else {
-            warn!("No canonical proposal chain to extend!");
-            continue;
+            bail!("Canonical tip proposal missing from database!");
         };
 
         // Query op-node to get latest safe l2 head
@@ -639,40 +426,226 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
     }
 }
 
-pub async fn unresolved_canonical_proposals(agent: &SyncAgent) -> anyhow::Result<Vec<u64>> {
+#[allow(clippy::too_many_arguments)]
+pub async fn resolve_next_pending_proposal<P: Provider>(
+    agent: &SyncAgent,
+    txn_args: &TransactArgs,
+    proposer_provider: P,
+    meter_prune_num: &Counter<u64>,
+    meter_prune_fail: &Counter<u64>,
+    meter_resolve_num: &Counter<u64>,
+    meter_resolve_fail: &Counter<u64>,
+    meter_resolve_last: &Gauge<u64>,
+) -> anyhow::Result<bool> {
     let tracer = tracer("kailua");
     let context =
-        opentelemetry::Context::current_with_span(tracer.start("unresolved_canonical_proposals"));
+        opentelemetry::Context::current_with_span(tracer.start("resolve_next_pending_proposal"));
 
-    // Nothing to do without a canonical tip
-    let Some(canonical_proposal_tip) = agent.cursor.canonical_proposal_tip else {
-        return Ok(Vec::new());
+    let Some(proposal_index) =
+        unresolved_canonical_proposal(agent).context("unresolved_canonical_proposals")?
+    else {
+        return Ok(false);
     };
-    // traverse up chain starting from canonical tip
-    let mut unresolved_proposal_indices = vec![canonical_proposal_tip];
-    loop {
-        let proposal_index = *unresolved_proposal_indices.last().unwrap();
-        let Some(proposal) = agent.proposals.get(&proposal_index) else {
-            error!("Proposal {proposal_index} missing from database.");
-            break;
-        };
-        // break if we reach a resolved game or a setup game
-        if proposal
-            .fetch_finality(&agent.provider.l1_provider)
-            .with_context(context.clone())
-            .await
-            .context("Proposal::fetch_finality")?
-            .is_some()
-        {
-            unresolved_proposal_indices.pop();
-            break;
-        } else if !proposal.has_parent() {
-            // this is an unresolved treasury, keep in stack
-            break;
-        }
-        unresolved_proposal_indices.push(proposal.parent);
+
+    let Some(proposal) = agent.proposals.get(&proposal_index) else {
+        bail!("Unresolved proposal {proposal_index} missing from database.");
+    };
+    let Some(parent) = agent.proposals.get(&proposal.parent) else {
+        bail!(
+            "Unresolved proposal {proposal_index} parent {} missing from database.",
+            proposal.parent
+        );
+    };
+    let parent_contract = parent.tournament_contract_instance(&agent.provider.l1_provider);
+
+    // Skip resolved games
+    if await_tel!(
+        context,
+        proposal.fetch_finality(&agent.provider.l1_provider)
+    )
+    .context("Proposal::fetch_finality")?
+    .unwrap_or_default()
+    {
+        return Ok(false);
     }
-    Ok(unresolved_proposal_indices)
+
+    // Check for timeout and fast-forward status
+    let challenger_duration = await_tel!(
+        context,
+        proposal.fetch_current_challenger_duration(&agent.provider.l1_provider)
+    )
+    .context("challenger_duration")?;
+    let is_validity_proven = await_tel!(
+        context,
+        parent.fetch_is_successor_validity_proven(&agent.provider.l1_provider)
+    )
+    .context("is_validity_proven")?;
+    if !is_validity_proven && challenger_duration > 0 {
+        info!("Waiting for {challenger_duration} more seconds before resolution.");
+        return Ok(false);
+    }
+
+    // Check if can prune next set of children in parent tournament
+    if proposal.has_parent() {
+        let can_resolve = loop {
+            let result = await_tel_res!(
+                context,
+                tracer,
+                "KailuaTournament::pruneChildren",
+                parent_contract
+                    .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
+                    .call()
+                    .into_future()
+            );
+
+            if let Err(err) = result {
+                // Pruning failure means unresolved disputes
+                debug!("pruneChildren: {err:?}");
+                break false;
+            };
+            let result = result.unwrap();
+
+            // Final prune will be during resolution
+            if !result.0.is_zero() {
+                break true;
+            }
+
+            // Prune next set of children
+            info!("Eliminating {ELIMINATIONS_LIMIT} opponents before resolution.");
+            match parent_contract
+                .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
+                .timed_transact_with_context(
+                    context.clone(),
+                    "KailuaTournament::pruneChildren",
+                    Some(Duration::from_secs(txn_args.txn_timeout)),
+                )
+                .await
+                .context("KailuaTournament::pruneChildren transact")
+            {
+                Ok(receipt) => {
+                    info!("KailuaTournament::pruneChildren: {} gas", receipt.gas_used);
+                    meter_prune_num.add(
+                        1,
+                        &[
+                            KeyValue::new("tournament", parent_contract.address().to_string()),
+                            KeyValue::new("txn_hash", receipt.transaction_hash.to_string()),
+                            KeyValue::new("txn_from", receipt.from.to_string()),
+                            KeyValue::new("txn_to", receipt.to.unwrap_or_default().to_string()),
+                            KeyValue::new("txn_gas_used", receipt.gas_used.to_string()),
+                            KeyValue::new("txn_gas_price", receipt.effective_gas_price.to_string()),
+                            KeyValue::new(
+                                "txn_blob_gas_used",
+                                receipt.blob_gas_used.unwrap_or_default().to_string(),
+                            ),
+                            KeyValue::new(
+                                "txn_blob_gas_price",
+                                receipt.blob_gas_price.unwrap_or_default().to_string(),
+                            ),
+                        ],
+                    );
+                }
+                Err(err) => {
+                    error!("KailuaTournament::pruneChildren: {err:?}");
+                    meter_prune_fail.add(
+                        1,
+                        &[
+                            KeyValue::new("tournament", parent_contract.address().to_string()),
+                            KeyValue::new("msg", err.to_string()),
+                        ],
+                    );
+                    break false;
+                }
+            }
+        };
+        // Some disputes are still unresolved
+        if !can_resolve {
+            info!("Waiting for more proofs to resolve proposal.");
+            return Ok(false);
+        }
+    }
+
+    // Check if claim won in tournament
+    if !await_tel!(
+        context,
+        proposal.fetch_parent_tournament_survivor_status(&agent.provider.l1_provider)
+    )
+    .unwrap_or_default()
+    .unwrap_or_default()
+    {
+        error!(
+            "Failed to determine proposal at {} as successor of proposal at {}.",
+            proposal.contract, parent.contract
+        );
+        return Ok(false);
+    }
+
+    // resolve
+    info!(
+        "Resolving game at index {} and height {}.",
+        proposal.index, proposal.output_block_number
+    );
+
+    match proposal
+        .resolve(&proposer_provider, txn_args)
+        .await
+        .context("KailuaTournament::resolve transact")
+    {
+        Ok(receipt) => {
+            info!("KailuaTournament::resolve: {} gas", receipt.gas_used);
+            meter_resolve_num.add(
+                1,
+                &[
+                    KeyValue::new("proposal", proposal.contract.to_string()),
+                    KeyValue::new("l2_height", proposal.output_block_number.to_string()),
+                    KeyValue::new("txn_hash", receipt.transaction_hash.to_string()),
+                    KeyValue::new("txn_from", receipt.from.to_string()),
+                    KeyValue::new("txn_to", receipt.to.unwrap_or_default().to_string()),
+                    KeyValue::new("txn_gas_used", receipt.gas_used.to_string()),
+                    KeyValue::new("txn_gas_price", receipt.effective_gas_price.to_string()),
+                    KeyValue::new(
+                        "txn_blob_gas_used",
+                        receipt.blob_gas_used.unwrap_or_default().to_string(),
+                    ),
+                    KeyValue::new(
+                        "txn_blob_gas_price",
+                        receipt.blob_gas_price.unwrap_or_default().to_string(),
+                    ),
+                ],
+            );
+            meter_resolve_last.record(
+                proposal.index,
+                &[
+                    KeyValue::new("proposal", proposal.contract.to_string()),
+                    KeyValue::new("l2_height", proposal.output_block_number.to_string()),
+                ],
+            );
+            Ok(true)
+        }
+        Err(err) => {
+            error!("KailuaTournament::resolve: {err:?}");
+            meter_resolve_fail.add(
+                1,
+                &[
+                    KeyValue::new("proposal", proposal.contract.to_string()),
+                    KeyValue::new("l2_height", proposal.output_block_number.to_string()),
+                    KeyValue::new("msg", err.to_string()),
+                ],
+            );
+            Ok(false)
+        }
+    }
+}
+
+pub fn unresolved_canonical_proposal(agent: &SyncAgent) -> anyhow::Result<Option<u64>> {
+    // Load last resolved proposal
+    let Some(last_resolved_proposal) = agent.proposals.get(&agent.cursor.last_resolved_game) else {
+        bail!(
+            "Last resolved proposal {} missing from database.",
+            agent.cursor.last_resolved_game
+        );
+    };
+    // Return successor
+    Ok(last_resolved_proposal.successor)
 }
 
 pub async fn fetch_vanguard(agent: &SyncAgent) -> Address {

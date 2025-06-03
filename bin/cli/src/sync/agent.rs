@@ -143,6 +143,8 @@ impl SyncAgent {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("SyncAgent::sync"));
 
+        // todo: garbage collection -- erase all in-memory data that belongs to proposals prior to last resolved proposal
+
         // load all relevant output commitments
         let sync_status = await_tel_res!(
             context,
@@ -213,7 +215,11 @@ impl SyncAgent {
             if let Some(proposal) = proposal {
                 if let Some(true) = proposal.canonical {
                     // Update canonical chain tip
-                    self.cursor.canonical_proposal_tip = Some(proposal.index);
+                    self.cursor.canonical_proposal_tip = proposal.index;
+                    // Update last resolved index
+                    if proposal.resolved_at != 0 {
+                        self.cursor.last_resolved_game = proposal.index;
+                    }
                 } else if let Some(false) = proposal.is_correct() {
                     // Update player eliminations
                     if let Entry::Vacant(entry) = self.eliminations.entry(proposal.proposer) {
@@ -226,18 +232,55 @@ impl SyncAgent {
             self.cursor.next_factory_index += 1;
         }
 
+        // update proposal resolutions
+        loop {
+            let Some(last_unresolved_proposal_index) = self
+                .proposals
+                .get(&self.cursor.last_resolved_game)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "Last resolved proposal {} missing from database.",
+                        self.cursor.last_resolved_game
+                    )
+                })?
+                .successor
+            else {
+                break;
+            };
+
+            let Some(last_unresolved_proposal) =
+                self.proposals.get_mut(&last_unresolved_proposal_index)
+            else {
+                bail!("Last unresolved proposal {last_unresolved_proposal_index} missing from database.");
+            };
+
+            let resolved_at = last_unresolved_proposal
+                .fetch_resolved_at(&self.provider.l1_provider)
+                .await;
+
+            // stop at last unresolved proposal
+            if resolved_at == 0 {
+                break;
+            }
+            // update resolved status
+            last_unresolved_proposal.resolved_at = resolved_at;
+            // move cursor forward
+            self.cursor.last_resolved_game = last_unresolved_proposal_index;
+        }
+
         // Update sync telemetry
-        if let Some(canonical_tip) = self
-            .cursor
-            .canonical_proposal_tip
-            .map(|i| self.proposals.get(&i).unwrap())
-        {
+        if let Some(canonical_tip) = self.proposals.get(&self.cursor.canonical_proposal_tip) {
             self.telemetry.sync_canonical.record(
                 canonical_tip.index,
                 &[
                     KeyValue::new("proposal", canonical_tip.contract.to_string()),
                     KeyValue::new("l2_height", canonical_tip.output_block_number.to_string()),
                 ],
+            );
+        } else {
+            error!(
+                "Telemetry update failed. Canonical proposal tip {} missing from database.",
+                self.cursor.canonical_proposal_tip
             );
         };
         self.telemetry
@@ -420,7 +463,7 @@ impl SyncAgent {
 
     pub fn determine_if_canonical(&mut self, proposal: &mut Proposal) -> Option<bool> {
         if proposal.is_correct()? && !self.was_proposer_eliminated_before(proposal) {
-            // Consider updating canonical chain tip if none exists or proposal has greater height
+            // Consider updating canonical chain tip if proposal has greater height
             if self
                 .canonical_tip_height()
                 .is_none_or(|h| h < proposal.output_block_number)
@@ -444,15 +487,13 @@ impl SyncAgent {
     }
 
     pub fn canonical_tip(&self) -> Option<&Proposal> {
-        self.cursor
-            .canonical_proposal_tip
-            .map(|p| self.proposals.get(&p).unwrap())
+        self.proposals.get(&self.cursor.canonical_proposal_tip)
     }
 
     pub fn canonical_tip_height(&self) -> Option<u64> {
-        self.cursor
-            .canonical_proposal_tip
-            .map(|i| self.proposals.get(&i).unwrap().output_block_number)
+        self.proposals
+            .get(&self.cursor.canonical_proposal_tip)
+            .map(|p| p.output_block_number)
     }
 
     pub fn determine_tournament_participation(
