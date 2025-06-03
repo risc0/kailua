@@ -18,7 +18,6 @@ use std::path::PathBuf;
 pub mod bench;
 pub mod channel;
 pub mod config;
-pub mod db;
 pub mod fast_track;
 pub mod fault;
 pub mod propose;

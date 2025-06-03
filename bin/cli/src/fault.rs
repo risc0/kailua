@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::db::proposal::Proposal;
 use crate::propose::ProposeArgs;
 use crate::stall::Stall;
+use crate::sync::proposal::Proposal;
 use crate::transact::Transact;
 use crate::{retry_with_context, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
