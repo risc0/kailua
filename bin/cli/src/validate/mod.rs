@@ -79,6 +79,9 @@ pub struct ValidateArgs {
     pub boundless: BoundlessArgs,
 
     #[clap(flatten)]
+    pub boundless: BoundlessArgs,
+
+    #[clap(flatten)]
     pub telemetry: TelemetryArgs,
 }
 
