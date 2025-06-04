@@ -139,6 +139,19 @@ impl SyncAgent {
         options
     }
 
+    pub fn free_memory(&mut self) -> anyhow::Result<()> {
+        // todo: delete all proposals prior to last resolved proposal
+        // todo: delete all output commitments prior to last resolved proposal
+
+        // older commitments are needed to assess proposal correctness?
+        // -- lack of tournament participation should negate the need to check correctness
+        // -- in this case, we know that all proposals covering blocks older than those by
+        // -- the last resolved proposals need not be checked
+        // -- in essence, no tournament participation -> no need to check correctness
+
+        todo!()
+    }
+
     pub async fn sync(&mut self) -> anyhow::Result<Vec<u64>> {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("SyncAgent::sync"));
@@ -328,6 +341,32 @@ impl SyncAgent {
             return Ok(false);
         }
 
+        // Check if the proposer elimination round is non-zero
+        if let Entry::Vacant(vacancy) = self.eliminations.entry(proposal.proposer) {
+            let treasury_contract =
+                KailuaTreasury::new(self.deployment.treasury, &self.provider.l1_provider);
+            let elimination_round: u64 = treasury_contract
+                .eliminationRound(proposal.proposer)
+                .stall_with_context(context.clone(), "KailuaTreasury::eliminationRound")
+                .await
+                .to();
+            if elimination_round > 0 {
+                vacancy.insert(elimination_round);
+            }
+        }
+
+        // Skip irrelevant proposals
+        if !self
+            .determine_tournament_participation(&mut proposal)
+            .context("Failed to determine tournament participation")?
+        {
+            warn!(
+                "Ignoring proposal {} (no tournament participation)",
+                proposal.index
+            );
+            return Ok(false);
+        }
+
         // Fetch any relevant data from op-node
         if self.cursor.last_output_index + self.deployment.output_block_span
             < proposal.output_block_number
@@ -354,20 +393,6 @@ impl SyncAgent {
             .await
             .context("Failed to determine proposal correctness")?;
 
-        // Check if the proposer elimination round is non-zero
-        if let Entry::Vacant(vacancy) = self.eliminations.entry(proposal.proposer) {
-            let treasury_contract =
-                KailuaTreasury::new(self.deployment.treasury, &self.provider.l1_provider);
-            let elimination_round: u64 = treasury_contract
-                .eliminationRound(proposal.proposer)
-                .stall_with_context(context.clone(), "KailuaTreasury::eliminationRound")
-                .await
-                .to();
-            if elimination_round > 0 {
-                vacancy.insert(elimination_round);
-            }
-        }
-
         // Determine whether to follow or eliminate proposer
         if self.determine_if_canonical(&mut proposal).is_none() {
             bail!(
@@ -377,21 +402,16 @@ impl SyncAgent {
             );
         }
 
-        // Determine tournament performance
-        if self
-            .determine_tournament_participation(&mut proposal)
-            .context("Failed to determine tournament participation")?
-        {
-            // Insert proposal in db
-            self.proposals.insert(proposal.index, proposal);
-            Ok(true)
-        } else {
-            warn!(
-                "Ignoring proposal {} (no tournament participation)",
-                proposal.index
-            );
-            Ok(false)
+        // Determine if the proposal is its parent's successor
+        if let Some(true) = proposal.canonical {
+            if let Some(parent) = self.proposals.get_mut(&proposal.parent) {
+                parent.successor = Some(proposal.index);
+            }
         }
+
+        // Store proposal and return inclusion
+        self.proposals.insert(proposal.index, proposal);
+        Ok(true)
     }
 
     pub async fn assess_correctness(&mut self, proposal: &mut Proposal) -> anyhow::Result<bool> {
@@ -500,11 +520,12 @@ impl SyncAgent {
         &mut self,
         proposal: &mut Proposal,
     ) -> anyhow::Result<bool> {
+        // Treasury is accepted by default
         if !proposal.has_parent() {
-            // Treasury is accepted by default
             return Ok(true);
-        } else if proposal.resolved_at != 0 {
-            // Resolved games are part of the tournament
+        }
+        // Resolved games are accepted by default
+        if proposal.resolved_at != 0 {
             return Ok(true);
         }
 
@@ -517,7 +538,7 @@ impl SyncAgent {
             // Append child to parent tournament children list
             if !parent.append_child(proposal.index) {
                 warn!(
-                    "Attempted duplicate child {} insertion into parent {} ",
+                    "Attempted to append duplicate child {} to parent {}.",
                     proposal.index, parent.index
                 );
             }
@@ -544,12 +565,6 @@ impl SyncAgent {
                     return Ok(false);
                 }
             }
-        }
-
-        // Determine if opponent is the next successor
-        if let Some(true) = proposal.canonical {
-            let parent = self.proposals.get_mut(&proposal.parent).unwrap();
-            parent.successor = Some(proposal.index);
         }
         Ok(true)
     }
