@@ -360,17 +360,28 @@ pub async fn handle_proposals(
         for _ in 0..output_fault_proof_requests {
             let proposal_index = output_fault_buffer.pop_front().unwrap();
             let Some(proposal) = agent.proposals.get(&proposal_index) else {
-                error!("Proposal {proposal_index} missing from database.");
-                output_fault_buffer.push_back(proposal_index);
+                if agent.cursor.last_resolved_game < proposal_index {
+                    error!("Proposal {proposal_index} missing from database.");
+                    output_fault_buffer.push_back(proposal_index);
+                } else {
+                    warn!("Skipping fault proof request for freed proposal {proposal_index}.");
+                };
                 continue;
             };
             // Look up parent proposal
             let Some(parent) = agent.proposals.get(&proposal.parent) else {
-                error!(
-                    "Proposal {} parent {} missing from database.",
-                    proposal.index, proposal.parent
-                );
-                output_fault_buffer.push_back(proposal_index);
+                if agent.cursor.last_resolved_game < proposal.parent {
+                    error!(
+                        "Proposal {} parent {} missing from database.",
+                        proposal.index, proposal.parent
+                    );
+                    output_fault_buffer.push_back(proposal_index);
+                } else {
+                    warn!(
+                        "Skipping fault proof request for proposal {} with freed parent {}.",
+                        proposal.index, proposal.parent
+                    );
+                };
                 continue;
             };
 
@@ -395,17 +406,28 @@ pub async fn handle_proposals(
         for _ in 0..validity_proof_requests {
             let proposal_index = valid_buffer.pop_front().unwrap();
             let Some(proposal) = agent.proposals.get(&proposal_index) else {
-                error!("Proposal {proposal_index} missing from database.");
-                valid_buffer.push_front(proposal_index);
+                if agent.cursor.last_resolved_game < proposal_index {
+                    error!("Proposal {proposal_index} missing from database.");
+                    valid_buffer.push_front(proposal_index);
+                } else {
+                    warn!("Skipping validity proof request for freed proposal {proposal_index}");
+                }
                 continue;
             };
             // Look up parent proposal
             let Some(parent) = agent.proposals.get(&proposal.parent) else {
-                error!(
-                    "Proposal {} parent {} missing from database.",
-                    proposal.index, proposal.parent
-                );
-                valid_buffer.push_front(proposal_index);
+                if agent.cursor.last_resolved_game < proposal.parent {
+                    error!(
+                        "Proposal {} parent {} missing from database.",
+                        proposal.index, proposal.parent
+                    );
+                    valid_buffer.push_front(proposal_index);
+                } else {
+                    warn!(
+                        "Skipping validity proof request for proposal {} with freed parent {}",
+                        proposal.index, proposal.parent
+                    );
+                }
                 continue;
             };
 
@@ -461,13 +483,24 @@ pub async fn handle_proposals(
                 continue;
             };
             let Some(proposal) = agent.proposals.get(&proposal_index) else {
-                error!("Proposal {proposal_index} missing from database.");
-                output_fault_proof_buffer.push_back(Message::Proof(proposal_index, receipt));
+                if agent.cursor.last_resolved_game < proposal_index {
+                    error!("Proposal {proposal_index} missing from database.");
+                    output_fault_proof_buffer.push_back(Message::Proof(proposal_index, receipt));
+                } else {
+                    warn!("Skipping proof submission for freed proposal {proposal_index}.")
+                }
                 continue;
             };
             let Some(parent) = agent.proposals.get(&proposal.parent) else {
-                error!("Parent proposal {} missing from database.", proposal.parent);
-                output_fault_proof_buffer.push_back(Message::Proof(proposal_index, receipt));
+                if agent.cursor.last_resolved_game < proposal.parent {
+                    error!("Parent proposal {} missing from database.", proposal.parent);
+                    output_fault_proof_buffer.push_back(Message::Proof(proposal_index, receipt));
+                } else {
+                    warn!(
+                        "Skipping proof submission for proposal {} with freed parent {}.",
+                        proposal.index, proposal.parent
+                    );
+                }
                 continue;
             };
             // Abort early if a validity proof is already submitted in this tournament
@@ -659,7 +692,7 @@ pub async fn handle_proposals(
 
             // The index of the non-zero intermediate output to challenge
             let Some(fault) = proposal.fault() else {
-                error!("Attempted output proof for correct proposal!");
+                error!("Attempted output fault proof for correct proposal!");
                 meter_proofs_discarded.add(
                     1,
                     &[
@@ -670,7 +703,7 @@ pub async fn handle_proposals(
                 continue;
             };
             if !fault.is_output() {
-                error!("Received computed proof for null fault!");
+                error!("Received output fault proof for null fault!");
             }
             let divergence_point = fault.divergence_point() as u64;
 
@@ -940,16 +973,29 @@ pub async fn handle_proposals(
             let proposal_index = null_fault_buffer.pop_front().unwrap();
             // Fetch proposal from db
             let Some(proposal) = agent.proposals.get(&proposal_index) else {
-                error!("Proposal {proposal_index} missing from database.");
-                null_fault_buffer.push_back(proposal_index);
+                if agent.cursor.last_resolved_game < proposal_index {
+                    error!("Proposal {proposal_index} missing from database.");
+                    null_fault_buffer.push_back(proposal_index);
+                } else {
+                    warn!(
+                        "Skipping null fault proof submission for freed proposal {proposal_index}."
+                    );
+                }
                 continue;
             };
             let proposal_contract =
                 KailuaTournament::new(proposal.contract, &agent.provider.l1_provider);
             // Fetch proposal parent from db
             let Some(parent) = agent.proposals.get(&proposal.parent) else {
-                error!("Parent proposal {} missing from database.", proposal.parent);
-                null_fault_buffer.push_back(proposal_index);
+                if agent.cursor.last_resolved_game < proposal_index {
+                    error!("Parent proposal {} missing from database.", proposal.parent);
+                    null_fault_buffer.push_back(proposal_index);
+                } else {
+                    warn!(
+                        "Skipping null fault proof submission for proposal {} with freed parent {}.",
+                        proposal.index, proposal.parent
+                    );
+                }
                 continue;
             };
             let parent_contract = KailuaTournament::new(parent.contract, &validator_provider);
@@ -966,7 +1012,7 @@ pub async fn handle_proposals(
                 continue;
             };
             if !fault.is_null() {
-                error!("Attempting null proof for output fault!");
+                error!("Attempting null fault proof for output fault!");
             }
             let divergence_point = fault.divergence_point() as u64;
             let output_fe = proposal.output_fe_at(divergence_point);

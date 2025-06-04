@@ -39,7 +39,7 @@ use opentelemetry::trace::FutureExt;
 use opentelemetry::trace::{TraceContextExt, Tracer};
 use opentelemetry::KeyValue;
 use std::collections::btree_map::Entry;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{error, info, warn};
@@ -139,24 +139,48 @@ impl SyncAgent {
         options
     }
 
-    pub fn free_memory(&mut self) -> anyhow::Result<()> {
-        // todo: delete all proposals prior to last resolved proposal
-        // todo: delete all output commitments prior to last resolved proposal
-
-        // older commitments are needed to assess proposal correctness?
-        // -- lack of tournament participation should negate the need to check correctness
-        // -- in this case, we know that all proposals covering blocks older than those by
-        // -- the last resolved proposals need not be checked
-        // -- in essence, no tournament participation -> no need to check correctness
-
-        todo!()
+    pub fn free_cached_data(&mut self) -> anyhow::Result<BTreeSet<u64>> {
+        // delete all proposals prior to last resolved proposal
+        let Some(earliest_proposal) = self.proposals.first_key_value().map(|(k, _)| *k) else {
+            return Ok(Default::default());
+        };
+        let mut proposals = BTreeSet::new();
+        for i in earliest_proposal..self.cursor.last_resolved_game {
+            if self.proposals.remove(&i).is_some() {
+                info!("Freed proposal {i} from memory.");
+                proposals.insert(i);
+            }
+        }
+        // delete all output commitments prior to last resolved proposal
+        let Some(earliest_output) = self
+            .proposals
+            .get(&self.cursor.last_resolved_game)
+            .map(|p| p.output_block_number)
+        else {
+            bail!("Last resolved game is missing from database.");
+        };
+        let mut commitments = 0;
+        for i in 1..=earliest_output {
+            let output_number =
+                earliest_output.saturating_sub(i * self.deployment.output_block_span);
+            if self.outputs.remove(&output_number).is_none() {
+                // abort early once we hit an output commitment we never stored during this run
+                break;
+            }
+            if let Err(err) = self.db.delete(output_number.to_be_bytes()) {
+                error!("Failed to delete output commitment {output_number} from storage: {err:?}.");
+            }
+            commitments += 1;
+        }
+        if commitments > 0 {
+            info!("Freed {commitments} output commitments from storage.");
+        }
+        Ok(proposals)
     }
 
     pub async fn sync(&mut self) -> anyhow::Result<Vec<u64>> {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("SyncAgent::sync"));
-
-        // todo: garbage collection -- erase all in-memory data that belongs to proposals prior to last resolved proposal
 
         // load all relevant output commitments
         let sync_status = await_tel_res!(
@@ -194,7 +218,7 @@ impl SyncAgent {
             .stall_with_context(context.clone(), "DisputeGameFactory::gameCount")
             .await
             .to();
-        let mut proposals = Vec::new();
+        let first_factory_index = self.cursor.next_factory_index;
         while self.cursor.next_factory_index < game_count {
             let proposal = match self
                 .sync_proposal(&dispute_game_factory, self.cursor.next_factory_index)
@@ -204,7 +228,6 @@ impl SyncAgent {
                 Ok(processed) => {
                     if processed {
                         // append proposal to returned result
-                        proposals.push(self.cursor.next_factory_index);
                         let proposal = self
                             .proposals
                             .get(&self.cursor.next_factory_index)
@@ -239,6 +262,11 @@ impl SyncAgent {
                         entry.insert(proposal.index);
                     }
                 }
+            }
+
+            // Prune memory and storage
+            if let Err(err) = self.free_cached_data() {
+                error!("Failed to free cached data: {err:?}.");
             }
 
             // Process next game index
@@ -299,6 +327,11 @@ impl SyncAgent {
         self.telemetry
             .sync_next
             .record(self.cursor.next_factory_index, &[]);
+
+        // Collect newly processed and retained proposals
+        let proposals = (first_factory_index..self.cursor.next_factory_index)
+            .filter(|p| self.proposals.contains_key(p))
+            .collect();
 
         Ok(proposals)
     }
