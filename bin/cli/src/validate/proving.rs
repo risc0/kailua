@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::channel::DuplexChannel;
-use crate::retry_with_context;
+use crate::retry_res_ctx_timeout;
 use crate::sync::agent::SyncAgent;
 use crate::sync::proposal::Proposal;
 use crate::transact::rpc::{get_block_by_number, get_next_block};
@@ -23,7 +23,7 @@ use alloy::network::primitives::HeaderResponse;
 use alloy::network::BlockResponse;
 use alloy::primitives::{Address, B256};
 use anyhow::{bail, Context};
-use kailua_client::{await_tel, await_tel_res};
+use kailua_client::await_tel;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
 use kona_protocol::BlockInfo;
@@ -251,27 +251,33 @@ pub async fn request_fault_proof(
     debug!("l2_head {:?}", &agreed_l2_head_hash);
 
     // Get L2 head output root
-    let agreed_l2_output_root = await_tel_res!(
+    let agreed_l2_output_root = await_tel!(
         context,
         tracer,
         "output_at_block",
-        retry_with_context!(agent
-            .provider
-            .op_provider
-            .output_at_block(agreed_l2_head_number))
-    )?;
+        retry_res_ctx_timeout!(
+            agent
+                .provider
+                .op_provider
+                .output_at_block(agreed_l2_head_number)
+                .await
+        )
+    );
 
     // Prepare expected output commitment: target the first bad transition
     let claimed_l2_block_number = agreed_l2_head_number + agent.deployment.output_block_span;
-    let claimed_l2_output_root = await_tel_res!(
+    let claimed_l2_output_root = await_tel!(
         context,
         tracer,
         "claimed_l2_output_root",
-        retry_with_context!(agent
-            .provider
-            .op_provider
-            .output_at_block(claimed_l2_block_number))
-    )?;
+        retry_res_ctx_timeout!(
+            agent
+                .provider
+                .op_provider
+                .output_at_block(claimed_l2_block_number)
+                .await
+        )
+    );
 
     // Set appropriate L1 head
     let l1_head = proposal.l1_head;

@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::retry;
+use crate::retry_res_timeout;
 use alloy::consensus::{Blob, BlobTransactionSidecar};
 use alloy::eips::eip4844::{kzg_to_versioned_hash, BLS_MODULUS, FIELD_ELEMENTS_PER_BLOB};
 use alloy::primitives::{B256, U256};
 use alloy_rpc_types_beacon::sidecar::{BeaconBlobBundle, BlobData};
 use anyhow::{bail, Context};
+use kailua_client::await_tel;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use serde::de::DeserializeOwned;
@@ -41,20 +42,31 @@ impl BlobProvider {
         let cl_node_endpoint = cl_node_endpoint.trim_end_matches('/').to_owned();
         let client = reqwest::Client::new();
 
-        let genesis =
-            Self::client_get::<Value>(&client, &cl_node_endpoint, "eth/v1/beacon/genesis")
-                .with_context(context.clone())
-                .await
-                .context("BlobProvider::provider_get")?;
+        let genesis = await_tel!(
+            context,
+            tracer,
+            "BlobProvider::client_get (genesis)",
+            retry_res_timeout!(
+                Self::client_get::<Value>(&client, &cl_node_endpoint, "eth/v1/beacon/genesis")
+                    .with_context(context.clone())
+                    .await
+            )
+        );
         debug!("genesis {:?}", &genesis);
         let genesis_time = genesis["data"]["genesis_time"]
             .as_str()
             .unwrap()
             .parse::<u64>()?;
-        let spec = Self::client_get::<Value>(&client, &cl_node_endpoint, "eth/v1/config/spec")
-            .with_context(context.clone())
-            .await
-            .context("BlobProvider::provider_get")?;
+        let spec = await_tel!(
+            context,
+            tracer,
+            "BlobProvider::client_get (spec)",
+            retry_res_timeout!(
+                Self::client_get::<Value>(&client, &cl_node_endpoint, "eth/v1/config/spec")
+                    .with_context(context.clone())
+                    .await
+            )
+        );
         debug!("spec {:?}", &spec);
         let seconds_per_slot = spec["data"]["SECONDS_PER_SLOT"]
             .as_str()
@@ -103,14 +115,16 @@ impl BlobProvider {
             opentelemetry::Context::current_with_span(tracer.start("BlobProvider::get_blob"));
 
         let slot = self.slot(timestamp);
-        let blobs = retry!(
-            self.get::<BeaconBlobBundle>(&format!("eth/v1/beacon/blob_sidecars/{slot}"))
-                .with_context(context.clone())
-                .await
-        )
-        .with_context(context.with_span(tracer.start_with_context("BlobProvider::get", &context)))
-        .await
-        .context(format!("blob_sidecars {slot}"))?;
+        let blobs = await_tel!(
+            context,
+            tracer,
+            "BlobProvider::get",
+            retry_res_timeout!(
+                self.get::<BeaconBlobBundle>(&format!("eth/v1/beacon/blob_sidecars/{slot}"))
+                    .with_context(context.clone())
+                    .await
+            )
+        );
 
         let blob_count = blobs.len();
         for blob in blobs {

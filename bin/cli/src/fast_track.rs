@@ -15,7 +15,7 @@
 use crate::stall::Stall;
 use crate::transact::signer::{DeployerSignerArgs, GuardianSignerArgs, OwnerSignerArgs};
 use crate::transact::{Transact, TransactArgs};
-use crate::{retry_with_context, KAILUA_GAME_TYPE};
+use crate::{retry_res_ctx_timeout, KAILUA_GAME_TYPE};
 use alloy::network::{Ethereum, Network, ReceiptResponse, TxSigner};
 use alloy::primitives::{Address, Bytes, Uint, U256};
 use alloy::providers::{Provider, RootProvider};
@@ -197,12 +197,16 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     };
 
     // Deploy KailuaTreasury contract
-    let root_claim = await_tel_res!(
+    let root_claim = await_tel!(
         context,
         tracer,
         "root_claim",
-        retry_with_context!(op_node_provider.output_at_block(args.starting_block_number))
-    )?;
+        retry_res_ctx_timeout!(
+            op_node_provider
+                .output_at_block(args.starting_block_number)
+                .await
+        )
+    );
     info!("Deploying KailuaTreasury contract to L1 rpc.");
     let receipt = KailuaTreasury::deploy_builder(
         &deployer_provider,

@@ -12,19 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::retry_res_ctx_timeout;
 use alloy::contract::{EthCall, SolCallBuilder};
 use alloy::network::Network;
 use alloy::providers::Provider;
 use alloy::sol_types::SolCall;
 use async_trait::async_trait;
+use kailua_client::await_tel;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use opentelemetry::Context;
 use std::future::IntoFuture;
 use std::marker::PhantomData;
-use std::time::Duration;
-use tokio::time::sleep;
-use tracing::error;
 
 #[async_trait]
 pub trait Stall<R> {
@@ -46,21 +45,14 @@ where
         let tracer = tracer("kailua");
         let context = Context::current_with_span(tracer.start(span));
 
-        loop {
-            match self
+        await_tel!(
+            context,
+            tracer,
+            "call_raw",
+            retry_res_ctx_timeout!(self
                 .call_raw()
-                .into_future()
-                .with_context(context.with_span(tracer.start_with_context("call_raw", &context)))
                 .await
-                .and_then(|raw_result| self.decode_output(raw_result))
-            {
-                Ok(res) => break res,
-                Err(error) => {
-                    error!("Stall Error: {:?}", error);
-                    // Wait before retrying
-                    sleep(Duration::from_millis(250)).await;
-                }
-            }
-        }
+                .and_then(|response| self.decode_output(response)))
+        )
     }
 }

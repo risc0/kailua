@@ -15,37 +15,140 @@
 #[macro_export]
 macro_rules! retry {
     ($e:expr) => {
-        retry!(200, 1024, $e)
+        $crate::retry!(250, 1000, $e)
     };
     ($m:literal, $e:expr) => {
-        retry!(200, $m, $e)
+        $crate::retry!(250, $m, $e)
     };
     ($b:literal, $m:literal, $e:expr) => {
         tokio_retry::Retry::spawn(
             tokio_retry::strategy::ExponentialBackoff::from_millis($b)
                 .max_delay(std::time::Duration::from_millis($m)),
-            || async { $e },
+            || async {
+                let res = $e;
+                if let Err(err) = &res {
+                    tracing::error!("(Retrying) {err:?}");
+                }
+                res
+            },
         )
     };
 }
 
 #[macro_export]
-macro_rules! retry_with_context {
+macro_rules! retry_res {
     ($e:expr) => {
-        retry_with_context!(2, 1024, $e)
+        $crate::retry_res!(250, 1000, $e)
     };
     ($m:literal, $e:expr) => {
-        retry_with_context!(2, $m, $e)
+        $crate::retry_res!(250, $m, $e)
+    };
+    ($b:literal, $m:literal, $e:expr) => {
+        async { $crate::retry!($b, $m, $e).await.unwrap() }
+    };
+}
+
+#[macro_export]
+macro_rules! retry_ctx {
+    ($e:expr) => {
+        $crate::retry_ctx!(250, 1000, $e)
+    };
+    ($m:literal, $e:expr) => {
+        $crate::retry_ctx!(250, $m, $e)
     };
     ($b:literal, $m:literal, $e:expr) => {
         $crate::retry!(
             $b,
             $m,
-            $e.with_context(opentelemetry::Context::current_with_span(
-                opentelemetry::global::tracer("kailua")
-                    .start_with_context("retry_attempt", &opentelemetry::Context::current()),
-            ))
+            opentelemetry::trace::FutureExt::with_context(
+                $e,
+                opentelemetry::Context::current_with_span(
+                    opentelemetry::global::tracer("kailua")
+                        .start_with_context("retry_attempt", &opentelemetry::Context::current()),
+                )
+            )
             .await
         )
+    };
+}
+
+#[macro_export]
+macro_rules! retry_res_ctx {
+    ($e:expr) => {
+        $crate::retry_res_ctx!(250, 1000, $e)
+    };
+    ($m:literal, $e:expr) => {
+        $crate::retry_res_ctx!(250, $m, $e)
+    };
+    ($b:literal, $m:literal, $e:expr) => {
+        async { $crate::retry_ctx!($b, $m, $e).await.unwrap() }
+    };
+}
+
+#[macro_export]
+macro_rules! retry_timeout {
+    ($e:expr) => {
+        $crate::retry_timeout!(2, 250, 1000, $e)
+    };
+    ($t:expr, $e:expr) => {
+        $crate::retry_timeout!($t, 250, 1000, $e)
+    };
+    ($t:expr, $m:literal, $e:expr) => {
+        $crate::retry_timeout!($t, 250, $m, $e)
+    };
+    ($t:expr, $b:literal, $m:literal, $e:expr) => {
+        $crate::retry_res!(
+            $b,
+            $m,
+            tokio::time::timeout(core::time::Duration::from_secs($t), async { $e }).await
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! retry_res_timeout {
+    ($e:expr) => {
+        $crate::retry_res_timeout!(2, 250, 1000, $e)
+    };
+    ($t:expr, $e:expr) => {
+        $crate::retry_res_timeout!($t, 250, 1000, $e)
+    };
+    ($t:expr, $m:literal, $e:expr) => {
+        $crate::retry_res_timeout!($t, 250, $m, $e)
+    };
+    ($t:expr, $b:literal, $m:literal, $e:expr) => {
+        async {
+            $crate::retry_res!(
+                $b,
+                $m,
+                tokio::time::timeout(core::time::Duration::from_secs($t), async { $e }).await
+            )
+            .await
+            .unwrap()
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! retry_res_ctx_timeout {
+    ($e:expr) => {
+        $crate::retry_res_ctx_timeout!(2, 250, 1000, $e)
+    };
+    ($t:expr, $e:expr) => {
+        $crate::retry_res_ctx_timeout!($t, 250, 1000, $e)
+    };
+    ($t:expr, $m:literal, $e:expr) => {
+        $crate::retry_res_ctx_timeout!($t, 250, $m, $e)
+    };
+    ($t:expr, $b:literal, $m:literal, $e:expr) => {
+        async {
+            $crate::retry_res_ctx!(
+                $b,
+                $m,
+                tokio::time::timeout(core::time::Duration::from_secs($t), async { $e })
+            )
+            .await
+            .unwrap()
+        }
     };
 }

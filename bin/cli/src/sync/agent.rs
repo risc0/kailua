@@ -18,7 +18,7 @@ use crate::sync::deployment::SyncDeployment;
 use crate::sync::proposal::Proposal;
 use crate::sync::provider::SyncProvider;
 use crate::sync::telemetry::SyncTelemetry;
-use crate::{retry, retry_with_context, CoreArgs, KAILUA_GAME_TYPE};
+use crate::{retry_res_ctx_timeout, retry_res_timeout, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::network::Network;
 use alloy::primitives::{Address, B256, U256};
 use alloy_provider::Provider;
@@ -183,12 +183,12 @@ impl SyncAgent {
         let context = opentelemetry::Context::current_with_span(tracer.start("SyncAgent::sync"));
 
         // load all relevant output commitments
-        let sync_status = await_tel_res!(
+        let sync_status = await_tel!(
             context,
             tracer,
             "sync_status",
-            retry_with_context!(self.provider.op_provider.sync_status())
-        )?;
+            retry_res_ctx_timeout!(self.provider.op_provider.sync_status().await)
+        );
         let output_block_number = sync_status["safe_l2"]["number"]
             .as_u64()
             .unwrap()
@@ -628,7 +628,10 @@ impl SyncAgent {
                 .map(|i| {
                     let provider = self.provider.op_provider.clone();
                     Box::pin(async move {
-                        (i, retry!(provider.output_at_block(i).await).await.unwrap())
+                        (
+                            i,
+                            retry_res_timeout!(provider.output_at_block(i).await).await,
+                        )
                     })
                 })
                 .collect_vec();

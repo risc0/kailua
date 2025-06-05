@@ -18,7 +18,7 @@ use crate::transact::provider::SafeProvider;
 use crate::transact::rpc::get_block;
 use crate::transact::signer::ProposerSignerArgs;
 use crate::transact::{Transact, TransactArgs};
-use crate::{retry_with_context, stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
+use crate::{retry_res_ctx_timeout, stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
 use alloy::consensus::BlockHeader;
 use alloy::eips::BlockNumberOrTag;
 use alloy::network::{BlockResponse, Ethereum, TxSigner};
@@ -116,7 +116,9 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
         // fetch latest games
-        await_tel!(context, agent.sync()).context("SyncAgent::sync")?;
+        if let Err(err) = await_tel!(context, agent.sync()).context("SyncAgent::sync") {
+            error!("Synchronization error: {err:?}");
+        }
 
         // alert on honesty compromise
         if let Some(elimination_index) = agent.eliminations.get(&proposer_address) {
@@ -176,12 +178,12 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         };
 
         // Query op-node to get latest safe l2 head
-        let sync_status = await_tel_res!(
+        let sync_status = await_tel!(
             context,
             tracer,
             "sync_status",
-            retry_with_context!(agent.provider.op_provider.sync_status())
-        )?;
+            retry_res_ctx_timeout!(agent.provider.op_provider.sync_status().await)
+        );
         debug!("sync_status[safe_l2] {:?}", &sync_status["safe_l2"]);
         let output_block_number = sync_status["safe_l2"]["number"].as_u64().unwrap();
         if output_block_number < canonical_tip.output_block_number {
@@ -237,26 +239,35 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         }
 
         // Prepare proposal
-        let proposed_output_root = await_tel_res!(
+        let proposed_output_root = await_tel!(
             context,
             tracer,
             "proposed_output_root",
-            retry_with_context!(agent
-                .provider
-                .op_provider
-                .output_at_block(proposed_block_number))
-        )?;
+            retry_res_ctx_timeout!(
+                agent
+                    .provider
+                    .op_provider
+                    .output_at_block(proposed_block_number)
+                    .await
+            )
+        );
         // Prepare intermediate outputs
         let mut io_field_elements = vec![];
         for i in 1..agent.deployment.proposal_output_count {
             let io_block_number =
                 canonical_tip.output_block_number + i * agent.deployment.output_block_span;
-            let output_hash = await_tel_res!(
+            let output_hash = await_tel!(
                 context,
                 tracer,
                 "output_hash",
-                retry_with_context!(agent.provider.op_provider.output_at_block(io_block_number))
-            )?;
+                retry_res_ctx_timeout!(
+                    agent
+                        .provider
+                        .op_provider
+                        .output_at_block(io_block_number)
+                        .await
+                )
+            );
             io_field_elements.push(hash_to_fe(output_hash));
         }
         if io_field_elements.len() as u64 != agent.deployment.proposal_output_count - 1 {
@@ -332,16 +343,18 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         // Check collateral requirements
         let bond_value = await_tel!(context, fetch_participation_bond(&agent));
         let paid_in = await_tel!(context, fetch_paid_bond(&agent, proposer_address));
-        let balance = await_tel_res!(
+        let balance = await_tel!(
             context,
             tracer,
             "ReqwestProvider::get_balance",
-            retry_with_context!(agent
-                .provider
-                .l1_provider
-                .get_balance(proposer_address)
-                .into_future())
-        )?;
+            retry_res_ctx_timeout!(
+                agent
+                    .provider
+                    .l1_provider
+                    .get_balance(proposer_address)
+                    .await
+            )
+        );
         let owed_collateral = bond_value.saturating_sub(paid_in);
         if balance < owed_collateral {
             error!("INSUFFICIENT BALANCE! Need to lock in at least {owed_collateral} more.");

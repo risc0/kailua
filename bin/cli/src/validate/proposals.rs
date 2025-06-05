@@ -18,7 +18,7 @@ use crate::transact::provider::SafeProvider;
 use crate::transact::Transact;
 use crate::validate::proving::{encode_seal, request_fault_proof, request_validity_proof};
 use crate::validate::{Message, ValidateArgs};
-use crate::{retry_with_context, stall::Stall};
+use crate::{retry_res_ctx_timeout, stall::Stall};
 use alloy::network::{Ethereum, TxSigner};
 use alloy::primitives::Bytes;
 use alloy::primitives::B256;
@@ -100,7 +100,12 @@ pub async fn handle_proposals(
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
         // fetch latest games
-        let loaded_proposals = await_tel!(context, agent.sync()).context("SyncAgent::sync")?;
+        let loaded_proposals = await_tel!(context, agent.sync())
+            .context("SyncAgent::sync")
+            .unwrap_or_else(|err| {
+                error!("Synchronization error: {err:?}");
+                vec![]
+            });
 
         // check new proposals for fault and queue potential responses
         for proposal_index in loaded_proposals {
@@ -718,15 +723,18 @@ pub async fn handle_proposals(
                             "Proposal output fe {output_fe} doesn't match proof fe {proof_output_root_fe}",
                         );
                 }
-                let op_node_output = await_tel_res!(
+                let op_node_output = await_tel!(
                     context,
                     tracer,
                     "op_node_output",
-                    retry_with_context!(agent
-                        .provider
-                        .op_provider
-                        .output_at_block(proof_journal.claimed_l2_block_number))
-                )?;
+                    retry_res_ctx_timeout!(
+                        agent
+                            .provider
+                            .op_provider
+                            .output_at_block(proof_journal.claimed_l2_block_number)
+                            .await
+                    )
+                );
                 if proof_journal.claimed_l2_output_root != op_node_output {
                     error!(
                         "Local op node output {op_node_output} doesn't match proof {}",
