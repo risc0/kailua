@@ -632,7 +632,11 @@ pub async fn handle_proposals(
                         child_index,
                         encoded_seal.clone(),
                     )
-                    .transact_with_context(context.clone(), "KailuaTournament::proveValidity")
+                    .timed_transact_with_context(
+                        context.clone(),
+                        "KailuaTournament::proveValidity",
+                        Some(Duration::from_secs(args.txn_args.txn_timeout)),
+                    )
                     .await
                     .context("KailuaTournament::proveValidity")
                 {
@@ -921,7 +925,11 @@ pub async fn handle_proposals(
                     commitments,
                     proofs,
                 )
-                .transact_with_context(context.clone(), "KailuaTournament::proveOutputFault")
+                .timed_transact_with_context(
+                    context.clone(),
+                    "KailuaTournament::proveOutputFault",
+                    Some(Duration::from_secs(args.txn_args.txn_timeout)),
+                )
                 .await
                 .context("KailuaTournament::proveOutputFault");
 
@@ -1096,7 +1104,11 @@ pub async fn handle_proposals(
                     blob_commitment,
                     kzg_proof,
                 )
-                .transact_with_context(context.clone(), "KailuaTournament::proveNullFault")
+                .timed_transact_with_context(
+                    context.clone(),
+                    "KailuaTournament::proveNullFault",
+                    Some(Duration::from_secs(args.txn_args.txn_timeout)),
+                )
                 .await
                 .context("KailuaTournament::proveNullFault");
 
