@@ -19,7 +19,7 @@ use foundry_compilers::{
 fn main() {
     let mut settings = MultiCompilerSettings::default();
     settings.solc.optimizer.enabled = Some(true);
-    settings.solc.optimizer.runs = Some(10_000_000);
+    settings.solc.optimizer.runs = Some(10_000);
     settings.solc.evm_version = Some(EvmVersion::Cancun);
     let project = Project::builder()
         .settings(settings)

@@ -1,4 +1,4 @@
-// Copyright 2024 RISC Zero, Inc.
+// Copyright 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy::primitives::Address;
-use std::collections::HashMap;
-
-#[derive(Clone, Debug, Default)]
-pub struct State {
-    pub eliminations: HashMap<Address, u64>,
-    pub next_factory_index: u64,
-    pub canonical_tip_index: Option<u64>,
-}
+pub mod agent;
+pub mod cursor;
+pub mod deployment;
+pub mod fault;
+pub mod proposal;
+pub mod provider;
+pub mod telemetry;

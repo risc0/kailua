@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::db::proposal::Proposal;
 use crate::propose::ProposeArgs;
 use crate::stall::Stall;
+use crate::sync::proposal::Proposal;
 use crate::transact::Transact;
-use crate::{retry_with_context, KAILUA_GAME_TYPE};
+use crate::{retry_res_ctx_timeout, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy::network::Ethereum;
 use alloy::primitives::{Bytes, B256, U256};
@@ -154,17 +154,21 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let proposed_output_root = if proposed_block_number == faulty_block_number {
         faulty_root_claim
     } else {
-        await_tel_res!(
+        await_tel!(
             context,
             tracer,
             "proposed_output_root",
-            retry_with_context!(op_node_provider.output_at_block(proposed_block_number))
-        )?
+            retry_res_ctx_timeout!(
+                op_node_provider
+                    .output_at_block(proposed_block_number)
+                    .await
+            )
+        )
     };
 
     // Prepare intermediate outputs
     let mut io_field_elements = vec![];
-    let is_output_fault = faulty_block_number <= proposal_block_count;
+    let is_output_fault = faulty_block_number <= proposed_block_number;
     let normalized_fault_block_number =
         faulty_block_number - (!is_output_fault as u64) * output_block_span;
     for i in 1..FIELD_ELEMENTS_PER_BLOB {
@@ -173,12 +177,12 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         let output_hash = if io_block_number == normalized_fault_block_number {
             faulty_root_claim
         } else if io_block_number < proposed_block_number {
-            await_tel_res!(
+            await_tel!(
                 context,
                 tracer,
                 "output_hash",
-                retry_with_context!(op_node_provider.output_at_block(io_block_number))
-            )?
+                retry_res_ctx_timeout!(op_node_provider.output_at_block(io_block_number).await)
+            )
         } else {
             B256::ZERO
         };

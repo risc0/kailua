@@ -61,7 +61,9 @@ contract ClaimDisputeTest is KailuaTest {
 
         // Resolve after dispute timeout
         vm.warp(block.timestamp + 1);
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
     }
 
     function test_eliminate() public {
@@ -192,7 +194,9 @@ contract ClaimDisputeTest is KailuaTest {
         vm.assertTrue(proposal_128_0.parentGame().isViableSignature(proposal_128_0.signature()));
 
         // Finalize
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
     }
 
     function test_proveValidity() public {
@@ -210,7 +214,9 @@ contract ClaimDisputeTest is KailuaTest {
             game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
 
         // Generate mock proof
         bytes memory proof = mockFaultProof(
@@ -258,9 +264,11 @@ contract ClaimDisputeTest is KailuaTest {
         // Reject resolve for bad proposal
         vm.expectRevert(ProvenFaulty.selector);
         proposal_256_1.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
 
         // Resolve honest proposal
         proposal_256_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_256_0));
     }
 
     function test_prove_resolved() public {
@@ -278,7 +286,9 @@ contract ClaimDisputeTest is KailuaTest {
             game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
 
         // honest proposal
         KailuaTournament proposal_256_0 = treasury.propose(
@@ -308,6 +318,7 @@ contract ClaimDisputeTest is KailuaTest {
 
         // Resolve honest proposal
         proposal_256_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_256_0));
         vm.expectRevert(GameNotInProgress.selector);
         proposal_256_0.getChallengerDuration(block.timestamp);
 
@@ -391,7 +402,9 @@ contract ClaimDisputeTest is KailuaTest {
             game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
 
         // Generate mock proof
         bytes32 goodClaim = bytes32(uint256(proposal_128_0.rootClaim().raw()) + KailuaKZGLib.BLS_MODULUS);
@@ -583,6 +596,7 @@ contract ClaimDisputeTest is KailuaTest {
 
             // Finalize canonical proposal
             proposals[i].resolve();
+            vm.assertEq(treasury.lastResolved(), address(proposals[i]));
 
             // Fail to resolve any proposal after correct resolution
             for (uint256 j = 0; j < PROPOSAL_BUFFER_LEN; j++) {
@@ -695,6 +709,7 @@ contract ClaimDisputeTest is KailuaTest {
 
             // Finalize canonical proposal
             proposals[i].resolve();
+            vm.assertEq(treasury.lastResolved(), address(proposals[i]));
 
             // Fail to resolve any proposal after correct resolution
             for (uint256 j = 0; j < PROPOSAL_BUFFER_LEN; j++) {
@@ -798,6 +813,7 @@ contract ClaimDisputeTest is KailuaTest {
 
             // Finalize canonical proposal
             proposals[i].resolve();
+            vm.assertEq(treasury.lastResolved(), address(proposals[i]));
 
             // Fail to resolve any proposal after correct resolution
             for (uint256 j = 0; j < PROPOSAL_BUFFER_LEN; j++) {
@@ -875,7 +891,9 @@ contract ClaimDisputeTest is KailuaTest {
         while (address(anchor.pruneChildren(1)) != address(proposal_128_0)) {
             //            console2.log("anchor %s:%s/%s", anchor.contenderIndex(), anchor.opponentIndex(), anchor.childCount());
         }
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
 
         //        console2.log(
         //            "pre proposal_128_0 %s:%s/%s",
@@ -925,6 +943,7 @@ contract ClaimDisputeTest is KailuaTest {
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 3
         );
         proposal_256_X.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_256_X));
     }
 
     function test_pruneChildren_opponent() public {
@@ -989,8 +1008,11 @@ contract ClaimDisputeTest is KailuaTest {
             game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 3
         );
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
         proposal_256_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_256_0));
 
         // Reject validity proof after resolution
         vm.expectRevert(GameNotInProgress.selector);

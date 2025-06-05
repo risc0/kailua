@@ -167,7 +167,9 @@ contract BlobDisputeTest is KailuaTest {
         );
 
         // Resolve
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
 
         // Fail to prove null fault after resolution
         KailuaTournament parent = proposal_128_0.parentGame();
@@ -241,7 +243,9 @@ contract BlobDisputeTest is KailuaTest {
 
         // Finalize
         vm.warp(block.timestamp + game.MAX_CLOCK_DURATION().raw());
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
     }
 
     function test_proveOutputFault_undisputed_1() public {
@@ -437,7 +441,9 @@ contract BlobDisputeTest is KailuaTest {
             game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         proposal_128_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
         // Generate mock proof
         bytes memory proof = mockValidityProof(
             address(this),
@@ -482,5 +488,6 @@ contract BlobDisputeTest is KailuaTest {
 
         // Resolve
         proposal_256_0.resolve();
+        vm.assertEq(treasury.lastResolved(), address(proposal_256_0));
     }
 }

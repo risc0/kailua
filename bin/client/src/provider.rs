@@ -12,51 +12,66 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::await_tel;
 use alloy::primitives::B256;
 use alloy::providers::{Provider, RootProvider};
 use anyhow::Context;
 use opentelemetry::global::tracer;
-use opentelemetry::trace::Tracer;
+use opentelemetry::trace::FutureExt;
+use opentelemetry::trace::{TraceContextExt, Tracer};
 use serde_json::Value;
 use std::str::FromStr;
 
+#[derive(Clone)]
 pub struct OpNodeProvider(pub RootProvider);
 
 impl OpNodeProvider {
     pub async fn output_at_block(&self, output_block_number: u64) -> anyhow::Result<B256> {
-        tracer("kailua").start("OpNodeProvider::output_at_block");
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(
+            tracer.start("OpNodeProvider::output_at_block"),
+        );
 
-        let output_at_block: Value = self
-            .0
-            .client()
-            .request(
+        let output_at_block: Value = await_tel!(
+            context,
+            tracer,
+            "optimism_outputAtBlock",
+            self.0.client().request(
                 "optimism_outputAtBlock",
                 (format!("0x{:x}", output_block_number),),
             )
-            .await
-            .context(format!("optimism_outputAtBlock {output_block_number}"))?;
+        )
+        .context(format!("optimism_outputAtBlock {output_block_number}"))?;
+
         Ok(B256::from_str(
             output_at_block["outputRoot"].as_str().unwrap(),
         )?)
     }
 
     pub async fn sync_status(&self) -> anyhow::Result<Value> {
-        tracer("kailua").start("OpNodeProvider::sync_status");
+        let tracer = tracer("kailua");
+        let context =
+            opentelemetry::Context::current_with_span(tracer.start("OpNodeProvider::sync_status"));
 
-        Ok(self
-            .0
-            .client()
-            .request_noparams("optimism_syncStatus")
-            .await?)
+        Ok(await_tel!(
+            context,
+            tracer,
+            "optimism_syncStatus",
+            self.0.client().request_noparams("optimism_syncStatus")
+        )?)
     }
 
     pub async fn rollup_config(&self) -> anyhow::Result<Value> {
-        tracer("kailua").start("OpNodeProvider::rollup_config");
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(
+            tracer.start("OpNodeProvider::rollup_config"),
+        );
 
-        Ok(self
-            .0
-            .client()
-            .request_noparams("optimism_rollupConfig")
-            .await?)
+        Ok(await_tel!(
+            context,
+            tracer,
+            "optimism_rollupConfig",
+            self.0.client().request_noparams("optimism_rollupConfig")
+        )?)
     }
 }

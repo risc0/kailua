@@ -34,6 +34,7 @@ contract DeployTest is KailuaTest {
             uint64(0x0)
         );
         // Check anchor data
+        vm.assertEq(treasury.lastResolved(), address(anchor));
         vm.assertEq(factory.gameCount() - 1, anchor.gameIndex());
         vm.assertEq(address(anchor.parentGame()), address(anchor));
         vm.assertEq(anchor.minCreationTime().raw(), anchor.createdAt().raw());

@@ -18,12 +18,12 @@ use std::path::PathBuf;
 pub mod bench;
 pub mod channel;
 pub mod config;
-pub mod db;
 pub mod fast_track;
 pub mod fault;
 pub mod propose;
 pub mod retry;
 pub mod stall;
+pub mod sync;
 pub mod transact;
 pub mod validate;
 
