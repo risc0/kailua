@@ -21,7 +21,7 @@ permissions:
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   SOLC_VERSION: 0.8.24
-  RISC0_VERSION: 2.0.2
+  RISC0_VERSION: 2.1.0
   RISC0_TOOLCHAIN_VERSION: 1.85.0
 
 jobs:
