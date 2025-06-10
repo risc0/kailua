@@ -21,10 +21,15 @@ use kailua_client::provider::OpNodeProvider;
 use opentelemetry::trace::FutureExt;
 use opentelemetry::trace::{TraceContextExt, Tracer};
 
+/// A collection of RPC providers for L1 and L2 data
 pub struct SyncProvider {
+    /// DA provider for blobs
     pub da_provider: BlobProvider,
+    /// Provider for L1 chain data
     pub l1_provider: RootProvider,
+    /// Provider for op-node queries
     pub op_provider: OpNodeProvider,
+    /// Provider for L2 chain data
     pub l2_provider: RootProvider,
 }
 

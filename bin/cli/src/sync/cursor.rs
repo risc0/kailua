@@ -23,10 +23,15 @@ use opentelemetry::global::tracer;
 use opentelemetry::trace::{TraceContextExt, Tracer};
 use opentelemetry::Context;
 
+/// A collection of pointers to statefully track synchrony information
 pub struct SyncCursor {
+    /// Factory game index of the latest canonical proposal
     pub canonical_proposal_tip: u64,
+    /// Index of the next proposal to query
     pub next_factory_index: u64,
+    /// Index of the last L2 block height whose output is known
     pub last_output_index: u64,
+    /// Index of the last proposal resolved on chain
     pub last_resolved_game: u64,
 }
 

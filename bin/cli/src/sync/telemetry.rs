@@ -15,9 +15,13 @@
 use opentelemetry::global::meter;
 use opentelemetry::metrics::{Gauge, Meter};
 
+/// An collection of objects for reporting telemetry information
 pub struct SyncTelemetry {
+    /// Global meter object
     pub meter: Meter,
+    /// Gauge for reporting the latest canonical block height
     pub sync_canonical: Gauge<u64>,
+    /// Gauge for reporting the next proposal index to query
     pub sync_next: Gauge<u64>,
 }
 

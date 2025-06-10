@@ -44,22 +44,26 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
+/// A stateful agent object for synchronizing with an on-chain Kailua deployment.
 pub struct SyncAgent {
+    /// RPC providers to use for querying chain data
     pub provider: SyncProvider,
+    /// Telemetry object for reporting synchronization state
     pub telemetry: SyncTelemetry,
+    /// L2 Configuration of the rollup being monitored
     pub config: RollupConfig,
+    /// Kailua deployment configuration for instance being synchronized
     pub deployment: SyncDeployment,
+    /// Local persistent key-value store
     pub db: Arc<rocksdb::DB>,
+    /// Pointers to the latest synchronized items
     pub cursor: SyncCursor,
+    /// In-memory cache of op-node query results
     pub outputs: BTreeMap<u64, B256>,
+    /// In-memory cache of on-chain proposal data
     pub proposals: BTreeMap<u64, Proposal>,
+    /// In-memory cache of proposer elimination rounds
     pub eliminations: BTreeMap<Address, u64>,
-}
-
-impl Drop for SyncAgent {
-    fn drop(&mut self) {
-        let _ = rocksdb::DB::destroy(&Self::db_options(), self.db.path());
-    }
 }
 
 impl SyncAgent {

@@ -24,21 +24,36 @@ use opentelemetry::Context;
 use std::process::exit;
 use tracing::{error, info, warn};
 
+/// A collection of information about a Kailua deployment
 #[derive(Clone, Debug, Default)]
 pub struct SyncDeployment {
+    /// Address of the KailuaTreasury contract
     pub treasury: Address,
+    /// Address of the KailuaGame contract
     pub game: Address,
+    /// Address of the RISC Zero verifier contract
     pub verifier: Address,
+    /// Image ID of the FPVM program
     pub image_id: B256,
+    /// Hash of the rollup configuration
     pub cfg_hash: B256,
+    /// Number of output commitments published per proposal
     pub proposal_output_count: u64,
+    /// Number of L2 blocks covered by each output commitment
     pub output_block_span: u64,
+    /// Number of blobs published per proposal
     pub proposal_blobs: u64,
+    /// Game type ID used (Default: 1337)
     pub game_type: u8,
+    /// Address of the DisputeGameFactory contract
     pub factory: Address,
+    /// Proposal dispute timeout
     pub timeout: u64,
+    /// L2 Chain genesis block timestamp
     pub genesis_time: u64,
+    /// L2 Chain block time
     pub block_time: u64,
+    /// Delay before a proposal can be posted for a given L2 block
     pub proposal_gap: u64,
 }
 
