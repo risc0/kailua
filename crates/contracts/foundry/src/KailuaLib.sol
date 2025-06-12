@@ -63,7 +63,7 @@ error NotProposed();
 error NoConflict();
 
 // 0x9276ab5a
-/// @notice Thrown when proposing before the proposal gap timeout
+/// @notice Thrown when proposing before the minimum creation time
 error ProposalGapRemaining(uint256 currentTime, uint256 minCreationTime);
 
 // 0x1434391f

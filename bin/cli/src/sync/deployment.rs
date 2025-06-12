@@ -53,8 +53,6 @@ pub struct SyncDeployment {
     pub genesis_time: u64,
     /// L2 Chain block time
     pub block_time: u64,
-    /// Delay before a proposal can be posted for a given L2 block
-    pub proposal_gap: u64,
 }
 
 impl SyncDeployment {
@@ -124,18 +122,15 @@ impl SyncDeployment {
         let proposal_output_count = kailua_game_implementation
             .PROPOSAL_OUTPUT_COUNT()
             .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_OUTPUT_COUNT")
-            .await
-            .to();
+            .await;
         let output_block_span = kailua_game_implementation
             .OUTPUT_BLOCK_SPAN()
             .stall_with_context(context.clone(), "KailuaGame::OUTPUT_BLOCK_SPAN")
-            .await
-            .to();
+            .await;
         let proposal_blobs = kailua_game_implementation
             .PROPOSAL_BLOBS()
             .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_BLOBS")
-            .await
-            .to();
+            .await;
         let game_type = kailua_game_implementation
             .GAME_TYPE()
             .stall_with_context(context.clone(), "KailuaGame::GAME_TYPE")
@@ -158,11 +153,6 @@ impl SyncDeployment {
             .stall_with_context(context.clone(), "KailuaGame::L2_BLOCK_TIME")
             .await
             .to();
-        let proposal_gap = kailua_game_implementation
-            .PROPOSAL_TIME_GAP()
-            .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_TIME_GAP")
-            .await
-            .to();
         Ok(Self {
             treasury,
             game,
@@ -177,7 +167,6 @@ impl SyncDeployment {
             timeout,
             genesis_time,
             block_time,
-            proposal_gap,
         })
     }
 
@@ -191,7 +180,7 @@ impl SyncDeployment {
     }
 
     pub fn min_proposal_time(&self, proposal_block_number: u64) -> u64 {
-        self.genesis_time + proposal_block_number * self.block_time + self.proposal_gap + 1
+        self.genesis_time + proposal_block_number * self.block_time + 1
     }
 
     pub fn blocks_per_proposal(&self) -> u64 {

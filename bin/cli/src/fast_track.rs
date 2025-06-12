@@ -17,7 +17,7 @@ use crate::transact::signer::{DeployerSignerArgs, GuardianSignerArgs, OwnerSigne
 use crate::transact::{Transact, TransactArgs};
 use crate::{retry_res_ctx_timeout, KAILUA_GAME_TYPE};
 use alloy::network::{Ethereum, Network, ReceiptResponse, TxSigner};
-use alloy::primitives::{Address, Bytes, Uint, U256};
+use alloy::primitives::{Address, Bytes, U256};
 use alloy::providers::{Provider, RootProvider};
 use alloy::sol_types::SolValue;
 use anyhow::{anyhow, bail, Context};
@@ -61,9 +61,6 @@ pub struct FastTrackArgs {
     /// The number of blocks each output must cover
     #[clap(long, env)]
     pub output_block_span: u64,
-    /// The time gap before a proposal can be made
-    #[clap(long, env)]
-    pub proposal_time_gap: u64,
 
     /// The collateral (wei) that must be locked up by a sequencer to propose
     #[clap(long, env)]
@@ -213,8 +210,8 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         verifier_contract_address,
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
         rollup_config_hash.into(),
-        Uint::from(args.proposal_output_count),
-        Uint::from(args.output_block_span),
+        args.proposal_output_count,
+        args.output_block_span,
         KAILUA_GAME_TYPE,
         portal_address,
         root_claim,
@@ -354,7 +351,6 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         *kailua_treasury_implementation.address(),
         U256::from(config.genesis.l2_time),
         U256::from(config.block_time),
-        U256::from(args.proposal_time_gap),
         args.challenge_timeout,
     )
     .transact_with_context(context.clone(), "KailuaGame::deploy")

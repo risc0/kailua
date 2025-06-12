@@ -629,6 +629,7 @@ pub async fn handle_proposals(
                 match parent_contract
                     .proveValidity(
                         proof_journal.payout_recipient,
+                        proposal.contract,
                         child_index,
                         encoded_seal.clone(),
                     )
@@ -916,14 +917,15 @@ pub async fn handle_proposals(
 
             let transaction_dispatch = parent_contract
                 .proveOutputFault(
-                    proof_journal.payout_recipient,
+                    [proof_journal.payout_recipient, proposal.contract], // todo: dynamic l1 head
                     [child_index, divergence_point],
                     encoded_seal.clone(),
-                    proof_journal.agreed_l2_output_root,
+                    [
+                        proof_journal.agreed_l2_output_root,
+                        proof_journal.claimed_l2_output_root,
+                    ],
                     output_fe,
-                    proof_journal.claimed_l2_output_root,
-                    commitments,
-                    proofs,
+                    [commitments, proofs],
                 )
                 .timed_transact_with_context(
                     context.clone(),

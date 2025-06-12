@@ -114,16 +114,14 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let kailua_treasury_instance = KailuaTreasury::new(kailua_treasury_address, &tester_provider);
 
     // load constants
-    let proposal_output_count: u64 = kailua_game_implementation
+    let proposal_output_count = kailua_game_implementation
         .PROPOSAL_OUTPUT_COUNT()
         .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_OUTPUT_COUNT")
-        .await
-        .to();
-    let output_block_span: u64 = kailua_game_implementation
+        .await;
+    let output_block_span = kailua_game_implementation
         .OUTPUT_BLOCK_SPAN()
         .stall_with_context(context.clone(), "KailuaGame::OUTPUT_BLOCK_SPAN")
-        .await
-        .to();
+        .await;
     let proposal_block_count = proposal_output_count * output_block_span;
 
     // get proposal parent
