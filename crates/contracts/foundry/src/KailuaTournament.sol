@@ -38,13 +38,13 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     bytes32 public immutable ROLLUP_CONFIG_HASH;
 
     /// @notice The number of outputs a proposal must publish
-    uint256 public immutable PROPOSAL_OUTPUT_COUNT;
+    uint64 public immutable PROPOSAL_OUTPUT_COUNT;
 
     /// @notice The number of blocks each output must cover
-    uint256 public immutable OUTPUT_BLOCK_SPAN;
+    uint64 public immutable OUTPUT_BLOCK_SPAN;
 
     /// @notice The number of blobs a claim must provide
-    uint256 public immutable PROPOSAL_BLOBS;
+    uint64 public immutable PROPOSAL_BLOBS;
 
     /// @notice The game type ID
     GameType public immutable GAME_TYPE;
@@ -60,8 +60,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         IRiscZeroVerifier _verifierContract,
         bytes32 _imageId,
         bytes32 _configHash,
-        uint256 _proposalOutputCount,
-        uint256 _outputBlockSpan,
+        uint64 _proposalOutputCount,
+        uint64 _outputBlockSpan,
         GameType _gameType,
         OptimismPortal2 _optimismPortal
     ) {
@@ -73,8 +73,8 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         OUTPUT_BLOCK_SPAN = _outputBlockSpan;
         // discard published root commitment in calldata
         _proposalOutputCount--;
-        PROPOSAL_BLOBS = (_proposalOutputCount / KailuaKZGLib.FIELD_ELEMENTS_PER_BLOB)
-            + ((_proposalOutputCount % KailuaKZGLib.FIELD_ELEMENTS_PER_BLOB) == 0 ? 0 : 1);
+        PROPOSAL_BLOBS = (_proposalOutputCount / uint64(KailuaKZGLib.FIELD_ELEMENTS_PER_BLOB))
+            + ((_proposalOutputCount % uint64(KailuaKZGLib.FIELD_ELEMENTS_PER_BLOB)) == 0 ? 0 : 1);
         GAME_TYPE = _gameType;
         OPTIMISM_PORTAL = _optimismPortal;
         DISPUTE_GAME_FACTORY = OPTIMISM_PORTAL.disputeGameFactory();
@@ -217,6 +217,11 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     ) external virtual returns (bool success);
 
     function updateProofStatus(address payoutRecipient, bytes32 childSignature, ProofStatus outcome) internal {
+        // INVARIANT: Proofs can only be submitted once
+        if (proofStatus[childSignature] != ProofStatus.NONE) {
+            revert AlreadyProven();
+        }
+
         // Update proof status
         proofStatus[childSignature] = outcome;
 
@@ -424,7 +429,9 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     }
 
     /// @notice Proves that a proposal is valid
-    function proveValidity(address payoutRecipient, uint64 childIndex, bytes calldata encodedSeal) external {
+    function proveValidity(address payoutRecipient, address l1HeadSource, uint64 childIndex, bytes calldata encodedSeal)
+        external
+    {
         KailuaTournament childContract = children[childIndex];
         // INVARIANT: Can only prove validity of unresolved proposals
         if (childContract.status() != GameStatus.IN_PROGRESS) {
@@ -433,11 +440,6 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
         // Store validity proof data (deleted on revert)
         validChildSignature = childContract.signature();
-
-        // INVARIANT: Proofs can only be submitted once
-        if (provenAt[validChildSignature].raw() != 0) {
-            revert AlreadyProven();
-        }
 
         // INVARIANT: No longer accept proofs after resolution
         if (contenderIndex < children.length && children[contenderIndex].status() == GameStatus.DEFENDER_WINS) {
@@ -457,36 +459,18 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             );
         }
 
-        // Calculate the expected block number
-        uint64 claimBlockNumber = uint64(l2BlockNumber() + PROPOSAL_OUTPUT_COUNT * OUTPUT_BLOCK_SPAN);
-
-        // Construct the expected journal
-        bytes32 journalDigest = sha256(
-            abi.encodePacked(
-                // The address of the recipient of the payout for this proof
-                payoutRecipient,
-                // The blob equivalence precondition hash
-                preconditionHash,
-                // The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
-                childContract.l1Head().raw(),
-                // The accepted output
-                rootClaim().raw(),
-                // The proposed output
-                childContract.rootClaim().raw(),
-                // The claim block number
-                claimBlockNumber,
-                // The rollup configuration hash
-                ROLLUP_CONFIG_HASH,
-                // The FPVM Image ID
-                FPVM_IMAGE_ID
-            )
+        // update proof status
+        prove(
+            l1HeadSource,
+            payoutRecipient,
+            preconditionHash,
+            rootClaim().raw(),
+            childContract.rootClaim().raw(),
+            PROPOSAL_OUTPUT_COUNT,
+            encodedSeal,
+            validChildSignature,
+            ProofStatus.VALIDITY
         );
-
-        // Revert on proof verification failure
-        RISC_ZERO_VERIFIER.verify(encodedSeal, FPVM_IMAGE_ID, journalDigest);
-
-        // Mark the child as proven valid
-        updateProofStatus(payoutRecipient, validChildSignature, ProofStatus.VALIDITY);
     }
 
     // ------------------------------
@@ -495,25 +479,20 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
 
     /// @notice Proves that a proposal committed to an incorrect transition
     function proveOutputFault(
-        address payoutRecipient,
+        // [ payoutRecipient, l1HeadSource ]
+        address[2] calldata prHs,
+        // [ childIndex, outputOffset ]
         uint64[2] calldata co,
         bytes calldata encodedSeal,
-        bytes32 acceptedOutputHash,
+        // [ acceptedOutputHash, computedOutputHash ]
+        bytes32[2] memory ac,
         uint256 proposedOutputFe,
-        bytes32 computedOutputHash,
-        bytes[] calldata blobCommitments,
-        bytes[] calldata kzgProofs
+        bytes[][2] calldata kzgCommitmentsProofs
     ) external {
         KailuaTournament childContract = children[co[0]];
         // INVARIANT: Proofs cannot be submitted unless the child is playing.
         if (childContract.status() != GameStatus.IN_PROGRESS) {
             revert GameNotInProgress();
-        }
-
-        bytes32 childSignature = childContract.signature();
-        // INVARIANT: Proofs can only be submitted once
-        if (proofStatus[childSignature] != ProofStatus.NONE) {
-            revert AlreadyProven();
         }
 
         // INVARIANT: No longer accept proofs after resolution
@@ -530,13 +509,13 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         if (co[1] == 0) {
             // Note: acceptedOutputHash cannot be a reduced fe because the comparison below will fail
             // The safe output is the parent game's output when proving the first output
-            require(acceptedOutputHash == rootClaim().raw(), "bad acceptedOutput");
+            require(ac[0] == rootClaim().raw(), "bad acceptedOutput");
         } else {
             // Note: acceptedOutputHash cannot be a reduced fe because the journal would not be provable
             // Prove common output publication
             require(
                 childContract.verifyIntermediateOutput(
-                    co[1] - 1, KailuaKZGLib.hashToFe(acceptedOutputHash), blobCommitments[0], kzgProofs[0]
+                    co[1] - 1, KailuaKZGLib.hashToFe(ac[0]), kzgCommitmentsProofs[0][0], kzgCommitmentsProofs[1][0]
                 ),
                 "bad acceptedOutput kzg"
             );
@@ -545,7 +524,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         // Validate the claimed output root.
         if (co[1] == PROPOSAL_OUTPUT_COUNT - 1) {
             // INVARIANT: Proofs can only show disparities
-            if (computedOutputHash == childContract.rootClaim().raw()) {
+            if (ac[1] == childContract.rootClaim().raw()) {
                 revert NoConflict();
             }
         } else {
@@ -555,46 +534,29 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
                 childContract.verifyIntermediateOutput(
                     co[1],
                     proposedOutputFe,
-                    blobCommitments[blobCommitments.length - 1],
-                    kzgProofs[kzgProofs.length - 1]
+                    kzgCommitmentsProofs[0][kzgCommitmentsProofs[0].length - 1],
+                    kzgCommitmentsProofs[1][kzgCommitmentsProofs[1].length - 1]
                 ),
                 "bad proposedOutput kzg"
             );
             // INVARIANT: Proofs can only show disparities
-            if (KailuaKZGLib.hashToFe(computedOutputHash) == proposedOutputFe) {
+            if (KailuaKZGLib.hashToFe(ac[1]) == proposedOutputFe) {
                 revert NoConflict();
             }
         }
 
-        // Construct the expected journal
-        {
-            uint64 claimedBlockNumber = uint64(l2BlockNumber() + (co[1] + 1) * OUTPUT_BLOCK_SPAN);
-            bytes32 journalDigest = sha256(
-                abi.encodePacked(
-                    // The address of the recipient of the payout for this proof
-                    payoutRecipient,
-                    // No precondition hash
-                    bytes32(0x0),
-                    // The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
-                    childContract.l1Head().raw(),
-                    // The latest finalized L2 output root.
-                    acceptedOutputHash,
-                    // The L2 output root claim.
-                    computedOutputHash,
-                    // The L2 claim block number.
-                    claimedBlockNumber,
-                    // The rollup configuration hash
-                    ROLLUP_CONFIG_HASH,
-                    // The FPVM Image ID
-                    FPVM_IMAGE_ID
-                )
-            );
-
-            // reverts on failure
-            RISC_ZERO_VERIFIER.verify(encodedSeal, FPVM_IMAGE_ID, journalDigest);
-        }
-
-        updateProofStatus(payoutRecipient, childSignature, ProofStatus.FAULT);
+        // update proof status
+        prove(
+            prHs[1],
+            prHs[0],
+            bytes32(0),
+            ac[0],
+            ac[1],
+            co[1] + 1,
+            encodedSeal,
+            childContract.signature(),
+            ProofStatus.FAULT
+        );
     }
 
     /// @notice Proves that a proposal contains invalid intermediate data
@@ -609,12 +571,6 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         // INVARIANT: Proofs cannot be submitted unless the children are playing.
         if (childContract.status() != GameStatus.IN_PROGRESS) {
             revert GameNotInProgress();
-        }
-
-        bytes32 childSignature = childContract.signature();
-        // INVARIANT: Proofs can only be submitted once
-        if (proofStatus[childSignature] != ProofStatus.NONE) {
-            revert AlreadyProven();
         }
 
         // INVARIANT: No longer accept proofs after resolution
@@ -650,6 +606,54 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
         );
 
         // Update dispute status based on trailing data
-        updateProofStatus(payoutRecipient, childSignature, ProofStatus.FAULT);
+        updateProofStatus(payoutRecipient, childContract.signature(), ProofStatus.FAULT);
+    }
+
+    // ------------------------------
+    // ZK Proving
+    // ------------------------------
+
+    /// @notice Verifies a ZK proof and updates the proof status according to the provided outcome if the proof is valid
+    function prove(
+        address l1HeadSource,
+        address payoutRecipient,
+        bytes32 preconditionHash,
+        bytes32 acceptedOutputHash,
+        bytes32 computedOutputHash,
+        uint64 outputCount,
+        bytes calldata encodedSeal,
+        bytes32 childSignature,
+        ProofStatus outcome
+    ) internal {
+        // Validate the l1Head source
+        if (KAILUA_TREASURY.proposerOf(l1HeadSource) == address(0x0)) {
+            revert UnknownGame();
+        }
+
+        // Construct the expected journal
+        bytes memory journal = abi.encodePacked(
+            // The address of the recipient of the payout for this proof
+            payoutRecipient,
+            // The blob equivalence precondition hash
+            preconditionHash,
+            // The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
+            KailuaTournament(l1HeadSource).l1Head().raw(),
+            // The accepted output
+            acceptedOutputHash,
+            // The proposed output
+            computedOutputHash,
+            // The claim block number
+            uint64(l2BlockNumber() + outputCount * OUTPUT_BLOCK_SPAN),
+            // The rollup configuration hash
+            ROLLUP_CONFIG_HASH,
+            // The FPVM Image ID
+            FPVM_IMAGE_ID
+        );
+
+        // Revert on proof verification failure
+        RISC_ZERO_VERIFIER.verify(encodedSeal, FPVM_IMAGE_ID, sha256(journal));
+
+        // Mark the child as proven
+        updateProofStatus(payoutRecipient, childSignature, outcome);
     }
 }

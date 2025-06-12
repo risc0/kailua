@@ -28,8 +28,8 @@ contract BlobDisputeTest is KailuaTest {
         super.setUp();
         // Deploy dispute contracts
         (treasury, game, anchor) = deployKailua(
-            uint256(0x10), // 16 intermediate commitments
-            uint256(0x08), // 128 blocks per proposal (8 per commitment)
+            uint64(0x10), // 16 intermediate commitments
+            uint64(0x08), // 128 blocks per proposal (8 per commitment)
             sha256(abi.encodePacked(bytes32(0x00))), // arbitrary genesis hash
             uint64(0x0), // genesis
             uint256(block.timestamp), // start l2 from now
@@ -215,27 +215,23 @@ contract BlobDisputeTest is KailuaTest {
         // Reject no conflict fault proof
         vm.expectRevert(NoConflict.selector);
         parent.proveOutputFault(
-            address(this),
+            [address(this), address(proposal_128_0)],
             [uint64(0), uint64(0)],
             proof,
-            parentClaim,
+            [parentClaim, goodClaim],
             BLOB_NZ_VALUE,
-            goodClaim,
-            blobCommitments,
-            kzgProofs
+            [blobCommitments, kzgProofs]
         );
 
         // Reject bad prestate fault proof
         vm.expectRevert("bad acceptedOutput");
         parent.proveOutputFault(
-            address(this),
+            [address(this), address(proposal_128_0)],
             [uint64(0), uint64(0)],
             proof,
-            ~parentClaim,
+            [~parentClaim, goodClaim],
             BLOB_NZ_VALUE,
-            goodClaim,
-            blobCommitments,
-            kzgProofs
+            [blobCommitments, kzgProofs]
         );
 
         // Ensure signature is viable
@@ -280,14 +276,12 @@ contract BlobDisputeTest is KailuaTest {
         bytes[] memory kzgProofs = new bytes[](1);
         kzgProofs[0] = BLOB_ID_ELEM;
         parent.proveOutputFault(
-            address(this),
+            [address(this), address(proposal_128_0)],
             [uint64(0), uint64(0)],
             proof,
-            parentClaim,
+            [parentClaim, goodClaim],
             BLOB_NZ_VALUE,
-            goodClaim,
-            blobCommitments,
-            kzgProofs
+            [blobCommitments, kzgProofs]
         );
 
         // Ensure signature is viable
@@ -331,41 +325,35 @@ contract BlobDisputeTest is KailuaTest {
         // Reject bad prestate fault proof
         vm.expectRevert("bad acceptedOutput kzg");
         parent.proveOutputFault(
-            address(this),
+            [address(this), address(proposal_128_0)],
             [uint64(0), uint64(1)],
             proof,
-            ~bytes32(BLOB_NZ_VALUE),
+            [~bytes32(BLOB_NZ_VALUE), goodClaim],
             BLOB_NZ_VALUE,
-            goodClaim,
-            blobCommitments,
-            kzgProofs
+            [blobCommitments, kzgProofs]
         );
 
         // Reject bad proposed output fault proof
         blobCommitments[0] = BLOB_NZ_COMMIT;
         vm.expectRevert("bad proposedOutput kzg");
         parent.proveOutputFault(
-            address(this),
+            [address(this), address(proposal_128_0)],
             [uint64(0), uint64(1)],
             proof,
-            bytes32(BLOB_NZ_VALUE),
+            [bytes32(BLOB_NZ_VALUE), goodClaim],
             BLOB_NZ_VALUE,
-            goodClaim,
-            blobCommitments,
-            kzgProofs
+            [blobCommitments, kzgProofs]
         );
 
         // Accept fault proof
         blobCommitments[1] = BLOB_NZ_COMMIT;
         parent.proveOutputFault(
-            address(this),
+            [address(this), address(proposal_128_0)],
             [uint64(0), uint64(1)],
             proof,
-            bytes32(BLOB_NZ_VALUE),
+            [bytes32(BLOB_NZ_VALUE), goodClaim],
             BLOB_NZ_VALUE,
-            goodClaim,
-            blobCommitments,
-            kzgProofs
+            [blobCommitments, kzgProofs]
         );
 
         // Ensure signature is viable
@@ -404,14 +392,12 @@ contract BlobDisputeTest is KailuaTest {
         bytes[] memory kzgProofs = new bytes[](1);
         kzgProofs[0] = BLOB_ID_ELEM;
         parent.proveOutputFault(
-            address(this),
+            [address(this), address(proposal_128_0)],
             [uint64(0), uint64(0x0f)],
             proof,
-            bytes32(BLOB_NZ_VALUE),
+            [bytes32(BLOB_NZ_VALUE), goodClaim],
             KailuaKZGLib.hashToFe(proposal_128_0.rootClaim().raw()),
-            goodClaim,
-            blobCommitments,
-            kzgProofs
+            [blobCommitments, kzgProofs]
         );
 
         // Ensure signature is viable
@@ -458,7 +444,7 @@ contract BlobDisputeTest is KailuaTest {
 
         // Reject validity proof after resolution
         vm.expectRevert(GameNotInProgress.selector);
-        anchor.proveValidity(address(this), uint64(0), proof);
+        anchor.proveValidity(address(this), address(proposal_128_0), uint64(0), proof);
 
         // honest proposal
         vm.blobhashes(blobs);
@@ -480,11 +466,11 @@ contract BlobDisputeTest is KailuaTest {
         );
 
         // Accept validity proof
-        proposal_128_0.proveValidity(address(this), uint64(0), proof);
+        proposal_128_0.proveValidity(address(this), address(proposal_256_0), uint64(0), proof);
 
         // Reject repeat validity proof
         vm.expectRevert(AlreadyProven.selector);
-        proposal_128_0.proveValidity(address(this), uint64(0), proof);
+        proposal_128_0.proveValidity(address(this), address(proposal_256_0), uint64(0), proof);
 
         // Resolve
         proposal_256_0.resolve();

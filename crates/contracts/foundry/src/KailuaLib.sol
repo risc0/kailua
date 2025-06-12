@@ -140,7 +140,7 @@ library KailuaKZGLib {
     uint256 internal constant FIELD_ELEMENTS_PER_BLOB_PO2 = 12;
 
     /// @notice The number of field elements in a single blob
-    uint256 internal constant FIELD_ELEMENTS_PER_BLOB = (1 << FIELD_ELEMENTS_PER_BLOB_PO2);
+    uint256 internal constant FIELD_ELEMENTS_PER_BLOB = uint64(1 << FIELD_ELEMENTS_PER_BLOB_PO2);
 
     /// @notice The index of the blob containing the FE at the provided offset
     function blobIndex(uint256 outputOffset) internal pure returns (uint256 index) {

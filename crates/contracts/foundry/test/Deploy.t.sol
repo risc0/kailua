@@ -24,8 +24,8 @@ contract DeployTest is KailuaTest {
 
     function test_canDeployKailua() public {
         (KailuaTreasury treasury,, KailuaTournament anchor) = deployKailua(
-            uint256(0x1),
-            uint256(0x1),
+            uint64(0x1),
+            uint64(0x1),
             sha256(abi.encodePacked(bytes32(0x00))),
             uint64(0x0),
             uint256(0x0),

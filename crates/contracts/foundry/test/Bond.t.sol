@@ -34,8 +34,8 @@ contract BondTest is KailuaTest {
         super.setUp();
         // Deploy dispute contracts
         (treasury, game, anchor) = deployKailua(
-            uint256(0x1), // no intermediate commitments
-            uint256(0x80), // 128 blocks per proposal
+            uint64(0x1), // no intermediate commitments
+            uint64(0x80), // 128 blocks per proposal
             sha256(abi.encodePacked(bytes32(0x00))), // arbitrary block hash
             uint64(0x0), // genesis
             uint256(block.timestamp), // start l2 from now

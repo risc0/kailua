@@ -56,8 +56,8 @@ contract KailuaTest is Test {
     }
 
     function deployKailua(
-        uint256 proposalOutputCount,
-        uint256 outputBlockSpan,
+        uint64 proposalOutputCount,
+        uint64 outputBlockSpan,
         bytes32 rootClaim,
         uint64 l2BlockNumber,
         uint256 genesisTimestamp,
