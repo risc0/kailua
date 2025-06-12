@@ -34,17 +34,15 @@ contract ClaimDisputeTest is KailuaTest {
             uint64(0x0), // genesis
             uint256(block.timestamp), // start l2 from now
             uint256(0x1), // 1-second block times
-            uint256(0x5), // 5-second wait
             uint64(0xA) // 10-second dispute timeout
         );
     }
 
     function test_getChallengerDuration() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
-        // Succeed to propose after proposal time gap
+        // Succeed to propose after min creation time
         KailuaTournament proposal_128_0 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
@@ -68,19 +66,18 @@ contract ClaimDisputeTest is KailuaTest {
 
     function test_eliminate() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
-        // Succeed to propose after proposal time gap
+        // Succeed to propose after min creation time
         KailuaTournament proposal_128_0 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
         );
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
-        // Succeed to propose after proposal time gap
+        // Succeed to propose after min creation time
         KailuaTournament proposal_256_0 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(256), uint64(proposal_128_0.gameIndex()), uint64(0))
@@ -114,24 +111,23 @@ contract ClaimDisputeTest is KailuaTest {
             uint64(0x0), // genesis
             uint256(block.timestamp), // start l2 from now
             uint256(0x1), // 1-second block times
-            uint256(0x5), // 5-second wait
             uint64(0xA) // 10-second dispute timeout
         );
 
         vm.warp(
-            new_game.GENESIS_TIME_STAMP() + new_game.PROPOSAL_TIME_GAP()
+            new_game.GENESIS_TIME_STAMP()
                 + new_game.PROPOSAL_OUTPUT_COUNT() * new_game.OUTPUT_BLOCK_SPAN() * new_game.L2_BLOCK_TIME()
         );
-        // Succeed to propose after proposal time gap
+        // Succeed to propose after min creation time
         KailuaTournament new_proposal_128_0 = new_treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(128), uint64(new_anchor.gameIndex()), uint64(0))
         );
         vm.warp(
-            new_game.GENESIS_TIME_STAMP() + new_game.PROPOSAL_TIME_GAP()
+            new_game.GENESIS_TIME_STAMP()
                 + new_game.PROPOSAL_OUTPUT_COUNT() * new_game.OUTPUT_BLOCK_SPAN() * new_game.L2_BLOCK_TIME() * 2
         );
-        // Succeed to propose after proposal time gap
+        // Succeed to propose after min creation time
         KailuaTournament new_proposal_256_0 = new_treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(256), uint64(new_proposal_128_0.gameIndex()), uint64(0))
@@ -146,10 +142,9 @@ contract ClaimDisputeTest is KailuaTest {
 
     function test_proveValidity_undisputed() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
-        // Succeed to propose after proposal time gap
+        // Succeed to propose after min creation time
         KailuaTournament proposal_128_0 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
@@ -199,8 +194,7 @@ contract ClaimDisputeTest is KailuaTest {
 
     function test_proveValidity() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // honest proposal
         KailuaTournament proposal_128_0 = treasury.propose(
@@ -209,7 +203,7 @@ contract ClaimDisputeTest is KailuaTest {
         );
 
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
         vm.assertEq(treasury.lastResolved(), address(anchor));
@@ -271,8 +265,7 @@ contract ClaimDisputeTest is KailuaTest {
 
     function test_prove_resolved() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // honest proposal
         KailuaTournament proposal_128_0 = treasury.propose(
@@ -281,7 +274,7 @@ contract ClaimDisputeTest is KailuaTest {
         );
 
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
         vm.assertEq(treasury.lastResolved(), address(anchor));
@@ -354,10 +347,9 @@ contract ClaimDisputeTest is KailuaTest {
 
     function test_proveOutputFault_range() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
-        // Succeed to propose after proposal time gap
+        // Succeed to propose after min creation time
         KailuaTournament proposal_128_0 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
@@ -389,10 +381,9 @@ contract ClaimDisputeTest is KailuaTest {
 
     function test_proveOutputFault_late() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
-        // Succeed to propose after proposal time gap
+        // Succeed to propose after min creation time
         KailuaTournament proposal_128_0 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
@@ -400,7 +391,7 @@ contract ClaimDisputeTest is KailuaTest {
 
         // Finalize claim
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
         vm.assertEq(treasury.lastResolved(), address(anchor));
@@ -433,10 +424,9 @@ contract ClaimDisputeTest is KailuaTest {
 
     function test_proveOutputFault_l1HeadSource() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
-        // Succeed to propose after proposal time gap
+        // Succeed to propose after min creation time
         KailuaTournament proposal_128_0 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
@@ -444,7 +434,7 @@ contract ClaimDisputeTest is KailuaTest {
 
         // Finalize claim
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
         vm.assertEq(treasury.lastResolved(), address(anchor));
@@ -476,10 +466,10 @@ contract ClaimDisputeTest is KailuaTest {
     function test_proveOutputFault_undisputed() public {
         // Time for at most two proposals
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
-        // Succeed to propose after proposal time gap
+        // Succeed to propose after min creation time
         KailuaTournament proposal_128_0 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
@@ -539,7 +529,7 @@ contract ClaimDisputeTest is KailuaTest {
             uint64 blockHeight = uint64(128 * i);
 
             vm.warp(
-                game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+                game.GENESIS_TIME_STAMP()
                     + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * i
             );
 
@@ -663,7 +653,7 @@ contract ClaimDisputeTest is KailuaTest {
             uint64 dupeCtr = 0;
 
             vm.warp(
-                game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+                game.GENESIS_TIME_STAMP()
                     + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * i
             );
 
@@ -764,7 +754,7 @@ contract ClaimDisputeTest is KailuaTest {
             uint64 badDupeCtr = 0;
 
             vm.warp(
-                game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+                game.GENESIS_TIME_STAMP()
                     + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * i
             );
 
@@ -859,8 +849,7 @@ contract ClaimDisputeTest is KailuaTest {
 
     function test_pruneChildren_contenders() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
 
         // honest proposal
@@ -881,7 +870,7 @@ contract ClaimDisputeTest is KailuaTest {
         }
 
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
 
@@ -968,7 +957,7 @@ contract ClaimDisputeTest is KailuaTest {
         //            proposal_128_0.childCount()
         //        );
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 3
         );
         proposal_256_X.resolve();
@@ -977,8 +966,7 @@ contract ClaimDisputeTest is KailuaTest {
 
     function test_pruneChildren_opponent() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // honest proposal
         KailuaTournament proposal_128_0 = treasury.propose(
@@ -995,7 +983,7 @@ contract ClaimDisputeTest is KailuaTest {
         vm.stopPrank();
 
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
         // honest proposal
@@ -1032,7 +1020,7 @@ contract ClaimDisputeTest is KailuaTest {
         );
 
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 3
         );
         vm.assertEq(treasury.lastResolved(), address(anchor));

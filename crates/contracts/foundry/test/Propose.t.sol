@@ -32,7 +32,6 @@ contract ProposeTest is KailuaTest {
             uint64(0x0), // genesis
             uint256(block.timestamp), // start l2 from now
             uint256(0x1), // 1-second block times
-            uint256(0x5), // 5-second wait
             uint64(0x0) // no dispute timeout
         );
     }
@@ -44,7 +43,7 @@ contract ProposeTest is KailuaTest {
     function test_participationBond() public {
         treasury.setParticipationBond(123);
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 1
         );
         // Fail without deposit
@@ -61,7 +60,7 @@ contract ProposeTest is KailuaTest {
         );
 
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
         // Success without more collateral
@@ -92,7 +91,7 @@ contract ProposeTest is KailuaTest {
         vm.assertEq(treasury.vanguard(), address(0x007));
 
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 1
         );
         // Fail if not vanguard
@@ -124,7 +123,7 @@ contract ProposeTest is KailuaTest {
 
     function test_duplication() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 1
         );
         // Succeed on fresh proposal
@@ -163,7 +162,7 @@ contract ProposeTest is KailuaTest {
 
     function test_appendChild() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
         // Succeed on fresh proposal
@@ -192,7 +191,7 @@ contract ProposeTest is KailuaTest {
 
     function test_proposerOf() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
 
@@ -225,7 +224,7 @@ contract ProposeTest is KailuaTest {
 
     function test_nullClaim() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
 
@@ -237,7 +236,7 @@ contract ProposeTest is KailuaTest {
 
     function test_selfParent() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
 
@@ -260,8 +259,7 @@ contract ProposeTest is KailuaTest {
 
     function test_gameCreator() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
 
         // Fail to bypass treasury.propose
@@ -277,7 +275,7 @@ contract ProposeTest is KailuaTest {
 
     function test_lastProposal() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
         // Fail on low successor height
@@ -322,7 +320,7 @@ contract ProposeTest is KailuaTest {
         );
 
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 3
         );
         // Succeed on successor proposal
@@ -334,7 +332,7 @@ contract ProposeTest is KailuaTest {
         );
 
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 4
         );
         // Succeed on child proposal for new proposer
@@ -380,18 +378,7 @@ contract ProposeTest is KailuaTest {
         vm.warp(
             game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
-        // Fail before proposal time gap
-        vm.expectRevert();
-        treasury.propose(
-            Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
-            abi.encodePacked(uint64(128), anchorIndex, uint64(0))
-        );
-
-        vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
-        );
-        // Succeed after proposal time gap
+        // Succeed after l2 block time
         KailuaTournament proposal_128_0 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(128), anchorIndex, uint64(0))
@@ -466,7 +453,7 @@ contract ProposeTest is KailuaTest {
         uint256 blocksPerProposal = game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN();
         // Propose in order
         for (uint256 i = 1; i <= 128; i++) {
-            vm.warp(game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP() + blocksPerProposal * game.L2_BLOCK_TIME() * i);
+            vm.warp(game.GENESIS_TIME_STAMP() + blocksPerProposal * game.L2_BLOCK_TIME() * i);
             bytes32 claim = sha256(abi.encodePacked(bytes32(i)));
             // Fail with bad extra data
             vm.expectRevert(BadExtraData.selector);

@@ -136,7 +136,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     /// @notice Returns the hash of the output claim and all blob hashes associated with this proposal
     function signature() public view returns (bytes32 signature_) {
         // note: the absence of the l1Head in the signature implies that
-        // the proposal gap should absolutely guarantee derivation
+        // proofs will eventually demonstrate derivation
         signature_ = sha256(abi.encodePacked(rootClaim().raw(), proposalBlobHashes));
     }
 

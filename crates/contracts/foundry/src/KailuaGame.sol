@@ -39,14 +39,10 @@ contract KailuaGame is KailuaTournament {
     /// @notice The time between l2 blocks
     uint256 public immutable L2_BLOCK_TIME;
 
-    /// @notice The minimum gap between the l1 and proposed l2 tip timestamps
-    uint256 public immutable PROPOSAL_TIME_GAP;
-
     constructor(
         KailuaTreasury _kailuaTreasury,
         uint256 _genesisTimeStamp,
         uint256 _l2BlockTime,
-        uint256 _proposalTimeGap,
         Duration _maxClockDuration
     )
         KailuaTournament(
@@ -62,7 +58,6 @@ contract KailuaGame is KailuaTournament {
     {
         GENESIS_TIME_STAMP = _genesisTimeStamp;
         L2_BLOCK_TIME = _l2BlockTime;
-        PROPOSAL_TIME_GAP = _proposalTimeGap;
         MAX_CLOCK_DURATION = _maxClockDuration;
     }
 
@@ -251,7 +246,6 @@ contract KailuaGame is KailuaTournament {
 
     /// @inheritdoc KailuaTournament
     function minCreationTime() public view override returns (Timestamp minCreationTime_) {
-        minCreationTime_ =
-            Timestamp.wrap(uint64(GENESIS_TIME_STAMP + l2BlockNumber() * L2_BLOCK_TIME + PROPOSAL_TIME_GAP));
+        minCreationTime_ = Timestamp.wrap(uint64(GENESIS_TIME_STAMP + l2BlockNumber() * L2_BLOCK_TIME));
     }
 }

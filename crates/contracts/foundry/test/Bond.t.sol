@@ -40,7 +40,6 @@ contract BondTest is KailuaTest {
             uint64(0x0), // genesis
             uint256(block.timestamp), // start l2 from now
             uint256(0x1), // 1-second block times
-            uint256(0x5), // 5-second wait
             uint64(0xA) // 10-second dispute timeout
         );
         // Set collateral requirement
@@ -85,8 +84,7 @@ contract BondTest is KailuaTest {
     function test_claimProposerBond() public {
         // Jump ahead
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Fail to propose with no collateral
         uint64 anchorIndex = uint64(anchor.gameIndex());
@@ -102,7 +100,7 @@ contract BondTest is KailuaTest {
         );
         // Jump ahead
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
         // Fail to reclaim bond with pending proposal
@@ -142,8 +140,7 @@ contract BondTest is KailuaTest {
     function test_claimProposerBond_duplicate() public {
         // Jump ahead
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
 
         // Propose with collateral
@@ -163,7 +160,7 @@ contract BondTest is KailuaTest {
 
         // Jump ahead
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
 
@@ -186,8 +183,7 @@ contract BondTest is KailuaTest {
     function test_claimProposerBond_late() public {
         // Jump ahead
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
 
         // Propose with collateral
@@ -199,7 +195,7 @@ contract BondTest is KailuaTest {
 
         // Jump ahead
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
 
@@ -235,19 +231,18 @@ contract BondTest is KailuaTest {
         }
 
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
-        // Succeed to propose after proposal time gap
+        // Succeed to propose after min creation time
         KailuaTournament proposal_128_0 = treasury.propose{value: 987}(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
         );
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
-        // Succeed to propose after proposal time gap
+        // Succeed to propose after min creation time
         KailuaTournament proposal_256_0 = treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),
             abi.encodePacked(uint64(256), uint64(proposal_128_0.gameIndex()), uint64(0))

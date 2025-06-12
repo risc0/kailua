@@ -30,7 +30,6 @@ contract DeployTest is KailuaTest {
             uint64(0x0),
             uint256(0x0),
             uint256(0x0),
-            uint256(0x0),
             uint64(0x0)
         );
         // Check anchor data

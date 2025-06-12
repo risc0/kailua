@@ -34,15 +34,13 @@ contract BlobDisputeTest is KailuaTest {
             uint64(0x0), // genesis
             uint256(block.timestamp), // start l2 from now
             uint256(0x1), // 1-second block times
-            uint256(0x5), // 5-second wait
             uint64(0xA) // 10-second dispute timeout
         );
     }
 
     function test_blobHashes() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Fail to propose without blob hash
         uint64 anchorIndex = uint64(anchor.gameIndex());
@@ -67,8 +65,7 @@ contract BlobDisputeTest is KailuaTest {
 
     function test_proveNullFault_0() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Succeed in proposing with blob hash
         bytes32[] memory blobs = new bytes32[](1);
@@ -99,8 +96,7 @@ contract BlobDisputeTest is KailuaTest {
 
     function test_proveNullFault_1() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Succeed in proposing with blob hash
         bytes32[] memory blobs = new bytes32[](1);
@@ -149,8 +145,7 @@ contract BlobDisputeTest is KailuaTest {
 
     function test_proveNullFault_2() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Succeed in proposing with blob hash
         bytes32[] memory blobhashes = new bytes32[](1);
@@ -162,7 +157,7 @@ contract BlobDisputeTest is KailuaTest {
         );
 
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
 
@@ -182,8 +177,7 @@ contract BlobDisputeTest is KailuaTest {
 
     function test_proveOutputFault_undisputed_0() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Succeed in proposing with blob hash
         bytes32[] memory blobhashes = new bytes32[](1);
@@ -246,8 +240,7 @@ contract BlobDisputeTest is KailuaTest {
 
     function test_proveOutputFault_undisputed_1() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Succeed in proposing with blob hash
         bytes32[] memory blobhashes = new bytes32[](1);
@@ -295,8 +288,7 @@ contract BlobDisputeTest is KailuaTest {
 
     function test_proveOutputFault_undisputed_2() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Succeed in proposing with blob hash
         bytes32[] memory blobhashes = new bytes32[](1);
@@ -367,8 +359,7 @@ contract BlobDisputeTest is KailuaTest {
 
     function test_proveOutputFault_undisputed_3() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Succeed in proposing with blob hash
         bytes32[] memory blobhashes = new bytes32[](1);
@@ -411,8 +402,7 @@ contract BlobDisputeTest is KailuaTest {
 
     function test_proveValidity() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // honest proposal
         bytes32[] memory blobs = new bytes32[](1);
@@ -424,7 +414,7 @@ contract BlobDisputeTest is KailuaTest {
         );
 
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
         vm.assertEq(treasury.lastResolved(), address(anchor));
