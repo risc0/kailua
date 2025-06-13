@@ -18,6 +18,7 @@ use alloy_eips::eip4844::{
     kzg_to_versioned_hash, Blob, IndexedBlobHash, BLS_MODULUS, FIELD_ELEMENTS_PER_BLOB,
 };
 use alloy_primitives::{B256, U256};
+use anyhow::bail;
 use async_trait::async_trait;
 use c_kzg::{ethereum_kzg_settings, Bytes48};
 use kona_derive::errors::BlobProviderError;
@@ -195,9 +196,13 @@ impl BlobProvider for PreloadedBlobProvider {
         let mut blobs = Vec::with_capacity(blob_count);
         for hash in blob_hashes {
             let (blob_hash, blob) = self.entries.pop().unwrap();
-            if hash.hash == blob_hash {
-                blobs.push(Box::new(blob));
+            if hash.hash != blob_hash {
+                return Err(BlobProviderError::Backend(format!(
+                    "Expected entry with hash {} but found {blob_hash}",
+                    hash.hash
+                )));
             }
+            blobs.push(Box::new(blob));
         }
         Ok(blobs)
     }
@@ -263,7 +268,11 @@ pub fn field_elements(
     let mut field_elements = vec![];
     for index in iterator.map(|i| 32 * i) {
         let bytes: [u8; 32] = blob.as_ref().0[index..index + 32].try_into()?;
-        field_elements.push(U256::from_be_bytes(bytes));
+        let fe = U256::from_be_bytes(bytes);
+        if !fe.cmp(&BLS_MODULUS).is_lt() {
+            bail!("Invalid field element at index {index}.");
+        }
+        field_elements.push(fe);
     }
     Ok(field_elements)
 }
@@ -440,10 +449,9 @@ pub mod tests {
         let mut blob_provider = PreloadedBlobProvider::from(blob_witness_data);
         let retrieved = blob_provider
             .get_blobs(&Default::default(), &indexed_hashes)
-            .await
-            .unwrap();
+            .await;
 
-        assert!(retrieved.is_empty());
-        assert!(blob_provider.entries.is_empty());
+        assert!(retrieved.is_err());
+        assert_eq!(blob_provider.entries.len(), 31);
     }
 }
