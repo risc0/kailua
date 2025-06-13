@@ -30,10 +30,7 @@ tokio.workspace = true
 
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
-opentelemetry-semantic-conventions.workspace = true
 opentelemetry-otlp.workspace = true
-opentelemetry-prometheus.workspace = true
-opentelemetry-zipkin.workspace = true
 
 alloy = { workspace = true, features = ["full", "kzg"] }
 alloy-primitives = { workspace = true, features = ["map-hashbrown"] }

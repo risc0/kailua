@@ -87,8 +87,7 @@ impl<T: Into<Blob>> From<Vec<T>> for BlobWitnessData {
     /// - Panics if proof computation fails.
     fn from(blobs: Vec<T>) -> Self {
         let mut result = Self::default();
-        let settings = alloy_eips::eip4844::env_settings::EnvKzgSettings::default();
-        let settings_ref = settings.get();
+        let settings_ref = ethereum_kzg_settings(0);
         for blob in blobs {
             let blob: Blob = blob.into();
             let c_kzg_blob = c_kzg::Blob::new(blob.0);
@@ -280,7 +279,7 @@ pub fn field_elements(
 /// - The function interprets the input hash as a big-endian byte sequence and converts it to a `U256` integer.
 /// - It then reduces the resultant number modulo `BLS_MODULUS` to ensure it falls within the desired field range.
 pub fn hash_to_fe(hash: B256) -> U256 {
-    U256::from_be_bytes(hash.0).reduce_mod(BLS_MODULUS)
+    U256::from_be_bytes(hash.0) % BLS_MODULUS
 }
 
 #[cfg(test)]
