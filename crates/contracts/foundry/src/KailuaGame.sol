@@ -124,11 +124,6 @@ contract KailuaGame is KailuaTournament {
             revert ProvenFaulty();
         }
 
-        // Prohibit null claims
-        if (rootClaim().raw() == 0x0) {
-            revert UnexpectedRootClaim(rootClaim());
-        }
-
         // Register this new game in the parent game's contract
         parentGame_.appendChild();
 

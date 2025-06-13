@@ -500,7 +500,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             revert ClaimAlreadyResolved();
         }
 
-        // INVARIANT: Proofs can only pertain to computed outputs
+        // INVARIANT: Proofs can only pertain to intermediate outputs
         if (co[1] >= PROPOSAL_OUTPUT_COUNT) {
             revert InvalidDisputedClaimIndex();
         }
@@ -560,7 +560,7 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
     }
 
     /// @notice Proves that a proposal contains invalid intermediate data
-    function proveNullFault(
+    function proveTrailFault(
         address payoutRecipient,
         uint64[2] calldata co,
         uint256 proposedOutputFe,
@@ -578,23 +578,21 @@ abstract contract KailuaTournament is Clone, IDisputeGame {
             revert ClaimAlreadyResolved();
         }
 
-        // INVARIANT: Proofs can only pertain to intermediate commitments
-        if (co[1] == PROPOSAL_OUTPUT_COUNT - 1) {
+        // INVARIANT: Proofs can only pertain to trail data
+        if (co[1] < PROPOSAL_OUTPUT_COUNT) {
             revert InvalidDisputedClaimIndex();
         }
 
-        // We expect all trail data to be zeroed, while non-trail data to be non-zero
-        bool isTrailFe = co[1] >= PROPOSAL_OUTPUT_COUNT;
-        bool isZeroFe = proposedOutputFe == 0;
-        if (isTrailFe == isZeroFe) {
+        // We expect all trail data to be zeroed
+        if (proposedOutputFe == 0) {
             revert NoConflict();
         }
 
-        // Because the root claim is considered the last published output, we shift the output offset down by one to
-        // correctly point to the target trailing zero output
-        // INVARIANT: The divergence occurs at a proper blob index
-        uint64 feOffset = isTrailFe ? co[1] - 1 : co[1];
-        if (KailuaKZGLib.blobIndex(feOffset) >= PROPOSAL_BLOBS) {
+        // Because the root claim is considered the last published output, we shift the provided  output offset down by
+        // one to correctly point to the target trailing zero output
+        // INVARIANT: The divergence occurs in the last blob
+        uint64 feOffset = co[1] - 1;
+        if (KailuaKZGLib.blobIndex(feOffset) != PROPOSAL_BLOBS - 1) {
             revert InvalidDataRemainder();
         }
 

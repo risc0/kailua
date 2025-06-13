@@ -63,7 +63,7 @@ contract BlobDisputeTest is KailuaTest {
         vm.assertFalse(proposal_128_0.verifyIntermediateOutput(0, 0, BLOB_ID_ELEM, BLOB_ID_ELEM));
     }
 
-    function test_proveNullFault_0() public {
+    function test_proveTrailFault_0() public {
         vm.warp(
             game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
@@ -76,25 +76,22 @@ contract BlobDisputeTest is KailuaTest {
             abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
         );
 
-        // Fail to prove null fault before io count
+        // Fail to prove trail fault after io count
         KailuaTournament parent = proposal_128_0.parentGame();
         uint256 proposalOutputCount = treasury.PROPOSAL_OUTPUT_COUNT();
         for (uint256 i = proposalOutputCount; i < 4096; i++) {
             vm.expectRevert(NoConflict.selector);
-            parent.proveNullFault(address(this), [uint64(0), uint64(i)], 0, BLOB_ID_ELEM, BLOB_ID_ELEM);
+            parent.proveTrailFault(address(this), [uint64(0), uint64(i)], 0, BLOB_ID_ELEM, BLOB_ID_ELEM);
         }
 
-        // Fail to prove null fault at root claim position
+        // Fail to prove trail fault at root claim position
         vm.expectRevert(InvalidDisputedClaimIndex.selector);
-        parent.proveNullFault(
+        parent.proveTrailFault(
             address(this), [uint64(0), uint64(proposalOutputCount - 1)], 0, BLOB_ID_ELEM, BLOB_ID_ELEM
         );
-
-        // Succeed to prove null fault before io count
-        parent.proveNullFault(address(this), [uint64(0), uint64(0)], 0, BLOB_ID_ELEM, BLOB_ID_ELEM);
     }
 
-    function test_proveNullFault_1() public {
+    function test_proveTrailFault_1() public {
         vm.warp(
             game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
@@ -107,43 +104,45 @@ contract BlobDisputeTest is KailuaTest {
             abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
         );
 
-        // Fail to prove null fault before io count
+        // Fail to prove trail fault before io count
         KailuaTournament parent = proposal_128_0.parentGame();
         uint256 proposalOutputCount = treasury.PROPOSAL_OUTPUT_COUNT();
         for (uint256 i = 0; i < proposalOutputCount - 1; i++) {
-            vm.expectRevert(NoConflict.selector);
-            parent.proveNullFault(address(this), [uint64(0), uint64(i)], BLOB_NZ_VALUE, BLOB_NZ_COMMIT, BLOB_ID_ELEM);
+            vm.expectRevert(InvalidDisputedClaimIndex.selector);
+            parent.proveTrailFault(address(this), [uint64(0), uint64(i)], BLOB_NZ_VALUE, BLOB_NZ_COMMIT, BLOB_ID_ELEM);
         }
 
-        // Fail to prove null fault at root claim position
+        // Fail to prove trail fault at root claim position
         vm.expectRevert(InvalidDisputedClaimIndex.selector);
-        parent.proveNullFault(
+        parent.proveTrailFault(
             address(this), [uint64(0), uint64(proposalOutputCount - 1)], BLOB_NZ_VALUE, BLOB_NZ_COMMIT, BLOB_ID_ELEM
         );
 
-        // Fail to prove null fault after blob count
+        // Fail to prove trail fault after blob count
         vm.expectRevert(InvalidDataRemainder.selector);
-        parent.proveNullFault(address(this), [uint64(0), uint64(4096 + 2)], BLOB_NZ_VALUE, BLOB_NZ_COMMIT, BLOB_ID_ELEM);
+        parent.proveTrailFault(
+            address(this), [uint64(0), uint64(4096 + 2)], BLOB_NZ_VALUE, BLOB_NZ_COMMIT, BLOB_ID_ELEM
+        );
 
-        // Fail to prove null fault with bad blob
+        // Fail to prove trail fault with bad blob
         vm.expectRevert("bad proposedOutput kzg");
-        parent.proveNullFault(
+        parent.proveTrailFault(
             address(this), [uint64(0), uint64(proposalOutputCount)], BLOB_NZ_VALUE, BLOB_ID_ELEM, BLOB_ID_ELEM
         );
 
-        // Succeed to prove null fault after io count
-        parent.proveNullFault(
+        // Succeed to prove trail fault after io count
+        parent.proveTrailFault(
             address(this), [uint64(0), uint64(proposalOutputCount)], BLOB_NZ_VALUE, BLOB_NZ_COMMIT, BLOB_ID_ELEM
         );
 
-        // Fail to reprove null fault
+        // Fail to reprove trail fault
         vm.expectRevert(AlreadyProven.selector);
-        parent.proveNullFault(
+        parent.proveTrailFault(
             address(this), [uint64(0), uint64(proposalOutputCount)], BLOB_NZ_VALUE, BLOB_NZ_COMMIT, BLOB_ID_ELEM
         );
     }
 
-    function test_proveNullFault_2() public {
+    function test_proveTrailFault_2() public {
         vm.warp(
             game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
@@ -166,11 +165,11 @@ contract BlobDisputeTest is KailuaTest {
         proposal_128_0.resolve();
         vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
 
-        // Fail to prove null fault after resolution
+        // Fail to prove trail fault after resolution
         KailuaTournament parent = proposal_128_0.parentGame();
         uint256 proposalOutputCount = treasury.PROPOSAL_OUTPUT_COUNT();
         vm.expectRevert(GameNotInProgress.selector);
-        parent.proveNullFault(
+        parent.proveTrailFault(
             address(this), [uint64(0), uint64(proposalOutputCount)], BLOB_NZ_VALUE, BLOB_NZ_COMMIT, BLOB_ID_ELEM
         );
     }

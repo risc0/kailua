@@ -222,18 +222,6 @@ contract ProposeTest is KailuaTest {
         vm.assertEq(treasury.lastResolved(), address(anchor));
     }
 
-    function test_nullClaim() public {
-        vm.warp(
-            game.GENESIS_TIME_STAMP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
-        );
-
-        // Fail to propose 0x0000..
-        uint64 parentIndex = uint64(anchor.gameIndex());
-        vm.expectPartialRevert(UnexpectedRootClaim.selector);
-        treasury.propose(Claim.wrap(bytes32(0x0)), abi.encodePacked(uint64(128), parentIndex, uint64(0)));
-    }
-
     function test_selfParent() public {
         vm.warp(
             game.GENESIS_TIME_STAMP()

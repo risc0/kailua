@@ -327,9 +327,9 @@ contract ClaimDisputeTest is KailuaTest {
             [new bytes[](0), new bytes[](0)]
         );
 
-        // Reject null fault proof after resolution
+        // Reject trail fault proof after resolution
         vm.expectRevert(ClaimAlreadyResolved.selector);
-        proposal_128_0.proveNullFault(address(this), [uint64(1), uint64(0)], 0, BLOB_ID_ELEM, BLOB_ID_ELEM);
+        proposal_128_0.proveTrailFault(address(this), [uint64(1), uint64(0)], 0, BLOB_ID_ELEM, BLOB_ID_ELEM);
 
         // Mock validity proof
         proof = mockFaultProof(
