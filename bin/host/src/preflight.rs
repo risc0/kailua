@@ -38,6 +38,7 @@ pub async fn get_blob_fetch_request(
 ) -> anyhow::Result<BlobFetchRequest> {
     let block = l1_provider
         .get_block_by_hash(block_hash)
+        .full()
         .await?
         .expect("Failed to fetch block {block_hash}.");
     let mut blob_index = 0;
@@ -99,6 +100,7 @@ pub async fn fetch_precondition_data(
                 cfg.precondition_block_hashes.iter(),
                 cfg.precondition_blob_hashes.iter(),
             ) {
+                info!("Fetching blob hash {blob_hash} from block {block_hash}");
                 fetch_requests
                     .push(get_blob_fetch_request(&providers.l1, *block_hash, *blob_hash).await?);
             }

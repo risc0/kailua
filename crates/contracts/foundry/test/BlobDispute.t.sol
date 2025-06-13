@@ -28,21 +28,19 @@ contract BlobDisputeTest is KailuaTest {
         super.setUp();
         // Deploy dispute contracts
         (treasury, game, anchor) = deployKailua(
-            uint256(0x10), // 16 intermediate commitments
-            uint256(0x08), // 128 blocks per proposal (8 per commitment)
+            uint64(0x10), // 16 intermediate commitments
+            uint64(0x08), // 128 blocks per proposal (8 per commitment)
             sha256(abi.encodePacked(bytes32(0x00))), // arbitrary genesis hash
             uint64(0x0), // genesis
             uint256(block.timestamp), // start l2 from now
             uint256(0x1), // 1-second block times
-            uint256(0x5), // 5-second wait
             uint64(0xA) // 10-second dispute timeout
         );
     }
 
     function test_blobHashes() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Fail to propose without blob hash
         uint64 anchorIndex = uint64(anchor.gameIndex());
@@ -65,10 +63,9 @@ contract BlobDisputeTest is KailuaTest {
         vm.assertFalse(proposal_128_0.verifyIntermediateOutput(0, 0, BLOB_ID_ELEM, BLOB_ID_ELEM));
     }
 
-    function test_proveNullFault_0() public {
+    function test_proveTrailFault_0() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Succeed in proposing with blob hash
         bytes32[] memory blobs = new bytes32[](1);
@@ -79,28 +76,24 @@ contract BlobDisputeTest is KailuaTest {
             abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
         );
 
-        // Fail to prove null fault before io count
+        // Fail to prove trail fault after io count
         KailuaTournament parent = proposal_128_0.parentGame();
         uint256 proposalOutputCount = treasury.PROPOSAL_OUTPUT_COUNT();
         for (uint256 i = proposalOutputCount; i < 4096; i++) {
             vm.expectRevert(NoConflict.selector);
-            parent.proveNullFault(address(this), [uint64(0), uint64(i)], 0, BLOB_ID_ELEM, BLOB_ID_ELEM);
+            parent.proveTrailFault(address(this), [uint64(0), uint64(i)], 0, BLOB_ID_ELEM, BLOB_ID_ELEM);
         }
 
-        // Fail to prove null fault at root claim position
+        // Fail to prove trail fault at root claim position
         vm.expectRevert(InvalidDisputedClaimIndex.selector);
-        parent.proveNullFault(
+        parent.proveTrailFault(
             address(this), [uint64(0), uint64(proposalOutputCount - 1)], 0, BLOB_ID_ELEM, BLOB_ID_ELEM
         );
-
-        // Succeed to prove null fault before io count
-        parent.proveNullFault(address(this), [uint64(0), uint64(0)], 0, BLOB_ID_ELEM, BLOB_ID_ELEM);
     }
 
-    function test_proveNullFault_1() public {
+    function test_proveTrailFault_1() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Succeed in proposing with blob hash
         bytes32[] memory blobs = new bytes32[](1);
@@ -111,46 +104,47 @@ contract BlobDisputeTest is KailuaTest {
             abi.encodePacked(uint64(128), uint64(anchor.gameIndex()), uint64(0))
         );
 
-        // Fail to prove null fault before io count
+        // Fail to prove trail fault before io count
         KailuaTournament parent = proposal_128_0.parentGame();
         uint256 proposalOutputCount = treasury.PROPOSAL_OUTPUT_COUNT();
         for (uint256 i = 0; i < proposalOutputCount - 1; i++) {
-            vm.expectRevert(NoConflict.selector);
-            parent.proveNullFault(address(this), [uint64(0), uint64(i)], BLOB_NZ_VALUE, BLOB_NZ_COMMIT, BLOB_ID_ELEM);
+            vm.expectRevert(InvalidDisputedClaimIndex.selector);
+            parent.proveTrailFault(address(this), [uint64(0), uint64(i)], BLOB_NZ_VALUE, BLOB_NZ_COMMIT, BLOB_ID_ELEM);
         }
 
-        // Fail to prove null fault at root claim position
+        // Fail to prove trail fault at root claim position
         vm.expectRevert(InvalidDisputedClaimIndex.selector);
-        parent.proveNullFault(
+        parent.proveTrailFault(
             address(this), [uint64(0), uint64(proposalOutputCount - 1)], BLOB_NZ_VALUE, BLOB_NZ_COMMIT, BLOB_ID_ELEM
         );
 
-        // Fail to prove null fault after blob count
+        // Fail to prove trail fault after blob count
         vm.expectRevert(InvalidDataRemainder.selector);
-        parent.proveNullFault(address(this), [uint64(0), uint64(4096 + 2)], BLOB_NZ_VALUE, BLOB_NZ_COMMIT, BLOB_ID_ELEM);
+        parent.proveTrailFault(
+            address(this), [uint64(0), uint64(4096 + 2)], BLOB_NZ_VALUE, BLOB_NZ_COMMIT, BLOB_ID_ELEM
+        );
 
-        // Fail to prove null fault with bad blob
+        // Fail to prove trail fault with bad blob
         vm.expectRevert("bad proposedOutput kzg");
-        parent.proveNullFault(
+        parent.proveTrailFault(
             address(this), [uint64(0), uint64(proposalOutputCount)], BLOB_NZ_VALUE, BLOB_ID_ELEM, BLOB_ID_ELEM
         );
 
-        // Succeed to prove null fault after io count
-        parent.proveNullFault(
+        // Succeed to prove trail fault after io count
+        parent.proveTrailFault(
             address(this), [uint64(0), uint64(proposalOutputCount)], BLOB_NZ_VALUE, BLOB_NZ_COMMIT, BLOB_ID_ELEM
         );
 
-        // Fail to reprove null fault
+        // Fail to reprove trail fault
         vm.expectRevert(AlreadyProven.selector);
-        parent.proveNullFault(
+        parent.proveTrailFault(
             address(this), [uint64(0), uint64(proposalOutputCount)], BLOB_NZ_VALUE, BLOB_NZ_COMMIT, BLOB_ID_ELEM
         );
     }
 
-    function test_proveNullFault_2() public {
+    function test_proveTrailFault_2() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Succeed in proposing with blob hash
         bytes32[] memory blobhashes = new bytes32[](1);
@@ -162,7 +156,7 @@ contract BlobDisputeTest is KailuaTest {
         );
 
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
 
@@ -171,19 +165,18 @@ contract BlobDisputeTest is KailuaTest {
         proposal_128_0.resolve();
         vm.assertEq(treasury.lastResolved(), address(proposal_128_0));
 
-        // Fail to prove null fault after resolution
+        // Fail to prove trail fault after resolution
         KailuaTournament parent = proposal_128_0.parentGame();
         uint256 proposalOutputCount = treasury.PROPOSAL_OUTPUT_COUNT();
         vm.expectRevert(GameNotInProgress.selector);
-        parent.proveNullFault(
+        parent.proveTrailFault(
             address(this), [uint64(0), uint64(proposalOutputCount)], BLOB_NZ_VALUE, BLOB_NZ_COMMIT, BLOB_ID_ELEM
         );
     }
 
     function test_proveOutputFault_undisputed_0() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Succeed in proposing with blob hash
         bytes32[] memory blobhashes = new bytes32[](1);
@@ -215,27 +208,23 @@ contract BlobDisputeTest is KailuaTest {
         // Reject no conflict fault proof
         vm.expectRevert(NoConflict.selector);
         parent.proveOutputFault(
-            address(this),
+            [address(this), address(proposal_128_0)],
             [uint64(0), uint64(0)],
             proof,
-            parentClaim,
+            [parentClaim, goodClaim],
             BLOB_NZ_VALUE,
-            goodClaim,
-            blobCommitments,
-            kzgProofs
+            [blobCommitments, kzgProofs]
         );
 
         // Reject bad prestate fault proof
         vm.expectRevert("bad acceptedOutput");
         parent.proveOutputFault(
-            address(this),
+            [address(this), address(proposal_128_0)],
             [uint64(0), uint64(0)],
             proof,
-            ~parentClaim,
+            [~parentClaim, goodClaim],
             BLOB_NZ_VALUE,
-            goodClaim,
-            blobCommitments,
-            kzgProofs
+            [blobCommitments, kzgProofs]
         );
 
         // Ensure signature is viable
@@ -250,8 +239,7 @@ contract BlobDisputeTest is KailuaTest {
 
     function test_proveOutputFault_undisputed_1() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Succeed in proposing with blob hash
         bytes32[] memory blobhashes = new bytes32[](1);
@@ -280,14 +268,12 @@ contract BlobDisputeTest is KailuaTest {
         bytes[] memory kzgProofs = new bytes[](1);
         kzgProofs[0] = BLOB_ID_ELEM;
         parent.proveOutputFault(
-            address(this),
+            [address(this), address(proposal_128_0)],
             [uint64(0), uint64(0)],
             proof,
-            parentClaim,
+            [parentClaim, goodClaim],
             BLOB_NZ_VALUE,
-            goodClaim,
-            blobCommitments,
-            kzgProofs
+            [blobCommitments, kzgProofs]
         );
 
         // Ensure signature is viable
@@ -301,8 +287,7 @@ contract BlobDisputeTest is KailuaTest {
 
     function test_proveOutputFault_undisputed_2() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Succeed in proposing with blob hash
         bytes32[] memory blobhashes = new bytes32[](1);
@@ -331,41 +316,35 @@ contract BlobDisputeTest is KailuaTest {
         // Reject bad prestate fault proof
         vm.expectRevert("bad acceptedOutput kzg");
         parent.proveOutputFault(
-            address(this),
+            [address(this), address(proposal_128_0)],
             [uint64(0), uint64(1)],
             proof,
-            ~bytes32(BLOB_NZ_VALUE),
+            [~bytes32(BLOB_NZ_VALUE), goodClaim],
             BLOB_NZ_VALUE,
-            goodClaim,
-            blobCommitments,
-            kzgProofs
+            [blobCommitments, kzgProofs]
         );
 
         // Reject bad proposed output fault proof
         blobCommitments[0] = BLOB_NZ_COMMIT;
         vm.expectRevert("bad proposedOutput kzg");
         parent.proveOutputFault(
-            address(this),
+            [address(this), address(proposal_128_0)],
             [uint64(0), uint64(1)],
             proof,
-            bytes32(BLOB_NZ_VALUE),
+            [bytes32(BLOB_NZ_VALUE), goodClaim],
             BLOB_NZ_VALUE,
-            goodClaim,
-            blobCommitments,
-            kzgProofs
+            [blobCommitments, kzgProofs]
         );
 
         // Accept fault proof
         blobCommitments[1] = BLOB_NZ_COMMIT;
         parent.proveOutputFault(
-            address(this),
+            [address(this), address(proposal_128_0)],
             [uint64(0), uint64(1)],
             proof,
-            bytes32(BLOB_NZ_VALUE),
+            [bytes32(BLOB_NZ_VALUE), goodClaim],
             BLOB_NZ_VALUE,
-            goodClaim,
-            blobCommitments,
-            kzgProofs
+            [blobCommitments, kzgProofs]
         );
 
         // Ensure signature is viable
@@ -379,8 +358,7 @@ contract BlobDisputeTest is KailuaTest {
 
     function test_proveOutputFault_undisputed_3() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // Succeed in proposing with blob hash
         bytes32[] memory blobhashes = new bytes32[](1);
@@ -404,14 +382,12 @@ contract BlobDisputeTest is KailuaTest {
         bytes[] memory kzgProofs = new bytes[](1);
         kzgProofs[0] = BLOB_ID_ELEM;
         parent.proveOutputFault(
-            address(this),
+            [address(this), address(proposal_128_0)],
             [uint64(0), uint64(0x0f)],
             proof,
-            bytes32(BLOB_NZ_VALUE),
+            [bytes32(BLOB_NZ_VALUE), goodClaim],
             KailuaKZGLib.hashToFe(proposal_128_0.rootClaim().raw()),
-            goodClaim,
-            blobCommitments,
-            kzgProofs
+            [blobCommitments, kzgProofs]
         );
 
         // Ensure signature is viable
@@ -425,8 +401,7 @@ contract BlobDisputeTest is KailuaTest {
 
     function test_proveValidity() public {
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         // honest proposal
         bytes32[] memory blobs = new bytes32[](1);
@@ -438,7 +413,7 @@ contract BlobDisputeTest is KailuaTest {
         );
 
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
+            game.GENESIS_TIME_STAMP()
                 + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME() * 2
         );
         vm.assertEq(treasury.lastResolved(), address(anchor));
@@ -458,7 +433,7 @@ contract BlobDisputeTest is KailuaTest {
 
         // Reject validity proof after resolution
         vm.expectRevert(GameNotInProgress.selector);
-        anchor.proveValidity(address(this), uint64(0), proof);
+        anchor.proveValidity(address(this), address(proposal_128_0), uint64(0), proof);
 
         // honest proposal
         vm.blobhashes(blobs);
@@ -480,11 +455,11 @@ contract BlobDisputeTest is KailuaTest {
         );
 
         // Accept validity proof
-        proposal_128_0.proveValidity(address(this), uint64(0), proof);
+        proposal_128_0.proveValidity(address(this), address(proposal_256_0), uint64(0), proof);
 
         // Reject repeat validity proof
         vm.expectRevert(AlreadyProven.selector);
-        proposal_128_0.proveValidity(address(this), uint64(0), proof);
+        proposal_128_0.proveValidity(address(this), address(proposal_256_0), uint64(0), proof);
 
         // Resolve
         proposal_256_0.resolve();

@@ -63,7 +63,7 @@ error NotProposed();
 error NoConflict();
 
 // 0x9276ab5a
-/// @notice Thrown when proposing before the proposal gap timeout
+/// @notice Thrown when proposing before the minimum creation time
 error ProposalGapRemaining(uint256 currentTime, uint256 minCreationTime);
 
 // 0x1434391f
@@ -140,7 +140,7 @@ library KailuaKZGLib {
     uint256 internal constant FIELD_ELEMENTS_PER_BLOB_PO2 = 12;
 
     /// @notice The number of field elements in a single blob
-    uint256 internal constant FIELD_ELEMENTS_PER_BLOB = (1 << FIELD_ELEMENTS_PER_BLOB_PO2);
+    uint256 internal constant FIELD_ELEMENTS_PER_BLOB = uint64(1 << FIELD_ELEMENTS_PER_BLOB_PO2);
 
     /// @notice The index of the blob containing the FE at the provided offset
     function blobIndex(uint256 outputOffset) internal pure returns (uint256 index) {

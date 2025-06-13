@@ -354,7 +354,6 @@ impl Proposal {
                     .PROPOSAL_BLOBS()
                     .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_BLOBS")
                     .await
-                    .to()
             }
         });
         let proposal_output_count = tokio::task::spawn({
@@ -365,7 +364,6 @@ impl Proposal {
                     .PROPOSAL_OUTPUT_COUNT()
                     .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_OUTPUT_COUNT")
                     .await
-                    .to()
             }
         });
         let mut io_blobs = Vec::new();
@@ -450,16 +448,10 @@ impl Proposal {
     }
 
     pub fn fault(&self) -> Option<Fault> {
-        // Check null commitment
-        for i in 0..self.io_field_elements.len() {
-            if self.io_field_elements[i].is_zero() {
-                return Some(Fault::Null(i));
-            }
-        }
         // Check divergence in trail data
         for i in 0..self.correct_trail.len() {
             if let Some(false) = self.correct_trail[i] {
-                return Some(Fault::Null(self.io_field_elements.len() + i + 1));
+                return Some(Fault::Trail(self.io_field_elements.len() + i + 1));
             }
         }
         // Check divergence in IO

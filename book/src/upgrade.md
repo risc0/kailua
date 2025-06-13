@@ -78,7 +78,6 @@ kailua-cli fast-track \
       --starting-block-number [YOUR_STARTING_BLOCK_NUMBER] \
       --proposal-output-count [YOUR_OUTPUTS_PER_PROPOSAL] \
       --output-block-span [YOUR_BLOCKS_PER_OUTPUT] \
-      --proposal-time-gap [YOUR_PROPOSAL_TIME_GAP] \
 \
       --collateral-amount [YOUR_COLLATERAL_AMOUNT] \
       --verifier-contract [RISC_ZERO_VERIFIER_ADDRESS] \
@@ -108,7 +107,6 @@ The next three parameters configure sequencing:
 * `starting-block-number`: The rollup block number to immediately finalize and start sequencing from.
 * `proposal-output-count`: The number of intermediate output commitments published per proposal.
 * `output-block-span`: The number of rollup blocks each intermediate output commitment must cover.
-* `proposal-time-gap`: The minimum amount of time (in seconds) that must pass before a rollup block can be sequenced.
 
 ```admonish warning
 The sequencing state at the block `starting-block-number` as reported by the `op-node` will be finalized without delay.
