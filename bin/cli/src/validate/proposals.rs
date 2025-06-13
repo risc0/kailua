@@ -94,7 +94,7 @@ pub async fn handle_proposals(
     // init channel buffers
     let mut output_fault_proof_buffer = VecDeque::new();
     let mut output_fault_buffer = VecDeque::new();
-    let mut null_fault_buffer = VecDeque::new();
+    let mut trail_fault_buffer = VecDeque::new();
     let mut valid_buffer = VecDeque::new();
     loop {
         // Wait for new data on every iteration
@@ -355,8 +355,8 @@ pub async fn handle_proposals(
                 // Queue output fault proof request
                 output_fault_buffer.push_back(proposal_index);
             } else {
-                // Queue null fault proof submission
-                null_fault_buffer.push_back(proposal_index);
+                // Queue trail fault proof submission
+                trail_fault_buffer.push_back(proposal_index);
             }
         }
 
@@ -713,7 +713,7 @@ pub async fn handle_proposals(
                 continue;
             };
             if !fault.is_output() {
-                error!("Received output fault proof for null fault!");
+                error!("Received output fault proof for trail fault!");
             }
             let divergence_point = fault.divergence_point() as u64;
 
@@ -985,18 +985,18 @@ pub async fn handle_proposals(
                 }
             }
         }
-        // publish null fault proofs
-        let null_fault_proof_count = null_fault_buffer.len();
-        for _ in 0..null_fault_proof_count {
-            let proposal_index = null_fault_buffer.pop_front().unwrap();
+        // publish trail fault proofs
+        let trail_fault_proof_count = trail_fault_buffer.len();
+        for _ in 0..trail_fault_proof_count {
+            let proposal_index = trail_fault_buffer.pop_front().unwrap();
             // Fetch proposal from db
             let Some(proposal) = agent.proposals.get(&proposal_index) else {
                 if agent.cursor.last_resolved_game < proposal_index {
                     error!("Proposal {proposal_index} missing from database.");
-                    null_fault_buffer.push_back(proposal_index);
+                    trail_fault_buffer.push_back(proposal_index);
                 } else {
                     warn!(
-                        "Skipping null fault proof submission for freed proposal {proposal_index}."
+                        "Skipping trail fault proof submission for freed proposal {proposal_index}."
                     );
                 }
                 continue;
@@ -1007,10 +1007,10 @@ pub async fn handle_proposals(
             let Some(parent) = agent.proposals.get(&proposal.parent) else {
                 if agent.cursor.last_resolved_game < proposal_index {
                     error!("Parent proposal {} missing from database.", proposal.parent);
-                    null_fault_buffer.push_back(proposal_index);
+                    trail_fault_buffer.push_back(proposal_index);
                 } else {
                     warn!(
-                        "Skipping null fault proof submission for proposal {} with freed parent {}.",
+                        "Skipping trail fault proof submission for proposal {} with freed parent {}.",
                         proposal.index, proposal.parent
                     );
                 }
@@ -1019,7 +1019,7 @@ pub async fn handle_proposals(
             let parent_contract = KailuaTournament::new(parent.contract, &validator_provider);
 
             let Some(fault) = proposal.fault() else {
-                error!("Attempted null proof for correct proposal!");
+                error!("Attempted trail proof for correct proposal!");
                 meter_proofs_discarded.add(
                     1,
                     &[
@@ -1029,19 +1029,14 @@ pub async fn handle_proposals(
                 );
                 continue;
             };
-            if !fault.is_null() {
-                error!("Attempting null fault proof for output fault!");
+            if !fault.is_trail() {
+                error!("Attempting trail fault proof for output fault!");
             }
             let divergence_point = fault.divergence_point() as u64;
             let output_fe = proposal.output_fe_at(divergence_point);
-            let expect_zero_fe = fault.expect_zero(proposal);
-            let fe_position = if expect_zero_fe {
-                divergence_point - 1
-            } else {
-                divergence_point
-            };
+            let fe_position = divergence_point - 1;
 
-            if expect_zero_fe == output_fe.is_zero() {
+            if output_fe.is_zero() {
                 error!("Proposal fe {output_fe} zeroness as expected.");
             } else {
                 warn!("Proposal fe {output_fe} zeroness divergent.");
@@ -1099,7 +1094,7 @@ pub async fn handle_proposals(
             );
 
             let transaction_dispatch = parent_contract
-                .proveNullFault(
+                .proveTrailFault(
                     validator_address,
                     [child_index, divergence_point],
                     output_fe,
@@ -1108,11 +1103,11 @@ pub async fn handle_proposals(
                 )
                 .timed_transact_with_context(
                     context.clone(),
-                    "KailuaTournament::proveNullFault",
+                    "KailuaTournament::proveTrailFault",
                     Some(Duration::from_secs(args.txn_args.txn_timeout)),
                 )
                 .await
-                .context("KailuaTournament::proveNullFault");
+                .context("KailuaTournament::proveTrailFault");
 
             match transaction_dispatch {
                 Ok(receipt) => {
@@ -1122,12 +1117,15 @@ pub async fn handle_proposals(
                         .stall_with_context(context.clone(), "KailuaTournament::proofStatus")
                         .await;
                     info!("Proposal {} proven: {proof_status}", proposal.index);
-                    info!("KailuaTournament::proveNullFault: {} gas", receipt.gas_used);
+                    info!(
+                        "KailuaTournament::proveTrailFault: {} gas",
+                        receipt.gas_used
+                    );
 
                     meter_proofs_published.add(
                         1,
                         &[
-                            KeyValue::new("type", "fault_null"),
+                            KeyValue::new("type", "fault_trail"),
                             KeyValue::new("proposal", proposal.contract.to_string()),
                             KeyValue::new("l2_height", proposal.output_block_number.to_string()),
                             KeyValue::new("txn_hash", receipt.transaction_hash.to_string()),
@@ -1151,13 +1149,13 @@ pub async fn handle_proposals(
                     meter_proofs_fail.add(
                         1,
                         &[
-                            KeyValue::new("type", "fault_null"),
+                            KeyValue::new("type", "fault_trail"),
                             KeyValue::new("proposal", proposal.contract.to_string()),
                             KeyValue::new("l2_height", proposal.output_block_number.to_string()),
                             KeyValue::new("msg", e.to_string()),
                         ],
                     );
-                    null_fault_buffer.push_back(proposal_index);
+                    trail_fault_buffer.push_back(proposal_index);
                 }
             }
         }
