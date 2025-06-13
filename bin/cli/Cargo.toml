@@ -39,11 +39,6 @@ tracing-subscriber.workspace = true
 tracing.workspace = true
 
 opentelemetry.workspace = true
-opentelemetry_sdk.workspace = true
-opentelemetry-semantic-conventions.workspace = true
-opentelemetry-otlp.workspace = true
-opentelemetry-prometheus.workspace = true
-opentelemetry-zipkin.workspace = true
 
 alloy = { workspace = true, features = ["full", "kzg", "signer-aws", "signer-gcp"] }
 alloy-provider.workspace = true
