@@ -237,7 +237,7 @@ where
     )
     .context("Pot::from_slice")?;
     let mut blobs = Vec::new();
-    // Read the blobs to validate divergence
+    // Read the blob data corresponding to the supplied blob hashes
     for request in precondition_validation_data.blob_fetch_requests() {
         blobs.push(
             *beacon
@@ -316,6 +316,11 @@ where
 ///   matches the field element representation of the hash.
 /// - In case of mismatching field element values, the specific error points to the
 ///   exact field position, blob index, and block number where the mismatch occurs.
+///
+/// # Caveats
+///
+/// This method assumes that the provided blobs have been already verified to correspond to the
+/// blob hashes supplied in the precondition validation data.
 pub fn validate_precondition(
     precondition_validation_data: PreconditionValidationData,
     blobs: Vec<Blob>,
@@ -328,7 +333,7 @@ pub fn validate_precondition(
             proposal_l2_head_number,
             proposal_output_count,
             output_block_span,
-            blob_hashes: _,
+            blob_hashes: _, // correspondence with `blobs` assumed to have been already validated
         } => {
             let proposal_root_claim_block_number =
                 proposal_l2_head_number + proposal_output_count * output_block_span;
