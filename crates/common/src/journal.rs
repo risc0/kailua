@@ -23,7 +23,12 @@ use serde::{Deserialize, Serialize};
 pub struct ProofJournal {
     /// The recipient address for the proof payout
     pub payout_recipient: Address,
-    /// The hash of the precondition for validating this proof
+    /// The hash of the precondition for validating this proof.
+    ///
+    /// The value represents exactly one of the following cases:
+    /// - Validity proving: Equal to [crate::precondition::PreconditionValidationData::precondition_hash].
+    /// - Fault proving: Equal to [B256::ZERO].
+    /// - Execution proving: Equal to [crate::executor::exec_precondition_hash].
     pub precondition_hash: B256,
     /// The L1 head hash containing the safe L2 chain data that may reproduce the L2 head hash.
     pub l1_head: B256,
