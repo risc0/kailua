@@ -120,10 +120,12 @@ boundless-market = "0.8.0"
 [profile.dev]
 opt-level = 3
 
+
 [profile.release]
 codegen-units = 1
 debug = 1
 lto = "fat"
+overflow-checks = true
 
 [profile.release.build-override]
 codegen-units = 1
