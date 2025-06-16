@@ -15,7 +15,7 @@
 use crate::stall::Stall;
 use crate::sync::cursor::SyncCursor;
 use crate::sync::deployment::SyncDeployment;
-use crate::sync::proposal::Proposal;
+use crate::sync::proposal::{Proposal, ProposalSync};
 use crate::sync::provider::SyncProvider;
 use crate::sync::telemetry::SyncTelemetry;
 use crate::{retry_res_ctx_timeout, retry_res_timeout, CoreArgs, KAILUA_GAME_TYPE};
@@ -143,8 +143,8 @@ impl SyncAgent {
         options
     }
 
-    pub fn free_cached_data(&mut self) -> anyhow::Result<BTreeSet<u64>> {
-        // delete all proposals prior to last resolved proposal
+    pub fn prune_data(&mut self) -> anyhow::Result<BTreeSet<u64>> {
+        // delete all loaded proposals prior to last resolved proposal
         let Some(earliest_proposal) = self.proposals.first_key_value().map(|(k, _)| *k) else {
             return Ok(Default::default());
         };
@@ -155,6 +155,10 @@ impl SyncAgent {
                 proposals.insert(i);
             }
         }
+        // delete all delayed proposals prior to last resolved proposal
+        self.cursor
+            .delayed_factory_indices
+            .retain(|i| *i < self.cursor.last_resolved_game);
         // delete all output commitments prior to last resolved proposal
         let Some(earliest_output) = self
             .proposals
@@ -193,9 +197,8 @@ impl SyncAgent {
             "sync_status",
             retry_res_ctx_timeout!(self.provider.op_provider.sync_status().await)
         );
-        let output_block_number = sync_status["safe_l2"]["number"]
-            .as_u64()
-            .unwrap()
+        let safe_l2_number = sync_status["safe_l2"]["number"].as_u64().unwrap();
+        let output_block_number = safe_l2_number
             .min(self.cursor.last_output_index + self.deployment.blocks_per_proposal());
         if self.cursor.last_output_index + self.deployment.output_block_span < output_block_number {
             info!(
@@ -223,24 +226,44 @@ impl SyncAgent {
             .await
             .to();
         let first_factory_index = self.cursor.next_factory_index;
-        while self.cursor.next_factory_index < game_count {
-            let proposal = match self
-                .sync_proposal(&dispute_game_factory, self.cursor.next_factory_index)
+        let mut delayed_indices = Vec::new();
+        while self.cursor.has_next(game_count) {
+            let proposal_index = self.cursor.next_index();
+
+            match self
+                .sync_proposal(&dispute_game_factory, proposal_index)
                 .with_context(context.clone())
                 .await
             {
-                Ok(processed) => {
-                    if processed {
-                        // append proposal to returned result
-                        let proposal = self
-                            .proposals
-                            .get(&self.cursor.next_factory_index)
-                            .ok_or_else(|| {
-                                anyhow!("Failed to load immediately processed proposal")
-                            })?;
-                        Some(proposal)
-                    } else {
-                        None
+                Ok(ProposalSync::IGNORED) => { /* noop */ }
+                Ok(ProposalSync::DELAYED(proposal_block)) => {
+                    if proposal_block < safe_l2_number {
+                        // sync more outputs
+                        break;
+                    }
+                    // Queue delayed proposal for later reprocessing once more blocks available
+                    delayed_indices.push(proposal_index);
+                }
+                Ok(ProposalSync::SUCCESS) => {
+                    // Update state according to proposal
+                    let proposal = self
+                        .proposals
+                        .get(&self.cursor.next_factory_index)
+                        .ok_or_else(|| anyhow!("Failed to load immediately processed proposal"))?;
+                    // If canonical, then the proposal must have an index larger than that of the
+                    // last canonical proposal, even if the new proposal was previously delayed
+                    if let Some(true) = proposal.canonical {
+                        // Update canonical chain tip
+                        self.cursor.canonical_proposal_tip = proposal.index;
+                        // Update last resolved index
+                        if proposal.resolved_at != 0 {
+                            self.cursor.last_resolved_game = proposal.index;
+                        }
+                    } else if let Some(false) = proposal.is_correct() {
+                        // Update player eliminations
+                        if let Entry::Vacant(entry) = self.eliminations.entry(proposal.proposer) {
+                            entry.insert(proposal.index);
+                        }
                     }
                 }
                 Err(err) => {
@@ -251,31 +274,19 @@ impl SyncAgent {
                     break;
                 }
             };
-            // Update state according to proposal
-            if let Some(proposal) = proposal {
-                if let Some(true) = proposal.canonical {
-                    // Update canonical chain tip
-                    self.cursor.canonical_proposal_tip = proposal.index;
-                    // Update last resolved index
-                    if proposal.resolved_at != 0 {
-                        self.cursor.last_resolved_game = proposal.index;
-                    }
-                } else if let Some(false) = proposal.is_correct() {
-                    // Update player eliminations
-                    if let Entry::Vacant(entry) = self.eliminations.entry(proposal.proposer) {
-                        entry.insert(proposal.index);
-                    }
-                }
-            }
 
             // Prune memory and storage
-            if let Err(err) = self.free_cached_data() {
+            if let Err(err) = self.prune_data() {
                 error!("Failed to free cached data: {err:?}.");
             }
 
-            // Process next game index
-            self.cursor.next_factory_index += 1;
+            // Process next game index if proposal was not delayed
+            if proposal_index == self.cursor.next_factory_index {
+                self.cursor.next_factory_index += 1;
+            }
         }
+        // Keep delayed indices in cursor
+        self.cursor.load_delayed_indices(delayed_indices);
 
         // update proposal resolutions
         loop {
@@ -344,7 +355,7 @@ impl SyncAgent {
         &mut self,
         dispute_game_factory: &IDisputeGameFactoryInstance<P, N>,
         index: u64,
-    ) -> anyhow::Result<bool> {
+    ) -> anyhow::Result<ProposalSync> {
         let tracer = tracer("kailua");
         let context =
             opentelemetry::Context::current_with_span(tracer.start("SyncAgent::sync_proposal"));
@@ -361,7 +372,7 @@ impl SyncAgent {
         // skip entries for other game types
         if game_type != KAILUA_GAME_TYPE {
             info!("Skipping proposal of different game type {game_type} at factory index {index}");
-            return Ok(false);
+            return Ok(ProposalSync::IGNORED);
         }
         info!("Processing tournament {index} at {game_address}");
         let mut proposal = Proposal::load(&self.provider, game_address)
@@ -370,12 +381,12 @@ impl SyncAgent {
         // Skip proposals unrelated to current run
         if proposal.treasury != self.deployment.treasury {
             info!("Skipping proposal for different deployment.");
-            return Ok(false);
+            return Ok(ProposalSync::IGNORED);
         }
         // Skip dangling proposals
         if !self.proposals.is_empty() && !self.proposals.contains_key(&proposal.parent) {
             warn!("Ignoring dangling proposal.");
-            return Ok(false);
+            return Ok(ProposalSync::IGNORED);
         }
 
         // Check if the proposer elimination round is non-zero
@@ -392,6 +403,17 @@ impl SyncAgent {
             }
         }
 
+        // Require synchrony with op-node
+        if self.cursor.last_output_index + self.deployment.output_block_span
+            < proposal.output_block_number
+        {
+            warn!(
+                "Cannot yet process proposal until op-node safely derives L2 block {}.",
+                proposal.output_block_number
+            );
+            return Ok(ProposalSync::DELAYED(proposal.output_block_number));
+        }
+
         // Skip irrelevant proposals
         if !self
             .determine_tournament_participation(&mut proposal)
@@ -401,17 +423,7 @@ impl SyncAgent {
                 "Ignoring proposal {} (no tournament participation)",
                 proposal.index
             );
-            return Ok(false);
-        }
-
-        // Fetch any relevant data from op-node
-        if self.cursor.last_output_index + self.deployment.output_block_span
-            < proposal.output_block_number
-        {
-            bail!(
-                "Cannot yet process proposal until op-node safely derives L2 block {}.",
-                proposal.output_block_number
-            );
+            return Ok(ProposalSync::IGNORED);
         }
 
         // Determine inherited correctness
@@ -441,7 +453,7 @@ impl SyncAgent {
 
         // Store proposal and return inclusion
         self.proposals.insert(proposal.index, proposal);
-        Ok(true)
+        Ok(ProposalSync::SUCCESS)
     }
 
     pub async fn assess_correctness(&mut self, proposal: &mut Proposal) -> anyhow::Result<bool> {

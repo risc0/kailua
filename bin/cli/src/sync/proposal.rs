@@ -95,6 +95,12 @@ pub struct Proposal {
     pub resolved_at: u64,
 }
 
+pub enum ProposalSync {
+    SUCCESS,
+    DELAYED(u64),
+    IGNORED,
+}
+
 impl Proposal {
     pub async fn load(provider: &SyncProvider, address: Address) -> anyhow::Result<Self> {
         let tracer = tracer("kailua");

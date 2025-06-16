@@ -22,6 +22,7 @@ use kailua_contracts::*;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{TraceContextExt, Tracer};
 use opentelemetry::Context;
+use std::collections::VecDeque;
 
 /// A collection of pointers to statefully track synchrony information
 pub struct SyncCursor {
@@ -29,6 +30,8 @@ pub struct SyncCursor {
     pub canonical_proposal_tip: u64,
     /// Index of the next proposal to query
     pub next_factory_index: u64,
+    /// Queue of proposal indices whose processing is delayed
+    pub delayed_factory_indices: VecDeque<u64>,
     /// Index of the last L2 block height whose output is known
     pub last_output_index: u64,
     /// Index of the last proposal resolved on chain
@@ -36,6 +39,21 @@ pub struct SyncCursor {
 }
 
 impl SyncCursor {
+    pub fn has_next(&self, game_count: u64) -> bool {
+        !self.delayed_factory_indices.is_empty() || self.next_factory_index < game_count
+    }
+
+    pub fn next_index(&mut self) -> u64 {
+        self.delayed_factory_indices
+            .pop_front()
+            .unwrap_or(self.next_factory_index)
+    }
+
+    pub fn load_delayed_indices(&mut self, new_indices: impl IntoIterator<Item = u64>) {
+        let existing_indices = core::mem::take(&mut self.delayed_factory_indices).into_iter();
+        self.delayed_factory_indices = new_indices.into_iter().chain(existing_indices).collect();
+    }
+
     pub async fn load(
         deployment: &SyncDeployment,
         provider: &SyncProvider,
@@ -106,6 +124,7 @@ impl SyncCursor {
         Ok(SyncCursor {
             canonical_proposal_tip: anchor_index,
             next_factory_index: anchor_index,
+            delayed_factory_indices: VecDeque::new(),
             last_output_index,
             last_resolved_game: anchor_index,
         })
