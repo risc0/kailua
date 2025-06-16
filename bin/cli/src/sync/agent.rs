@@ -408,19 +408,9 @@ impl SyncAgent {
         if self.cursor.last_output_index + self.deployment.output_block_span
             < proposal.output_block_number
         {
-            info!(
-                "Syncing with op-node from block {} until block {}",
-                self.cursor.last_output_index, proposal.output_block_number
-            );
-            await_tel!(
-                context,
-                tracer,
-                "sync_outputs",
-                self.sync_outputs(
-                    self.cursor.last_output_index,
-                    proposal.output_block_number,
-                    self.deployment.output_block_span
-                )
+            bail!(
+                "Cannot yet process proposal until op-node safely derives L2 block {}.",
+                proposal.output_block_number
             );
         }
 
@@ -431,16 +421,19 @@ impl SyncAgent {
             .context("Failed to determine proposal correctness")?;
 
         // Determine whether to follow or eliminate proposer
-        if self.determine_if_canonical(&mut proposal).is_none() {
-            bail!(
-                "Failed to determine if proposal {} is canonical (correctness: {:?}).",
-                proposal.index,
-                proposal.is_correct()
-            );
-        }
+        let is_proposal_canonical = self
+            .determine_if_canonical(&mut proposal)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Failed to determine if proposal {} is canonical (correctness: {:?}).",
+                    proposal.index,
+                    proposal.is_correct()
+                )
+            })
+            .context("Failed to determine if proposal is canonical.")?;
 
         // Determine if the proposal is its parent's successor
-        if let Some(true) = proposal.canonical {
+        if is_proposal_canonical {
             if let Some(parent) = self.proposals.get_mut(&proposal.parent) {
                 parent.successor = Some(proposal.index);
             }
