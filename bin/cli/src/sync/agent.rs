@@ -190,7 +190,7 @@ impl SyncAgent {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("SyncAgent::sync"));
 
-        // load all relevant output commitments
+        // more output commitments
         let sync_status = await_tel!(
             context,
             tracer,
@@ -237,11 +237,11 @@ impl SyncAgent {
             {
                 Ok(ProposalSync::IGNORED) => { /* noop */ }
                 Ok(ProposalSync::DELAYED(proposal_block)) => {
+                    // sync more blocks and try again if available
                     if proposal_block < safe_l2_number {
-                        // sync more outputs
                         break;
                     }
-                    // Queue delayed proposal for later reprocessing once more blocks available
+                    // Queue delayed proposal for later reprocessing once more blocks are available
                     delayed_indices.push(proposal_index);
                 }
                 Ok(ProposalSync::SUCCESS) => {
@@ -618,7 +618,7 @@ impl SyncAgent {
     pub async fn sync_outputs(&mut self, mut start: u64, end: u64, step: u64) {
         while start <= end {
             // perform at most 1024 tasks at a time
-            let end = end.min(start + 1024 * step);
+            let end = end.min(start + 128 * step);
 
             // check persisted data
             for i in (start..=end).step_by(step as usize) {
