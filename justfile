@@ -176,20 +176,20 @@ query block_number l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc seq_window="50":
   echo $L1_ORIGIN_NUM
   # L1 head
   cast block --rpc-url $L1_NODE_ADDRESS $((L1_ORIGIN_NUM + {{seq_window}})) --json | jq -r .hash
-  # L2 agreed output root
-  cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $((L2_BLOCK_NUMBER - 1))) | jq -r .outputRoot
+  # L2 hash
+  cast block --rpc-url $L2_NODE_ADDRESS $((L2_BLOCK_NUMBER - 1)) --json | jq -r .hash
   # L2 Claim
   cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $L2_BLOCK_NUMBER) | jq -r .outputRoot
-  # L2 head
-  cast block --rpc-url $L2_NODE_ADDRESS $((L2_BLOCK_NUMBER - 1)) --json | jq -r .hash
+  # L2 agreed output root
+  cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $((L2_BLOCK_NUMBER - 1))) | jq -r .outputRoot
   # L2 chain id
   cast chain-id --rpc-url $L2_NODE_ADDRESS
 
-prove-offline block_number l2_claim l2_output_root l2_head l1_head l2_chain_id data target="release" verbosity="":
+prove-offline block_number l1_head l2_hash l2_claim l2_output_root l2_chain_id data target="release" verbosity="":
   echo "Running host program with zk client program..."
-  NUM_CONCURRENT_PREFLIGHTS=1 ./target/{{target}}/kailua-host {{verbosity}} \
+  NUM_CONCURRENT_PREFLIGHTS=0 ./target/{{target}}/kailua-host {{verbosity}} \
     --l1-head {{l1_head}} \
-    --agreed-l2-head-hash {{l2_head}} \
+    --agreed-l2-head-hash {{l2_hash}} \
     --claimed-l2-output-root {{l2_claim}} \
     --agreed-l2-output-root {{l2_output_root}} \
     --claimed-l2-block-number {{block_number}} \
@@ -201,7 +201,7 @@ test verbosity="":
     echo "Running cargo tests"
     RISC0_DEV_MODE=1 cargo test -F devnet
 
-test-offline target="release" verbosity="": (prove-offline "16491249" "0x82da7204148ba4d8d59e587b6b3fdde5561dc31d9e726220f7974bf9f2158d75" "0xa548f22e1aa590de7ed271e3eab5b66c6c3db9b8cb0e3f91618516ea9ececde4" "0x09b298a83baf4c2e3c6a2e355bb09e27e3fdca435080e8754f8749233d7333b2" "0x33a3e5721faa4dc6f25e75000d9810fd6c41320868f3befcc0c261a71da398e1" "11155420" "./testdata/16491249" target verbosity)
+test-offline target="release" verbosity="": (prove-offline "16491249" "0x33a3e5721faa4dc6f25e75000d9810fd6c41320868f3befcc0c261a71da398e1" "0x09b298a83baf4c2e3c6a2e355bb09e27e3fdca435080e8754f8749233d7333b2" "0x82da7204148ba4d8d59e587b6b3fdde5561dc31d9e726220f7974bf9f2158d75" "0xa548f22e1aa590de7ed271e3eab5b66c6c3db9b8cb0e3f91618516ea9ececde4" "11155420" "./testdata/16491249" target verbosity)
 
 cleanup:
     echo "Cleanup: Removing any .fake receipt files in directory."

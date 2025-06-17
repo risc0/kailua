@@ -303,9 +303,9 @@ where
     if let Some(computed_output) = output_hash {
         // With sufficient data, the input l2_claim must be true
         assert_eq!(boot.claimed_l2_output_root, computed_output);
-    } else {
+    } else if !boot.claimed_l2_output_root.is_zero() {
         // We use the zero claim hash to denote that the data as of l1 head is insufficient
-        assert_eq!(boot.claimed_l2_output_root, B256::ZERO);
+        bail!("Expected zero claim hash.");
     }
 
     Ok((boot, precondition_hash))

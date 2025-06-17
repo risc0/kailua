@@ -29,6 +29,7 @@ use kona_genesis::RollupConfig;
 use kona_proof::BootInfo;
 use risc0_zkvm::Receipt;
 use std::collections::BinaryHeap;
+use std::convert::identity;
 use std::path::Path;
 use std::sync::Arc;
 use tracing::{info, warn};
@@ -79,10 +80,10 @@ pub async fn compute_fpvm_proof(
         task_sender.clone(),
     )
     .await;
-    // on WitnessSizeError or SeekProofError, extract execution trace
+    // on WitnessSizeError or NotSeekingProof, extract execution trace
     let executed_blocks = match complete_proof_result {
         Err(ProvingError::WitnessSizeError(_, _, executed_blocks)) => executed_blocks,
-        Err(ProvingError::SeekProofError(_, executed_blocks)) => executed_blocks,
+        Err(ProvingError::NotSeekingProof(_, executed_blocks)) => executed_blocks,
         other_result => return Ok(Some(other_result?)),
     };
     // flatten executed l2 blocks
@@ -110,7 +111,7 @@ pub async fn compute_fpvm_proof(
         )
         .await;
         // propagate unexpected error up on failure to trigger higher-level division
-        let Err(ProvingError::SeekProofError(witness_size, _)) = derivation_only_result else {
+        let Err(ProvingError::NotSeekingProof(witness_size, _)) = derivation_only_result else {
             warn!(
                 "Unexpected derivation-only result (is_ok={}).",
                 derivation_only_result.is_ok()
@@ -182,8 +183,8 @@ pub async fn compute_fpvm_proof(
             ProvingError::OtherError(e) => {
                 return Err(ProvingError::OtherError(e));
             }
-            ProvingError::SeekProofError(_, _) => {
-                unreachable!("Sought proof, found SeekProofError {err:?}")
+            ProvingError::NotSeekingProof(_, _) => {
+                unreachable!("Sought proof, found NotSeekingProof {err:?}")
             }
             ProvingError::DerivationProofError(_) => {
                 unreachable!("Sought proof, found DerivationProofError {err:?}")
@@ -361,7 +362,7 @@ pub async fn compute_cached_proof(
     );
     // Skip computation if previously saved to disk
     let proof_file_name = proof_file_name(&proof_journal);
-    if matches!(Path::new(&proof_file_name).try_exists(), Ok(true)) && seek_proof {
+    if Path::new(&proof_file_name).try_exists().is_ok_and(identity) && seek_proof {
         info!("Proving skipped. Proof file {proof_file_name} already exists.");
     } else {
         info!("Computing uncached proof.");

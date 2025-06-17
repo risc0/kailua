@@ -174,7 +174,7 @@ pub async fn concurrent_execution_preflight(
         args.kona.claimed_l2_output_root = op_node_provider
             .output_at_block(args.kona.claimed_l2_block_number)
             .await?;
-        // queue new job
+        // queue and start new job
         jobs.push(tokio::spawn(crate::prove::compute_cached_proof(
             args.clone(),
             rollup_config.clone(),
@@ -204,7 +204,7 @@ pub async fn concurrent_execution_preflight(
     for job in jobs {
         let result = job.await?;
         if let Err(e) = result {
-            if !matches!(e, ProvingError::SeekProofError(..)) {
+            if !matches!(e, ProvingError::NotSeekingProof(..)) {
                 error!("Error during preflight execution: {e:?}");
             }
         }

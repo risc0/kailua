@@ -84,7 +84,7 @@ pub async fn start_server_and_native_client(
         force_attempt,
         seek_proof,
     ));
-    // Execute both tasks and wait for them to complete.
+    // Wait for both tasks to complete.
     info!("Starting preimage server and client program.");
     let (_, client_result) = tokio::try_join!(server_task, program_task,)
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;

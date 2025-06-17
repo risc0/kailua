@@ -16,7 +16,7 @@ use crate::args::parse_address;
 use crate::boundless::BoundlessArgs;
 use crate::{bonsai, boundless, proof, witgen, zkvm};
 use alloy_primitives::{Address, B256};
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use clap::Parser;
 use kailua_common::boot::StitchedBootInfo;
 use kailua_common::client::stitching::split_executions;
@@ -56,8 +56,8 @@ pub enum ProvingError {
     #[error("DerivationProofError error: execution proofs {0}")]
     DerivationProofError(usize),
 
-    #[error("SeekProofError error: witness {0}")]
-    SeekProofError(usize, Vec<Vec<Execution>>),
+    #[error("NotSeekingProof error: witness {0}")]
+    NotSeekingProof(usize, Vec<Vec<Execution>>),
 
     #[error("WitnessSizeError error: size {0} limit {0}")]
     WitnessSizeError(usize, usize, Vec<Vec<Execution>>),
@@ -130,7 +130,8 @@ where
             stitched_boot_info.clone(),
         )
         .await
-        .expect("Failed to run vec witgen client.")
+        .context("Failed to run vec witgen client.")
+        .map_err(ProvingError::OtherError)?
     };
 
     let execution_trace =
@@ -159,7 +160,7 @@ where
     }
 
     if !seek_proof {
-        return Err(ProvingError::SeekProofError(witness_size, execution_trace));
+        return Err(ProvingError::NotSeekingProof(witness_size, execution_trace));
     }
 
     let (preloaded_frames, streamed_frames) =

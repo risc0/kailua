@@ -29,7 +29,7 @@ use kailua_host::tasks::{handle_oneshot_tasks, Cached, Oneshot, OneshotResult};
 use std::collections::BinaryHeap;
 use std::env::set_var;
 use tempfile::tempdir;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -81,7 +81,7 @@ async fn main() -> anyhow::Result<()> {
     // create concurrent db
     let disk_kv_store = create_disk_kv_store(&args.kona);
     // perform preflight to fetch data
-    if args.num_concurrent_preflights > 1 {
+    if args.num_concurrent_preflights > 0 {
         // run parallelized preflight instances to populate kv store
         info!(
             "Running concurrent preflights with {} threads",
@@ -220,10 +220,18 @@ async fn main() -> anyhow::Result<()> {
                         warn!("Splitting proof after ZKVM execution error: {e:?}")
                     }
                     ProvingError::OtherError(e) => {
+                        if e.root_cause()
+                            .to_string()
+                            .contains("Expected zero claim hash")
+                        {
+                            // we use this special exit code to signal an insufficient l1 head
+                            error!("Insufficient L1 head.");
+                            std::process::exit(111);
+                        }
                         bail!("Irrecoverable proving error: {e:?}")
                     }
-                    ProvingError::SeekProofError(..) => {
-                        unreachable!("SeekProofError bubbled up")
+                    ProvingError::NotSeekingProof(..) => {
+                        unreachable!("NotSeekingProof bubbled up")
                     }
                     ProvingError::DerivationProofError(proofs) => {
                         info!("Computed {proofs} execution-only proofs.");
