@@ -66,6 +66,8 @@ pub struct SyncAgent {
     pub eliminations: BTreeMap<Address, u64>,
     /// In-memory cache of available l1-heads for derivation
     pub l1_heads: BTreeMap<u64, (Address, B256)>,
+    /// In-memory cache of available l1-heads for derivation (inverse map)
+    pub l1_heads_inv: BTreeMap<B256, (Address, u64)>,
 }
 
 impl SyncAgent {
@@ -137,6 +139,7 @@ impl SyncAgent {
             proposals: Default::default(),
             eliminations: Default::default(),
             l1_heads: Default::default(),
+            l1_heads_inv: Default::default(),
         })
     }
 
@@ -390,6 +393,9 @@ impl SyncAgent {
 
         if let Entry::Vacant(vacancy) = self.l1_heads.entry(block.header.number) {
             vacancy.insert((proposal, l1_head));
+        }
+        if let Entry::Vacant(vacancy) = self.l1_heads_inv.entry(l1_head) {
+            vacancy.insert((proposal, block.header.number));
         }
     }
 

@@ -220,6 +220,7 @@ pub async fn request_fault_proof(
     channel: &mut DuplexChannel<Message>,
     parent: &Proposal,
     proposal: &Proposal,
+    l1_head: B256,
 ) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("request_fault_proof"));
@@ -279,9 +280,6 @@ pub async fn request_fault_proof(
         )
     );
 
-    // Set appropriate L1 head
-    let l1_head = proposal.l1_head;
-
     // Message proving task
     channel
         .sender
@@ -303,6 +301,7 @@ pub async fn request_validity_proof(
     channel: &mut DuplexChannel<Message>,
     parent: &Proposal,
     proposal: &Proposal,
+    l1_head: B256,
 ) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("request_validity_proof"));
@@ -354,7 +353,7 @@ pub async fn request_validity_proof(
         .send(Message::Proposal {
             index: proposal.index,
             precondition_validation_data,
-            l1_head: proposal.l1_head,
+            l1_head,
             agreed_l2_head_hash,
             agreed_l2_output_root: parent.output_root,
             claimed_l2_block_number: proposal.output_block_number,

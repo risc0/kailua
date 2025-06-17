@@ -14,14 +14,15 @@
 
 use crate::channel::DuplexChannel;
 use crate::sync::agent::SyncAgent;
+use crate::sync::proposal::Proposal;
 use crate::transact::provider::SafeProvider;
 use crate::transact::Transact;
-use crate::validate::proving::{encode_seal, request_fault_proof, request_validity_proof};
+use crate::validate::proving::encode_seal;
 use crate::validate::{Message, ValidateArgs};
 use crate::{retry_res_ctx_timeout, stall::Stall};
 use alloy::network::{Ethereum, TxSigner};
-use alloy::primitives::Bytes;
 use alloy::primitives::B256;
+use alloy::primitives::{Address, Bytes};
 use anyhow::Context;
 use kailua_client::{await_tel, await_tel_res};
 use kailua_common::blobs::hash_to_fe;
@@ -32,7 +33,7 @@ use opentelemetry::global::{meter, tracer};
 use opentelemetry::trace::FutureExt;
 use opentelemetry::trace::{TraceContextExt, Tracer};
 use opentelemetry::KeyValue;
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -96,6 +97,7 @@ pub async fn handle_proposals(
     let mut output_fault_buffer = VecDeque::new();
     let mut trail_fault_buffer = VecDeque::new();
     let mut valid_buffer = VecDeque::new();
+    let mut last_proof_l1_head = BTreeMap::new();
     loop {
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
@@ -390,9 +392,20 @@ pub async fn handle_proposals(
                 continue;
             };
 
+            let Some((_, l1_head)) = get_next_l1_head(&agent, &last_proof_l1_head, proposal) else {
+                error!("Could not choose an L1 head to fault prove proposal {proposal_index}");
+                output_fault_buffer.push_back(proposal_index);
+                continue;
+            };
             if let Err(err) = await_tel!(
                 context,
-                request_fault_proof(&agent, &mut channel, parent, proposal,)
+                crate::validate::proving::request_fault_proof(
+                    &agent,
+                    &mut channel,
+                    parent,
+                    proposal,
+                    l1_head
+                )
             ) {
                 error!("Could not request fault proof for {proposal_index}: {err:?}");
                 output_fault_buffer.push_back(proposal_index);
@@ -451,9 +464,21 @@ pub async fn handle_proposals(
                 continue;
             }
 
+            let Some((_, l1_head)) = get_next_l1_head(&agent, &last_proof_l1_head, proposal) else {
+                error!("Could not choose an L1 head to validity prove proposal {proposal_index}");
+                valid_buffer.push_back(proposal_index);
+                continue;
+            };
+
             if let Err(err) = await_tel!(
                 context,
-                request_validity_proof(&agent, &mut channel, parent, proposal,)
+                crate::validate::proving::request_validity_proof(
+                    &agent,
+                    &mut channel,
+                    parent,
+                    proposal,
+                    l1_head
+                )
             ) {
                 error!("Could not request validity proof for {proposal_index}: {err:?}");
                 valid_buffer.push_front(proposal_index);
@@ -532,6 +557,24 @@ pub async fn handle_proposals(
                 .stall_with_context(context.clone(), "KailuaTournament::FPVM_IMAGE_ID")
                 .await
                 .0;
+            // advance l1 head if insufficient data
+            let Some(receipt) = receipt else {
+                let last_l1_head = get_next_l1_head(&agent, &last_proof_l1_head, proposal)
+                    .expect("Could not recalculate proving l1 head");
+                update_last_l1_head(
+                    &agent,
+                    &mut last_proof_l1_head,
+                    proposal.index,
+                    &last_l1_head.1,
+                );
+                // request another proof with new head
+                if let Some(true) = proposal.canonical {
+                    valid_buffer.push_back(proposal_index);
+                } else {
+                    output_fault_buffer.push_back(proposal_index);
+                }
+                continue;
+            };
             // patch the proof if in dev mode
             #[cfg(feature = "devnet")]
             let receipt =
@@ -545,6 +588,15 @@ pub async fn handle_proposals(
             // Decode ProofJournal
             let proof_journal = ProofJournal::decode_packed(receipt.journal.as_ref());
             info!("Proof journal: {:?}", proof_journal);
+            // get pointer to proposal with l1 head if okay
+            let Some((l1_head_contract, _)) = agent.l1_heads_inv.get(&proof_journal.l1_head) else {
+                error!(
+                    "Failed to look up proposal contract with l1 head {}",
+                    proof_journal.l1_head
+                );
+                output_fault_proof_buffer.push_back(Message::Proof(proposal_index, Some(receipt)));
+                continue;
+            };
             // encode seal data
             let encoded_seal = Bytes::from(encode_seal(&receipt)?);
 
@@ -554,8 +606,7 @@ pub async fn handle_proposals(
             let proposal_contract =
                 KailuaTournament::new(proposal.contract, &agent.provider.l1_provider);
             // Check if proof is a viable validity proof
-            if proof_journal.l1_head == proposal.l1_head
-                && proof_journal.agreed_l2_output_root == parent.output_root
+            if proof_journal.agreed_l2_output_root == parent.output_root
                 && proof_journal.claimed_l2_output_root == proposal.output_root
             {
                 info!(
@@ -629,7 +680,7 @@ pub async fn handle_proposals(
                 match parent_contract
                     .proveValidity(
                         proof_journal.payout_recipient,
-                        proposal.contract,
+                        *l1_head_contract,
                         child_index,
                         encoded_seal.clone(),
                     )
@@ -693,7 +744,7 @@ pub async fn handle_proposals(
                             ],
                         );
                         output_fault_proof_buffer
-                            .push_back(Message::Proof(proposal_index, receipt));
+                            .push_back(Message::Proof(proposal_index, Some(receipt)));
                     }
                 }
                 // Skip fault proof submission logic
@@ -750,15 +801,6 @@ pub async fn handle_proposals(
                         "Proven output matches local op node output {}:{op_node_output}.",
                         proof_journal.claimed_l2_block_number
                     );
-                }
-
-                if proof_journal.l1_head != proposal.l1_head {
-                    warn!(
-                        "L1 head mismatch. Found {}, expected {}.",
-                        proof_journal.l1_head, proposal.l1_head
-                    );
-                } else {
-                    info!("Proof L1 head {} confirmed.", proposal.l1_head);
                 }
 
                 let expected_block_number = parent.output_block_number
@@ -917,7 +959,7 @@ pub async fn handle_proposals(
 
             let transaction_dispatch = parent_contract
                 .proveOutputFault(
-                    [proof_journal.payout_recipient, proposal.contract], // todo: dynamic l1 head
+                    [proof_journal.payout_recipient, *l1_head_contract],
                     [child_index, divergence_point],
                     encoded_seal.clone(),
                     [
@@ -981,7 +1023,8 @@ pub async fn handle_proposals(
                             KeyValue::new("msg", e.to_string()),
                         ],
                     );
-                    output_fault_proof_buffer.push_back(Message::Proof(proposal_index, receipt));
+                    output_fault_proof_buffer
+                        .push_back(Message::Proof(proposal_index, Some(receipt)));
                 }
             }
         }
@@ -1160,4 +1203,36 @@ pub async fn handle_proposals(
             }
         }
     }
+}
+
+pub fn get_next_l1_head(
+    agent: &SyncAgent,
+    last_proof_l1_head: &BTreeMap<u64, u64>,
+    proposal: &Proposal,
+) -> Option<(Address, B256)> {
+    match last_proof_l1_head.get(&proposal.index) {
+        None => agent
+            .l1_heads_inv
+            .get(&proposal.l1_head)
+            .map(|(address, _)| (*address, proposal.l1_head)),
+        Some(last_block_no) => agent
+            .l1_heads
+            .range((last_block_no + 1)..)
+            .next()
+            .map(|(_, (address, l1_head))| (*address, *l1_head)),
+    }
+}
+
+pub fn update_last_l1_head(
+    agent: &SyncAgent,
+    last_proof_l1_head: &mut BTreeMap<u64, u64>,
+    proposal: u64,
+    l1_head: &B256,
+) {
+    let block_no = agent
+        .l1_heads_inv
+        .get(l1_head)
+        .expect("Missing l1 head from db")
+        .1;
+    last_proof_l1_head.insert(proposal, block_no);
 }

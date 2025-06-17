@@ -42,7 +42,7 @@ use tokio::process::Command;
 use tokio::sync::mpsc::Sender;
 use tokio::time::sleep;
 use tokio::{spawn, try_join};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct ValidateArgs {
@@ -117,7 +117,7 @@ pub enum Message {
         claimed_l2_block_number: u64,
         claimed_l2_output_root: FixedBytes<32>,
     },
-    Proof(u64, Receipt),
+    Proof(u64, Option<Receipt>),
 }
 
 pub async fn handle_proof_requests(
@@ -253,7 +253,7 @@ pub async fn handle_proving_tasks(
         kailua_host_command.args(proving_args.clone());
         debug!("kailua_host_command {:?}", &kailua_host_command);
         // call the kailua-host binary to generate a proof
-        match await_tel_res!(
+        let insufficient_l1_data = match await_tel_res!(
             context,
             tracer,
             "KailuaHost",
@@ -269,33 +269,43 @@ pub async fn handle_proving_tasks(
                 } else {
                     info!("Proving task successful.");
                 }
+                proving_task.code().unwrap_or_default() == 111
             }
             Err(e) => {
                 error!("Failed to invoke kailua-host: {e:?}");
+                false
             }
-        }
+        };
         // wait for io then read computed proof from disk
         sleep(Duration::from_secs(1)).await;
         match read_proof_file(&proof_file_name).await {
             Ok(proof) => {
                 // Send proof via the channel
                 proof_sender
-                    .send(Message::Proof(proposal_index, proof))
+                    .send(Message::Proof(proposal_index, Some(proof)))
                     .await?;
                 info!("Proof for local index {proposal_index} complete.");
             }
             Err(e) => {
                 error!("Failed to read proof file: {e:?}");
-                // retry proving task
-                task_channel
-                    .0
-                    .send(Task {
-                        proposal_index,
-                        proving_args,
-                        proof_file_name,
-                    })
-                    .await
-                    .context("task channel closed")?;
+                if insufficient_l1_data {
+                    // Complain about unprovability
+                    proof_sender
+                        .send(Message::Proof(proposal_index, None))
+                        .await?;
+                    warn!("Cannot prove local index {proposal_index} due to insufficient l1 head.");
+                } else {
+                    // retry proving task
+                    task_channel
+                        .0
+                        .send(Task {
+                            proposal_index,
+                            proving_args,
+                            proof_file_name,
+                        })
+                        .await
+                        .context("task channel closed")?;
+                }
             }
         }
     }
