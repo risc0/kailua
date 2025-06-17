@@ -64,6 +64,8 @@ pub struct SyncAgent {
     pub proposals: BTreeMap<u64, Proposal>,
     /// In-memory cache of proposer elimination rounds
     pub eliminations: BTreeMap<Address, u64>,
+    /// In-memory cache of available l1-heads for derivation
+    pub l1_heads: BTreeMap<u64, (Address, B256)>,
 }
 
 impl SyncAgent {
@@ -134,6 +136,7 @@ impl SyncAgent {
             outputs: Default::default(),
             proposals: Default::default(),
             eliminations: Default::default(),
+            l1_heads: Default::default(),
         })
     }
 
@@ -163,7 +166,10 @@ impl SyncAgent {
         let Some(earliest_output) = self
             .proposals
             .get(&self.cursor.last_resolved_game)
-            .map(|p| p.output_block_number)
+            .map(|p| {
+                p.output_block_number
+                    .saturating_sub(self.deployment.blocks_per_proposal())
+            })
         else {
             bail!("Last resolved game is missing from database.");
         };
@@ -235,7 +241,12 @@ impl SyncAgent {
                 .with_context(context.clone())
                 .await
             {
-                Ok(ProposalSync::IGNORED) => { /* noop */ }
+                Ok(ProposalSync::IGNORED(contract, l1_head)) => {
+                    // Record batcher nonce at proposal l1 head if needed
+                    self.sync_l1_head(contract, l1_head)
+                        .with_context(context.clone())
+                        .await;
+                }
                 Ok(ProposalSync::DELAYED(proposal_block)) => {
                     // sync more blocks and try again if available
                     if proposal_block < safe_l2_number {
@@ -244,7 +255,11 @@ impl SyncAgent {
                     // Queue delayed proposal for later reprocessing once more blocks are available
                     delayed_indices.push(proposal_index);
                 }
-                Ok(ProposalSync::SUCCESS) => {
+                Ok(ProposalSync::SUCCESS(contract, l1_head)) => {
+                    // Record batcher nonce at proposal l1 head if needed
+                    self.sync_l1_head(contract, l1_head)
+                        .with_context(context.clone())
+                        .await;
                     // Update state according to proposal
                     let proposal = self
                         .proposals
@@ -351,6 +366,33 @@ impl SyncAgent {
         Ok(proposals)
     }
 
+    pub async fn sync_l1_head(&mut self, proposal: Address, l1_head: B256) {
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(
+            tracer.start("SyncAgent::sync_batcher_nonce"),
+        );
+
+        let block = loop {
+            if let Some(block) = await_tel!(
+                context,
+                tracer,
+                "get_block_by_hash",
+                retry_res_ctx_timeout!(self
+                    .provider
+                    .l1_provider
+                    .get_block_by_hash(l1_head)
+                    .await
+                    .context("get_block_by_hash"))
+            ) {
+                break block;
+            }
+        };
+
+        if let Entry::Vacant(vacancy) = self.l1_heads.entry(block.header.number) {
+            vacancy.insert((proposal, l1_head));
+        }
+    }
+
     pub async fn sync_proposal<P: Provider<N>, N: Network>(
         &mut self,
         dispute_game_factory: &IDisputeGameFactoryInstance<P, N>,
@@ -372,7 +414,7 @@ impl SyncAgent {
         // skip entries for other game types
         if game_type != KAILUA_GAME_TYPE {
             info!("Skipping proposal of different game type {game_type} at factory index {index}");
-            return Ok(ProposalSync::IGNORED);
+            return Ok(ProposalSync::IGNORED(game_address, B256::ZERO));
         }
         info!("Processing tournament {index} at {game_address}");
         let mut proposal = Proposal::load(&self.provider, game_address)
@@ -381,12 +423,12 @@ impl SyncAgent {
         // Skip proposals unrelated to current run
         if proposal.treasury != self.deployment.treasury {
             info!("Skipping proposal for different deployment.");
-            return Ok(ProposalSync::IGNORED);
+            return Ok(proposal.as_ignored());
         }
         // Skip dangling proposals
         if !self.proposals.is_empty() && !self.proposals.contains_key(&proposal.parent) {
             warn!("Ignoring dangling proposal.");
-            return Ok(ProposalSync::IGNORED);
+            return Ok(proposal.as_ignored());
         }
 
         // Check if the proposer elimination round is non-zero
@@ -411,7 +453,7 @@ impl SyncAgent {
                 "Cannot yet process proposal until op-node safely derives L2 block {}.",
                 proposal.output_block_number
             );
-            return Ok(ProposalSync::DELAYED(proposal.output_block_number));
+            return Ok(proposal.as_delayed());
         }
 
         // Skip irrelevant proposals
@@ -423,7 +465,7 @@ impl SyncAgent {
                 "Ignoring proposal {} (no tournament participation)",
                 proposal.index
             );
-            return Ok(ProposalSync::IGNORED);
+            return Ok(proposal.as_ignored());
         }
 
         // Determine inherited correctness
@@ -452,8 +494,9 @@ impl SyncAgent {
         }
 
         // Store proposal and return inclusion
+        let result = proposal.as_success();
         self.proposals.insert(proposal.index, proposal);
-        Ok(ProposalSync::SUCCESS)
+        Ok(result)
     }
 
     pub async fn assess_correctness(&mut self, proposal: &mut Proposal) -> anyhow::Result<bool> {

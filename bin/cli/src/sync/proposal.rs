@@ -96,9 +96,9 @@ pub struct Proposal {
 }
 
 pub enum ProposalSync {
-    SUCCESS,
+    SUCCESS(Address, B256),
     DELAYED(u64),
-    IGNORED,
+    IGNORED(Address, B256),
 }
 
 impl Proposal {
@@ -422,6 +422,18 @@ impl Proposal {
             canonical: None,
             resolved_at: resolved_at.await?,
         })
+    }
+
+    pub fn as_delayed(&self) -> ProposalSync {
+        ProposalSync::DELAYED(self.output_block_number)
+    }
+
+    pub fn as_ignored(&self) -> ProposalSync {
+        ProposalSync::IGNORED(self.contract, self.l1_head)
+    }
+
+    pub fn as_success(&self) -> ProposalSync {
+        ProposalSync::SUCCESS(self.contract, self.l1_head)
     }
 
     pub fn is_correct(&self) -> Option<bool> {
