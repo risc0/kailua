@@ -117,7 +117,15 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
         // fetch latest games
-        if let Err(err) = await_tel!(context, agent.sync()).context("SyncAgent::sync") {
+        if let Err(err) = await_tel!(
+            context,
+            agent.sync(
+                #[cfg(feature = "devnet")]
+                args.core.delay_l2_blocks
+            )
+        )
+        .context("SyncAgent::sync")
+        {
             error!("Synchronization error: {err:?}");
         }
 

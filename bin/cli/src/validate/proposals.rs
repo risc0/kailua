@@ -21,8 +21,8 @@ use crate::validate::proving::encode_seal;
 use crate::validate::{Message, ValidateArgs};
 use crate::{retry_res_ctx_timeout, stall::Stall};
 use alloy::network::{Ethereum, TxSigner};
+use alloy::primitives::Bytes;
 use alloy::primitives::B256;
-use alloy::primitives::{Address, Bytes};
 use anyhow::Context;
 use kailua_client::{await_tel, await_tel_res};
 use kailua_common::blobs::hash_to_fe;
@@ -102,12 +102,18 @@ pub async fn handle_proposals(
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
         // fetch latest games
-        let loaded_proposals = await_tel!(context, agent.sync())
-            .context("SyncAgent::sync")
-            .unwrap_or_else(|err| {
-                error!("Synchronization error: {err:?}");
-                vec![]
-            });
+        let loaded_proposals = await_tel!(
+            context,
+            agent.sync(
+                #[cfg(feature = "devnet")]
+                args.core.delay_l2_blocks
+            )
+        )
+        .context("SyncAgent::sync")
+        .unwrap_or_else(|err| {
+            error!("Synchronization error: {err:?}");
+            vec![]
+        });
 
         // check new proposals for fault and queue potential responses
         for proposal_index in loaded_proposals {
@@ -392,14 +398,17 @@ pub async fn handle_proposals(
                 continue;
             };
 
-            let Some((_, l1_head)) = get_next_l1_head(&agent, &last_proof_l1_head, proposal) else {
+            let Some(l1_head) = get_next_l1_head(
+                &agent,
+                &mut last_proof_l1_head,
+                proposal,
+                #[cfg(feature = "devnet")]
+                args.core.delay_l1_heads,
+            ) else {
                 error!("Could not choose an L1 head to fault prove proposal {proposal_index}");
                 output_fault_buffer.push_back(proposal_index);
                 continue;
             };
-
-            #[cfg(feature = "devnet")]
-            let l1_head = get_prior_l1_head(&agent, l1_head);
 
             if let Err(err) = await_tel!(
                 context,
@@ -468,14 +477,17 @@ pub async fn handle_proposals(
                 continue;
             }
 
-            let Some((_, l1_head)) = get_next_l1_head(&agent, &last_proof_l1_head, proposal) else {
+            let Some(l1_head) = get_next_l1_head(
+                &agent,
+                &mut last_proof_l1_head,
+                proposal,
+                #[cfg(feature = "devnet")]
+                args.core.delay_l1_heads,
+            ) else {
                 error!("Could not choose an L1 head to validity prove proposal {proposal_index}");
                 valid_buffer.push_back(proposal_index);
                 continue;
             };
-
-            #[cfg(feature = "devnet")]
-            let l1_head = get_prior_l1_head(&agent, l1_head);
 
             if let Err(err) = await_tel!(
                 context,
@@ -566,16 +578,6 @@ pub async fn handle_proposals(
                 .0;
             // advance l1 head if insufficient data
             let Some(receipt) = receipt else {
-                let (_, last_l1_head) = get_next_l1_head(&agent, &last_proof_l1_head, proposal)
-                    .expect("Could not recalculate proving l1 head");
-                #[cfg(feature = "devnet")]
-                let last_l1_head = get_prior_l1_head(&agent, last_l1_head);
-                update_last_l1_head(
-                    &agent,
-                    &mut last_proof_l1_head,
-                    proposal.index,
-                    &last_l1_head,
-                );
                 // request another proof with new head
                 if let Some(true) = proposal.canonical {
                     valid_buffer.push_back(proposal_index);
@@ -1216,52 +1218,45 @@ pub async fn handle_proposals(
 
 pub fn get_next_l1_head(
     agent: &SyncAgent,
-    last_proof_l1_head: &BTreeMap<u64, u64>,
+    last_proof_l1_head: &mut BTreeMap<u64, u64>,
     proposal: &Proposal,
-) -> Option<(Address, B256)> {
-    match last_proof_l1_head.get(&proposal.index) {
-        None => agent
-            .l1_heads_inv
-            .get(&proposal.l1_head)
-            .map(|(address, _)| (*address, proposal.l1_head)),
+    #[cfg(feature = "devnet")] delay: u64,
+) -> Option<B256> {
+    // fetch next l1 head to use
+    let l1_head = match last_proof_l1_head.get(&proposal.index) {
+        None => Some(proposal.l1_head),
         Some(last_block_no) => agent
             .l1_heads
             .range((last_block_no + 1)..)
             .next()
-            .map(|(_, (address, l1_head))| (*address, *l1_head)),
-    }
-}
-
-pub fn update_last_l1_head(
-    agent: &SyncAgent,
-    last_proof_l1_head: &mut BTreeMap<u64, u64>,
-    proposal: u64,
-    l1_head: &B256,
-) {
+            .map(|(_, (_, l1_head))| *l1_head),
+    }?;
+    // delay if necessary
+    #[cfg(feature = "devnet")]
+    let l1_head = if last_proof_l1_head.contains_key(&proposal.index) {
+        l1_head
+    } else {
+        let (_, block_no) = *agent.l1_heads_inv.get(&l1_head).unwrap();
+        let delayed_l1_head = agent
+            .l1_heads
+            .range(..block_no)
+            .rev()
+            .take(delay as usize)
+            .last()
+            .map(|(_, (_, delayed_head))| *delayed_head)
+            .unwrap_or(l1_head);
+        if delayed_l1_head != l1_head {
+            warn!("(DEVNET ONLY) Forced l1 head rollback from {l1_head} to {delayed_l1_head}. Expect a proving error.");
+        }
+        delayed_l1_head
+    };
+    // update last head used
     let block_no = agent
         .l1_heads_inv
-        .get(l1_head)
+        .get(&l1_head)
         .expect("Missing l1 head from db")
         .1;
-    last_proof_l1_head.insert(proposal, block_no);
-}
+    last_proof_l1_head.insert(proposal.index, block_no);
 
-/// Forces the l1 head to fall behind to test retry logic
-#[cfg(feature = "devnet")]
-pub fn get_prior_l1_head(agent: &SyncAgent, l1_head: B256) -> B256 {
-    let (_, block_no) = *agent.l1_heads_inv.get(&l1_head).unwrap();
-    // don't fall back if using the latest head
-    if agent.l1_heads.range((block_no + 1)..).next().is_none() {
-        return l1_head;
-    }
-    let delayed_l1_head = agent
-        .l1_heads
-        .range(..block_no)
-        .last()
-        .map(|(_, (_, prior_head))| *prior_head)
-        .unwrap_or(l1_head);
-    if delayed_l1_head != l1_head {
-        warn!("(DEVNET ONLY) Forced l1 head rollback from {l1_head} to {delayed_l1_head}. Expect a proving error.");
-    }
-    delayed_l1_head
+    Some(l1_head)
 }

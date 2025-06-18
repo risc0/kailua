@@ -64,6 +64,9 @@ pub struct CoreArgs {
     #[cfg(feature = "devnet")]
     #[clap(long, env, default_value_t = 0)]
     pub delay_l2_blocks: u64,
+    #[cfg(feature = "devnet")]
+    #[clap(long, env, default_value_t = 0)]
+    pub delay_l1_heads: u64,
 
     /// Directory to use for caching data
     #[clap(long, env)]
