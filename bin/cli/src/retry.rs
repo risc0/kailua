@@ -119,12 +119,14 @@ macro_rules! retry_res_timeout {
     ($t:expr, $b:literal, $m:literal, $e:expr) => {
         async {
             $crate::retry_res!(
-                $b,
-                $m,
-                tokio::time::timeout(core::time::Duration::from_secs($t), async { $e }).await
+                $crate::retry_res!(
+                    $b,
+                    $m,
+                    tokio::time::timeout(core::time::Duration::from_secs($t), async { $e }).await
+                )
+                .await
             )
             .await
-            .unwrap()
         }
     };
 }
@@ -142,13 +144,12 @@ macro_rules! retry_res_ctx_timeout {
     };
     ($t:expr, $b:literal, $m:literal, $e:expr) => {
         async {
-            $crate::retry_res_ctx!(
+            $crate::retry_res_ctx!($crate::retry_res_ctx!(
                 $b,
                 $m,
                 tokio::time::timeout(core::time::Duration::from_secs($t), async { $e })
-            )
+            ))
             .await
-            .unwrap()
         }
     };
 }

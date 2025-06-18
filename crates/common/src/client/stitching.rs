@@ -316,8 +316,9 @@ pub fn stitch_executions(
     };
     for execution_trace in stitched_executions {
         let precondition_hash = crate::executor::exec_precondition_hash(execution_trace.as_slice());
-        // Validate receipt roots
+        // Validate execution data
         for execution in execution_trace {
+            // Validate receipts
             assert_eq!(
                 execution.artifacts.header.receipts_root,
                 kona_executor::compute_receipts_root(
@@ -325,6 +326,13 @@ pub fn stitch_executions(
                     &boot.rollup_config,
                     execution.attributes.payload_attributes.timestamp
                 )
+            );
+            // Validate requests
+            assert!(execution.artifacts.execution_result.requests.is_empty());
+            // Validate gas used
+            assert_eq!(
+                execution.artifacts.header.gas_used,
+                execution.artifacts.execution_result.gas_used
             );
         }
         // Construct expected proof journal

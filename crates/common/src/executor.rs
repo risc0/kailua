@@ -213,7 +213,7 @@ impl<E: Executor + Send + Sync + Debug> Executor for CachedExecutor<E> {
 ///
 /// # Arguments
 /// * `rollup_config` - A reference to the rollup configuration containing chain-specific settings.
-/// * `safe_header` - A sealed header representing the latest safe L1 block.
+/// * `safe_header` - A sealed header representing the latest safe L2 block.
 /// * `l2_chain_provider` - A mutable reference to an L2 chain provider for fetching L2 block data.
 ///
 /// # Type Parameters
@@ -252,6 +252,8 @@ where
 
     // Construct the cursor.
     let mut cursor = PipelineCursor::new(channel_timeout, BlockInfo::default());
+    // `l2_safe_head_output_root` can be zero because it is not used. The executor is always
+    // instructed to recompute the output root.
     let tip = TipCursor::new(safe_head_info, safe_header, B256::ZERO);
     cursor.advance(BlockInfo::default(), tip);
 
