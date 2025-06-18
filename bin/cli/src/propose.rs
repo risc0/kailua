@@ -111,7 +111,8 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         agent.cursor.next_factory_index
     );
 
-    let mut prioritize_proposing = false;
+    // on startup, prioritize submitting a proposal
+    let mut prioritize_proposing = true;
     loop {
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
