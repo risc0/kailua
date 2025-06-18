@@ -353,6 +353,14 @@ pub mod tests {
     }
 
     #[test]
+    fn test_field_element_fail() {
+        let mut blob = gen_blobs(1).pop().unwrap();
+        blob.0[0] = 0xff;
+        let blob = Box::new(blob);
+        intermediate_outputs(&blob, 1).unwrap_err();
+    }
+
+    #[test]
     fn test_preloaded_blob_provider_tampering() {
         let witness_data = BlobWitnessData::from(gen_blobs(1));
         // Fail if any bit is wrong

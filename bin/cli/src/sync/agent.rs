@@ -456,8 +456,8 @@ impl SyncAgent {
             < proposal.output_block_number
         {
             warn!(
-                "Cannot yet process proposal until op-node safely derives L2 block {}.",
-                proposal.output_block_number
+                "Delayed proposal {} processing until synced with op-node safe L2 block {}.",
+                proposal.index, proposal.output_block_number
             );
             return Ok(proposal.as_delayed());
         }
