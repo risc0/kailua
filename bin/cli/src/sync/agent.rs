@@ -164,7 +164,7 @@ impl SyncAgent {
         // delete all delayed proposals prior to last resolved proposal
         self.cursor
             .delayed_factory_indices
-            .retain(|i| *i < self.cursor.last_resolved_game);
+            .retain(|i| *i >= self.cursor.last_resolved_game);
         // fetch last resolved proposal
         let Some(last_resolved_proposal) = self.proposals.get(&self.cursor.last_resolved_game)
         else {
