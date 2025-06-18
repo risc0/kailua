@@ -98,6 +98,7 @@ devnet-validate fastforward="0" target="debug" verbosity="" l1_rpc="http://127.0
       --op-geth-url {{l2_rpc}} \
       --op-node-url {{rollup_node_rpc}} \
       --kailua-host ./target/{{target}}/kailua-host \
+      --data-dir {{data_dir}} \
       --validator-key {{validator}} \
       {{verbosity}}
 
