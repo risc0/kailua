@@ -316,11 +316,6 @@ impl SyncAgent {
                 }
             };
 
-            // Prune memory and storage
-            if let Err(err) = self.prune_data() {
-                error!("Failed to free cached data: {err:?}.");
-            }
-
             // Process next game index if proposal was not delayed
             if proposal_index == self.cursor.next_factory_index {
                 self.cursor.next_factory_index += 1;
@@ -342,6 +337,10 @@ impl SyncAgent {
                 })?
                 .successor
             else {
+                info!(
+                    "No successor known yet for last resolved proposal {}. ({} is canonical)",
+                    self.cursor.last_resolved_game, self.cursor.canonical_proposal_tip
+                );
                 break;
             };
 
@@ -357,12 +356,17 @@ impl SyncAgent {
 
             // stop at last unresolved proposal
             if resolved_at == 0 {
+                info!("Proposal {last_unresolved_proposal_index} still unresolved.");
                 break;
             }
             // update resolved status
             last_unresolved_proposal.resolved_at = resolved_at;
             // move cursor forward
             self.cursor.last_resolved_game = last_unresolved_proposal_index;
+            // Prune memory and storage
+            if let Err(err) = self.prune_data() {
+                error!("Failed to free cached data: {err:?}.");
+            }
         }
 
         // Update sync telemetry
