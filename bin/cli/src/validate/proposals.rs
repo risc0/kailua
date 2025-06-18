@@ -1246,10 +1246,14 @@ pub fn update_last_l1_head(
     last_proof_l1_head.insert(proposal, block_no);
 }
 
+/// Forces the l1 head to fall behind to test retry logic
 #[cfg(feature = "devnet")]
 pub fn get_prior_l1_head(agent: &SyncAgent, l1_head: B256) -> B256 {
-    // force l1 head to fall behind to test logic
     let (_, block_no) = *agent.l1_heads_inv.get(&l1_head).unwrap();
+    // don't fall back if using the latest head
+    if agent.l1_heads.range((block_no + 1)..).next().is_none() {
+        return l1_head;
+    }
     let delayed_l1_head = agent
         .l1_heads
         .range(..block_no)
