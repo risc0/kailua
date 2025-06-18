@@ -192,6 +192,7 @@ impl SyncAgent {
         if commitments > 0 {
             info!("Freed {commitments} output commitments from storage.");
         }
+        // todo: prune l1_head data
         Ok(proposals)
     }
 
@@ -246,9 +247,11 @@ impl SyncAgent {
             {
                 Ok(ProposalSync::IGNORED(contract, l1_head)) => {
                     // Record batcher nonce at proposal l1 head if needed
-                    self.sync_l1_head(contract, l1_head)
-                        .with_context(context.clone())
-                        .await;
+                    if !l1_head.is_zero() {
+                        self.sync_l1_head(contract, l1_head)
+                            .with_context(context.clone())
+                            .await;
+                    }
                 }
                 Ok(ProposalSync::DELAYED(proposal_block)) => {
                     // sync more blocks and try again if available

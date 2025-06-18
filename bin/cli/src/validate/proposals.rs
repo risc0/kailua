@@ -397,6 +397,10 @@ pub async fn handle_proposals(
                 output_fault_buffer.push_back(proposal_index);
                 continue;
             };
+
+            #[cfg(feature = "devnet")]
+            let l1_head = get_prior_l1_head(&agent, l1_head);
+
             if let Err(err) = await_tel!(
                 context,
                 crate::validate::proving::request_fault_proof(
@@ -469,6 +473,9 @@ pub async fn handle_proposals(
                 valid_buffer.push_back(proposal_index);
                 continue;
             };
+
+            #[cfg(feature = "devnet")]
+            let l1_head = get_prior_l1_head(&agent, l1_head);
 
             if let Err(err) = await_tel!(
                 context,
@@ -559,13 +566,15 @@ pub async fn handle_proposals(
                 .0;
             // advance l1 head if insufficient data
             let Some(receipt) = receipt else {
-                let last_l1_head = get_next_l1_head(&agent, &last_proof_l1_head, proposal)
+                let (_, last_l1_head) = get_next_l1_head(&agent, &last_proof_l1_head, proposal)
                     .expect("Could not recalculate proving l1 head");
+                #[cfg(feature = "devnet")]
+                let last_l1_head = get_prior_l1_head(&agent, last_l1_head);
                 update_last_l1_head(
                     &agent,
                     &mut last_proof_l1_head,
                     proposal.index,
-                    &last_l1_head.1,
+                    &last_l1_head,
                 );
                 // request another proof with new head
                 if let Some(true) = proposal.canonical {
@@ -1235,4 +1244,20 @@ pub fn update_last_l1_head(
         .expect("Missing l1 head from db")
         .1;
     last_proof_l1_head.insert(proposal, block_no);
+}
+
+#[cfg(feature = "devnet")]
+pub fn get_prior_l1_head(agent: &SyncAgent, l1_head: B256) -> B256 {
+    // force l1 head to fall behind to test logic
+    let (_, block_no) = *agent.l1_heads_inv.get(&l1_head).unwrap();
+    let delayed_l1_head = agent
+        .l1_heads
+        .range(..block_no)
+        .last()
+        .map(|(_, (_, prior_head))| *prior_head)
+        .unwrap_or(l1_head);
+    if delayed_l1_head != l1_head {
+        warn!("(DEVNET ONLY) Forced l1 head rollback from {l1_head} to {delayed_l1_head}. Expect a proving error.");
+    }
+    delayed_l1_head
 }

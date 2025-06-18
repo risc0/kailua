@@ -186,19 +186,18 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         );
         debug!("sync_status[safe_l2] {:?}", &sync_status["safe_l2"]);
         let output_block_number = sync_status["safe_l2"]["number"].as_u64().unwrap();
+        let proposal_block_number =
+            canonical_tip.output_block_number + agent.deployment.blocks_per_proposal();
         if output_block_number < canonical_tip.output_block_number {
             warn!(
                 "op-node is still {} blocks behind latest canonical proposal.",
                 canonical_tip.output_block_number - output_block_number
             );
             continue;
-        } else if output_block_number - canonical_tip.output_block_number
-            < agent.deployment.blocks_per_proposal()
-        {
+        } else if output_block_number < proposal_block_number {
             info!(
-                "Waiting for safe l2 head to advance by {} more blocks before submitting proposal.",
-                agent.deployment.blocks_per_proposal()
-                    - (output_block_number - canonical_tip.output_block_number)
+                "Waiting for op-node safe l2 head to reach block {proposal_block_number} before proposing ({} more blocks needed).",
+                proposal_block_number - output_block_number
             );
             continue;
         }
@@ -494,7 +493,7 @@ pub async fn resolve_next_pending_proposal<P: Provider>(
     )
     .context("is_validity_proven")?;
     if !is_validity_proven && challenger_duration > 0 {
-        info!("Waiting for {challenger_duration} more seconds before resolution.");
+        info!("Waiting for {challenger_duration} more seconds of chain time before resolution of proposal {proposal_index}.");
         return Ok(false);
     }
 
