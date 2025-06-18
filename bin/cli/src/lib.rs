@@ -61,6 +61,10 @@ pub struct CoreArgs {
     #[clap(long, env)]
     pub beacon_rpc_url: String,
 
+    #[cfg(feature = "devnet")]
+    #[clap(long, env, default_value_t = 0)]
+    pub delay_l2_blocks: u64,
+
     /// Directory to use for caching data
     #[clap(long, env)]
     pub data_dir: Option<PathBuf>,

@@ -211,7 +211,10 @@ impl SyncAgent {
         Ok(proposals)
     }
 
-    pub async fn sync(&mut self) -> anyhow::Result<Vec<u64>> {
+    pub async fn sync(
+        &mut self,
+        #[cfg(feature = "devnet")] delay_l2_blocks: u64,
+    ) -> anyhow::Result<Vec<u64>> {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("SyncAgent::sync"));
 
@@ -223,6 +226,8 @@ impl SyncAgent {
             retry_res_ctx_timeout!(self.provider.op_provider.sync_status().await)
         );
         let safe_l2_number = sync_status["safe_l2"]["number"].as_u64().unwrap();
+        #[cfg(feature = "devnet")]
+        let safe_l2_number = safe_l2_number.saturating_sub(delay_l2_blocks);
         let output_block_number = safe_l2_number
             .min(self.cursor.last_output_index + self.deployment.blocks_per_proposal());
         if self.cursor.last_output_index + self.deployment.output_block_span < output_block_number {

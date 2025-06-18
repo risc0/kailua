@@ -186,19 +186,18 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             retry_res_ctx_timeout!(agent.provider.op_provider.sync_status().await)
         );
         debug!("sync_status[safe_l2] {:?}", &sync_status["safe_l2"]);
-        let output_block_number = sync_status["safe_l2"]["number"].as_u64().unwrap();
         let proposal_block_number =
             canonical_tip.output_block_number + agent.deployment.blocks_per_proposal();
-        if output_block_number < canonical_tip.output_block_number {
+        if agent.cursor.last_output_index < canonical_tip.output_block_number {
             warn!(
                 "op-node is still {} blocks behind latest canonical proposal.",
-                canonical_tip.output_block_number - output_block_number
+                canonical_tip.output_block_number - agent.cursor.last_output_index
             );
             continue;
-        } else if output_block_number < proposal_block_number {
+        } else if agent.cursor.last_output_index < proposal_block_number {
             info!(
                 "Waiting for op-node safe l2 head to reach block {proposal_block_number} before proposing ({} more blocks needed).",
-                proposal_block_number - output_block_number
+                proposal_block_number - agent.cursor.last_output_index
             );
             continue;
         }
@@ -239,35 +238,18 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         }
 
         // Prepare proposal
-        let proposed_output_root = await_tel!(
-            context,
-            tracer,
-            "proposed_output_root",
-            retry_res_ctx_timeout!(
-                agent
-                    .provider
-                    .op_provider
-                    .output_at_block(proposed_block_number)
-                    .await
-            )
-        );
+        let Some(proposed_output_root) = agent.outputs.get(&proposed_block_number).copied() else {
+            error!("Could not fetch output claim.");
+            continue;
+        };
         // Prepare intermediate outputs
         let mut io_field_elements = vec![];
         for i in 1..agent.deployment.proposal_output_count {
             let io_block_number =
                 canonical_tip.output_block_number + i * agent.deployment.output_block_span;
-            let output_hash = await_tel!(
-                context,
-                tracer,
-                "output_hash",
-                retry_res_ctx_timeout!(
-                    agent
-                        .provider
-                        .op_provider
-                        .output_at_block(io_block_number)
-                        .await
-                )
-            );
+            let Some(output_hash) = agent.outputs.get(&io_block_number).copied() else {
+                break;
+            };
             io_field_elements.push(hash_to_fe(output_hash));
         }
         if io_field_elements.len() as u64 != agent.deployment.proposal_output_count - 1 {
