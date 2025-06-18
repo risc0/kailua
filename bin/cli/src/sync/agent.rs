@@ -165,17 +165,15 @@ impl SyncAgent {
         self.cursor
             .delayed_factory_indices
             .retain(|i| *i < self.cursor.last_resolved_game);
-        // delete all output commitments prior to last resolved proposal
-        let Some(earliest_output) = self
-            .proposals
-            .get(&self.cursor.last_resolved_game)
-            .map(|p| {
-                p.output_block_number
-                    .saturating_sub(self.deployment.blocks_per_proposal())
-            })
+        // fetch last resolved proposal
+        let Some(last_resolved_proposal) = self.proposals.get(&self.cursor.last_resolved_game)
         else {
             bail!("Last resolved game is missing from database.");
         };
+        // delete all output commitments prior to last resolved proposal
+        let earliest_output = last_resolved_proposal
+            .output_block_number
+            .saturating_sub(self.deployment.blocks_per_proposal());
         let mut commitments = 0;
         for i in 1..=earliest_output {
             let output_number =
@@ -192,7 +190,24 @@ impl SyncAgent {
         if commitments > 0 {
             info!("Freed {commitments} output commitments from storage.");
         }
-        // todo: prune l1_head data
+        // prune l1 head data older than that of last resolved proposal
+        let Some((_, block_no)) = self
+            .l1_heads_inv
+            .get(&last_resolved_proposal.l1_head)
+            .copied()
+        else {
+            bail!("Inverse pointer data missing for latest resolved game l1 head");
+        };
+        let mut l1_heads = 0;
+        for (_, (_, old_l1_head)) in self.l1_heads.range(..block_no) {
+            if self.l1_heads_inv.remove(old_l1_head).is_some() {
+                l1_heads += 1;
+            }
+        }
+        self.l1_heads.retain(|h, _| *h >= block_no);
+        if l1_heads > 0 {
+            info!("Freed {l1_heads} l1 heads from memory.");
+        }
         Ok(proposals)
     }
 
