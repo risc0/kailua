@@ -356,7 +356,10 @@ impl SyncAgent {
 
             // stop at last unresolved proposal
             if resolved_at == 0 {
-                info!("Proposal {last_unresolved_proposal_index} still unresolved.");
+                info!(
+                    "Proposal {last_unresolved_proposal_index} still unresolved. ({} is canonical)",
+                    self.cursor.canonical_proposal_tip
+                );
                 break;
             }
             // update resolved status
