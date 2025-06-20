@@ -107,7 +107,6 @@ constructor(
   IRiscZeroVerifier _verifierContract,
   uint256 _genesisTimeStamp,
   uint256 _l2BlockTime,
-  uint256 _proposalTimeGap,
   Duration _maxClockDuration
 )
 ```
@@ -121,7 +120,6 @@ forge create KailuaGame --evm-version cancun --constructor-args \
   [YOUR_DEPLOYED_TREASURY_CONTRACT] \
   [YOUR_GENESIS_TIMESTAMP] \
   [YOUR_BLOCK_TIME] \
-  [YOUR_PROPOSAL_TIME_GAP] \
   [YOUR_MAX_CLOCK_DURATION]
 ```
 

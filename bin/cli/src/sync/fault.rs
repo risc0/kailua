@@ -12,35 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::sync::proposal::Proposal;
-use std::cmp::Ordering;
-
 #[derive(Copy, Clone, Debug)]
 pub enum Fault {
+    /// Denotes a faulty intermediate output commitment
     Output(usize),
-    Null(usize),
+    /// Denotes a faulty trailing data field element
+    Trail(usize),
 }
 
 impl Fault {
-    pub fn is_null(&self) -> bool {
-        matches!(self, Self::Null(_))
+    /// Returns true iff this fault denotes a trail data fault
+    pub fn is_trail(&self) -> bool {
+        matches!(self, Self::Trail(_))
     }
 
+    /// Returns true iff this fault denotes an output commitment fault
     pub fn is_output(&self) -> bool {
         matches!(self, Self::Output(_))
     }
 
+    /// Returns the faulty output index
     pub fn divergence_point(&self) -> usize {
         match self {
-            Fault::Output(index) | Fault::Null(index) => *index,
-        }
-    }
-
-    pub fn expect_zero(&self, proposal: &Proposal) -> bool {
-        let position = self.divergence_point();
-        match position.cmp(&proposal.io_field_elements.len()) {
-            Ordering::Less | Ordering::Equal => false,
-            Ordering::Greater => true,
+            Fault::Output(index) | Fault::Trail(index) => *index,
         }
     }
 }

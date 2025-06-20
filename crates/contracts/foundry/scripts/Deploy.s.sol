@@ -29,7 +29,6 @@ contract DeployScript is Script {
     uint64 l2BlockNumber = uint64(vm.envUint("L2_BLOCK_NUMBER"));
     uint256 genesisTimestamp = vm.envUint("GENESIS_TIMESTAMP");
     uint256 blocktime = vm.envUint("BLOCK_TIME");
-    uint256 proposalTimeGap = vm.envUint("PROPOSAL_TIME_GAP");
     Duration maxClockDuration = Duration.wrap(uint64(vm.envUint("MAX_CLOCK_DURATION")));
     uint256 participationBond = vm.envUint("PARTICIPATION_BOND");
     address vanguardAddress = vm.envAddress("VANGUARD_ADDRESS");
@@ -57,7 +56,7 @@ contract DeployScript is Script {
 
     function _6_2_disputeResolution() public returns (KailuaTreasury, KailuaGame) {
         KailuaTreasury treasury = new KailuaTreasury(riscZeroVerifier, fpvmImageId, rollupConfigHash, proposalOutputCount, outputBlockSpan, gameType, optimismPortal, outputRootClaim, l2BlockNumber);
-        KailuaGame game = new KailuaGame(treasury, genesisTimestamp, blocktime, proposalTimeGap, maxClockDuration);
+        KailuaGame game = new KailuaGame(treasury, genesisTimestamp, blocktime, maxClockDuration);
 
         return (treasury, game);
     }

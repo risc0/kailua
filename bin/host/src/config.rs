@@ -44,8 +44,8 @@ pub async fn generate_rollup_config(
                 }
             }) {
                 info!(
-                    "Loading config for rollup with chain id {} from registry",
-                    cfg.kona.l2_chain_id.unwrap()
+                    "Loaded config for rollup with chain id {} from registry",
+                    rollup_config.l2_chain_id
                 );
                 let ser_config = serde_json::to_string(rollup_config)?;
                 fs::write(&tmp_cfg_file, &ser_config).await?;

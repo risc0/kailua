@@ -45,10 +45,6 @@ pub struct FaultArgs {
     /// Index of the parent of the faulty proposal
     #[clap(long, env)]
     pub fault_parent: u64,
-
-    /// Form of fault
-    #[clap(long, env, default_value_t = false)]
-    pub fault_null: bool,
 }
 
 pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
@@ -114,16 +110,14 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let kailua_treasury_instance = KailuaTreasury::new(kailua_treasury_address, &tester_provider);
 
     // load constants
-    let proposal_output_count: u64 = kailua_game_implementation
+    let proposal_output_count = kailua_game_implementation
         .PROPOSAL_OUTPUT_COUNT()
         .stall_with_context(context.clone(), "KailuaGame::PROPOSAL_OUTPUT_COUNT")
-        .await
-        .to();
-    let output_block_span: u64 = kailua_game_implementation
+        .await;
+    let output_block_span = kailua_game_implementation
         .OUTPUT_BLOCK_SPAN()
         .stall_with_context(context.clone(), "KailuaGame::OUTPUT_BLOCK_SPAN")
-        .await
-        .to();
+        .await;
     let proposal_block_count = proposal_output_count * output_block_span;
 
     // get proposal parent
@@ -144,11 +138,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .to();
     // Prepare faulty proposal
     let faulty_block_number = parent_block_number + args.fault_offset * output_block_span;
-    let faulty_root_claim = if args.fault_null {
-        B256::ZERO
-    } else {
-        B256::from(games_count.to_be_bytes())
-    };
+    let faulty_root_claim = B256::from(games_count.to_be_bytes());
     // Prepare remainder of proposal
     let proposed_block_number = parent_block_number + proposal_block_count;
     let proposed_output_root = if proposed_block_number == faulty_block_number {

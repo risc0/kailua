@@ -56,13 +56,12 @@ contract KailuaTest is Test {
     }
 
     function deployKailua(
-        uint256 proposalOutputCount,
-        uint256 outputBlockSpan,
+        uint64 proposalOutputCount,
+        uint64 outputBlockSpan,
         bytes32 rootClaim,
         uint64 l2BlockNumber,
         uint256 genesisTimestamp,
         uint256 l2BlockTime,
-        uint256 proposalTimeGap,
         uint64 maxClockDuration
     ) public returns (KailuaTreasury treasury, KailuaGame game, KailuaTournament anchor) {
         // Kailua
@@ -77,7 +76,7 @@ contract KailuaTest is Test {
             Claim.wrap(rootClaim),
             l2BlockNumber
         );
-        game = new KailuaGame(treasury, genesisTimestamp, l2BlockTime, proposalTimeGap, Duration.wrap(maxClockDuration));
+        game = new KailuaGame(treasury, genesisTimestamp, l2BlockTime, Duration.wrap(maxClockDuration));
         // Anchoring
         factory.setImplementation(GameType.wrap(1337), treasury);
         anchor = treasury.propose(Claim.wrap(rootClaim), abi.encodePacked(l2BlockNumber, address(treasury)));

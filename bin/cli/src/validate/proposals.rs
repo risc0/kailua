@@ -14,9 +14,10 @@
 
 use crate::channel::DuplexChannel;
 use crate::sync::agent::SyncAgent;
+use crate::sync::proposal::Proposal;
 use crate::transact::provider::SafeProvider;
 use crate::transact::Transact;
-use crate::validate::proving::{encode_seal, request_fault_proof, request_validity_proof};
+use crate::validate::proving::encode_seal;
 use crate::validate::{Message, ValidateArgs};
 use crate::{retry_res_ctx_timeout, stall::Stall};
 use alloy::network::{Ethereum, TxSigner};
@@ -32,7 +33,7 @@ use opentelemetry::global::{meter, tracer};
 use opentelemetry::trace::FutureExt;
 use opentelemetry::trace::{TraceContextExt, Tracer};
 use opentelemetry::KeyValue;
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -94,18 +95,25 @@ pub async fn handle_proposals(
     // init channel buffers
     let mut output_fault_proof_buffer = VecDeque::new();
     let mut output_fault_buffer = VecDeque::new();
-    let mut null_fault_buffer = VecDeque::new();
+    let mut trail_fault_buffer = VecDeque::new();
     let mut valid_buffer = VecDeque::new();
+    let mut last_proof_l1_head = BTreeMap::new();
     loop {
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
         // fetch latest games
-        let loaded_proposals = await_tel!(context, agent.sync())
-            .context("SyncAgent::sync")
-            .unwrap_or_else(|err| {
-                error!("Synchronization error: {err:?}");
-                vec![]
-            });
+        let loaded_proposals = await_tel!(
+            context,
+            agent.sync(
+                #[cfg(feature = "devnet")]
+                args.core.delay_l2_blocks
+            )
+        )
+        .context("SyncAgent::sync")
+        .unwrap_or_else(|err| {
+            error!("Synchronization error: {err:?}");
+            vec![]
+        });
 
         // check new proposals for fault and queue potential responses
         for proposal_index in loaded_proposals {
@@ -355,8 +363,8 @@ pub async fn handle_proposals(
                 // Queue output fault proof request
                 output_fault_buffer.push_back(proposal_index);
             } else {
-                // Queue null fault proof submission
-                null_fault_buffer.push_back(proposal_index);
+                // Queue trail fault proof submission
+                trail_fault_buffer.push_back(proposal_index);
             }
         }
 
@@ -390,9 +398,27 @@ pub async fn handle_proposals(
                 continue;
             };
 
+            let Some(l1_head) = get_next_l1_head(
+                &agent,
+                &mut last_proof_l1_head,
+                proposal,
+                #[cfg(feature = "devnet")]
+                args.core.delay_l1_heads,
+            ) else {
+                error!("Could not choose an L1 head to fault prove proposal {proposal_index}");
+                output_fault_buffer.push_back(proposal_index);
+                continue;
+            };
+
             if let Err(err) = await_tel!(
                 context,
-                request_fault_proof(&agent, &mut channel, parent, proposal,)
+                crate::validate::proving::request_fault_proof(
+                    &agent,
+                    &mut channel,
+                    parent,
+                    proposal,
+                    l1_head
+                )
             ) {
                 error!("Could not request fault proof for {proposal_index}: {err:?}");
                 output_fault_buffer.push_back(proposal_index);
@@ -451,9 +477,27 @@ pub async fn handle_proposals(
                 continue;
             }
 
+            let Some(l1_head) = get_next_l1_head(
+                &agent,
+                &mut last_proof_l1_head,
+                proposal,
+                #[cfg(feature = "devnet")]
+                args.core.delay_l1_heads,
+            ) else {
+                error!("Could not choose an L1 head to validity prove proposal {proposal_index}");
+                valid_buffer.push_back(proposal_index);
+                continue;
+            };
+
             if let Err(err) = await_tel!(
                 context,
-                request_validity_proof(&agent, &mut channel, parent, proposal,)
+                crate::validate::proving::request_validity_proof(
+                    &agent,
+                    &mut channel,
+                    parent,
+                    proposal,
+                    l1_head
+                )
             ) {
                 error!("Could not request validity proof for {proposal_index}: {err:?}");
                 valid_buffer.push_front(proposal_index);
@@ -532,6 +576,16 @@ pub async fn handle_proposals(
                 .stall_with_context(context.clone(), "KailuaTournament::FPVM_IMAGE_ID")
                 .await
                 .0;
+            // advance l1 head if insufficient data
+            let Some(receipt) = receipt else {
+                // request another proof with new head
+                if let Some(true) = proposal.canonical {
+                    valid_buffer.push_back(proposal_index);
+                } else {
+                    output_fault_buffer.push_back(proposal_index);
+                }
+                continue;
+            };
             // patch the proof if in dev mode
             #[cfg(feature = "devnet")]
             let receipt =
@@ -545,6 +599,15 @@ pub async fn handle_proposals(
             // Decode ProofJournal
             let proof_journal = ProofJournal::decode_packed(receipt.journal.as_ref());
             info!("Proof journal: {:?}", proof_journal);
+            // get pointer to proposal with l1 head if okay
+            let Some((l1_head_contract, _)) = agent.l1_heads_inv.get(&proof_journal.l1_head) else {
+                error!(
+                    "Failed to look up proposal contract with l1 head {}",
+                    proof_journal.l1_head
+                );
+                output_fault_proof_buffer.push_back(Message::Proof(proposal_index, Some(receipt)));
+                continue;
+            };
             // encode seal data
             let encoded_seal = Bytes::from(encode_seal(&receipt)?);
 
@@ -554,8 +617,7 @@ pub async fn handle_proposals(
             let proposal_contract =
                 KailuaTournament::new(proposal.contract, &agent.provider.l1_provider);
             // Check if proof is a viable validity proof
-            if proof_journal.l1_head == proposal.l1_head
-                && proof_journal.agreed_l2_output_root == parent.output_root
+            if proof_journal.agreed_l2_output_root == parent.output_root
                 && proof_journal.claimed_l2_output_root == proposal.output_root
             {
                 info!(
@@ -629,6 +691,7 @@ pub async fn handle_proposals(
                 match parent_contract
                     .proveValidity(
                         proof_journal.payout_recipient,
+                        *l1_head_contract,
                         child_index,
                         encoded_seal.clone(),
                     )
@@ -692,7 +755,7 @@ pub async fn handle_proposals(
                             ],
                         );
                         output_fault_proof_buffer
-                            .push_back(Message::Proof(proposal_index, receipt));
+                            .push_back(Message::Proof(proposal_index, Some(receipt)));
                     }
                 }
                 // Skip fault proof submission logic
@@ -712,7 +775,7 @@ pub async fn handle_proposals(
                 continue;
             };
             if !fault.is_output() {
-                error!("Received output fault proof for null fault!");
+                error!("Received output fault proof for trail fault!");
             }
             let divergence_point = fault.divergence_point() as u64;
 
@@ -749,15 +812,6 @@ pub async fn handle_proposals(
                         "Proven output matches local op node output {}:{op_node_output}.",
                         proof_journal.claimed_l2_block_number
                     );
-                }
-
-                if proof_journal.l1_head != proposal.l1_head {
-                    warn!(
-                        "L1 head mismatch. Found {}, expected {}.",
-                        proof_journal.l1_head, proposal.l1_head
-                    );
-                } else {
-                    info!("Proof L1 head {} confirmed.", proposal.l1_head);
                 }
 
                 let expected_block_number = parent.output_block_number
@@ -916,14 +970,15 @@ pub async fn handle_proposals(
 
             let transaction_dispatch = parent_contract
                 .proveOutputFault(
-                    proof_journal.payout_recipient,
+                    [proof_journal.payout_recipient, *l1_head_contract],
                     [child_index, divergence_point],
                     encoded_seal.clone(),
-                    proof_journal.agreed_l2_output_root,
+                    [
+                        proof_journal.agreed_l2_output_root,
+                        proof_journal.claimed_l2_output_root,
+                    ],
                     output_fe,
-                    proof_journal.claimed_l2_output_root,
-                    commitments,
-                    proofs,
+                    [commitments, proofs],
                 )
                 .timed_transact_with_context(
                     context.clone(),
@@ -979,22 +1034,23 @@ pub async fn handle_proposals(
                             KeyValue::new("msg", e.to_string()),
                         ],
                     );
-                    output_fault_proof_buffer.push_back(Message::Proof(proposal_index, receipt));
+                    output_fault_proof_buffer
+                        .push_back(Message::Proof(proposal_index, Some(receipt)));
                 }
             }
         }
-        // publish null fault proofs
-        let null_fault_proof_count = null_fault_buffer.len();
-        for _ in 0..null_fault_proof_count {
-            let proposal_index = null_fault_buffer.pop_front().unwrap();
+        // publish trail fault proofs
+        let trail_fault_proof_count = trail_fault_buffer.len();
+        for _ in 0..trail_fault_proof_count {
+            let proposal_index = trail_fault_buffer.pop_front().unwrap();
             // Fetch proposal from db
             let Some(proposal) = agent.proposals.get(&proposal_index) else {
                 if agent.cursor.last_resolved_game < proposal_index {
                     error!("Proposal {proposal_index} missing from database.");
-                    null_fault_buffer.push_back(proposal_index);
+                    trail_fault_buffer.push_back(proposal_index);
                 } else {
                     warn!(
-                        "Skipping null fault proof submission for freed proposal {proposal_index}."
+                        "Skipping trail fault proof submission for freed proposal {proposal_index}."
                     );
                 }
                 continue;
@@ -1005,10 +1061,10 @@ pub async fn handle_proposals(
             let Some(parent) = agent.proposals.get(&proposal.parent) else {
                 if agent.cursor.last_resolved_game < proposal_index {
                     error!("Parent proposal {} missing from database.", proposal.parent);
-                    null_fault_buffer.push_back(proposal_index);
+                    trail_fault_buffer.push_back(proposal_index);
                 } else {
                     warn!(
-                        "Skipping null fault proof submission for proposal {} with freed parent {}.",
+                        "Skipping trail fault proof submission for proposal {} with freed parent {}.",
                         proposal.index, proposal.parent
                     );
                 }
@@ -1017,7 +1073,7 @@ pub async fn handle_proposals(
             let parent_contract = KailuaTournament::new(parent.contract, &validator_provider);
 
             let Some(fault) = proposal.fault() else {
-                error!("Attempted null proof for correct proposal!");
+                error!("Attempted trail proof for correct proposal!");
                 meter_proofs_discarded.add(
                     1,
                     &[
@@ -1027,19 +1083,14 @@ pub async fn handle_proposals(
                 );
                 continue;
             };
-            if !fault.is_null() {
-                error!("Attempting null fault proof for output fault!");
+            if !fault.is_trail() {
+                error!("Attempting trail fault proof for output fault!");
             }
             let divergence_point = fault.divergence_point() as u64;
             let output_fe = proposal.output_fe_at(divergence_point);
-            let expect_zero_fe = fault.expect_zero(proposal);
-            let fe_position = if expect_zero_fe {
-                divergence_point - 1
-            } else {
-                divergence_point
-            };
+            let fe_position = divergence_point - 1;
 
-            if expect_zero_fe == output_fe.is_zero() {
+            if output_fe.is_zero() {
                 error!("Proposal fe {output_fe} zeroness as expected.");
             } else {
                 warn!("Proposal fe {output_fe} zeroness divergent.");
@@ -1097,7 +1148,7 @@ pub async fn handle_proposals(
             );
 
             let transaction_dispatch = parent_contract
-                .proveNullFault(
+                .proveTrailFault(
                     validator_address,
                     [child_index, divergence_point],
                     output_fe,
@@ -1106,11 +1157,11 @@ pub async fn handle_proposals(
                 )
                 .timed_transact_with_context(
                     context.clone(),
-                    "KailuaTournament::proveNullFault",
+                    "KailuaTournament::proveTrailFault",
                     Some(Duration::from_secs(args.txn_args.txn_timeout)),
                 )
                 .await
-                .context("KailuaTournament::proveNullFault");
+                .context("KailuaTournament::proveTrailFault");
 
             match transaction_dispatch {
                 Ok(receipt) => {
@@ -1120,12 +1171,15 @@ pub async fn handle_proposals(
                         .stall_with_context(context.clone(), "KailuaTournament::proofStatus")
                         .await;
                     info!("Proposal {} proven: {proof_status}", proposal.index);
-                    info!("KailuaTournament::proveNullFault: {} gas", receipt.gas_used);
+                    info!(
+                        "KailuaTournament::proveTrailFault: {} gas",
+                        receipt.gas_used
+                    );
 
                     meter_proofs_published.add(
                         1,
                         &[
-                            KeyValue::new("type", "fault_null"),
+                            KeyValue::new("type", "fault_trail"),
                             KeyValue::new("proposal", proposal.contract.to_string()),
                             KeyValue::new("l2_height", proposal.output_block_number.to_string()),
                             KeyValue::new("txn_hash", receipt.transaction_hash.to_string()),
@@ -1149,15 +1203,60 @@ pub async fn handle_proposals(
                     meter_proofs_fail.add(
                         1,
                         &[
-                            KeyValue::new("type", "fault_null"),
+                            KeyValue::new("type", "fault_trail"),
                             KeyValue::new("proposal", proposal.contract.to_string()),
                             KeyValue::new("l2_height", proposal.output_block_number.to_string()),
                             KeyValue::new("msg", e.to_string()),
                         ],
                     );
-                    null_fault_buffer.push_back(proposal_index);
+                    trail_fault_buffer.push_back(proposal_index);
                 }
             }
         }
     }
+}
+
+pub fn get_next_l1_head(
+    agent: &SyncAgent,
+    last_proof_l1_head: &mut BTreeMap<u64, u64>,
+    proposal: &Proposal,
+    #[cfg(feature = "devnet")] delay: u64,
+) -> Option<B256> {
+    // fetch next l1 head to use
+    let l1_head = match last_proof_l1_head.get(&proposal.index) {
+        None => Some(proposal.l1_head),
+        Some(last_block_no) => agent
+            .l1_heads
+            .range((last_block_no + 1)..)
+            .next()
+            .map(|(_, (_, l1_head))| *l1_head),
+    }?;
+    // delay if necessary
+    #[cfg(feature = "devnet")]
+    let l1_head = if last_proof_l1_head.contains_key(&proposal.index) {
+        l1_head
+    } else {
+        let (_, block_no) = *agent.l1_heads_inv.get(&l1_head).unwrap();
+        let delayed_l1_head = agent
+            .l1_heads
+            .range(..block_no)
+            .rev()
+            .take(delay as usize)
+            .last()
+            .map(|(_, (_, delayed_head))| *delayed_head)
+            .unwrap_or(l1_head);
+        if delayed_l1_head != l1_head {
+            warn!("(DEVNET ONLY) Forced l1 head rollback from {l1_head} to {delayed_l1_head}. Expect a proving error.");
+        }
+        delayed_l1_head
+    };
+    // update last head used
+    let block_no = agent
+        .l1_heads_inv
+        .get(&l1_head)
+        .expect("Missing l1 head from db")
+        .1;
+    last_proof_l1_head.insert(proposal.index, block_no);
+
+    Some(l1_head)
 }

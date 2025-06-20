@@ -17,6 +17,7 @@ kailua-cli validate \
   --beacon-rpc-url [YOUR_BEACON_RPC_URL] \
   --op-geth-url [YOUR_OP_GETH_URL] \
   --op-node-url [YOUR_OP_NODE_URL] \
+  --data-dir [YOUR_VALIDATOR_DATA_CACHE_PATH] \
   --kailua-host [YOUR_KAILUA_HOST_BINARY_PATH] \
   --validator-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY] \
   --payout-recipient-address [YOUR_FAULT_PROOF_PAYOUT_RECIPIENT] \
@@ -34,6 +35,12 @@ The first four arguments specify the endpoints that the validator should use to 
 * `beacon-rpc-url`: The DA layer (eth-beacon chain) endpoint for retrieving rollup data.
 * `op-geth-url`: The (archive) rollup `op-geth` endpoint to read fault proving witness data from.
 * `op-node-url`: The rollup `op-node` endpoint to read sequencing proposals from.
+
+### Cache Directory (Optional)
+The validator saves data to disk as it tracks on-chain proposals.
+This allows it to restart quickly without requesting a lot of old on-chain data if terminated.
+* `data-dir`: Optional directory to save data to.
+    * If unspecified, a tmp directory is created.
 
 ### Prover
 To create a fault proof, the validator invokes the `kailua-host` binary.

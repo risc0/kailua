@@ -29,13 +29,12 @@ contract CostsTest is KailuaTest {
     function test_propose_n(uint256 n) internal {
         // Deploy dispute contracts
         (treasury, game, anchor) = deployKailua(
-            uint256(4096 * n + 1), // 1 blob
-            uint256(0x01), // 1 block per commitment
+            uint64(4096 * n + 1), // 1 blob
+            uint64(0x01), // 1 block per commitment
             sha256(abi.encodePacked(bytes32(0x00))), // arbitrary genesis hash
             uint64(0x0), // genesis
             uint256(0), // start l2 from a while ago
             uint256(0x1), // 1-second block times
-            uint256(0x0), // no wait
             uint64(0x0) // no dispute timeout
         );
         // Succeed in proposing with blob hash
@@ -45,8 +44,7 @@ contract CostsTest is KailuaTest {
         }
         vm.blobhashes(blobs);
         vm.warp(
-            game.GENESIS_TIME_STAMP() + game.PROPOSAL_TIME_GAP()
-                + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
+            game.GENESIS_TIME_STAMP() + game.PROPOSAL_OUTPUT_COUNT() * game.OUTPUT_BLOCK_SPAN() * game.L2_BLOCK_TIME()
         );
         treasury.propose(
             Claim.wrap(0x0001010000010100000010100000101000001010000010100000010100000101),

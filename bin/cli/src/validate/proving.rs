@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use crate::channel::DuplexChannel;
-use crate::retry_res_ctx_timeout;
 use crate::sync::agent::SyncAgent;
 use crate::sync::proposal::Proposal;
 use crate::transact::rpc::{get_block_by_number, get_next_block};
@@ -33,7 +32,7 @@ use opentelemetry::trace::{TraceContextExt, Tracer};
 use risc0_zkvm::sha::Digestible;
 use risc0_zkvm::InnerReceipt;
 use std::path::PathBuf;
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
 #[derive(Debug, Clone)]
 pub struct Task {
@@ -220,13 +219,13 @@ pub async fn request_fault_proof(
     channel: &mut DuplexChannel<Message>,
     parent: &Proposal,
     proposal: &Proposal,
+    l1_head: B256,
 ) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("request_fault_proof"));
 
     let Some(fault) = proposal.fault() else {
-        error!("Proposal {} does not diverge from canon.", proposal.index);
-        return Ok(());
+        bail!("Proposal {} does not diverge from canon.", proposal.index);
     };
     let divergence_point = fault.divergence_point() as u64;
 
@@ -251,36 +250,15 @@ pub async fn request_fault_proof(
     debug!("l2_head {:?}", &agreed_l2_head_hash);
 
     // Get L2 head output root
-    let agreed_l2_output_root = await_tel!(
-        context,
-        tracer,
-        "output_at_block",
-        retry_res_ctx_timeout!(
-            agent
-                .provider
-                .op_provider
-                .output_at_block(agreed_l2_head_number)
-                .await
-        )
-    );
+    let Some(agreed_l2_output_root) = agent.outputs.get(&agreed_l2_head_number).copied() else {
+        bail!("Output root for agreed block {agreed_l2_head_number} not in memory.");
+    };
 
     // Prepare expected output commitment: target the first bad transition
     let claimed_l2_block_number = agreed_l2_head_number + agent.deployment.output_block_span;
-    let claimed_l2_output_root = await_tel!(
-        context,
-        tracer,
-        "claimed_l2_output_root",
-        retry_res_ctx_timeout!(
-            agent
-                .provider
-                .op_provider
-                .output_at_block(claimed_l2_block_number)
-                .await
-        )
-    );
-
-    // Set appropriate L1 head
-    let l1_head = proposal.l1_head;
+    let Some(claimed_l2_output_root) = agent.outputs.get(&claimed_l2_block_number).copied() else {
+        bail!("Output root for claimed block {claimed_l2_block_number} not in memory.");
+    };
 
     // Message proving task
     channel
@@ -303,6 +281,7 @@ pub async fn request_validity_proof(
     channel: &mut DuplexChannel<Message>,
     parent: &Proposal,
     proposal: &Proposal,
+    l1_head: B256,
 ) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("request_validity_proof"));
@@ -354,7 +333,7 @@ pub async fn request_validity_proof(
         .send(Message::Proposal {
             index: proposal.index,
             precondition_validation_data,
-            l1_head: proposal.l1_head,
+            l1_head,
             agreed_l2_head_hash,
             agreed_l2_output_root: parent.output_root,
             claimed_l2_block_number: proposal.output_block_number,
