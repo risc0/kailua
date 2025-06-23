@@ -195,6 +195,7 @@ Node software other than <code>op-geth</code> is not as reliable for the necessa
   --beacon-rpc-url [YOUR_BEACON_RPC_URL] \
   --op-geth-url [YOUR_OP_GETH_URL] \
   --op-node-url [YOUR_OP_NODE_URL] \
+  --data-dir [YOUR_VALIDATOR_DATA_CACHE_PATH] \
   --kailua-host [YOUR_KAILUA_HOST_BINARY_PATH] \
   --validator-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY] \
   --payout-recipient-address [YOUR_FAULT_PROOF_PAYOUT_RECIPIENT] \
@@ -219,6 +220,16 @@ Node software other than <code>op-geth</code> is not as reliable for the necessa
 <li><code>beacon-rpc-url</code>: The DA layer (eth-beacon chain) endpoint for retrieving rollup data.</li>
 <li><code>op-geth-url</code>: The (archive) rollup <code>op-geth</code> endpoint to read fault proving witness data from.</li>
 <li><code>op-node-url</code>: The rollup <code>op-node</code> endpoint to read sequencing proposals from.</li>
+</ul>
+<h3 id="cache-directory-optional"><a class="header" href="#cache-directory-optional">Cache Directory (Optional)</a></h3>
+<p>The validator saves data to disk as it tracks on-chain proposals.
+This allows it to restart quickly without requesting a lot of old on-chain data if terminated.</p>
+<ul>
+<li><code>data-dir</code>: Optional directory to save data to.
+<ul>
+<li>If unspecified, a tmp directory is created.</li>
+</ul>
+</li>
 </ul>
 <h3 id="prover"><a class="header" href="#prover">Prover</a></h3>
 <p>To create a fault proof, the validator invokes the <code>kailua-host</code> binary.</p>
