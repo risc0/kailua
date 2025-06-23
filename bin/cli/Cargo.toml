@@ -13,14 +13,9 @@ categories.workspace = true
 [dependencies]
 anyhow.workspace = true
 async-channel.workspace = true
-async-trait.workspace = true
-aws-config.workspace = true
-aws-sdk-kms.workspace = true
 bytemuck.workspace = true
 clap.workspace = true
-gcloud-sdk.workspace = true
 hex.workspace = true
-paste.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
 tokio-retry.workspace = true
@@ -30,7 +25,6 @@ tracing.workspace = true
 opentelemetry.workspace = true
 
 alloy = { workspace = true, features = ["full", "kzg", "signer-aws", "signer-gcp"] }
-alloy-provider.workspace = true
 
 kailua-build.workspace = true
 kailua-client.workspace = true
