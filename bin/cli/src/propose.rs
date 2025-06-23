@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::transact::provider::SafeProvider;
-use crate::transact::rpc::get_block;
-use crate::transact::signer::ProposerSignerArgs;
-use crate::transact::{Transact, TransactArgs};
 use crate::CoreArgs;
 use alloy::consensus::BlockHeader;
 use alloy::eips::BlockNumberOrTag;
@@ -27,11 +23,15 @@ use anyhow::{bail, Context};
 use kailua_client::args::parse_address;
 use kailua_common::blobs::hash_to_fe;
 use kailua_contracts::*;
-use kailua_game::agent::SyncAgent;
-use kailua_game::proposal::{Proposal, ELIMINATIONS_LIMIT};
-use kailua_game::stall::Stall;
-use kailua_game::telemetry::TelemetryArgs;
-use kailua_game::{await_tel, await_tel_res, retry_res_ctx_timeout, KAILUA_GAME_TYPE};
+use kailua_sync::agent::SyncAgent;
+use kailua_sync::proposal::{Proposal, ELIMINATIONS_LIMIT};
+use kailua_sync::stall::Stall;
+use kailua_sync::telemetry::TelemetryArgs;
+use kailua_sync::transact::provider::SafeProvider;
+use kailua_sync::transact::rpc::get_block;
+use kailua_sync::transact::signer::ProposerSignerArgs;
+use kailua_sync::transact::{Transact, TransactArgs};
+use kailua_sync::{await_tel, await_tel_res, retry_res_ctx_timeout, KAILUA_GAME_TYPE};
 use opentelemetry::global::{meter, tracer};
 use opentelemetry::metrics::{Counter, Gauge};
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
@@ -446,27 +446,28 @@ pub async fn resolve_next_pending_proposal<P: Provider>(
     let context =
         opentelemetry::Context::current_with_span(tracer.start("resolve_next_pending_proposal"));
 
-    let Some(proposal_index) =
-        unresolved_canonical_proposal(agent).context("unresolved_canonical_proposals")?
-    else {
+    let Some(resolved_parent) = agent.proposals.get(&agent.cursor.last_resolved_game) else {
+        bail!(
+            "Last resolved proposal {} missing from database.",
+            agent.cursor.last_resolved_game
+        );
+    };
+
+    let Some(unresolved_successor_index) = resolved_parent.successor else {
         return Ok(false);
     };
 
-    let Some(proposal) = agent.proposals.get(&proposal_index) else {
-        bail!("Unresolved proposal {proposal_index} missing from database.");
+    let Some(unresolved_successor) = agent.proposals.get(&unresolved_successor_index) else {
+        bail!("Unresolved successor {unresolved_successor_index} missing from database.");
     };
-    let Some(parent) = agent.proposals.get(&proposal.parent) else {
-        bail!(
-            "Unresolved proposal {proposal_index} parent {} missing from database.",
-            proposal.parent
-        );
-    };
-    let parent_contract = parent.tournament_contract_instance(&agent.provider.l1_provider);
+
+    let resolved_parent_contract =
+        resolved_parent.tournament_contract_instance(&agent.provider.l1_provider);
 
     // Skip resolved games
     if await_tel!(
         context,
-        proposal.fetch_finality(&agent.provider.l1_provider)
+        unresolved_successor.fetch_finality(&agent.provider.l1_provider)
     )
     .context("Proposal::fetch_finality")?
     .unwrap_or_default()
@@ -475,26 +476,28 @@ pub async fn resolve_next_pending_proposal<P: Provider>(
     }
 
     // Check for timeout and fast-forward status
-    let challenger_duration =
-        await_tel!(context, fetch_current_challenger_duration(agent, proposal));
+    let challenger_duration = await_tel!(
+        context,
+        fetch_current_challenger_duration(agent, unresolved_successor)
+    );
     let is_validity_proven = await_tel!(
         context,
-        parent.fetch_is_successor_validity_proven(&agent.provider.l1_provider)
+        resolved_parent.fetch_is_successor_validity_proven(&agent.provider.l1_provider)
     )
     .context("is_validity_proven")?;
     if !is_validity_proven && challenger_duration > 0 {
-        info!("Waiting for {challenger_duration} more seconds of chain time before resolution of proposal {proposal_index}.");
+        info!("Waiting for {challenger_duration} more seconds of chain time before resolution of proposal {unresolved_successor_index}.");
         return Ok(false);
     }
 
     // Check if can prune next set of children in parent tournament
-    if proposal.has_parent() {
+    if unresolved_successor.has_parent() {
         let can_resolve = loop {
             let result = await_tel_res!(
                 context,
                 tracer,
                 "KailuaTournament::pruneChildren",
-                parent_contract
+                resolved_parent_contract
                     .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
                     .call()
                     .into_future()
@@ -514,7 +517,7 @@ pub async fn resolve_next_pending_proposal<P: Provider>(
 
             // Prune next set of children
             info!("Eliminating {ELIMINATIONS_LIMIT} opponents before resolution.");
-            match parent_contract
+            match resolved_parent_contract
                 .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
                 .timed_transact_with_context(
                     context.clone(),
@@ -529,7 +532,10 @@ pub async fn resolve_next_pending_proposal<P: Provider>(
                     meter_prune_num.add(
                         1,
                         &[
-                            KeyValue::new("tournament", parent_contract.address().to_string()),
+                            KeyValue::new(
+                                "tournament",
+                                resolved_parent_contract.address().to_string(),
+                            ),
                             KeyValue::new("txn_hash", receipt.transaction_hash.to_string()),
                             KeyValue::new("txn_from", receipt.from.to_string()),
                             KeyValue::new("txn_to", receipt.to.unwrap_or_default().to_string()),
@@ -551,7 +557,10 @@ pub async fn resolve_next_pending_proposal<P: Provider>(
                     meter_prune_fail.add(
                         1,
                         &[
-                            KeyValue::new("tournament", parent_contract.address().to_string()),
+                            KeyValue::new(
+                                "tournament",
+                                resolved_parent_contract.address().to_string(),
+                            ),
                             KeyValue::new("msg", err.to_string()),
                         ],
                     );
@@ -569,14 +578,14 @@ pub async fn resolve_next_pending_proposal<P: Provider>(
     // Check if claim won in tournament
     if !await_tel!(
         context,
-        proposal.fetch_parent_tournament_survivor_status(&agent.provider.l1_provider)
+        unresolved_successor.fetch_parent_tournament_survivor_status(&agent.provider.l1_provider)
     )
     .unwrap_or_default()
     .unwrap_or_default()
     {
         error!(
             "Failed to determine proposal at {} as successor of proposal at {}.",
-            proposal.contract, parent.contract
+            unresolved_successor.contract, resolved_parent.contract
         );
         return Ok(false);
     }
@@ -584,10 +593,10 @@ pub async fn resolve_next_pending_proposal<P: Provider>(
     // resolve
     info!(
         "Resolving game at index {} and height {}.",
-        proposal.index, proposal.output_block_number
+        unresolved_successor.index, unresolved_successor.output_block_number
     );
 
-    match resolve_proposal(proposal, &proposer_provider, txn_args)
+    match resolve_proposal(unresolved_successor, &proposer_provider, txn_args)
         .await
         .context("KailuaTournament::resolve transact")
     {
@@ -596,8 +605,11 @@ pub async fn resolve_next_pending_proposal<P: Provider>(
             meter_resolve_num.add(
                 1,
                 &[
-                    KeyValue::new("proposal", proposal.contract.to_string()),
-                    KeyValue::new("l2_height", proposal.output_block_number.to_string()),
+                    KeyValue::new("proposal", unresolved_successor.contract.to_string()),
+                    KeyValue::new(
+                        "l2_height",
+                        unresolved_successor.output_block_number.to_string(),
+                    ),
                     KeyValue::new("txn_hash", receipt.transaction_hash.to_string()),
                     KeyValue::new("txn_from", receipt.from.to_string()),
                     KeyValue::new("txn_to", receipt.to.unwrap_or_default().to_string()),
@@ -614,10 +626,13 @@ pub async fn resolve_next_pending_proposal<P: Provider>(
                 ],
             );
             meter_resolve_last.record(
-                proposal.index,
+                unresolved_successor.index,
                 &[
-                    KeyValue::new("proposal", proposal.contract.to_string()),
-                    KeyValue::new("l2_height", proposal.output_block_number.to_string()),
+                    KeyValue::new("proposal", unresolved_successor.contract.to_string()),
+                    KeyValue::new(
+                        "l2_height",
+                        unresolved_successor.output_block_number.to_string(),
+                    ),
                 ],
             );
             Ok(true)
@@ -627,8 +642,11 @@ pub async fn resolve_next_pending_proposal<P: Provider>(
             meter_resolve_fail.add(
                 1,
                 &[
-                    KeyValue::new("proposal", proposal.contract.to_string()),
-                    KeyValue::new("l2_height", proposal.output_block_number.to_string()),
+                    KeyValue::new("proposal", unresolved_successor.contract.to_string()),
+                    KeyValue::new(
+                        "l2_height",
+                        unresolved_successor.output_block_number.to_string(),
+                    ),
                     KeyValue::new("msg", err.to_string()),
                 ],
             );
@@ -700,18 +718,6 @@ pub async fn resolve_proposal<P: Provider<N>, N: Network>(
     info!("KailuaTournament::resolve: {} gas", receipt.gas_used());
 
     Ok(receipt)
-}
-
-pub fn unresolved_canonical_proposal(agent: &SyncAgent) -> anyhow::Result<Option<u64>> {
-    // Load last resolved proposal
-    let Some(last_resolved_proposal) = agent.proposals.get(&agent.cursor.last_resolved_game) else {
-        bail!(
-            "Last resolved proposal {} missing from database.",
-            agent.cursor.last_resolved_game
-        );
-    };
-    // Return successor
-    Ok(last_resolved_proposal.successor)
 }
 
 pub async fn fetch_vanguard(agent: &SyncAgent) -> Address {

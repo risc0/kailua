@@ -88,8 +88,8 @@ kailua-build = { path = "build/risczero" }
 kailua-client = { path = "bin/client" }
 kailua-common = { path = "crates/common" }
 kailua-contracts = { path = "crates/contracts" }
-kailua-game = { path = "crates/game" }
 kailua-host = { path = "bin/host" }
+kailua-sync = { path = "crates/sync" }
 
 # Kona git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1"
 kona-cli = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1", default-features = false }

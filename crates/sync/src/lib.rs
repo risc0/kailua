@@ -22,5 +22,6 @@ pub mod provider;
 pub mod retry;
 pub mod stall;
 pub mod telemetry;
+pub mod transact;
 
 pub const KAILUA_GAME_TYPE: u32 = 1337;

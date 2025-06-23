@@ -15,7 +15,7 @@
 use crate::CoreArgs;
 use alloy::primitives::map::{Entry, HashMap};
 use alloy::providers::{Provider, ProviderBuilder};
-use kailua_game::telemetry::TelemetryArgs;
+use kailua_sync::telemetry::TelemetryArgs;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, Span, Status, TraceContextExt, Tracer};
 use risc0_zkvm::is_dev_mode;

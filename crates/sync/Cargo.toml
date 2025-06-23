@@ -1,5 +1,5 @@
 [package]
-name = "kailua-game"
+name = "kailua-sync"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -13,12 +13,16 @@ categories.workspace = true
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
+aws-config.workspace = true
+aws-sdk-kms.workspace = true
 bytemuck.workspace = true
 c-kzg.workspace = true
 clap.workspace = true
 futures.workspace = true
+gcloud-sdk.workspace = true
 hex.workspace = true
 itertools.workspace = true
+paste.workspace = true
 reqwest.workspace = true
 rocksdb.workspace = true
 serde.workspace = true

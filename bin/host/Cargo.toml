@@ -30,7 +30,7 @@ alloy-eips.workspace = true
 kailua-build.workspace = true
 kailua-client.workspace = true
 kailua-common.workspace = true
-kailua-game.workspace = true
+kailua-sync.workspace = true
 
 # Kona
 kona-cli.workspace = true

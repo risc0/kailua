@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use kailua_game::provider::ProviderArgs;
-use kailua_game::telemetry::TelemetryArgs;
+use kailua_sync::provider::ProviderArgs;
+use kailua_sync::telemetry::TelemetryArgs;
 use std::path::PathBuf;
 
 pub mod bench;
@@ -22,7 +22,6 @@ pub mod config;
 pub mod fast_track;
 pub mod fault;
 pub mod propose;
-pub mod transact;
 pub mod validate;
 
 #[derive(clap::Parser, Debug, Clone)]

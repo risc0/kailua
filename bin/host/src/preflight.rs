@@ -23,7 +23,7 @@ use anyhow::bail;
 use kailua_client::proving::ProvingError;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
-use kailua_game::provider::optimism::OpNodeProvider;
+use kailua_sync::provider::optimism::OpNodeProvider;
 use kona_genesis::RollupConfig;
 use kona_preimage::{PreimageKey, PreimageKeyType};
 use kona_protocol::BlockInfo;

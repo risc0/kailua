@@ -13,8 +13,6 @@
 // limitations under the License.
 
 use crate::channel::DuplexChannel;
-use crate::transact::provider::SafeProvider;
-use crate::transact::Transact;
 use crate::validate::proving::encode_seal;
 use crate::validate::{Message, ValidateArgs};
 use alloy::network::{Ethereum, TxSigner};
@@ -25,10 +23,12 @@ use kailua_common::blobs::hash_to_fe;
 use kailua_common::journal::ProofJournal;
 use kailua_common::precondition::validity_precondition_hash;
 use kailua_contracts::*;
-use kailua_game::agent::SyncAgent;
-use kailua_game::proposal::Proposal;
-use kailua_game::stall::Stall;
-use kailua_game::{await_tel, await_tel_res, retry_res_ctx_timeout};
+use kailua_sync::agent::SyncAgent;
+use kailua_sync::proposal::Proposal;
+use kailua_sync::stall::Stall;
+use kailua_sync::transact::provider::SafeProvider;
+use kailua_sync::transact::Transact;
+use kailua_sync::{await_tel, await_tel_res, retry_res_ctx_timeout};
 use opentelemetry::global::{meter, tracer};
 use opentelemetry::trace::FutureExt;
 use opentelemetry::trace::{TraceContextExt, Tracer};

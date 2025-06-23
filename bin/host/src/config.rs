@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::args::KailuaHostArgs;
-use kailua_game::provider::optimism::fetch_rollup_config;
+use kailua_sync::provider::optimism::fetch_rollup_config;
 use kona_genesis::RollupConfig;
 use kona_registry::Registry;
 use tempfile::TempDir;

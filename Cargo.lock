@@ -5068,8 +5068,8 @@ dependencies = [
  "kailua-client",
  "kailua-common",
  "kailua-contracts",
- "kailua-game",
  "kailua-host",
+ "kailua-sync",
  "kona-cli",
  "kona-protocol",
  "opentelemetry",
@@ -5166,36 +5166,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kailua-game"
-version = "1.0.0-rc.1"
-dependencies = [
- "alloy",
- "alloy-rpc-types-beacon",
- "anyhow",
- "async-trait",
- "bytemuck",
- "c-kzg",
- "clap",
- "futures",
- "hex",
- "itertools 0.14.0",
- "kailua-build",
- "kailua-common",
- "kailua-contracts",
- "kona-genesis",
- "opentelemetry",
- "opentelemetry-otlp",
- "opentelemetry_sdk",
- "reqwest",
- "rocksdb",
- "serde",
- "serde_json",
- "tokio",
- "tokio-retry",
- "tracing",
-]
-
-[[package]]
 name = "kailua-host"
 version = "1.0.0-rc.1"
 dependencies = [
@@ -5209,7 +5179,7 @@ dependencies = [
  "kailua-build",
  "kailua-client",
  "kailua-common",
- "kailua-game",
+ "kailua-sync",
  "kona-cli",
  "kona-genesis",
  "kona-host",
@@ -5223,6 +5193,40 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber 0.3.19",
+]
+
+[[package]]
+name = "kailua-sync"
+version = "1.0.0-rc.1"
+dependencies = [
+ "alloy",
+ "alloy-rpc-types-beacon",
+ "anyhow",
+ "async-trait",
+ "aws-config",
+ "aws-sdk-kms",
+ "bytemuck",
+ "c-kzg",
+ "clap",
+ "futures",
+ "gcloud-sdk",
+ "hex",
+ "itertools 0.14.0",
+ "kailua-build",
+ "kailua-common",
+ "kailua-contracts",
+ "kona-genesis",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
+ "paste",
+ "reqwest",
+ "rocksdb",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-retry",
+ "tracing",
 ]
 
 [[package]]

@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use crate::channel::DuplexChannel;
-use crate::transact::rpc::{get_block_by_number, get_next_block};
 use crate::validate::{Message, ValidateArgs};
 use alloy::eips::eip4844::IndexedBlobHash;
 use alloy::network::primitives::HeaderResponse;
@@ -22,9 +21,10 @@ use alloy::primitives::{Address, B256};
 use anyhow::{bail, Context};
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
-use kailua_game::agent::SyncAgent;
-use kailua_game::await_tel;
-use kailua_game::proposal::Proposal;
+use kailua_sync::agent::SyncAgent;
+use kailua_sync::await_tel;
+use kailua_sync::proposal::Proposal;
+use kailua_sync::transact::rpc::{get_block_by_number, get_next_block};
 use kona_protocol::BlockInfo;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::FutureExt;

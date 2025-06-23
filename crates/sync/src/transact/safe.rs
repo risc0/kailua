@@ -16,7 +16,7 @@ use crate::transact::Transact;
 use alloy::contract::SolCallBuilder;
 use alloy::network::{Network, TransactionBuilder};
 use alloy::primitives::{Address, Uint, U256};
-use alloy_provider::Provider;
+use alloy::providers::Provider;
 use anyhow::Context;
 
 pub async fn exec_safe_txn<P1: Provider<N>, P2: Provider<N>, C, N: Network>(

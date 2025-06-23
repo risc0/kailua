@@ -20,9 +20,9 @@ pub mod signer;
 
 use alloy::contract::{CallBuilder, CallDecoder, EthCall};
 use alloy::network::{Network, TransactionBuilder4844};
+use alloy::providers::fillers::JoinFill;
 use alloy::providers::Provider;
-use alloy_provider::fillers::JoinFill;
-use alloy_provider::{Identity, ProviderBuilder};
+use alloy::providers::{Identity, ProviderBuilder};
 use anyhow::Context;
 use async_trait::async_trait;
 use fillers::{PremiumBlobGasFiller, PremiumExecGasFiller, PremiumFiller};

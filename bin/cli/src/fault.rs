@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use crate::propose::ProposeArgs;
-use crate::transact::Transact;
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy::network::Ethereum;
 use alloy::primitives::{Bytes, B256, U256};
@@ -23,11 +22,12 @@ use anyhow::Context;
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::config::config_hash;
 use kailua_contracts::*;
-use kailua_game::proposal::Proposal;
-use kailua_game::provider::optimism::fetch_rollup_config;
-use kailua_game::provider::optimism::OpNodeProvider;
-use kailua_game::stall::Stall;
-use kailua_game::{await_tel, await_tel_res, retry_res_ctx_timeout, KAILUA_GAME_TYPE};
+use kailua_sync::proposal::Proposal;
+use kailua_sync::provider::optimism::fetch_rollup_config;
+use kailua_sync::provider::optimism::OpNodeProvider;
+use kailua_sync::stall::Stall;
+use kailua_sync::transact::Transact;
+use kailua_sync::{await_tel, await_tel_res, retry_res_ctx_timeout, KAILUA_GAME_TYPE};
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use tracing::{error, info};

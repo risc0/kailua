@@ -16,12 +16,12 @@ use alloy::eips::eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
 use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::{Network, TransactionBuilder, TransactionBuilder4844};
 use alloy::primitives::Address;
-use alloy::transports::{RpcError, TransportResult};
-use alloy_provider::fillers::{
+use alloy::providers::fillers::{
     BlobGasFiller, ChainIdFiller, FillerControlFlow, GasFillable, GasFiller, JoinFill, NonceFiller,
     NonceManager, TxFiller,
 };
-use alloy_provider::{Provider, SendableTx};
+use alloy::providers::{Provider, SendableTx};
+use alloy::transports::{RpcError, TransportResult};
 use async_trait::async_trait;
 
 #[derive(Clone, Copy, Debug, Default)]

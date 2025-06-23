@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::{await_tel, retry_res_ctx_timeout};
 use alloy::consensus::BlockHeader;
 use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::{BlockResponse, Network};
 use alloy::primitives::{BlockNumber, B256};
-use alloy_provider::Provider;
+use alloy::providers::Provider;
 use anyhow::{anyhow, Context};
-use kailua_game::{await_tel, retry_res_ctx_timeout};
 use opentelemetry::global::tracer;
 use opentelemetry::trace::FutureExt;
 use opentelemetry::trace::{TraceContextExt, Tracer};
