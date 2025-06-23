@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::deployment::SyncDeployment;
+use crate::proposal::Proposal;
+use crate::provider::SyncProvider;
 use crate::stall::Stall;
-use crate::sync::deployment::SyncDeployment;
-use crate::sync::proposal::Proposal;
-use crate::sync::provider::SyncProvider;
 use alloy::primitives::Address;
 use anyhow::bail;
 use kailua_contracts::*;

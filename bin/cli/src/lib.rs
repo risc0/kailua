@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use kailua_client::telemetry::TelemetryArgs;
+use kailua_game::provider::ProviderArgs;
+use kailua_game::telemetry::TelemetryArgs;
 use std::path::PathBuf;
 
 pub mod bench;
@@ -21,13 +22,8 @@ pub mod config;
 pub mod fast_track;
 pub mod fault;
 pub mod propose;
-pub mod retry;
-pub mod stall;
-pub mod sync;
 pub mod transact;
 pub mod validate;
-
-pub const KAILUA_GAME_TYPE: u32 = 1337;
 
 #[derive(clap::Parser, Debug, Clone)]
 #[command(name = "kailua-cli")]
@@ -48,18 +44,8 @@ pub struct CoreArgs {
     #[arg(long, short, help = "Verbosity level (0-4)", action = clap::ArgAction::Count)]
     pub v: u8,
 
-    /// Address of the OP-NODE endpoint to use
-    #[clap(long, env)]
-    pub op_node_url: String,
-    /// Address of the OP-GETH endpoint to use (eth and debug namespace required).
-    #[clap(long, env)]
-    pub op_geth_url: String,
-    /// Address of the ethereum rpc endpoint to use (eth namespace required)
-    #[clap(long, env)]
-    pub eth_rpc_url: String,
-    /// Address of the L1 Beacon API endpoint to use.
-    #[clap(long, env)]
-    pub beacon_rpc_url: String,
+    #[clap(flatten)]
+    pub provider: ProviderArgs,
 
     #[cfg(feature = "devnet")]
     #[clap(long, env, default_value_t = 0)]

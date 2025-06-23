@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::retry_res_ctx_timeout;
 use alloy::consensus::BlockHeader;
 use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::{BlockResponse, Network};
 use alloy::primitives::{BlockNumber, B256};
 use alloy_provider::Provider;
 use anyhow::{anyhow, Context};
-use kailua_client::await_tel;
+use kailua_game::{await_tel, retry_res_ctx_timeout};
 use opentelemetry::global::tracer;
 use opentelemetry::trace::FutureExt;
 use opentelemetry::trace::{TraceContextExt, Tracer};
@@ -71,11 +70,11 @@ pub async fn get_block_by_number<P: Provider<N>, N: Network>(
 pub async fn get_block<P: Provider<N>, N: Network>(
     provider: P,
     block_id: BlockNumberOrTag,
-) -> anyhow::Result<N::BlockResponse> {
+) -> N::BlockResponse {
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("get_block"));
 
-    let block = await_tel!(
+    await_tel!(
         context,
         tracer,
         "Provider::get_block",
@@ -84,7 +83,5 @@ pub async fn get_block<P: Provider<N>, N: Network>(
             .await
             .context("get_block")?
             .ok_or_else(|| anyhow!("Failed to fetch block")))
-    );
-
-    Ok(block)
+    )
 }

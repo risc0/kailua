@@ -17,7 +17,7 @@ use clap::{ArgAction, Parser};
 use kailua_client::args::parse_b256;
 use kailua_client::boundless::BoundlessArgs;
 use kailua_client::proving::ProvingArgs;
-use kailua_client::telemetry::TelemetryArgs;
+use kailua_game::telemetry::TelemetryArgs;
 use std::cmp::Ordering;
 
 /// The host binary CLI application arguments.

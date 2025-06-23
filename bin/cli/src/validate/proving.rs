@@ -13,8 +13,6 @@
 // limitations under the License.
 
 use crate::channel::DuplexChannel;
-use crate::sync::agent::SyncAgent;
-use crate::sync::proposal::Proposal;
 use crate::transact::rpc::{get_block_by_number, get_next_block};
 use crate::validate::{Message, ValidateArgs};
 use alloy::eips::eip4844::IndexedBlobHash;
@@ -22,9 +20,11 @@ use alloy::network::primitives::HeaderResponse;
 use alloy::network::BlockResponse;
 use alloy::primitives::{Address, B256};
 use anyhow::{bail, Context};
-use kailua_client::await_tel;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
+use kailua_game::agent::SyncAgent;
+use kailua_game::await_tel;
+use kailua_game::proposal::Proposal;
 use kona_protocol::BlockInfo;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::FutureExt;
@@ -66,7 +66,7 @@ pub fn create_proving_args(
         payout_recipient.to_string(),
         // l2 el node
         String::from("--op-node-address"),
-        args.core.op_node_url.clone(),
+        args.core.provider.op_node_url.clone(),
     ];
     // precondition data
     if let Some(precondition_data) = precondition_validation_data {
@@ -132,13 +132,13 @@ pub fn create_proving_args(
         l2_chain_id.clone(),
         // l1 el node
         String::from("--l1-node-address"),
-        args.core.eth_rpc_url.clone(),
+        args.core.provider.eth_rpc_url.clone(),
         // l1 cl node
         String::from("--l1-beacon-address"),
-        args.core.beacon_rpc_url.clone(),
+        args.core.provider.beacon_rpc_url.clone(),
         // l2 el node
         String::from("--l2-node-address"),
-        args.core.op_geth_url.clone(),
+        args.core.provider.op_geth_url.clone(),
         // path to cache
         String::from("--data-dir"),
         data_dir.to_str().unwrap().to_string(),

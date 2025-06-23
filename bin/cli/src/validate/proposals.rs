@@ -13,22 +13,22 @@
 // limitations under the License.
 
 use crate::channel::DuplexChannel;
-use crate::sync::agent::SyncAgent;
-use crate::sync::proposal::Proposal;
 use crate::transact::provider::SafeProvider;
 use crate::transact::Transact;
 use crate::validate::proving::encode_seal;
 use crate::validate::{Message, ValidateArgs};
-use crate::{retry_res_ctx_timeout, stall::Stall};
 use alloy::network::{Ethereum, TxSigner};
 use alloy::primitives::Bytes;
 use alloy::primitives::B256;
 use anyhow::Context;
-use kailua_client::{await_tel, await_tel_res};
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::journal::ProofJournal;
 use kailua_common::precondition::validity_precondition_hash;
 use kailua_contracts::*;
+use kailua_game::agent::SyncAgent;
+use kailua_game::proposal::Proposal;
+use kailua_game::stall::Stall;
+use kailua_game::{await_tel, await_tel_res, retry_res_ctx_timeout};
 use opentelemetry::global::{meter, tracer};
 use opentelemetry::trace::FutureExt;
 use opentelemetry::trace::{TraceContextExt, Tracer};
@@ -62,7 +62,7 @@ pub async fn handle_proposals(
 
     // initialize sync agent
     let mut agent = SyncAgent::new(
-        &args.core,
+        &args.core.provider,
         data_dir,
         args.kailua_game_implementation,
         args.kailua_anchor_address,
@@ -83,7 +83,7 @@ pub async fn handle_proposals(
         args.txn_args
             .premium_provider::<Ethereum>()
             .wallet(validator_wallet)
-            .connect_http(args.core.eth_rpc_url.as_str().try_into()?),
+            .connect_http(args.core.provider.eth_rpc_url.as_str().try_into()?),
     );
     info!("Validator address: {validator_address}");
 

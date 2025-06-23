@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod blob;
 pub mod fillers;
 pub mod provider;
 pub mod rpc;

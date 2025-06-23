@@ -12,23 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::blobs::blob_fe_proof;
+use crate::fault::Fault;
+use crate::provider::beacon::blob_sidecar;
+use crate::provider::SyncProvider;
 use crate::stall::Stall;
-use crate::sync::fault::Fault;
-use crate::sync::provider::SyncProvider;
-use crate::transact::blob::{blob_fe_proof, blob_sidecar};
-use crate::transact::rpc::get_block;
-use crate::transact::Transact;
-use crate::transact::TransactArgs;
-use alloy::consensus::{Blob, BlobTransactionSidecar, BlockHeader};
+use crate::{await_tel, await_tel_res};
+use alloy::consensus::{Blob, BlobTransactionSidecar};
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
-use alloy::eips::BlockNumberOrTag;
-use alloy::network::ReceiptResponse;
-use alloy::network::{BlockResponse, Network};
+use alloy::network::Network;
 use alloy::primitives::{Address, Bytes, B256, U256};
-use alloy_provider::Provider;
+use alloy::providers::Provider;
 use alloy_rpc_types_beacon::sidecar::BlobData;
 use anyhow::{bail, Context};
-use kailua_client::{await_tel, await_tel_res};
 use kailua_common::blobs::{hash_to_fe, intermediate_outputs, trail_data};
 use kailua_common::precondition::blobs_hash;
 use kailua_contracts::{KailuaTournament::KailuaTournamentInstance, *};
@@ -39,7 +35,6 @@ use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::future::IntoFuture;
 use std::iter::repeat;
-use std::time::Duration;
 use tracing::{error, info};
 
 pub const ELIMINATIONS_LIMIT: u64 = 128;
@@ -691,90 +686,5 @@ impl Proposal {
             .stall_with_context(context.clone(), "KailuaTournament::validChildSignature")
             .await
             .is_zero())
-    }
-
-    pub async fn fetch_current_challenger_duration<P: Provider<N>, N: Network>(
-        &self,
-        provider: P,
-    ) -> anyhow::Result<u64> {
-        let tracer = tracer("kailua");
-        let context = opentelemetry::Context::current_with_span(
-            tracer.start("Proposal::fetch_current_challenger_duration"),
-        );
-
-        let chain_time = await_tel!(context, get_block(&provider, BlockNumberOrTag::Latest))?
-            .header()
-            .timestamp();
-
-        Ok(self
-            .tournament_contract_instance(provider)
-            .getChallengerDuration(U256::from(chain_time))
-            .stall_with_context(context.clone(), "KailuaTournament::getChallengerDuration")
-            .await)
-    }
-
-    pub async fn resolve<P: Provider<N>, N: Network>(
-        &self,
-        provider: P,
-        txn_args: &TransactArgs,
-    ) -> anyhow::Result<N::ReceiptResponse> {
-        let tracer = tracer("kailua");
-        let context = opentelemetry::Context::current_with_span(tracer.start("Proposal::resolve"));
-
-        let contract_instance = self.tournament_contract_instance(&provider);
-        let parent_tournament: Address = contract_instance
-            .parentGame()
-            .stall_with_context(context.clone(), "KailuaTournament::parentGame")
-            .await;
-        let parent_tournament_instance = KailuaTournament::new(parent_tournament, &provider);
-
-        // Issue any necessary pre-emptive pruning calls
-        loop {
-            // check if calling pruneChildren doesn't fail
-            let survivor = await_tel_res!(
-                context,
-                tracer,
-                "KailuaTournament::pruneChildren",
-                parent_tournament_instance
-                    .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
-                    .call()
-                    .into_future()
-            )?
-            .0;
-
-            // If a survivor is returned we don't need pruning
-            if !survivor.is_zero() {
-                break;
-            }
-
-            info!("Eliminating {ELIMINATIONS_LIMIT} opponents before resolution.");
-            let receipt = parent_tournament_instance
-                .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
-                .timed_transact_with_context(
-                    context.clone(),
-                    "KailuaTournament::pruneChildren",
-                    Some(Duration::from_secs(txn_args.txn_timeout)),
-                )
-                .await
-                .context("KailuaTournament::pruneChildren")?;
-            info!(
-                "KailuaTournament::pruneChildren: {} gas",
-                receipt.gas_used()
-            );
-        }
-
-        // Issue resolution call
-        let receipt = contract_instance
-            .resolve()
-            .timed_transact_with_context(
-                context.clone(),
-                "KailuaTournament::resolve",
-                Some(Duration::from_secs(txn_args.txn_timeout)),
-            )
-            .await
-            .context("KailuaTournament::resolve")?;
-        info!("KailuaTournament::resolve: {} gas", receipt.gas_used());
-
-        Ok(receipt)
     }
 }

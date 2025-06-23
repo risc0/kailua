@@ -13,22 +13,21 @@
 // limitations under the License.
 
 use crate::propose::ProposeArgs;
-use crate::stall::Stall;
-use crate::sync::proposal::Proposal;
 use crate::transact::Transact;
-use crate::{retry_res_ctx_timeout, KAILUA_GAME_TYPE};
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy::network::Ethereum;
 use alloy::primitives::{Bytes, B256, U256};
 use alloy::providers::RootProvider;
 use alloy::sol_types::SolValue;
 use anyhow::Context;
-use kailua_client::provider::OpNodeProvider;
-use kailua_client::{await_tel, await_tel_res};
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::config::config_hash;
 use kailua_contracts::*;
-use kailua_host::config::fetch_rollup_config;
+use kailua_game::proposal::Proposal;
+use kailua_game::provider::optimism::fetch_rollup_config;
+use kailua_game::provider::optimism::OpNodeProvider;
+use kailua_game::stall::Stall;
+use kailua_game::{await_tel, await_tel_res, retry_res_ctx_timeout, KAILUA_GAME_TYPE};
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use tracing::{error, info};
@@ -52,18 +51,29 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let context = opentelemetry::Context::current_with_span(tracer.start("fault"));
 
     let op_node_provider = OpNodeProvider(RootProvider::new_http(
-        args.propose_args.core.op_node_url.as_str().try_into()?,
+        args.propose_args
+            .core
+            .provider
+            .op_node_url
+            .as_str()
+            .try_into()?,
     ));
-    let eth_rpc_provider =
-        RootProvider::<Ethereum>::new_http(args.propose_args.core.eth_rpc_url.as_str().try_into()?);
+    let eth_rpc_provider = RootProvider::<Ethereum>::new_http(
+        args.propose_args
+            .core
+            .provider
+            .eth_rpc_url
+            .as_str()
+            .try_into()?,
+    );
 
     info!("Fetching rollup configuration from rpc endpoints.");
     // fetch rollup config
     let config = await_tel!(
         context,
         fetch_rollup_config(
-            &args.propose_args.core.op_node_url,
-            &args.propose_args.core.op_geth_url,
+            &args.propose_args.core.provider.op_node_url,
+            &args.propose_args.core.provider.op_geth_url,
             None,
         )
     )
@@ -93,7 +103,14 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .txn_args
         .premium_provider::<Ethereum>()
         .wallet(tester_wallet)
-        .connect_http(args.propose_args.core.eth_rpc_url.as_str().try_into()?);
+        .connect_http(
+            args.propose_args
+                .core
+                .provider
+                .eth_rpc_url
+                .as_str()
+                .try_into()?,
+        );
 
     let dispute_game_factory = IDisputeGameFactory::new(dgf_address, &tester_provider);
     let kailua_game_implementation = KailuaGame::new(

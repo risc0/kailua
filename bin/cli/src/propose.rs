@@ -12,25 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::sync::agent::SyncAgent;
-use crate::sync::proposal::{Proposal, ELIMINATIONS_LIMIT};
 use crate::transact::provider::SafeProvider;
 use crate::transact::rpc::get_block;
 use crate::transact::signer::ProposerSignerArgs;
 use crate::transact::{Transact, TransactArgs};
-use crate::{retry_res_ctx_timeout, stall::Stall, CoreArgs, KAILUA_GAME_TYPE};
+use crate::CoreArgs;
 use alloy::consensus::BlockHeader;
 use alloy::eips::BlockNumberOrTag;
-use alloy::network::{BlockResponse, Ethereum, TxSigner};
+use alloy::network::{BlockResponse, Ethereum, Network, ReceiptResponse, TxSigner};
 use alloy::primitives::{Address, Bytes, U256};
 use alloy::providers::Provider;
 use alloy::sol_types::SolValue;
 use anyhow::{bail, Context};
 use kailua_client::args::parse_address;
-use kailua_client::telemetry::TelemetryArgs;
-use kailua_client::{await_tel, await_tel_res};
 use kailua_common::blobs::hash_to_fe;
 use kailua_contracts::*;
+use kailua_game::agent::SyncAgent;
+use kailua_game::proposal::{Proposal, ELIMINATIONS_LIMIT};
+use kailua_game::stall::Stall;
+use kailua_game::telemetry::TelemetryArgs;
+use kailua_game::{await_tel, await_tel_res, retry_res_ctx_timeout, KAILUA_GAME_TYPE};
 use opentelemetry::global::{meter, tracer};
 use opentelemetry::metrics::{Counter, Gauge};
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
@@ -80,7 +81,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
 
     // initialize sync agent
     let mut agent = SyncAgent::new(
-        &args.core,
+        &args.core.provider,
         data_dir,
         args.kailua_game_implementation,
         args.kailua_anchor_address,
@@ -101,7 +102,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         args.txn_args
             .premium_provider::<Ethereum>()
             .wallet(&proposer_wallet)
-            .connect_http(args.core.eth_rpc_url.as_str().try_into()?),
+            .connect_http(args.core.provider.eth_rpc_url.as_str().try_into()?),
     );
     info!("Proposer address: {proposer_address}");
 
@@ -216,10 +217,11 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         // Wait for L1 timestamp to advance beyond the safety gap for proposals
         let proposed_block_number =
             canonical_tip.output_block_number + agent.deployment.blocks_per_proposal();
+
         let chain_time = await_tel!(
             context,
             get_block(&agent.provider.l1_provider, BlockNumberOrTag::Latest)
-        )?
+        )
         .header()
         .timestamp();
 
@@ -473,11 +475,8 @@ pub async fn resolve_next_pending_proposal<P: Provider>(
     }
 
     // Check for timeout and fast-forward status
-    let challenger_duration = await_tel!(
-        context,
-        proposal.fetch_current_challenger_duration(&agent.provider.l1_provider)
-    )
-    .context("challenger_duration")?;
+    let challenger_duration =
+        await_tel!(context, fetch_current_challenger_duration(agent, proposal));
     let is_validity_proven = await_tel!(
         context,
         parent.fetch_is_successor_validity_proven(&agent.provider.l1_provider)
@@ -588,8 +587,7 @@ pub async fn resolve_next_pending_proposal<P: Provider>(
         proposal.index, proposal.output_block_number
     );
 
-    match proposal
-        .resolve(&proposer_provider, txn_args)
+    match resolve_proposal(proposal, &proposer_provider, txn_args)
         .await
         .context("KailuaTournament::resolve transact")
     {
@@ -639,6 +637,71 @@ pub async fn resolve_next_pending_proposal<P: Provider>(
     }
 }
 
+pub async fn resolve_proposal<P: Provider<N>, N: Network>(
+    proposal: &Proposal,
+    provider: P,
+    txn_args: &TransactArgs,
+) -> anyhow::Result<N::ReceiptResponse> {
+    let tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(tracer.start("Proposal::resolve"));
+
+    let contract_instance = proposal.tournament_contract_instance(&provider);
+    let parent_tournament: Address = contract_instance
+        .parentGame()
+        .stall_with_context(context.clone(), "KailuaTournament::parentGame")
+        .await;
+    let parent_tournament_instance = KailuaTournament::new(parent_tournament, &provider);
+
+    // Issue any necessary pre-emptive pruning calls
+    loop {
+        // check if calling pruneChildren doesn't fail
+        let survivor = await_tel_res!(
+            context,
+            tracer,
+            "KailuaTournament::pruneChildren",
+            parent_tournament_instance
+                .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
+                .call()
+                .into_future()
+        )?
+        .0;
+
+        // If a survivor is returned we don't need pruning
+        if !survivor.is_zero() {
+            break;
+        }
+
+        info!("Eliminating {ELIMINATIONS_LIMIT} opponents before resolution.");
+        let receipt = parent_tournament_instance
+            .pruneChildren(U256::from(ELIMINATIONS_LIMIT))
+            .timed_transact_with_context(
+                context.clone(),
+                "KailuaTournament::pruneChildren",
+                Some(Duration::from_secs(txn_args.txn_timeout)),
+            )
+            .await
+            .context("KailuaTournament::pruneChildren")?;
+        info!(
+            "KailuaTournament::pruneChildren: {} gas",
+            receipt.gas_used()
+        );
+    }
+
+    // Issue resolution call
+    let receipt = contract_instance
+        .resolve()
+        .timed_transact_with_context(
+            context.clone(),
+            "KailuaTournament::resolve",
+            Some(Duration::from_secs(txn_args.txn_timeout)),
+        )
+        .await
+        .context("KailuaTournament::resolve")?;
+    info!("KailuaTournament::resolve: {} gas", receipt.gas_used());
+
+    Ok(receipt)
+}
+
 pub fn unresolved_canonical_proposal(agent: &SyncAgent) -> anyhow::Result<Option<u64>> {
     // Load last resolved proposal
     let Some(last_resolved_proposal) = agent.proposals.get(&agent.cursor.last_resolved_game) else {
@@ -686,5 +749,25 @@ pub async fn fetch_paid_bond(agent: &SyncAgent, address: Address) -> U256 {
     KailuaTreasury::new(agent.deployment.treasury, &agent.provider.l1_provider)
         .paidBonds(address)
         .stall_with_context(context.clone(), "KailuaTreasury::paidBonds")
+        .await
+}
+
+pub async fn fetch_current_challenger_duration(agent: &SyncAgent, proposal: &Proposal) -> u64 {
+    let tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(
+        tracer.start("Proposal::fetch_current_challenger_duration"),
+    );
+
+    let chain_time = await_tel!(
+        context,
+        get_block(&agent.provider.l1_provider, BlockNumberOrTag::Latest)
+    )
+    .header()
+    .timestamp();
+
+    proposal
+        .tournament_contract_instance(&agent.provider.l1_provider)
+        .getChallengerDuration(U256::from(chain_time))
+        .stall_with_context(context.clone(), "KailuaTournament::getChallengerDuration")
         .await
 }

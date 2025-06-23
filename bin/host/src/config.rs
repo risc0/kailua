@@ -13,15 +13,9 @@
 // limitations under the License.
 
 use crate::args::KailuaHostArgs;
-use alloy::providers::{Provider, ProviderBuilder, RootProvider};
-use anyhow::Context;
-use kailua_client::provider::OpNodeProvider;
+use kailua_game::provider::optimism::fetch_rollup_config;
 use kona_genesis::RollupConfig;
 use kona_registry::Registry;
-use opentelemetry::global::tracer;
-use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
-use serde_json::{json, Value};
-use std::path::PathBuf;
 use tempfile::TempDir;
 use tokio::fs;
 use tracing::{debug, info};
@@ -67,59 +61,4 @@ pub async fn generate_rollup_config(
             cfg.kona.read_rollup_config()?
         }
     })
-}
-
-pub async fn fetch_rollup_config(
-    op_node_address: &str,
-    l2_node_address: &str,
-    json_file_path: Option<&PathBuf>,
-) -> anyhow::Result<RollupConfig> {
-    let tracer = tracer("kailua");
-    let context = opentelemetry::Context::current_with_span(tracer.start("fetch_rollup_config"));
-
-    let op_node_provider = OpNodeProvider(RootProvider::new_http(op_node_address.try_into()?));
-    let l2_node_provider = ProviderBuilder::new().connect_http(l2_node_address.try_into()?);
-
-    let mut rollup_config: Value = op_node_provider
-        .rollup_config()
-        .with_context(context.clone())
-        .await
-        .context("rollup_config")?;
-
-    debug!("Rollup config: {:?}", rollup_config);
-
-    let chain_config: Value =
-        l2_node_provider
-            .client()
-            .request_noparams("debug_chainConfig")
-            .with_context(context.with_span(
-                tracer.start_with_context("ReqwestProvider::debug_chainConfig", &context),
-            ))
-            .await
-            .context("debug_chainConfig")?;
-
-    debug!("ChainConfig: {:?}", chain_config);
-
-    // fork times
-    for fork in &[
-        "regolithTime",
-        "canyonTime",
-        "deltaTime",
-        "ecotoneTime",
-        "fjordTime",
-        "graniteTime",
-        "holoceneTime",
-    ] {
-        if let Some(value) = chain_config[fork].as_str() {
-            rollup_config[fork] = json!(value);
-        }
-    }
-
-    // export
-    let ser_config = serde_json::to_string(&rollup_config)?;
-    if let Some(json_file_path) = json_file_path {
-        fs::write(json_file_path, &ser_config).await?;
-    }
-
-    Ok(serde_json::from_str(&ser_config)?)
 }

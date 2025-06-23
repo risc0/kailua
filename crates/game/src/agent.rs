@@ -12,27 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::cursor::SyncCursor;
+use crate::deployment::SyncDeployment;
+use crate::proposal::{Proposal, ProposalSync};
+use crate::provider::optimism::fetch_rollup_config;
+use crate::provider::{ProviderArgs, SyncProvider};
 use crate::stall::Stall;
-use crate::sync::cursor::SyncCursor;
-use crate::sync::deployment::SyncDeployment;
-use crate::sync::proposal::{Proposal, ProposalSync};
-use crate::sync::provider::SyncProvider;
-use crate::sync::telemetry::SyncTelemetry;
-use crate::{retry_res_ctx_timeout, retry_res_timeout, CoreArgs, KAILUA_GAME_TYPE};
+use crate::telemetry::SyncTelemetry;
+use crate::{await_tel, await_tel_res, retry_res_ctx_timeout, retry_res_timeout, KAILUA_GAME_TYPE};
 use alloy::network::Network;
 use alloy::primitives::{Address, B256, U256};
-use alloy_provider::Provider;
+use alloy::providers::Provider;
 use anyhow::{anyhow, bail, Context};
 use futures::future::join_all;
 use itertools::Itertools;
-use kailua_client::{await_tel, await_tel_res};
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::config::config_hash;
 use kailua_contracts::{
     IDisputeGameFactory::{gameAtIndexReturn, IDisputeGameFactoryInstance},
     *,
 };
-use kailua_host::config::fetch_rollup_config;
 use kona_genesis::RollupConfig;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::FutureExt;
@@ -72,7 +71,7 @@ pub struct SyncAgent {
 
 impl SyncAgent {
     pub async fn new(
-        core_args: &CoreArgs,
+        provider_args: &ProviderArgs,
         mut data_dir: PathBuf,
         game_impl_address: Option<Address>,
         anchor_address: Option<Address>,
@@ -83,13 +82,17 @@ impl SyncAgent {
         let telemetry = SyncTelemetry::new();
 
         // Connect to RPC providers
-        let provider = await_tel_res!(context, SyncProvider::new(core_args), "SyncProvider::new")?;
+        let provider = await_tel_res!(
+            context,
+            SyncProvider::new(provider_args),
+            "SyncProvider::new"
+        )?;
 
         // fetch rollup config
         info!("Fetching rollup configuration from rpc endpoints.");
         let config = await_tel_res!(
             context,
-            fetch_rollup_config(&core_args.op_node_url, &core_args.op_geth_url, None),
+            fetch_rollup_config(&provider_args.op_node_url, &provider_args.op_geth_url, None),
             "fetch_rollup_config"
         )?;
         let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");

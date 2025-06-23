@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::retry_res_ctx_timeout;
+use crate::{await_tel, retry_res_ctx_timeout};
 use alloy::contract::{EthCall, SolCallBuilder};
 use alloy::network::Network;
 use alloy::providers::Provider;
 use alloy::sol_types::SolCall;
 use async_trait::async_trait;
-use kailua_client::await_tel;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use opentelemetry::Context;

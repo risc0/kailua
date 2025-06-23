@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::provider::SyncProvider;
 use crate::stall::Stall;
-use crate::sync::provider::SyncProvider;
 use crate::KAILUA_GAME_TYPE;
 use alloy::primitives::{Address, B256};
 use kailua_contracts::*;

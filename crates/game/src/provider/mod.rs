@@ -12,14 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::transact::blob::BlobProvider;
-use crate::CoreArgs;
-use alloy_provider::RootProvider;
+use crate::await_tel;
+use crate::provider::beacon::BlobProvider;
+use crate::provider::optimism::OpNodeProvider;
+use alloy::providers::RootProvider;
 use anyhow::Context;
-use kailua_client::await_tel;
-use kailua_client::provider::OpNodeProvider;
-use opentelemetry::trace::FutureExt;
-use opentelemetry::trace::{TraceContextExt, Tracer};
+use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
+
+pub mod beacon;
+pub mod optimism;
+
+#[derive(clap::Args, Debug, Clone)]
+pub struct ProviderArgs {
+    /// Address of the OP-NODE endpoint to use
+    #[clap(long, env)]
+    pub op_node_url: String,
+    /// Address of the OP-GETH endpoint to use (eth and debug namespace required).
+    #[clap(long, env)]
+    pub op_geth_url: String,
+    /// Address of the ethereum rpc endpoint to use (eth namespace required)
+    #[clap(long, env)]
+    pub eth_rpc_url: String,
+    /// Address of the L1 Beacon API endpoint to use.
+    #[clap(long, env)]
+    pub beacon_rpc_url: String,
+}
 
 /// A collection of RPC providers for L1 and L2 data
 pub struct SyncProvider {
@@ -34,17 +51,17 @@ pub struct SyncProvider {
 }
 
 impl SyncProvider {
-    pub async fn new(core_args: &CoreArgs) -> anyhow::Result<Self> {
+    pub async fn new(args: &ProviderArgs) -> anyhow::Result<Self> {
         let tracer = opentelemetry::global::tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("SyncProvider::new"));
 
-        let da_provider = await_tel!(context, BlobProvider::new(core_args.beacon_rpc_url.clone()))
+        let da_provider = await_tel!(context, BlobProvider::new(args.beacon_rpc_url.clone()))
             .context("BlobProvider::new")?;
-        let l1_provider = RootProvider::new_http(core_args.eth_rpc_url.as_str().try_into()?);
+        let l1_provider = RootProvider::new_http(args.eth_rpc_url.as_str().try_into()?);
         let op_provider = OpNodeProvider(RootProvider::new_http(
-            core_args.op_node_url.as_str().try_into()?,
+            args.op_node_url.as_str().try_into()?,
         ));
-        let l2_provider = RootProvider::new_http(core_args.op_geth_url.as_str().try_into()?);
+        let l2_provider = RootProvider::new_http(args.op_geth_url.as_str().try_into()?);
 
         Ok(Self {
             da_provider,

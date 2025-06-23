@@ -26,13 +26,13 @@ use kailua_build::KAILUA_FPVM_ID;
 use kailua_client::args::parse_address;
 use kailua_client::boundless::BoundlessArgs;
 use kailua_client::proof::{proof_file_name, read_proof_file};
-use kailua_client::telemetry::TelemetryArgs;
-use kailua_client::{await_tel, await_tel_res};
 use kailua_common::config::config_hash;
 use kailua_common::journal::ProofJournal;
 use kailua_common::precondition::PreconditionValidationData;
+use kailua_game::provider::optimism::fetch_rollup_config;
+use kailua_game::telemetry::TelemetryArgs;
+use kailua_game::{await_tel, await_tel_res};
 use kailua_host::channel::AsyncChannel;
-use kailua_host::config::fetch_rollup_config;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use risc0_zkvm::{is_dev_mode, Receipt};
@@ -132,7 +132,11 @@ pub async fn handle_proof_requests(
     // Fetch rollup configuration
     let rollup_config = await_tel!(
         context,
-        fetch_rollup_config(&args.core.op_node_url, &args.core.op_geth_url, None)
+        fetch_rollup_config(
+            &args.core.provider.op_node_url,
+            &args.core.provider.op_geth_url,
+            None
+        )
     )
     .context("fetch_rollup_config")?;
     let l2_chain_id = rollup_config.l2_chain_id.to_string();

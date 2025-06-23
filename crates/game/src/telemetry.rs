@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use opentelemetry::global::{set_meter_provider, set_tracer_provider};
+use opentelemetry::global::{meter, set_meter_provider, set_tracer_provider};
+use opentelemetry::metrics::{Gauge, Meter};
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::{MetricExporter, SpanExporter, WithExportConfig};
 use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider, Temporality};
@@ -81,4 +82,34 @@ macro_rules! await_tel_res {
     ($c:ident, $t:ident, $l:literal, $e:expr) => {
         $crate::await_tel!($c, $t, $l, $e).context($l)
     };
+}
+
+/// An collection of objects for reporting telemetry information
+pub struct SyncTelemetry {
+    /// Global meter object
+    pub meter: Meter,
+    /// Gauge for reporting the latest canonical block height
+    pub sync_canonical: Gauge<u64>,
+    /// Gauge for reporting the next proposal index to query
+    pub sync_next: Gauge<u64>,
+}
+
+impl Default for SyncTelemetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SyncTelemetry {
+    pub fn new() -> Self {
+        let meter = meter("kailua");
+        let sync_canonical = meter.u64_gauge("sync.canonical").build();
+        let sync_next = meter.u64_gauge("sync.next").build();
+
+        Self {
+            meter,
+            sync_canonical,
+            sync_next,
+        }
+    }
 }

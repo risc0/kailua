@@ -13,9 +13,14 @@
 // limitations under the License.
 
 pub mod agent;
+pub mod blobs;
 pub mod cursor;
 pub mod deployment;
 pub mod fault;
 pub mod proposal;
 pub mod provider;
+pub mod retry;
+pub mod stall;
 pub mod telemetry;
+
+pub const KAILUA_GAME_TYPE: u32 = 1337;

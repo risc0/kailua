@@ -48,6 +48,7 @@ kailua-build.workspace = true
 kailua-client.workspace = true
 kailua-common.workspace = true
 kailua-contracts.workspace = true
+kailua-game.workspace = true
 kailua-host.workspace = true
 
 kona-cli.workspace = true
@@ -65,7 +66,9 @@ risc0-zkvm.workspace = true
 assert_cmd = "2.0.16"
 
 [features]
-devnet = []
+devnet = [
+    "kailua-game/devnet"
+]
 prove = [
     "risc0-zkvm/prove"
 ]

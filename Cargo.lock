@@ -5075,6 +5075,7 @@ dependencies = [
  "kailua-client",
  "kailua-common",
  "kailua-contracts",
+ "kailua-game",
  "kailua-host",
  "kona-cli",
  "kona-derive",
@@ -5119,6 +5120,7 @@ dependencies = [
  "kailua-build",
  "kailua-common",
  "kailua-contracts",
+ "kailua-game",
  "kona-cli",
  "kona-derive",
  "kona-host",
@@ -5192,6 +5194,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "kailua-game"
+version = "1.0.0-rc.1"
+dependencies = [
+ "alloy",
+ "alloy-rpc-types-beacon",
+ "anyhow",
+ "async-trait",
+ "bytemuck",
+ "c-kzg",
+ "clap",
+ "futures",
+ "hex",
+ "itertools 0.14.0",
+ "kailua-build",
+ "kailua-common",
+ "kailua-contracts",
+ "kona-genesis",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
+ "reqwest",
+ "rocksdb",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-retry",
+ "tracing",
+]
+
+[[package]]
 name = "kailua-host"
 version = "1.0.0-rc.1"
 dependencies = [
@@ -5209,6 +5241,7 @@ dependencies = [
  "kailua-build",
  "kailua-client",
  "kailua-common",
+ "kailua-game",
  "kona-cli",
  "kona-client",
  "kona-derive",

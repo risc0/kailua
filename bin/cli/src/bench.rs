@@ -15,7 +15,7 @@
 use crate::CoreArgs;
 use alloy::primitives::map::{Entry, HashMap};
 use alloy::providers::{Provider, ProviderBuilder};
-use kailua_client::telemetry::TelemetryArgs;
+use kailua_game::telemetry::TelemetryArgs;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, Span, Status, TraceContextExt, Tracer};
 use risc0_zkvm::is_dev_mode;
@@ -70,7 +70,7 @@ pub async fn benchmark(args: BenchArgs) -> anyhow::Result<()> {
     let context = opentelemetry::Context::current_with_span(tracer.start("benchmark"));
 
     let l2_node_provider =
-        ProviderBuilder::new().connect_http(args.core.op_geth_url.as_str().try_into()?);
+        ProviderBuilder::new().connect_http(args.core.provider.op_geth_url.as_str().try_into()?);
     let mut cache: HashMap<u64, u64> = HashMap::new();
     // Scan L2 blocks for highest transaction counts
     let bench_end = args.bench_start + args.bench_range;
@@ -139,10 +139,10 @@ pub async fn benchmark(args: BenchArgs) -> anyhow::Result<()> {
             "prove",
             &block_number,
             &block_count,
-            &args.core.eth_rpc_url,
-            &args.core.beacon_rpc_url,
-            &args.core.op_geth_url,
-            &args.core.op_node_url,
+            &args.core.provider.eth_rpc_url,
+            &args.core.provider.beacon_rpc_url,
+            &args.core.provider.op_geth_url,
+            &args.core.provider.op_node_url,
             data_dir.to_str().unwrap(),
             "debug",
             &verbosity_level,

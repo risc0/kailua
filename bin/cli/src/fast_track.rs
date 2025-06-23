@@ -12,22 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stall::Stall;
 use crate::transact::signer::{DeployerSignerArgs, GuardianSignerArgs, OwnerSignerArgs};
 use crate::transact::{Transact, TransactArgs};
-use crate::{retry_res_ctx_timeout, KAILUA_GAME_TYPE};
 use alloy::network::{Ethereum, Network, ReceiptResponse, TxSigner};
 use alloy::primitives::{Address, Bytes, U256};
 use alloy::providers::{Provider, RootProvider};
 use alloy::sol_types::SolValue;
 use anyhow::{anyhow, bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
-use kailua_client::provider::OpNodeProvider;
-use kailua_client::telemetry::TelemetryArgs;
-use kailua_client::{await_tel, await_tel_res};
 use kailua_common::config::{config_hash, BN254_CONTROL_ID, CONTROL_ROOT};
 use kailua_contracts::*;
-use kailua_host::config::fetch_rollup_config;
+use kailua_game::provider::optimism::fetch_rollup_config;
+use kailua_game::provider::optimism::OpNodeProvider;
+use kailua_game::stall::Stall;
+use kailua_game::telemetry::TelemetryArgs;
+use kailua_game::{await_tel, await_tel_res, retry_res_ctx_timeout, KAILUA_GAME_TYPE};
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, Status, TraceContextExt, Tracer};
 use std::str::FromStr;

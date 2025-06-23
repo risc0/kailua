@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::transact::rpc::get_block;
 use alloy::consensus::{BlockHeader, Transaction};
 use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::{BlockResponse, Ethereum, Network, TransactionBuilder4844};
@@ -20,6 +21,9 @@ use alloy_provider::fillers::{FillProvider, TxFiller};
 use alloy_provider::network::TransactionBuilder;
 use alloy_provider::{PendingTransactionBuilder, Provider, RootProvider};
 use async_trait::async_trait;
+use kailua_game::await_tel;
+use opentelemetry::global::tracer;
+use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use tracing::info;
 
 #[derive(Debug, Clone)]
@@ -53,14 +57,20 @@ where
         tx: <Ethereum as Network>::TransactionRequest,
     ) -> TransportResult<PendingTransactionBuilder<Ethereum>> {
         let mut fee_factor = 1.0;
+        let tracer = tracer("kailua");
+        let context = opentelemetry::Context::current_with_span(
+            tracer.start("Proposal::fetch_current_challenger_duration"),
+        );
+
         loop {
             let mut tx = tx.clone();
             // Get latest block
-            let latest_block = self
-                .get_block(BlockId::Number(BlockNumberOrTag::Latest))
-                .await?
-                .map(|b| b.header().number())
-                .unwrap_or_default();
+            let latest_block = await_tel!(
+                context,
+                get_block(self.provider(), BlockNumberOrTag::Latest)
+            )
+            .header()
+            .number();
             info!("Testing transaction viability under block {latest_block}");
 
             // Recover signer

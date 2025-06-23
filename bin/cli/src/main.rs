@@ -14,8 +14,8 @@
 
 use clap::Parser;
 use kailua_cli::KailuaCli;
-use kailua_client::await_tel;
-use kailua_client::telemetry::init_tracer_provider;
+use kailua_game::await_tel;
+use kailua_game::telemetry::init_tracer_provider;
 use opentelemetry::global::{shutdown_tracer_provider, tracer};
 use opentelemetry::trace::{FutureExt, Status, TraceContextExt, Tracer};
 use tempfile::tempdir;
