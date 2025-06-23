@@ -338,7 +338,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         let balance = await_tel!(
             context,
             tracer,
-            "ReqwestProvider::get_balance",
+            "get_balance",
             retry_res_ctx_timeout!(
                 agent
                     .provider

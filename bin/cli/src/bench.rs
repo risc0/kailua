@@ -83,16 +83,17 @@ pub async fn benchmark(args: BenchArgs) -> anyhow::Result<()> {
             txn_count += match cache.entry(block_number) {
                 Entry::Occupied(e) => *e.get(),
                 Entry::Vacant(e) => {
-                    let x = l2_node_provider
-                        .get_block_transaction_count_by_number(block_number.into())
-                        .with_context(context.with_span(tracer.start_with_context(
-                            "ReqwestProvider::get_block_transaction_count_by_number",
-                            &context,
-                        )))
-                        .await?
-                        .unwrap_or_else(|| {
-                            panic!("Failed to fetch transaction count for block {block_number}")
-                        });
+                    let x =
+                        l2_node_provider
+                            .get_block_transaction_count_by_number(block_number.into())
+                            .with_context(context.with_span(tracer.start_with_context(
+                                "get_block_transaction_count_by_number",
+                                &context,
+                            )))
+                            .await?
+                            .unwrap_or_else(|| {
+                                panic!("Failed to fetch transaction count for block {block_number}")
+                            });
                     *e.insert(x)
                 }
             }

@@ -16,23 +16,12 @@ async-channel.workspace = true
 async-trait.workspace = true
 aws-config.workspace = true
 aws-sdk-kms.workspace = true
-bincode.workspace = true
 bytemuck.workspace = true
-c-kzg.workspace = true
 clap.workspace = true
-futures.workspace = true
 gcloud-sdk.workspace = true
 hex.workspace = true
-itertools.workspace = true
 paste.workspace = true
-rayon.workspace = true
-reqwest.workspace = true
-rocksdb.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-sha2.workspace = true
 tempfile.workspace = true
-threadpool.workspace = true
 tokio.workspace = true
 tokio-retry.workspace = true
 tracing-subscriber.workspace = true
@@ -42,7 +31,6 @@ opentelemetry.workspace = true
 
 alloy = { workspace = true, features = ["full", "kzg", "signer-aws", "signer-gcp"] }
 alloy-provider.workspace = true
-alloy-rpc-types-beacon.workspace = true
 
 kailua-build.workspace = true
 kailua-client.workspace = true
@@ -52,14 +40,8 @@ kailua-game.workspace = true
 kailua-host.workspace = true
 
 kona-cli.workspace = true
-kona-genesis.workspace = true
-kona-host.workspace = true
-kona-derive.workspace = true
-kona-proof.workspace = true
 kona-protocol.workspace = true
-kona-providers-alloy.workspace = true
 
-bonsai-sdk.workspace = true
 risc0-zkvm.workspace = true
 
 [dev-dependencies]

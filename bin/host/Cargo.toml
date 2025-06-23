@@ -13,24 +13,17 @@ categories.workspace = true
 [dependencies]
 anyhow.workspace = true
 async-channel.workspace = true
-bincode.workspace = true
 bytemuck.workspace = true
 clap.workspace = true
-hashbrown = { workspace = true, features = ["rayon"] }
-rocksdb = { workspace = true, features = ["multi-threaded-cf"] }
-serde.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
 
-opentelemetry.workspace = true
-
 # Alloy
 alloy = { workspace = true, features = ["rlp", "reqwest"] }
 alloy-primitives = { workspace = true, features = ["map-hashbrown"] }
-alloy-chains.workspace = true
 alloy-eips.workspace = true
 
 # Kailua
@@ -41,8 +34,6 @@ kailua-game.workspace = true
 
 # Kona
 kona-cli.workspace = true
-kona-client.workspace = true
-kona-derive.workspace = true
 kona-genesis.workspace = true
 kona-host.workspace = true
 kona-preimage.workspace = true
@@ -51,7 +42,6 @@ kona-protocol.workspace = true
 kona-registry.workspace = true
 
 # zkVM
-bonsai-sdk.workspace = true
 risc0-zkvm.workspace = true
 
 [features]
