@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::CoreArgs;
 use alloy::primitives::map::{Entry, HashMap};
 use alloy::providers::{Provider, ProviderBuilder};
+use kailua_sync::args::SyncArgs;
 use kailua_sync::telemetry::TelemetryArgs;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, Span, Status, TraceContextExt, Tracer};
@@ -28,7 +28,7 @@ use tracing::{info, warn};
 #[derive(clap::Args, Debug, Clone)]
 pub struct BenchArgs {
     #[clap(flatten)]
-    pub core: CoreArgs,
+    pub sync: SyncArgs,
 
     /// The starting L2 block number to scan for blocks from
     #[clap(long, env)]
@@ -70,7 +70,7 @@ pub async fn benchmark(args: BenchArgs, verbosity: u8) -> anyhow::Result<()> {
     let context = opentelemetry::Context::current_with_span(tracer.start("benchmark"));
 
     let l2_node_provider =
-        ProviderBuilder::new().connect_http(args.core.provider.op_geth_url.as_str().try_into()?);
+        ProviderBuilder::new().connect_http(args.sync.provider.op_geth_url.as_str().try_into()?);
     let mut cache: HashMap<u64, u64> = HashMap::new();
     // Scan L2 blocks for highest transaction counts
     let bench_end = args.bench_start + args.bench_range;
@@ -135,15 +135,15 @@ pub async fn benchmark(args: BenchArgs, verbosity: u8) -> anyhow::Result<()> {
         }
         let block_number = block_number.to_string();
         let block_count = args.bench_length.to_string();
-        let data_dir = args.core.data_dir.clone().unwrap();
+        let data_dir = args.sync.data_dir.clone().unwrap();
         cmd.args(vec![
             "prove",
             &block_number,
             &block_count,
-            &args.core.provider.eth_rpc_url,
-            &args.core.provider.beacon_rpc_url,
-            &args.core.provider.op_geth_url,
-            &args.core.provider.op_node_url,
+            &args.sync.provider.eth_rpc_url,
+            &args.sync.provider.beacon_rpc_url,
+            &args.sync.provider.op_geth_url,
+            &args.sync.provider.op_node_url,
             data_dir.to_str().unwrap(),
             "debug",
             &verbosity_level,

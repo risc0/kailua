@@ -62,7 +62,7 @@ pub fn create_proving_args(
         payout_recipient.to_string(),
         // l2 el node
         String::from("--op-node-address"),
-        args.core.provider.op_node_url.clone(),
+        args.sync.provider.op_node_url.clone(),
     ];
     // precondition data
     if let Some(precondition_data) = precondition_validation_data {
@@ -128,13 +128,13 @@ pub fn create_proving_args(
         l2_chain_id.clone(),
         // l1 el node
         String::from("--l1-node-address"),
-        args.core.provider.eth_rpc_url.clone(),
+        args.sync.provider.eth_rpc_url.clone(),
         // l1 cl node
         String::from("--l1-beacon-address"),
-        args.core.provider.beacon_rpc_url.clone(),
+        args.sync.provider.beacon_rpc_url.clone(),
         // l2 el node
         String::from("--l2-node-address"),
-        args.core.provider.op_geth_url.clone(),
+        args.sync.provider.op_geth_url.clone(),
         // path to cache
         String::from("--data-dir"),
         data_dir.to_str().unwrap().to_string(),

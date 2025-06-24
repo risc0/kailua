@@ -52,7 +52,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
 
     let op_node_provider = OpNodeProvider(RootProvider::new_http(
         args.propose_args
-            .core
+            .sync
             .provider
             .op_node_url
             .as_str()
@@ -60,7 +60,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     ));
     let eth_rpc_provider = RootProvider::<Ethereum>::new_http(
         args.propose_args
-            .core
+            .sync
             .provider
             .eth_rpc_url
             .as_str()
@@ -72,8 +72,8 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
     let config = await_tel!(
         context,
         fetch_rollup_config(
-            &args.propose_args.core.provider.op_node_url,
-            &args.propose_args.core.provider.op_geth_url,
+            &args.propose_args.sync.provider.op_node_url,
+            &args.propose_args.sync.provider.op_geth_url,
             None,
         )
     )
@@ -105,7 +105,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
         .wallet(tester_wallet)
         .connect_http(
             args.propose_args
-                .core
+                .sync
                 .provider
                 .eth_rpc_url
                 .as_str()

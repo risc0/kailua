@@ -62,7 +62,7 @@ pub async fn handle_proposals(
 
     // initialize sync agent
     let mut agent = SyncAgent::new(
-        &args.core.provider,
+        &args.sync.provider,
         data_dir,
         args.kailua_game_implementation,
         args.kailua_anchor_address,
@@ -83,7 +83,7 @@ pub async fn handle_proposals(
         args.txn_args
             .premium_provider::<Ethereum>()
             .wallet(validator_wallet)
-            .connect_http(args.core.provider.eth_rpc_url.as_str().try_into()?),
+            .connect_http(args.sync.provider.eth_rpc_url.as_str().try_into()?),
     );
     info!("Validator address: {validator_address}");
 
@@ -106,7 +106,7 @@ pub async fn handle_proposals(
             context,
             agent.sync(
                 #[cfg(feature = "devnet")]
-                args.core.delay_l2_blocks
+                args.sync.delay_l2_blocks
             )
         )
         .context("SyncAgent::sync")

@@ -12,17 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod agent;
-pub mod args;
-pub mod blobs;
-pub mod cursor;
-pub mod deployment;
-pub mod fault;
-pub mod proposal;
-pub mod provider;
-pub mod retry;
-pub mod stall;
-pub mod telemetry;
-pub mod transact;
+use crate::provider::ProviderArgs;
+use std::path::PathBuf;
 
-pub const KAILUA_GAME_TYPE: u32 = 1337;
+#[derive(clap::Args, Debug, Clone)]
+pub struct SyncArgs {
+    #[clap(flatten)]
+    pub provider: ProviderArgs,
+
+    #[cfg(feature = "devnet")]
+    #[clap(long, env, default_value_t = 0)]
+    pub delay_l2_blocks: u64,
+
+    /// Directory to use for caching data
+    #[clap(long, env)]
+    pub data_dir: Option<PathBuf>,
+}

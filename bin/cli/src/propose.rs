@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::CoreArgs;
 use alloy::consensus::BlockHeader;
 use alloy::eips::BlockNumberOrTag;
 use alloy::network::{BlockResponse, Ethereum, Network, ReceiptResponse, TxSigner};
@@ -24,6 +23,7 @@ use kailua_client::args::parse_address;
 use kailua_common::blobs::hash_to_fe;
 use kailua_contracts::*;
 use kailua_sync::agent::SyncAgent;
+use kailua_sync::args::SyncArgs;
 use kailua_sync::proposal::{Proposal, ELIMINATIONS_LIMIT};
 use kailua_sync::stall::Stall;
 use kailua_sync::telemetry::TelemetryArgs;
@@ -45,7 +45,7 @@ use tracing::{debug, error, info, warn};
 #[derive(clap::Args, Debug, Clone)]
 pub struct ProposeArgs {
     #[clap(flatten)]
-    pub core: CoreArgs,
+    pub sync: SyncArgs,
 
     /// L1 wallet to use for proposing outputs
     #[clap(flatten)]
@@ -81,7 +81,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
 
     // initialize sync agent
     let mut agent = SyncAgent::new(
-        &args.core.provider,
+        &args.sync.provider,
         data_dir,
         args.kailua_game_implementation,
         args.kailua_anchor_address,
@@ -102,7 +102,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         args.txn_args
             .premium_provider::<Ethereum>()
             .wallet(&proposer_wallet)
-            .connect_http(args.core.provider.eth_rpc_url.as_str().try_into()?),
+            .connect_http(args.sync.provider.eth_rpc_url.as_str().try_into()?),
     );
     info!("Proposer address: {proposer_address}");
 
@@ -122,7 +122,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             context,
             agent.sync(
                 #[cfg(feature = "devnet")]
-                args.core.delay_l2_blocks
+                args.sync.delay_l2_blocks
             )
         )
         .context("SyncAgent::sync")

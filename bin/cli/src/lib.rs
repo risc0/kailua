@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use kailua_sync::provider::ProviderArgs;
 use kailua_sync::telemetry::TelemetryArgs;
 use std::path::PathBuf;
 
@@ -74,20 +73,6 @@ pub struct CliArgs {
     pub v: u8,
 }
 
-#[derive(clap::Args, Debug, Clone)]
-pub struct CoreArgs {
-    #[clap(flatten)]
-    pub provider: ProviderArgs,
-
-    #[cfg(feature = "devnet")]
-    #[clap(long, env, default_value_t = 0)]
-    pub delay_l2_blocks: u64,
-
-    /// Directory to use for caching data
-    #[clap(long, env)]
-    pub data_dir: Option<PathBuf>,
-}
-
 impl KailuaCli {
     pub fn verbosity(&self) -> u8 {
         match self {
@@ -102,8 +87,8 @@ impl KailuaCli {
 
     pub fn data_dir(&self) -> Option<PathBuf> {
         match self {
-            KailuaCli::Propose { args, .. } => args.core.data_dir.clone(),
-            KailuaCli::Validate { args, .. } => args.core.data_dir.clone(),
+            KailuaCli::Propose { args, .. } => args.sync.data_dir.clone(),
+            KailuaCli::Validate { args, .. } => args.sync.data_dir.clone(),
             _ => None,
         }
     }

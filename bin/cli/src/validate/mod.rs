@@ -17,7 +17,6 @@ pub mod proving;
 
 use crate::channel::DuplexChannel;
 use crate::validate::proving::{create_proving_args, Task};
-use crate::CoreArgs;
 use alloy::primitives::{Address, FixedBytes, B256};
 use anyhow::{anyhow, bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
@@ -28,6 +27,7 @@ use kailua_common::config::config_hash;
 use kailua_common::journal::ProofJournal;
 use kailua_common::precondition::PreconditionValidationData;
 use kailua_host::channel::AsyncChannel;
+use kailua_sync::args::SyncArgs;
 use kailua_sync::provider::optimism::fetch_rollup_config;
 use kailua_sync::telemetry::TelemetryArgs;
 use kailua_sync::transact::signer::ValidatorSignerArgs;
@@ -47,7 +47,7 @@ use tracing::{debug, error, info, warn};
 #[derive(clap::Args, Debug, Clone)]
 pub struct ValidateArgs {
     #[clap(flatten)]
-    pub core: CoreArgs,
+    pub sync: SyncArgs,
 
     /// Path to the kailua host binary to use for proving
     #[clap(long, env)]
@@ -140,8 +140,8 @@ pub async fn handle_proof_requests(
     let rollup_config = await_tel!(
         context,
         fetch_rollup_config(
-            &args.core.provider.op_node_url,
-            &args.core.provider.op_geth_url,
+            &args.sync.provider.op_node_url,
+            &args.sync.provider.op_geth_url,
             None
         )
     )
