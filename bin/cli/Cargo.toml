@@ -29,7 +29,6 @@ alloy = { workspace = true, features = ["full", "kzg", "signer-aws", "signer-gcp
 kailua-build.workspace = true
 kailua-common.workspace = true
 kailua-contracts.workspace = true
-kailua-host.workspace = true
 kailua-proposer.workspace = true
 kailua-prover.workspace = true
 kailua-sync.workspace = true

@@ -18,12 +18,12 @@ use alloy_primitives::B256;
 use anyhow::{anyhow, bail, Context};
 use clap::Parser;
 use kailua_common::boot::StitchedBootInfo;
-use kailua_host::args::KailuaHostArgs;
-use kailua_host::channel::AsyncChannel;
-use kailua_host::config::generate_rollup_config;
-use kailua_host::preflight::{concurrent_execution_preflight, fetch_precondition_data};
-use kailua_host::server::create_disk_kv_store;
-use kailua_host::tasks::{handle_oneshot_tasks, Cached, Oneshot, OneshotResult};
+use kailua_prover::args::ProveArgs;
+use kailua_prover::channel::AsyncChannel;
+use kailua_prover::config::generate_rollup_config_file;
+use kailua_prover::kv::create_disk_kv_store;
+use kailua_prover::preflight::{concurrent_execution_preflight, fetch_precondition_data};
+use kailua_prover::tasks::{handle_oneshot_tasks, Cached, Oneshot, OneshotResult};
 use kailua_prover::ProvingError;
 use kailua_sync::provider::optimism::OpNodeProvider;
 use std::collections::BinaryHeap;
@@ -34,9 +34,8 @@ use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let mut args = KailuaHostArgs::parse();
+    let mut args = ProveArgs::parse();
     kona_cli::init_tracing_subscriber(args.v, None::<EnvFilter>)?;
-    set_var("KAILUA_VERBOSITY", args.v.to_string());
 
     // fetch starting block number
     let l2_provider = if args.kona.is_offline() {
@@ -58,7 +57,7 @@ async fn main() -> anyhow::Result<()> {
         args.kona.data_dir = Some(tmp_dir.path().to_path_buf());
     }
     // fetch rollup config
-    let rollup_config = generate_rollup_config(&mut args, &tmp_dir)
+    let rollup_config = generate_rollup_config_file(&mut args, &tmp_dir)
         .await
         .context("generate_rollup_config")
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
@@ -149,7 +148,7 @@ async fn main() -> anyhow::Result<()> {
             let task_channel = task_channel.clone();
             let result_channel = result_channel.clone();
             tokio::spawn(async move {
-                let result = kailua_host::prove::compute_fpvm_proof(
+                let result = kailua_prover::tasks::compute_fpvm_proof(
                     job_args.clone(),
                     rollup_config,
                     disk_kv_store,
@@ -309,7 +308,7 @@ async fn main() -> anyhow::Result<()> {
             .map(StitchedBootInfo::from)
             .collect::<Vec<_>>();
 
-        kailua_host::prove::compute_fpvm_proof(
+        kailua_prover::tasks::compute_fpvm_proof(
             base_args,
             rollup_config.clone(),
             disk_kv_store.clone(),

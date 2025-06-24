@@ -12,32 +12,181 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::args::KailuaHostArgs;
+use crate::args::ProveArgs;
 use crate::kv::RWLKeyValueStore;
-use crate::tasks;
-use crate::tasks::{Cached, Oneshot};
+use crate::proof::{proof_file_name, read_proof_file};
+use crate::ProvingError;
 use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
-use async_channel::Sender;
+use async_channel::{Receiver, Sender};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_common::boot::StitchedBootInfo;
 use kailua_common::client::stitching::{split_executions, stitch_boot_info};
 use kailua_common::executor::{exec_precondition_hash, Execution};
-use kailua_prover::proof::{proof_file_name, read_proof_file};
-use kailua_prover::ProvingError;
 use kona_genesis::RollupConfig;
 use kona_proof::BootInfo;
 use risc0_zkvm::Receipt;
+use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::convert::identity;
 use std::path::Path;
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
+
+#[derive(Clone, Debug)]
+pub struct Cached {
+    pub args: ProveArgs,
+    pub rollup_config: RollupConfig,
+    pub disk_kv_store: Option<RWLKeyValueStore>,
+    pub precondition_hash: B256,
+    pub precondition_validation_data_hash: B256,
+    pub stitched_executions: Vec<Vec<Execution>>,
+    pub stitched_boot_info: Vec<StitchedBootInfo>,
+    pub stitched_proofs: Vec<Receipt>,
+    pub prove_snark: bool,
+    pub force_attempt: bool,
+    pub seek_proof: bool,
+}
+
+impl PartialEq for Cached {
+    fn eq(&self, other: &Self) -> bool {
+        self.args.eq(&other.args)
+    }
+}
+
+impl Eq for Cached {}
+
+impl PartialOrd for Cached {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Cached {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.args.cmp(&other.args)
+    }
+}
+
+#[derive(Debug)]
+pub struct OneshotResult {
+    pub cached: Cached,
+    pub result: Result<Receipt, ProvingError>,
+}
+
+impl PartialEq for OneshotResult {
+    fn eq(&self, other: &Self) -> bool {
+        self.cached.eq(&other.cached)
+    }
+}
+
+impl Eq for OneshotResult {}
+
+impl PartialOrd for OneshotResult {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for OneshotResult {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.cached.cmp(&other.cached)
+    }
+}
+
+#[derive(Debug)]
+pub struct Oneshot {
+    pub cached_task: Cached,
+    pub result_sender: Sender<OneshotResult>,
+}
+
+pub async fn handle_oneshot_tasks(task_receiver: Receiver<Oneshot>) -> anyhow::Result<()> {
+    loop {
+        let Oneshot {
+            cached_task,
+            result_sender,
+        } = task_receiver
+            .recv()
+            .await
+            .context("task receiver channel closed")?;
+
+        if let Err(res) = result_sender
+            .send(OneshotResult {
+                cached: cached_task.clone(),
+                result: compute_cached_proof(
+                    cached_task.args,
+                    cached_task.rollup_config,
+                    cached_task.disk_kv_store,
+                    cached_task.precondition_hash,
+                    cached_task.precondition_validation_data_hash,
+                    cached_task.stitched_executions,
+                    cached_task.stitched_boot_info,
+                    cached_task.stitched_proofs,
+                    cached_task.prove_snark,
+                    cached_task.force_attempt,
+                    cached_task.seek_proof,
+                )
+                .await,
+            })
+            .await
+        {
+            error!("failed to send task result: {res:?}");
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn compute_oneshot_task(
+    args: ProveArgs,
+    rollup_config: RollupConfig,
+    disk_kv_store: Option<RWLKeyValueStore>,
+    precondition_hash: B256,
+    precondition_validation_data_hash: B256,
+    stitched_executions: Vec<Vec<Execution>>,
+    stitched_boot_info: Vec<StitchedBootInfo>,
+    stitched_proofs: Vec<Receipt>,
+    prove_snark: bool,
+    force_attempt: bool,
+    seek_proof: bool,
+    task_sender: Sender<Oneshot>,
+) -> Result<Receipt, ProvingError> {
+    // create proving task
+    let cached_task = Cached {
+        args,
+        rollup_config,
+        disk_kv_store,
+        precondition_hash,
+        precondition_validation_data_hash,
+        stitched_executions,
+        stitched_boot_info,
+        stitched_proofs,
+        prove_snark,
+        force_attempt,
+        seek_proof,
+    };
+    // create onshot channel
+    let oneshot_channel = async_channel::bounded(1);
+    // dispatch task to pool
+    task_sender
+        .send(Oneshot {
+            cached_task,
+            result_sender: oneshot_channel.0,
+        })
+        .await
+        .expect("Oneshot channel closed");
+    // wait for result
+    oneshot_channel
+        .1
+        .recv()
+        .await
+        .expect("oneshot_channel should never panic")
+        .result
+}
 
 /// Computes a receipt if it is not cached
 #[allow(clippy::too_many_arguments)]
 pub async fn compute_fpvm_proof(
-    args: KailuaHostArgs,
+    args: ProveArgs,
     rollup_config: RollupConfig,
     disk_kv_store: Option<RWLKeyValueStore>,
     precondition_hash: B256,
@@ -62,7 +211,7 @@ pub async fn compute_fpvm_proof(
     let stitching_only = args.kona.agreed_l2_output_root == args.kona.claimed_l2_output_root;
     // generate master proof
     info!("Attempting complete proof.");
-    let complete_proof_result = tasks::compute_oneshot_task(
+    let complete_proof_result = compute_oneshot_task(
         args.clone(),
         rollup_config.clone(),
         disk_kv_store.clone(),
@@ -95,7 +244,7 @@ pub async fn compute_fpvm_proof(
             "Performing derivation-only run for {} executions.",
             execution_cache.len()
         );
-        let derivation_only_result = tasks::compute_oneshot_task(
+        let derivation_only_result = compute_oneshot_task(
             args.clone(),
             rollup_config.clone(),
             disk_kv_store.clone(),
@@ -257,7 +406,7 @@ pub async fn compute_fpvm_proof(
         stitched_executions.len()
     );
     Ok(Some(
-        tasks::compute_oneshot_task(
+        compute_oneshot_task(
             args,
             rollup_config,
             disk_kv_store,
@@ -276,7 +425,7 @@ pub async fn compute_fpvm_proof(
 }
 
 pub fn create_cached_execution_task(
-    args: KailuaHostArgs,
+    args: ProveArgs,
     rollup_config: RollupConfig,
     disk_kv_store: Option<RWLKeyValueStore>,
     execution_cache: &[Arc<Execution>],
@@ -331,7 +480,7 @@ pub fn create_cached_execution_task(
 
 #[allow(clippy::too_many_arguments)]
 pub async fn compute_cached_proof(
-    args: KailuaHostArgs,
+    args: ProveArgs,
     rollup_config: RollupConfig,
     disk_kv_store: Option<RWLKeyValueStore>,
     precondition_hash: B256,
@@ -368,7 +517,7 @@ pub async fn compute_cached_proof(
         info!("Computing uncached proof.");
 
         // generate a proof using the kailua client and kona server
-        crate::server::start_server_and_native_client(
+        crate::client::native::run_native_client(
             args,
             disk_kv_store,
             precondition_validation_data_hash,

@@ -12,17 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy_primitives::B256;
-use clap::{ArgAction, Parser};
-use kailua_prover::backends::boundless::BoundlessArgs;
-use kailua_prover::ProvingArgs;
-use kailua_sync::args::parse_b256;
+use crate::backends::boundless::BoundlessArgs;
+use alloy_primitives::{Address, B256};
+use clap::Parser;
+use kailua_sync::args::{parse_address, parse_b256};
 use kailua_sync::telemetry::TelemetryArgs;
 use std::cmp::Ordering;
 
+#[derive(Parser, Clone, Debug)]
+pub struct ProvingArgs {
+    #[clap(long, env, value_parser = parse_address)]
+    pub payout_recipient_address: Option<Address>,
+    #[clap(long, env, required = false, default_value_t = 21)]
+    pub segment_limit: u32,
+    #[clap(long, env, required = false, default_value_t = 2_684_354_560)]
+    pub max_witness_size: usize,
+    #[clap(long, env, default_value_t = false)]
+    pub skip_derivation_proof: bool,
+    #[clap(long, env, default_value_t = false)]
+    pub skip_await_proof: bool,
+}
+
 /// The host binary CLI application arguments.
 #[derive(Parser, Clone, Debug)]
-pub struct KailuaHostArgs {
+pub struct ProveArgs {
     #[clap(flatten)]
     pub kona: kona_host::single::SingleChainHost,
 
@@ -53,12 +66,11 @@ pub struct KailuaHostArgs {
     #[clap(flatten)]
     pub telemetry: TelemetryArgs,
 
-    /// Verbosity level (0-2)
-    #[arg(long, short, action = ArgAction::Count)]
+    #[arg(long, short, help = "Verbosity level (0-4)", action = clap::ArgAction::Count)]
     pub v: u8,
 }
 
-impl PartialEq<Self> for KailuaHostArgs {
+impl PartialEq<Self> for ProveArgs {
     fn eq(&self, other: &Self) -> bool {
         self.kona
             .claimed_l2_block_number
@@ -66,15 +78,15 @@ impl PartialEq<Self> for KailuaHostArgs {
     }
 }
 
-impl Eq for KailuaHostArgs {}
+impl Eq for ProveArgs {}
 
-impl PartialOrd<Self> for KailuaHostArgs {
+impl PartialOrd<Self> for ProveArgs {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for KailuaHostArgs {
+impl Ord for ProveArgs {
     fn cmp(&self, other: &Self) -> Ordering {
         self.kona
             .claimed_l2_block_number

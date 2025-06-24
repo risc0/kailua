@@ -13,9 +13,13 @@
 // limitations under the License.
 
 use alloy_primitives::B256;
-use kona_host::{DiskKeyValueStore, KeyValueStore};
+use kona_host::single::{SingleChainHost, SingleChainLocalInputs};
+use kona_host::{
+    DiskKeyValueStore, KeyValueStore, MemoryKeyValueStore, SharedKeyValueStore, SplitKeyValueStore,
+};
 use std::ops::Deref;
 use std::sync::{Arc, RwLock};
+use tokio::sync;
 
 #[derive(Debug, Clone)]
 pub struct RWLKeyValueStore(Arc<RwLock<DiskKeyValueStore>>);
@@ -42,4 +46,28 @@ impl KeyValueStore for RWLKeyValueStore {
     fn set(&mut self, key: B256, value: Vec<u8>) -> anyhow::Result<()> {
         self.write().unwrap().set(key, value)
     }
+}
+
+pub fn create_disk_kv_store(kona: &SingleChainHost) -> Option<RWLKeyValueStore> {
+    kona.data_dir
+        .as_ref()
+        .map(|data_dir| RWLKeyValueStore::from(DiskKeyValueStore::new(data_dir.clone())))
+}
+
+pub fn create_split_kv_store(
+    kona: &SingleChainHost,
+    disk_kv_store: Option<RWLKeyValueStore>,
+) -> anyhow::Result<SharedKeyValueStore> {
+    let local_kv_store = SingleChainLocalInputs::new(kona.clone());
+
+    let kv_store: SharedKeyValueStore = if let Some(disk_kv_store) = disk_kv_store {
+        let split_kv_store = SplitKeyValueStore::new(local_kv_store, disk_kv_store);
+        Arc::new(sync::RwLock::new(split_kv_store))
+    } else {
+        let mem_kv_store = MemoryKeyValueStore::new();
+        let split_kv_store = SplitKeyValueStore::new(local_kv_store, mem_kv_store);
+        Arc::new(sync::RwLock::new(split_kv_store))
+    };
+
+    Ok(kv_store)
 }

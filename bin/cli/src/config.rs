@@ -30,9 +30,6 @@ use tracing::debug;
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct ConfigArgs {
-    #[arg(long, short, help = "Verbosity level (0-4)", action = clap::ArgAction::Count)]
-    pub v: u8,
-
     /// URL of OP-NODE endpoint to use
     #[clap(long, env)]
     pub op_node_url: String,

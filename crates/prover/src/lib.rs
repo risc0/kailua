@@ -12,28 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy_primitives::Address;
-use clap::Parser;
 use kailua_common::executor::Execution;
-use kailua_sync::args::parse_address;
 
+pub mod args;
 pub mod backends;
+pub mod channel;
 pub mod client;
+pub mod config;
+pub mod kv;
+pub mod preflight;
 pub mod proof;
-
-#[derive(Parser, Clone, Debug)]
-pub struct ProvingArgs {
-    #[clap(long, env, value_parser = parse_address)]
-    pub payout_recipient_address: Option<Address>,
-    #[clap(long, env, required = false, default_value_t = 21)]
-    pub segment_limit: u32,
-    #[clap(long, env, required = false, default_value_t = 2_684_354_560)]
-    pub max_witness_size: usize,
-    #[clap(long, env, default_value_t = false)]
-    pub skip_derivation_proof: bool,
-    #[clap(long, env, default_value_t = false)]
-    pub skip_await_proof: bool,
-}
+pub mod tasks;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProvingError {

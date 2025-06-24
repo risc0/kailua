@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::args::ProvingArgs;
 use crate::backends::{KailuaProveInfo, KailuaSessionStats};
-use crate::{ProvingArgs, ProvingError};
+use crate::ProvingError;
 use anyhow::{anyhow, Context};
 use bonsai_sdk::non_blocking::Client;
 use human_bytes::human_bytes;

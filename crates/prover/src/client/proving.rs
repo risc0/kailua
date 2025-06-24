@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::args::ProvingArgs;
 use crate::backends::bonsai::{run_bonsai_client, should_use_bonsai};
 use crate::backends::boundless::{run_boundless_client, BoundlessArgs};
 use crate::backends::zkvm::run_zkvm_client;
 use crate::client::witgen;
 use crate::proof::proof_file_name;
-use crate::{ProvingArgs, ProvingError};
+use crate::ProvingError;
 use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
 use kailua_common::boot::StitchedBootInfo;

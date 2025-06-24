@@ -13,9 +13,7 @@ categories.workspace = true
 [dependencies]
 anyhow.workspace = true
 async-channel.workspace = true
-bytemuck.workspace = true
 clap.workspace = true
-serde_json.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
 tracing-subscriber.workspace = true
@@ -34,12 +32,6 @@ kailua-sync.workspace = true
 
 # Kona
 kona-cli.workspace = true
-kona-genesis.workspace = true
-kona-host.workspace = true
-kona-preimage.workspace = true
-kona-proof.workspace = true
-kona-protocol.workspace = true
-kona-registry.workspace = true
 
 # zkVM
 risc0-zkvm.workspace = true

@@ -12,17 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::args::KailuaHostArgs;
-use crate::kv::RWLKeyValueStore;
+use crate::args::ProveArgs;
+use crate::kv::{create_disk_kv_store, create_split_kv_store, RWLKeyValueStore};
+use crate::ProvingError;
 use alloy_primitives::B256;
 use anyhow::anyhow;
 use kailua_common::boot::StitchedBootInfo;
 use kailua_common::executor::Execution;
-use kailua_prover::ProvingError;
-use kona_host::single::{SingleChainHintHandler, SingleChainHost, SingleChainLocalInputs};
+use kona_host::single::{SingleChainHintHandler, SingleChainHost};
 use kona_host::{
-    DiskKeyValueStore, MemoryKeyValueStore, OfflineHostBackend, OnlineHostBackend, PreimageServer,
-    PreimageServerError, SharedKeyValueStore, SplitKeyValueStore,
+    OfflineHostBackend, OnlineHostBackend, PreimageServer, PreimageServerError, SharedKeyValueStore,
 };
 use kona_preimage::{
     BidirectionalChannel, Channel, HintReader, HintWriter, OracleReader, OracleServer,
@@ -30,7 +29,6 @@ use kona_preimage::{
 use kona_proof::HintType;
 use risc0_zkvm::Receipt;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tokio::task;
 use tokio::task::JoinHandle;
 use tracing::info;
@@ -46,8 +44,8 @@ use tracing::info;
 /// - `Err(_)` if the client program failed to execute, was killed by a signal, or the host program
 ///   exited first.
 #[allow(clippy::too_many_arguments)]
-pub async fn start_server_and_native_client(
-    args: KailuaHostArgs,
+pub async fn run_native_client(
+    args: ProveArgs,
     disk_kv_store: Option<RWLKeyValueStore>,
     precondition_validation_data_hash: B256,
     stitched_executions: Vec<Vec<Execution>>,
@@ -65,13 +63,13 @@ pub async fn start_server_and_native_client(
         None => create_disk_kv_store(&args.kona),
         v => v,
     };
-    let kv_store = create_key_value_store(&args.kona, disk_kv_store)
+    let kv_store = create_split_kv_store(&args.kona, disk_kv_store)
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     let server_task = start_server(&args.kona, kv_store, hint.host, preimage.host)
         .await
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-    // Start the client program in a separate child process.
-    let program_task = tokio::spawn(kailua_prover::client::proving::run_proving_client(
+    // Start the client program in a separate thread
+    let client_task = tokio::spawn(crate::client::proving::run_proving_client(
         args.proving,
         args.boundless,
         OracleReader::new(preimage.client),
@@ -86,35 +84,11 @@ pub async fn start_server_and_native_client(
     ));
     // Wait for both tasks to complete.
     info!("Starting preimage server and client program.");
-    let (_, client_result) = tokio::try_join!(server_task, program_task,)
+    let (_, client_result) = tokio::try_join!(server_task, client_task,)
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     info!(target: "kona_host", "Preimage server and client program have joined.");
     // Return execution result
     client_result
-}
-
-pub fn create_disk_kv_store(kona: &SingleChainHost) -> Option<RWLKeyValueStore> {
-    kona.data_dir
-        .as_ref()
-        .map(|data_dir| RWLKeyValueStore::from(DiskKeyValueStore::new(data_dir.clone())))
-}
-
-pub fn create_key_value_store(
-    kona: &SingleChainHost,
-    disk_kv_store: Option<RWLKeyValueStore>,
-) -> anyhow::Result<SharedKeyValueStore> {
-    let local_kv_store = SingleChainLocalInputs::new(kona.clone());
-
-    let kv_store: SharedKeyValueStore = if let Some(disk_kv_store) = disk_kv_store {
-        let split_kv_store = SplitKeyValueStore::new(local_kv_store, disk_kv_store);
-        Arc::new(RwLock::new(split_kv_store))
-    } else {
-        let mem_kv_store = MemoryKeyValueStore::new();
-        let split_kv_store = SplitKeyValueStore::new(local_kv_store, mem_kv_store);
-        Arc::new(RwLock::new(split_kv_store))
-    };
-
-    Ok(kv_store)
 }
 
 pub async fn start_server<C>(

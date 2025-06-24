@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::args::KailuaHostArgs;
+use crate::args::ProveArgs;
 use crate::kv::RWLKeyValueStore;
+use crate::ProvingError;
 use alloy::consensus::Transaction;
+use alloy::eips::eip4844::IndexedBlobHash;
+use alloy::eips::BlockNumberOrTag;
 use alloy::providers::{Provider, RootProvider};
-use alloy_eips::eip4844::IndexedBlobHash;
-use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::B256;
 use anyhow::bail;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
-use kailua_prover::ProvingError;
 use kailua_sync::provider::optimism::OpNodeProvider;
 use kona_genesis::RollupConfig;
 use kona_preimage::{PreimageKey, PreimageKeyType};
@@ -74,7 +74,7 @@ pub async fn get_blob_fetch_request(
 }
 
 pub async fn fetch_precondition_data(
-    cfg: &KailuaHostArgs,
+    cfg: &ProveArgs,
 ) -> anyhow::Result<Option<PreconditionValidationData>> {
     // Determine precondition hash
     let hash_arguments = [
@@ -134,7 +134,7 @@ pub async fn fetch_precondition_data(
 
 #[allow(clippy::too_many_arguments)]
 pub async fn concurrent_execution_preflight(
-    args: &KailuaHostArgs,
+    args: &ProveArgs,
     rollup_config: RollupConfig,
     op_node_provider: &OpNodeProvider,
     disk_kv_store: Option<RWLKeyValueStore>,
@@ -175,7 +175,7 @@ pub async fn concurrent_execution_preflight(
             .output_at_block(args.kona.claimed_l2_block_number)
             .await?;
         // queue and start new job
-        jobs.push(tokio::spawn(crate::prove::compute_cached_proof(
+        jobs.push(tokio::spawn(crate::tasks::compute_cached_proof(
             args.clone(),
             rollup_config.clone(),
             disk_kv_store.clone(),

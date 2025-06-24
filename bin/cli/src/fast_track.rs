@@ -35,9 +35,6 @@ use tracing::info;
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct FastTrackArgs {
-    #[arg(long, short, help = "Verbosity level (0-4)", action = clap::ArgAction::Count)]
-    pub v: u8,
-
     /// Address of the OP-NODE endpoint to use
     #[clap(long, env)]
     pub op_node_url: String,
