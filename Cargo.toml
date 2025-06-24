@@ -89,6 +89,7 @@ kailua-client = { path = "bin/client" }
 kailua-common = { path = "crates/common" }
 kailua-contracts = { path = "crates/contracts" }
 kailua-host = { path = "bin/host" }
+kailua-proposer = { path = "crates/proposer" }
 kailua-sync = { path = "crates/sync" }
 
 # Kona git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1"

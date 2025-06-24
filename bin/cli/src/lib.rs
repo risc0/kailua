@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use kailua_proposer::args;
 use kailua_sync::telemetry::TelemetryArgs;
 use std::path::PathBuf;
 
@@ -20,7 +21,6 @@ pub mod channel;
 pub mod config;
 pub mod fast_track;
 pub mod fault;
-pub mod propose;
 pub mod validate;
 
 #[derive(clap::Parser, Debug, Clone)]
@@ -43,7 +43,7 @@ pub enum KailuaCli {
     },
     Propose {
         #[clap(flatten)]
-        args: propose::ProposeArgs,
+        args: args::ProposeArgs,
         #[clap(flatten)]
         cli: CliArgs,
     },

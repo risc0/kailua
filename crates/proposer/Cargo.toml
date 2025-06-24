@@ -1,5 +1,5 @@
 [package]
-name = "kailua-cli"
+name = "kailua-proposer"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -27,11 +27,8 @@ opentelemetry.workspace = true
 alloy = { workspace = true, features = ["full", "kzg", "signer-aws", "signer-gcp"] }
 
 kailua-build.workspace = true
-kailua-client.workspace = true
 kailua-common.workspace = true
 kailua-contracts.workspace = true
-kailua-host.workspace = true
-kailua-proposer.workspace = true
 kailua-sync.workspace = true
 
 kona-cli.workspace = true
@@ -39,26 +36,7 @@ kona-protocol.workspace = true
 
 risc0-zkvm.workspace = true
 
-[dev-dependencies]
-assert_cmd = "2.0.16"
-
 [features]
 devnet = [
-    "kailua-proposer/devnet",
-    "kailua-sync/devnet",
-]
-prove = [
-    "risc0-zkvm/prove"
-]
-cuda = [
-    "risc0-zkvm/cuda"
-]
-metal = [
-    "risc0-zkvm/metal"
-]
-disable-dev-mode = [
-    "risc0-zkvm/disable-dev-mode"
-]
-rebuild-fpvm = [
-    "kailua-build/rebuild-fpvm"
+    "kailua-sync/devnet"
 ]

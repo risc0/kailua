@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::args::parse_address;
 use crate::boundless::BoundlessArgs;
 use crate::{bonsai, boundless, proof, witgen, zkvm};
 use alloy_primitives::{Address, B256};
@@ -24,6 +23,7 @@ use kailua_common::executor::Execution;
 use kailua_common::journal::ProofJournal;
 use kailua_common::oracle::vec::{PreimageVecEntry, VecOracle};
 use kailua_common::witness::Witness;
+use kailua_sync::args::parse_address;
 use kona_preimage::{HintWriterClient, PreimageOracleClient};
 use kona_proof::l1::OracleBlobProvider;
 use kona_proof::CachingOracle;

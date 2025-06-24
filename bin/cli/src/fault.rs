@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::propose::ProposeArgs;
 use alloy::eips::eip4844::FIELD_ELEMENTS_PER_BLOB;
 use alloy::network::Ethereum;
 use alloy::primitives::{Bytes, B256, U256};
@@ -22,6 +21,7 @@ use anyhow::Context;
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::config::config_hash;
 use kailua_contracts::*;
+use kailua_proposer::args::ProposeArgs;
 use kailua_sync::proposal::Proposal;
 use kailua_sync::provider::optimism::fetch_rollup_config;
 use kailua_sync::provider::optimism::OpNodeProvider;

@@ -13,7 +13,9 @@
 // limitations under the License.
 
 use crate::provider::ProviderArgs;
+use alloy::primitives::Address;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct SyncArgs {
@@ -27,4 +29,8 @@ pub struct SyncArgs {
     /// Directory to use for caching data
     #[clap(long, env)]
     pub data_dir: Option<PathBuf>,
+}
+
+pub fn parse_address(s: &str) -> Result<Address, String> {
+    Address::from_str(s).map_err(|_| format!("Invalid Address value: {}", s))
 }

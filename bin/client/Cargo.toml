@@ -30,6 +30,7 @@ alloy-primitives = { workspace = true, features = ["map-hashbrown"] }
 
 kailua-build.workspace = true
 kailua-common.workspace = true
+kailua-sync.workspace = true
 
 kona-cli.workspace = true
 kona-derive.workspace = true

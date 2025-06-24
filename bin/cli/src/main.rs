@@ -41,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
             await_tel!(context, kailua_cli::fast_track::fast_track(args))
         }
         KailuaCli::Propose { args, .. } => {
-            await_tel!(context, kailua_cli::propose::propose(args, data_dir))
+            await_tel!(context, kailua_proposer::propose::propose(args, data_dir))
         }
         KailuaCli::Validate { args, cli } => {
             await_tel!(

@@ -14,7 +14,7 @@
 
 use crate::boundless::BoundlessArgs;
 use crate::proving::ProvingArgs;
-use alloy_primitives::{Address, B256};
+use alloy_primitives::B256;
 use clap::Parser;
 use std::str::FromStr;
 
@@ -36,8 +36,4 @@ pub struct KailuaClientArgs {
 
 pub fn parse_b256(s: &str) -> Result<B256, String> {
     B256::from_str(s).map_err(|_| format!("Invalid B256 value: {}", s))
-}
-
-pub fn parse_address(s: &str) -> Result<Address, String> {
-    Address::from_str(s).map_err(|_| format!("Invalid Address value: {}", s))
 }
