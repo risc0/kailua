@@ -52,10 +52,12 @@ metal = [
     "risc0-zkvm/metal"
 ]
 disable-dev-mode = [
+    "kailua-build/disable-dev-mode",
     "kailua-prover/disable-dev-mode",
     "risc0-zkvm/disable-dev-mode"
 ]
 rebuild-fpvm = [
+    "kailua-build/rebuild-fpvm",
     "kailua-prover/rebuild-fpvm",
     "kailua-sync/rebuild-fpvm"
 ]

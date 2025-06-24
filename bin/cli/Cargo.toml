@@ -12,11 +12,9 @@ categories.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-async-channel.workspace = true
 bytemuck.workspace = true
 clap.workspace = true
 hex.workspace = true
-process_path.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
 tokio-retry.workspace = true
@@ -36,7 +34,6 @@ kailua-sync.workspace = true
 kailua-validator.workspace = true
 
 kona-cli.workspace = true
-kona-protocol.workspace = true
 
 risc0-zkvm.workspace = true
 

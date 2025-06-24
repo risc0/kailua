@@ -5055,7 +5055,6 @@ dependencies = [
  "alloy",
  "anyhow",
  "assert_cmd",
- "async-channel 2.3.1",
  "bytemuck",
  "clap",
  "hex",
@@ -5067,9 +5066,7 @@ dependencies = [
  "kailua-sync",
  "kailua-validator",
  "kona-cli",
- "kona-protocol",
  "opentelemetry",
- "process_path",
  "risc0-zkvm",
  "tempfile",
  "tokio",
@@ -5124,7 +5121,6 @@ name = "kailua-contracts"
 version = "1.0.0-rc.1"
 dependencies = [
  "alloy",
- "alloy-sol-types",
  "foundry-compilers",
 ]
 
