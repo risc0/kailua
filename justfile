@@ -97,7 +97,6 @@ devnet-validate fastforward="0" target="debug" verbosity="" l1_rpc="http://127.0
       --beacon-rpc-url {{l1_beacon_rpc}} \
       --op-geth-url {{l2_rpc}} \
       --op-node-url {{rollup_node_rpc}} \
-      --kailua-host ./target/{{target}}/kailua-host \
       --data-dir {{data_dir}} \
       --validator-key {{validator}} \
       {{verbosity}}
@@ -146,7 +145,7 @@ prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data 
   AGREED_L2_HEAD=$(cast block --rpc-url $L2_NODE_ADDRESS $((L2_BLOCK_NUMBER - 1)) --json | jq -r .hash)
 
   echo "Running host program with zk client program..."
-  ./target/{{target}}/kailua-host {{verbosity}} \
+  ./target/{{target}}/kailua-cli prove {{verbosity}} \
     --op-node-address $OP_NODE_ADDRESS \
     --l1-head $L1_HEAD \
     --agreed-l2-head-hash $AGREED_L2_HEAD \
@@ -188,7 +187,7 @@ query block_number l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc seq_window="50":
 
 prove-offline block_number l1_head l2_hash l2_claim l2_output_root l2_chain_id data target="release" verbosity="":
   echo "Running host program with zk client program..."
-  NUM_CONCURRENT_PREFLIGHTS=0 ./target/{{target}}/kailua-host {{verbosity}} \
+  NUM_CONCURRENT_PREFLIGHTS=0 ./target/{{target}}/kailua-cli prove {{verbosity}} \
     --l1-head {{l1_head}} \
     --agreed-l2-head-hash {{l2_hash}} \
     --claimed-l2-output-root {{l2_claim}} \

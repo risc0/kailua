@@ -12,22 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::stall::Stall;
-use crate::transact::signer::{DeployerSignerArgs, GuardianSignerArgs, OwnerSignerArgs};
-use crate::transact::{Transact, TransactArgs};
-use crate::{retry_res_ctx_timeout, KAILUA_GAME_TYPE};
 use alloy::network::{Ethereum, Network, ReceiptResponse, TxSigner};
 use alloy::primitives::{Address, Bytes, U256};
 use alloy::providers::{Provider, RootProvider};
 use alloy::sol_types::SolValue;
 use anyhow::{anyhow, bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
-use kailua_client::provider::OpNodeProvider;
-use kailua_client::telemetry::TelemetryArgs;
-use kailua_client::{await_tel, await_tel_res};
 use kailua_common::config::{config_hash, BN254_CONTROL_ID, CONTROL_ROOT};
 use kailua_contracts::*;
-use kailua_host::config::fetch_rollup_config;
+use kailua_sync::provider::optimism::fetch_rollup_config;
+use kailua_sync::provider::optimism::OpNodeProvider;
+use kailua_sync::stall::Stall;
+use kailua_sync::telemetry::TelemetryArgs;
+use kailua_sync::transact::safe::exec_safe_txn;
+use kailua_sync::transact::signer::{DeployerSignerArgs, GuardianSignerArgs, OwnerSignerArgs};
+use kailua_sync::transact::{Transact, TransactArgs};
+use kailua_sync::{await_tel, await_tel_res, retry_res_ctx_timeout, KAILUA_GAME_TYPE};
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, Status, TraceContextExt, Tracer};
 use std::str::FromStr;
@@ -35,9 +35,6 @@ use tracing::info;
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct FastTrackArgs {
-    #[arg(long, short, help = "Verbosity level (0-4)", action = clap::ArgAction::Count)]
-    pub v: u8,
-
     /// Address of the OP-NODE endpoint to use
     #[clap(long, env)]
     pub op_node_url: String,
@@ -234,7 +231,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         context,
         tracer,
         "DisputeGameFactory::setImplementation",
-        crate::transact::safe::exec_safe_txn(
+        exec_safe_txn(
             dispute_game_factory.setImplementation(KAILUA_GAME_TYPE, kailua_treasury_impl_addr),
             &factory_owner_safe,
             owner_address,
@@ -259,7 +256,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
             context,
             tracer,
             "DisputeGameFactory::setInitBond",
-            crate::transact::safe::exec_safe_txn(
+            exec_safe_txn(
                 dispute_game_factory.setInitBond(KAILUA_GAME_TYPE, U256::ZERO),
                 &factory_owner_safe,
                 owner_address,
@@ -310,7 +307,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
             context,
             tracer,
             "KailuaTreasury::resolve",
-            crate::transact::safe::exec_safe_txn(
+            exec_safe_txn(
                 kailua_treasury_instance.resolve(),
                 &factory_owner_safe,
                 owner_address,
@@ -330,7 +327,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         context,
         tracer,
         "KailuaTreasury::setParticipationBond",
-        crate::transact::safe::exec_safe_txn(
+        exec_safe_txn(
             kailua_treasury_implementation.setParticipationBond(bond_value),
             &factory_owner_safe,
             owner_address,
@@ -371,7 +368,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         context,
         tracer,
         "DisputeGameFactory::setImplementation",
-        crate::transact::safe::exec_safe_txn(
+        exec_safe_txn(
             dispute_game_factory
                 .setImplementation(KAILUA_GAME_TYPE, *kailua_game_contract.address()),
             &factory_owner_safe,
@@ -389,7 +386,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
             context,
             tracer,
             "KailuaTreasury::assignVanguard",
-            crate::transact::safe::exec_safe_txn(
+            exec_safe_txn(
                 kailua_treasury_implementation.assignVanguard(vanguard_address, vanguard_advantage),
                 &factory_owner_safe,
                 owner_address,

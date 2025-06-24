@@ -14,8 +14,8 @@
 
 use clap::Parser;
 use kailua_cli::KailuaCli;
-use kailua_client::await_tel;
-use kailua_client::telemetry::init_tracer_provider;
+use kailua_sync::await_tel;
+use kailua_sync::telemetry::init_tracer_provider;
 use opentelemetry::global::{shutdown_tracer_provider, tracer};
 use opentelemetry::trace::{FutureExt, Status, TraceContextExt, Tracer};
 use tempfile::tempdir;
@@ -34,26 +34,36 @@ async fn main() -> anyhow::Result<()> {
     let data_dir = cli.data_dir().unwrap_or(tmp_dir.path().to_path_buf());
 
     let command_res = match cli {
-        KailuaCli::Config(args) => {
+        KailuaCli::Config { args, .. } => {
             await_tel!(context, kailua_cli::config::config(args))
         }
-        KailuaCli::FastTrack(args) => {
+        KailuaCli::FastTrack { args, .. } => {
             await_tel!(context, kailua_cli::fast_track::fast_track(args))
         }
-        KailuaCli::Propose(args) => {
-            await_tel!(context, kailua_cli::propose::propose(args, data_dir))
+        KailuaCli::Propose { args, .. } => {
+            await_tel!(context, kailua_proposer::propose::propose(args, data_dir))
         }
-        KailuaCli::Validate(args) => {
-            await_tel!(context, kailua_cli::validate::validate(args, data_dir))
+        KailuaCli::Validate { args, cli } => {
+            await_tel!(
+                context,
+                kailua_validator::validate::validate(args, cli.v, data_dir)
+            )
         }
-        KailuaCli::TestFault(_args) => {
+        KailuaCli::Prove { args, .. } => {
+            await_tel!(context, kailua_prover::prove::prove(args))
+        }
+        KailuaCli::TestFault {
+            #[cfg(feature = "devnet")]
+            args,
+            ..
+        } => {
             #[cfg(not(feature = "devnet"))]
             unimplemented!("Intentional faults are only available on devnet environments");
             #[cfg(feature = "devnet")]
-            await_tel!(context, kailua_cli::fault::fault(_args))
+            await_tel!(context, kailua_cli::fault::fault(args))
         }
-        KailuaCli::Benchmark(bench_args) => {
-            await_tel!(context, kailua_cli::bench::benchmark(bench_args))
+        KailuaCli::Benchmark { args, cli } => {
+            await_tel!(context, kailua_cli::bench::benchmark(args, cli.v))
         }
     };
 

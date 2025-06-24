@@ -4360,7 +4360,6 @@ dependencies = [
  "allocator-api2",
  "equivalent",
  "foldhash",
- "rayon",
  "serde",
 ]
 
@@ -5054,89 +5053,24 @@ name = "kailua-cli"
 version = "1.0.0-rc.1"
 dependencies = [
  "alloy",
- "alloy-provider",
- "alloy-rpc-types-beacon",
  "anyhow",
  "assert_cmd",
- "async-channel 2.3.1",
- "async-trait",
- "aws-config",
- "aws-sdk-kms",
- "bincode",
- "bonsai-sdk",
  "bytemuck",
- "c-kzg",
  "clap",
- "futures",
- "gcloud-sdk",
  "hex",
- "itertools 0.14.0",
  "kailua-build",
- "kailua-client",
  "kailua-common",
  "kailua-contracts",
- "kailua-host",
+ "kailua-proposer",
+ "kailua-prover",
+ "kailua-sync",
+ "kailua-validator",
  "kona-cli",
- "kona-derive",
- "kona-genesis",
- "kona-host",
- "kona-proof",
- "kona-protocol",
- "kona-providers-alloy",
  "opentelemetry",
- "paste",
- "rayon",
- "reqwest",
  "risc0-zkvm",
- "rocksdb",
- "serde",
- "serde_json",
- "sha2 0.10.8",
  "tempfile",
- "threadpool",
  "tokio",
  "tokio-retry",
- "tracing",
- "tracing-subscriber 0.3.19",
-]
-
-[[package]]
-name = "kailua-client"
-version = "1.0.0-rc.1"
-dependencies = [
- "alloy",
- "alloy-primitives 1.2.0",
- "anyhow",
- "async-trait",
- "bincode",
- "bonsai-sdk",
- "boundless-market",
- "bytemuck",
- "c-kzg",
- "clap",
- "hex",
- "human_bytes",
- "kailua-build",
- "kailua-common",
- "kailua-contracts",
- "kona-cli",
- "kona-derive",
- "kona-host",
- "kona-preimage",
- "kona-proof",
- "kona-protocol",
- "kona-std-fpvm",
- "opentelemetry",
- "opentelemetry-otlp",
- "opentelemetry_sdk",
- "risc0-ethereum-contracts",
- "risc0-zkvm",
- "rkyv",
- "serde",
- "serde_json",
- "sha2 0.10.8",
- "thiserror 2.0.12",
- "tokio",
  "tracing",
  "tracing-subscriber 0.3.19",
 ]
@@ -5187,30 +5121,45 @@ name = "kailua-contracts"
 version = "1.0.0-rc.1"
 dependencies = [
  "alloy",
- "alloy-sol-types",
  "foundry-compilers",
 ]
 
 [[package]]
-name = "kailua-host"
+name = "kailua-proposer"
 version = "1.0.0-rc.1"
 dependencies = [
  "alloy",
- "alloy-chains",
- "alloy-eips 0.15.9",
+ "anyhow",
+ "clap",
+ "kailua-common",
+ "kailua-contracts",
+ "kailua-sync",
+ "opentelemetry",
+ "tokio",
+ "tokio-retry",
+ "tracing",
+]
+
+[[package]]
+name = "kailua-prover"
+version = "1.0.0-rc.1"
+dependencies = [
+ "alloy",
  "alloy-primitives 1.2.0",
  "anyhow",
  "async-channel 2.3.1",
+ "async-trait",
  "bincode",
  "bonsai-sdk",
+ "boundless-market",
  "bytemuck",
+ "c-kzg",
  "clap",
- "hashbrown 0.15.2",
+ "hex",
+ "human_bytes",
  "kailua-build",
- "kailua-client",
  "kailua-common",
- "kona-cli",
- "kona-client",
+ "kailua-sync",
  "kona-derive",
  "kona-genesis",
  "kona-host",
@@ -5218,15 +5167,72 @@ dependencies = [
  "kona-proof",
  "kona-protocol",
  "kona-registry",
- "opentelemetry",
+ "kona-std-fpvm",
+ "risc0-ethereum-contracts",
  "risc0-zkvm",
+ "rkyv",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.12",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "kailua-sync"
+version = "1.0.0-rc.1"
+dependencies = [
+ "alloy",
+ "alloy-rpc-types-beacon",
+ "anyhow",
+ "async-trait",
+ "aws-config",
+ "aws-sdk-kms",
+ "bytemuck",
+ "c-kzg",
+ "clap",
+ "futures",
+ "gcloud-sdk",
+ "hex",
+ "itertools 0.14.0",
+ "kailua-build",
+ "kailua-common",
+ "kailua-contracts",
+ "kona-genesis",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
+ "paste",
+ "reqwest",
  "rocksdb",
  "serde",
  "serde_json",
- "tempfile",
  "tokio",
+ "tokio-retry",
  "tracing",
- "tracing-subscriber 0.3.19",
+]
+
+[[package]]
+name = "kailua-validator"
+version = "1.0.0-rc.1"
+dependencies = [
+ "alloy",
+ "anyhow",
+ "async-channel 2.3.1",
+ "bytemuck",
+ "clap",
+ "kailua-build",
+ "kailua-common",
+ "kailua-contracts",
+ "kailua-prover",
+ "kailua-sync",
+ "kona-protocol",
+ "opentelemetry",
+ "process_path",
+ "risc0-zkvm",
+ "tokio",
+ "tokio-retry",
+ "tracing",
 ]
 
 [[package]]
@@ -7172,6 +7178,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60946a68e5f9d28b0dc1c21bb8a97ee7d018a8b322fa57838ba31cc878e22d99"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "process_path"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f676f11eb0b3e2ea0fbaee218fa6b806689e2297b8c8adc5bf73df465c4f6171"
+dependencies = [
+ "libc",
+ "winapi",
 ]
 
 [[package]]
