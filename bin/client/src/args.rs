@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::boundless::BoundlessArgs;
-use crate::proving::ProvingArgs;
 use alloy_primitives::B256;
 use clap::Parser;
-use std::str::FromStr;
+use kailua_prover::backends::boundless::BoundlessArgs;
+use kailua_prover::ProvingArgs;
+use kailua_sync::args::parse_b256;
 
 /// The client binary CLI application arguments.
 #[derive(Parser, Clone, Debug)]
@@ -32,8 +32,4 @@ pub struct KailuaClientArgs {
 
     #[clap(flatten)]
     pub boundless: BoundlessArgs,
-}
-
-pub fn parse_b256(s: &str) -> Result<B256, String> {
-    B256::from_str(s).map_err(|_| format!("Invalid B256 value: {}", s))
 }

@@ -16,9 +16,9 @@ use crate::args::KailuaHostArgs;
 use crate::kv::RWLKeyValueStore;
 use alloy_primitives::B256;
 use anyhow::anyhow;
-use kailua_client::proving::ProvingError;
 use kailua_common::boot::StitchedBootInfo;
 use kailua_common::executor::Execution;
+use kailua_prover::ProvingError;
 use kona_host::single::{SingleChainHintHandler, SingleChainHost, SingleChainLocalInputs};
 use kona_host::{
     DiskKeyValueStore, MemoryKeyValueStore, OfflineHostBackend, OnlineHostBackend, PreimageServer,
@@ -71,7 +71,7 @@ pub async fn start_server_and_native_client(
         .await
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     // Start the client program in a separate child process.
-    let program_task = tokio::spawn(kailua_client::proving::run_proving_client(
+    let program_task = tokio::spawn(kailua_prover::client::proving::run_proving_client(
         args.proving,
         args.boundless,
         OracleReader::new(preimage.client),

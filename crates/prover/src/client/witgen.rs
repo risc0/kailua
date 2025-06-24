@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::witness::{BlobWitnessProvider, OracleWitnessProvider};
+use alloy::consensus::Blob;
+use alloy::eips::eip4844::IndexedBlobHash;
 use alloy_primitives::{Address, B256};
+use async_trait::async_trait;
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_common::blobs::BlobWitnessData;
 use kailua_common::boot::StitchedBootInfo;
@@ -22,12 +24,15 @@ use kailua_common::journal::ProofJournal;
 use kailua_common::oracle::WitnessOracle;
 use kailua_common::witness::Witness;
 use kona_derive::prelude::BlobProvider;
-use kona_preimage::CommsClient;
+use kona_preimage::errors::PreimageOracleResult;
+use kona_preimage::{CommsClient, HintWriterClient, PreimageKey, PreimageOracleClient};
 use kona_proof::FlushableCache;
+use kona_protocol::BlockInfo;
 use std::fmt::Debug;
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use tracing::info;
+use tracing::log::error;
 
 pub async fn run_witgen_client<P, B, O>(
     preimage_oracle: Arc<P>,
@@ -101,4 +106,126 @@ where
     let journal_output =
         ProofJournal::new(fpvm_image_id, payout_recipient, precondition_hash, &boot);
     Ok((journal_output, witness))
+}
+
+#[derive(Clone, Debug)]
+pub struct BlobWitnessProvider<T: BlobProvider> {
+    pub provider: T,
+    pub witness: Arc<Mutex<BlobWitnessData>>,
+}
+
+#[async_trait]
+impl<T: BlobProvider + Send> BlobProvider for BlobWitnessProvider<T> {
+    type Error = T::Error;
+
+    async fn get_blobs(
+        &mut self,
+        block_ref: &BlockInfo,
+        blob_hashes: &[IndexedBlobHash],
+    ) -> Result<Vec<Box<Blob>>, Self::Error> {
+        let blobs = self.provider.get_blobs(block_ref, blob_hashes).await?;
+        let settings = alloy::consensus::EnvKzgSettings::default();
+        for blob in &blobs {
+            let c_kzg_blob = c_kzg::Blob::from_bytes(blob.as_slice()).unwrap();
+            let commitment = settings
+                .get()
+                .blob_to_kzg_commitment(&c_kzg_blob)
+                .expect("Failed to convert blob to commitment");
+            let proof = settings
+                .get()
+                .compute_blob_kzg_proof(&c_kzg_blob, &commitment.to_bytes())
+                .unwrap();
+            let mut witness = self.witness.lock().unwrap();
+            witness.blobs.push(Blob::from(*c_kzg_blob));
+            witness.commitments.push(commitment.to_bytes());
+            witness.proofs.push(proof.to_bytes());
+        }
+        Ok(blobs)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct OracleWitnessProvider<
+    P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
+    O: WitnessOracle,
+> {
+    pub oracle: Arc<P>,
+    pub witness: Arc<Mutex<O>>,
+}
+
+impl<P, O> OracleWitnessProvider<P, O>
+where
+    P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
+    O: WitnessOracle,
+{
+    pub fn save(&self, key: PreimageKey, value: &[u8]) {
+        self.witness
+            .lock()
+            .unwrap()
+            .insert_preimage(key, value.to_vec());
+    }
+}
+
+#[async_trait]
+impl<P, O> PreimageOracleClient for OracleWitnessProvider<P, O>
+where
+    P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
+    O: WitnessOracle,
+{
+    async fn get(&self, key: PreimageKey) -> PreimageOracleResult<Vec<u8>> {
+        match self.oracle.get(key).await {
+            Ok(value) => {
+                self.save(key, &value);
+                Ok(value)
+            }
+            Err(e) => {
+                error!(
+                    "OracleWitnessProvider failed to get value for key {:?}/{}: {:?}",
+                    key.key_type(),
+                    key.key_value(),
+                    e
+                );
+                Err(e)
+            }
+        }
+    }
+
+    async fn get_exact(&self, key: PreimageKey, buf: &mut [u8]) -> PreimageOracleResult<()> {
+        match self.oracle.get_exact(key, buf).await {
+            Ok(_) => {
+                self.save(key, buf);
+                Ok(())
+            }
+            Err(e) => {
+                error!(
+                    "OracleWitnessProvider failed to get exact value for key {:?}/{}: {:?}",
+                    key.key_type(),
+                    key.key_value(),
+                    e
+                );
+                Err(e)
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl<P, O> HintWriterClient for OracleWitnessProvider<P, O>
+where
+    P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
+    O: WitnessOracle,
+{
+    async fn write(&self, hint: &str) -> PreimageOracleResult<()> {
+        self.oracle.write(hint).await
+    }
+}
+
+impl<P, O> FlushableCache for OracleWitnessProvider<P, O>
+where
+    P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
+    O: WitnessOracle,
+{
+    fn flush(&self) {
+        self.oracle.flush();
+    }
 }

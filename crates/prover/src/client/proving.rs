@@ -12,18 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::boundless::BoundlessArgs;
-use crate::{bonsai, boundless, proof, witgen, zkvm};
-use alloy_primitives::{Address, B256};
+use crate::backends::bonsai::{run_bonsai_client, should_use_bonsai};
+use crate::backends::boundless::{run_boundless_client, BoundlessArgs};
+use crate::backends::zkvm::run_zkvm_client;
+use crate::client::witgen;
+use crate::proof::proof_file_name;
+use crate::{ProvingArgs, ProvingError};
+use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
-use clap::Parser;
 use kailua_common::boot::StitchedBootInfo;
 use kailua_common::client::stitching::split_executions;
 use kailua_common::executor::Execution;
 use kailua_common::journal::ProofJournal;
 use kailua_common::oracle::vec::{PreimageVecEntry, VecOracle};
 use kailua_common::witness::Witness;
-use kailua_sync::args::parse_address;
 use kona_preimage::{HintWriterClient, PreimageOracleClient};
 use kona_proof::l1::OracleBlobProvider;
 use kona_proof::CachingOracle;
@@ -32,59 +34,10 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 /// The size of the LRU cache in the oracle.
 pub const ORACLE_LRU_SIZE: usize = 1024;
-
-#[derive(Parser, Clone, Debug)]
-pub struct ProvingArgs {
-    #[clap(long, env, value_parser = parse_address)]
-    pub payout_recipient_address: Option<Address>,
-    #[clap(long, env, required = false, default_value_t = 21)]
-    pub segment_limit: u32,
-    #[clap(long, env, required = false, default_value_t = 2_684_354_560)]
-    pub max_witness_size: usize,
-    #[clap(long, env, default_value_t = false)]
-    pub skip_derivation_proof: bool,
-    #[clap(long, env, default_value_t = false)]
-    pub skip_await_proof: bool,
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum ProvingError {
-    #[error("DerivationProofError error: execution proofs {0}")]
-    DerivationProofError(usize),
-
-    #[error("NotSeekingProof error: witness {0}")]
-    NotSeekingProof(usize, Vec<Vec<Execution>>),
-
-    #[error("WitnessSizeError error: size {0} limit {0}")]
-    WitnessSizeError(usize, usize, Vec<Vec<Execution>>),
-
-    #[error("ExecutionError error: ZKVM failed {0:?}")]
-    ExecutionError(anyhow::Error),
-
-    #[error("OtherError error: {0:?}")]
-    OtherError(anyhow::Error),
-}
-
-/// Use our own version of SessionStats to avoid non-exhaustive issues (risc0_zkvm::SessionStats)
-#[derive(Debug, Clone)]
-pub struct KailuaSessionStats {
-    pub segments: usize,
-    pub total_cycles: u64,
-    pub user_cycles: u64,
-    pub paging_cycles: u64,
-    pub reserved_cycles: u64,
-}
-
-/// Our own version of ProveInfo to avoid non-exhaustive issues (risc0_zkvm::ProveInfo)
-#[derive(Debug)]
-pub struct KailuaProveInfo {
-    pub receipt: Receipt,
-    pub stats: KailuaSessionStats,
-}
 
 #[allow(clippy::too_many_arguments)]
 pub async fn run_proving_client<P, H>(
@@ -231,7 +184,7 @@ pub async fn seek_fpvm_proof(
     // compute the zkvm proof
     let proof = match boundless.market {
         Some(marked_provider_config) if !is_dev_mode() => {
-            boundless::run_boundless_client(
+            run_boundless_client(
                 marked_provider_config,
                 boundless.storage,
                 proof_journal,
@@ -242,11 +195,10 @@ pub async fn seek_fpvm_proof(
             .await?
         }
         _ => {
-            if bonsai::should_use_bonsai() {
-                bonsai::run_bonsai_client(witness_frames, stitched_proofs, prove_snark, proving)
-                    .await?
+            if should_use_bonsai() {
+                run_bonsai_client(witness_frames, stitched_proofs, prove_snark, proving).await?
             } else {
-                zkvm::run_zkvm_client(
+                run_zkvm_client(
                     witness_frames,
                     stitched_proofs,
                     prove_snark,
@@ -266,7 +218,7 @@ pub async fn seek_fpvm_proof(
 pub async fn save_proof_to_disk(proof: &Receipt) {
     // Save proof file to disk
     let proof_journal = ProofJournal::decode_packed(proof.journal.as_ref());
-    let mut output_file = File::create(proof::proof_file_name(&proof_journal))
+    let mut output_file = File::create(proof_file_name(&proof_journal))
         .await
         .expect("Failed to create proof output file");
     // Write proof data to file

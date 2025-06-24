@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::proving::ProvingError;
-use crate::proving::{KailuaProveInfo, KailuaSessionStats};
+use crate::backends::{KailuaProveInfo, KailuaSessionStats};
+use crate::ProvingError;
 use anyhow::{anyhow, Context};
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use risc0_zkvm::{default_prover, is_dev_mode, ExecutorEnv, InnerReceipt, ProverOpts, Receipt};

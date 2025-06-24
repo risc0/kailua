@@ -14,9 +14,9 @@
 
 use alloy_primitives::B256;
 use clap::{ArgAction, Parser};
-use kailua_client::args::parse_b256;
-use kailua_client::boundless::BoundlessArgs;
-use kailua_client::proving::ProvingArgs;
+use kailua_prover::backends::boundless::BoundlessArgs;
+use kailua_prover::ProvingArgs;
+use kailua_sync::args::parse_b256;
 use kailua_sync::telemetry::TelemetryArgs;
 use std::cmp::Ordering;
 

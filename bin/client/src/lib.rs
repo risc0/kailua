@@ -13,11 +13,3 @@
 // limitations under the License.
 
 pub mod args;
-pub mod bonsai;
-pub mod boundless;
-pub mod oracle;
-pub mod proof;
-pub mod proving;
-pub mod witgen;
-pub mod witness;
-pub mod zkvm;

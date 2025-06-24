@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::proving::{ProvingArgs, ProvingError};
+use crate::{ProvingArgs, ProvingError};
 use alloy::network::Ethereum;
 use alloy::transports::http::reqwest::Url;
 use alloy_primitives::utils::parse_ether;

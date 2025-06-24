@@ -14,7 +14,7 @@
 
 use clap::Parser;
 use kailua_client::args::KailuaClientArgs;
-use kailua_client::oracle::{HINT_WRITER, ORACLE_READER};
+use kailua_prover::client::{HINT_WRITER, ORACLE_READER};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -24,7 +24,7 @@ async fn main() -> anyhow::Result<()> {
     let precondition_validation_data_hash =
         args.precondition_validation_data_hash.unwrap_or_default();
 
-    kailua_client::proving::run_proving_client(
+    kailua_prover::client::proving::run_proving_client(
         args.proving,
         args.boundless,
         ORACLE_READER,
