@@ -18,7 +18,6 @@ kailua-cli validate \
   --op-geth-url [YOUR_OP_GETH_URL] \
   --op-node-url [YOUR_OP_NODE_URL] \
   --data-dir [YOUR_VALIDATOR_DATA_CACHE_PATH] \
-  --kailua-host [YOUR_KAILUA_HOST_BINARY_PATH] \
   --validator-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY] \
   --payout-recipient-address [YOUR_FAULT_PROOF_PAYOUT_RECIPIENT] \
   --txn-timeout [YOUR_TRANSACTION_TIMEOUT_SECONDS] \
@@ -43,8 +42,9 @@ This allows it to restart quickly without requesting a lot of old on-chain data 
     * If unspecified, a tmp directory is created.
 
 ### Prover
-To create a fault proof, the validator invokes the `kailua-host` binary.
-* `kailua-host`: The path to the `kailua-host` binary to call for proof generation.
+To create a fault proof, the validator invokes the `kailua-cli` binary with the `prove` command.
+* `kailua-cli`: The path to the binary to call for proof generation.
+Defaults to the path of the invoked `kailua-cli` executable.
 
 ### Wallet
 The validator requires a funded wallet to be able to publish fault proofs on chain, and an (optional) alternative address
@@ -174,9 +174,9 @@ Running `kailua-cli validate` with the above extra arguments should now delegate
 ## Advanced Settings
 
 Fault/Validity proof generation can be fine-tuned via the two following environment variables:
-* `NUM_CONCURRENT_HOSTS`: (default 1) The maximum number of kailua-host instances to run concurrently in the validator.
+* `NUM_CONCURRENT_PROVERS`: (default 1) The maximum number of prover instances to run concurrently in the validator.
 * `NUM_CONCURRENT_PREFLIGHTS`: (default 4) Sets the number of concurrent data preflights per proving task.
-* `NUM_CONCURRENT_PROOFS`: (default 1) Sets the number of concurrent proofs to seek per proving task.
+* `NUM_CONCURRENT_PROOFS`: (default 1) Sets the number of concurrent proofs to seek per prover instance.
 * `SEGMENT_LIMIT`: The [segment size limit](https://docs.rs/risc0-zkvm/1.2.3/risc0_zkvm/struct.ExecutorEnvBuilder.html#method.segment_limit_po2) used for local proving (Default 21).
 * `MAX_WITNESS_SIZE`: The maximum input size per single proof (Default 2.5GB).
 

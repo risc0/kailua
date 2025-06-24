@@ -65,9 +65,6 @@ pub struct ProveArgs {
 
     #[clap(flatten)]
     pub telemetry: TelemetryArgs,
-
-    #[arg(long, short, help = "Verbosity level (0-4)", action = clap::ArgAction::Count)]
-    pub v: u8,
 }
 
 impl PartialEq<Self> for ProveArgs {

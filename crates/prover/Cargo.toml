@@ -52,6 +52,9 @@ risc0-ethereum-contracts.workspace = true
 risc0-zkvm.workspace = true
 
 [features]
+devnet = [
+    "kailua-sync/devnet"
+]
 prove = [
     "risc0-zkvm/prove"
 ]
@@ -62,6 +65,7 @@ metal = [
     "risc0-zkvm/metal"
 ]
 disable-dev-mode = [
+    "kailua-build/disable-dev-mode",
     "risc0-zkvm/disable-dev-mode"
 ]
 rebuild-fpvm = [

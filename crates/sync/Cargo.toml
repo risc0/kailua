@@ -47,5 +47,5 @@ kona-genesis.workspace = true
 [features]
 devnet = []
 rebuild-fpvm = [
-    "kailua-build/rebuild-fpvm"
+    "kailua-build/rebuild-fpvm",
 ]

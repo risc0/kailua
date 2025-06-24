@@ -55,8 +55,10 @@ pub fn create_proving_args(
     claimed_l2_block_number: u64,
     claimed_l2_output_root: B256,
 ) -> Vec<String> {
-    // Prepare kailua-host parameters
+    // Prepare prover parameters
     let mut proving_args = vec![
+        // Invoke the CLI prove command
+        String::from("prove"),
         // wallet address for payouts
         String::from("--payout-recipient-address"),
         payout_recipient.to_string(),

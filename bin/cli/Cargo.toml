@@ -16,6 +16,7 @@ async-channel.workspace = true
 bytemuck.workspace = true
 clap.workspace = true
 hex.workspace = true
+process_path.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
 tokio-retry.workspace = true
@@ -47,17 +48,25 @@ devnet = [
     "kailua-sync/devnet",
 ]
 prove = [
-    "risc0-zkvm/prove"
+    "kailua-prover/prove",
+    "risc0-zkvm/prove",
 ]
 cuda = [
+    "kailua-prover/cuda",
     "risc0-zkvm/cuda"
 ]
 metal = [
+    "kailua-prover/metal",
     "risc0-zkvm/metal"
 ]
 disable-dev-mode = [
+    "kailua-build/disable-dev-mode",
+    "kailua-prover/disable-dev-mode",
     "risc0-zkvm/disable-dev-mode"
 ]
 rebuild-fpvm = [
-    "kailua-build/rebuild-fpvm"
+    "kailua-build/rebuild-fpvm",
+    "kailua-proposer/rebuild-fpvm",
+    "kailua-prover/rebuild-fpvm",
+    "kailua-sync/rebuild-fpvm",
 ]

@@ -317,6 +317,6 @@ pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
         .context("Failed to compute FPVM proof.")?;
     }
 
-    info!("Exiting host program.");
+    info!("Exiting prover program.");
     Ok(())
 }

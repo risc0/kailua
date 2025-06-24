@@ -23,13 +23,10 @@ RUN --mount=type=cache,target=/root/.cargo/registry,sharing=shared \
     --mount=type=cache,target=/kailua/target,sharing=private,id=rust-target-${TARGETARCH} \
     cargo build --jobs ${CARGO_BUILD_JOBS} --release -F disable-dev-mode \
     && mkdir out \
-    && mv target/release/kailua-host out/ \
     && mv target/release/kailua-cli out/ \
-    && strip out/kailua-host \
     && strip out/kailua-cli;
 
 FROM rust:1.81 as kailua
-COPY --from=build-environment /kailua/out/kailua-host /usr/local/bin/kailua-host
 COPY --from=build-environment /kailua/out/kailua-cli /usr/local/bin/kailua-cli
 
 ENTRYPOINT ["/bin/sh", "-c"]

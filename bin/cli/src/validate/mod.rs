@@ -49,15 +49,15 @@ pub struct ValidateArgs {
     #[clap(flatten)]
     pub sync: SyncArgs,
 
-    /// Path to the kailua host binary to use for proving
+    /// Path to the prover binary to use for proving
     #[clap(long, env)]
-    pub kailua_host: PathBuf,
+    pub kailua_cli: Option<PathBuf>,
     /// Fast-forward block height
     #[clap(long, env, required = false, default_value_t = 0)]
     pub fast_forward_target: u64,
     /// How many proofs to compute simultaneously
     #[clap(long, env, default_value_t = 1)]
-    pub num_concurrent_hosts: u64,
+    pub num_concurrent_provers: u64,
     /// The number of l1 heads to jump back when initially proving
     #[cfg(feature = "devnet")]
     #[clap(long, env, default_value_t = 0)]
@@ -165,9 +165,15 @@ pub async fn handle_proof_requests(
     let task_channel: AsyncChannel<Task> = async_channel::unbounded();
     let mut proving_handlers = vec![];
     // instantiate worker pool
-    for _ in 0..args.num_concurrent_hosts {
+    let kailua_cli = args.kailua_cli.clone().unwrap_or_else(|| {
+        process_path::get_executable_path().expect(
+            "Failed to get kailua-cli executable path. \
+                You must manually specify the 'kailua-cli' argument.",
+        )
+    });
+    for _ in 0..args.num_concurrent_provers {
         proving_handlers.push(spawn(handle_proving_tasks(
-            args.kailua_host.clone(),
+            kailua_cli.clone(),
             task_channel.clone(),
             channel.sender.clone(),
         )));
@@ -209,7 +215,7 @@ pub async fn handle_proof_requests(
             fpvm_image_id,
         };
         let proof_file_name = proof_file_name(&proof_journal);
-        // Prepare kailua-host proving args
+        // Prepare proving args
         let proving_args = create_proving_args(
             &args,
             verbosity,
@@ -237,7 +243,7 @@ pub async fn handle_proof_requests(
 }
 
 pub async fn handle_proving_tasks(
-    kailua_host: PathBuf,
+    kailua_cli: PathBuf,
     task_channel: AsyncChannel<Task>,
     proof_sender: Sender<Message>,
 ) -> anyhow::Result<()> {
@@ -255,24 +261,24 @@ pub async fn handle_proving_tasks(
             .await
             .context("task receiver channel closed")?;
 
-        // Prove via kailua-host (re dev mode/bonsai: env vars inherited!)
-        let mut kailua_host_command = Command::new(&kailua_host);
+        // Prove (note: dev-mode/bonsai env vars are inherited!)
+        let mut kailua_cli_command = Command::new(&kailua_cli);
         // get fake receipts when building under devnet
         if is_dev_mode() {
-            kailua_host_command.env("RISC0_DEV_MODE", "1");
+            kailua_cli_command.env("RISC0_DEV_MODE", "1");
         }
         // pass arguments to point at target block
-        kailua_host_command.args(proving_args.clone());
-        debug!("kailua_host_command {:?}", &kailua_host_command);
-        // call the kailua-host binary to generate a proof
+        kailua_cli_command.args(proving_args.clone());
+        debug!("kailua_cli_command {:?}", &kailua_cli_command);
+        // call the prover to generate a proof
         let insufficient_l1_data = match await_tel_res!(
             context,
             tracer,
-            "KailuaHost",
-            kailua_host_command
+            "kailua_cli_command",
+            kailua_cli_command
                 .kill_on_drop(true)
                 .spawn()
-                .context("Invoking kailua-host")?
+                .context("Invoking prover")?
                 .wait()
         ) {
             Ok(proving_task) => {
@@ -284,7 +290,7 @@ pub async fn handle_proving_tasks(
                 proving_task.code().unwrap_or_default() == 111
             }
             Err(e) => {
-                error!("Failed to invoke kailua-host: {e:?}");
+                error!("Failed to invoke prover: {e:?}");
                 false
             }
         };

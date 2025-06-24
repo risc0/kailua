@@ -12,16 +12,10 @@ commands from the root project directory:
 If you have modified the FPVM binary, you will need to build/install using `-F rebuild-fpvm`.
 ```
 
-### CLI Binary
-```shell
-cargo install kailua-cli --path bin/cli --locked
-```
-
-### Prover Binary
 ```admonish info
-At the cost of longer compilation time, you can embed the RISC Zero prover logic into `kailua-host` instead of having 
-it utilize your locally installed RISC Zero `r0vm`.
-To do this, add `-F prove` to the command below.
+At the cost of longer compilation time, you can embed the RISC Zero zkvm prover logic into `kailua-cli` instead of 
+having it utilize your locally installed RISC Zero `r0vm` for proving.
+To do this, add `-F prove` to the install command below.
 ```
 
 ```admonish tip
@@ -30,10 +24,10 @@ For GPU-accelerated local proving, use one of the following feature flags:
 * Nvidia: `-F cuda`
 ```
 
+### CLI Binary
 ```shell
-cargo install kailua-host --path bin/host --locked
+cargo install kailua-cli --path bin/cli --locked
 ```
-
 
 ## Configuration
 
