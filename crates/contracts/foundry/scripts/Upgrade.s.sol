@@ -12,7 +12,7 @@ import {KailuaGame} from "../src/KailuaGame.sol";
 // kailua-cli config --op-node-url $OP_NODE_URL --op-geth-url $OP_GETH_URL --eth-rpc-url $ETH_RPC_URL | grep -E '^[A-Z_]+:' | sed 's/: /=/; s/^/export /' > .env
 // source .env
 
-contract DeployScript is Script {
+contract UpgradeScript is Script {
     uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.addr(deployerPrivateKey);
 
@@ -21,14 +21,15 @@ contract DeployScript is Script {
     bytes32 controlId = vm.envBytes32("CONTROL_ID");
     IRiscZeroVerifier riscZeroVerifier = IRiscZeroVerifier(vm.envAddress("RISC_ZERO_VERIFIER"));
     bytes32 rollupConfigHash = vm.envBytes32("ROLLUP_CONFIG_HASH");
-    uint64 proposalOutputCount = uint64(vm.envUint("PROPOSAL_OUTPUT_COUNT"));
-    uint64 outputBlockSpan = uint64(vm.envUint("OUTPUT_BLOCK_SPAN"));
+    uint256 proposalOutputCount = vm.envUint("PROPOSAL_OUTPUT_COUNT");
+    uint256 outputBlockSpan = vm.envUint("OUTPUT_BLOCK_SPAN");
     GameType gameType = GameType.wrap(uint32(vm.envUint("KAILUA_GAME_TYPE")));
     IDisputeGameFactory dgf = IDisputeGameFactory(vm.envAddress("DISPUTE_GAME_FACTORY"));
     Claim outputRootClaim = Claim.wrap(vm.envBytes32("OUTPUT_ROOT_CLAIM"));
     uint64 l2BlockNumber = uint64(vm.envUint("L2_BLOCK_NUMBER"));
     uint256 genesisTimestamp = vm.envUint("GENESIS_TIMESTAMP");
     uint256 blocktime = vm.envUint("BLOCK_TIME");
+    uint256 proposalTimeGap = vm.envUint("PROPOSAL_TIME_GAP");
     Duration maxClockDuration = Duration.wrap(uint64(vm.envUint("MAX_CLOCK_DURATION")));
     uint256 participationBond = vm.envUint("PARTICIPATION_BOND");
     address vanguardAddress = vm.envAddress("VANGUARD_ADDRESS");
@@ -56,7 +57,7 @@ contract DeployScript is Script {
 
     function _6_2_disputeResolution() public returns (KailuaTreasury, KailuaGame) {
         KailuaTreasury treasury = new KailuaTreasury(riscZeroVerifier, fpvmImageId, rollupConfigHash, proposalOutputCount, outputBlockSpan, gameType, optimismPortal, outputRootClaim, l2BlockNumber);
-        KailuaGame game = new KailuaGame(treasury, genesisTimestamp, blocktime, maxClockDuration);
+        KailuaGame game = new KailuaGame(treasury, genesisTimestamp, blocktime, proposalTimeGap, maxClockDuration);
 
         return (treasury, game);
     }
