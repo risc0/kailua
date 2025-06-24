@@ -31,6 +31,7 @@ kailua-client.workspace = true
 kailua-common.workspace = true
 kailua-contracts.workspace = true
 kailua-host.workspace = true
+kailua-proposer.workspace = true
 kailua-sync.workspace = true
 
 kona-cli.workspace = true

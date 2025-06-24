@@ -403,7 +403,7 @@ pub async fn handle_proposals(
                 &mut last_proof_l1_head,
                 proposal,
                 #[cfg(feature = "devnet")]
-                args.core.delay_l1_heads,
+                args.l1_head_jump_back,
             ) else {
                 error!("Could not choose an L1 head to fault prove proposal {proposal_index}");
                 output_fault_buffer.push_back(proposal_index);
@@ -482,7 +482,7 @@ pub async fn handle_proposals(
                 &mut last_proof_l1_head,
                 proposal,
                 #[cfg(feature = "devnet")]
-                args.core.delay_l1_heads,
+                args.l1_head_jump_back,
             ) else {
                 error!("Could not choose an L1 head to validity prove proposal {proposal_index}");
                 valid_buffer.push_back(proposal_index);
@@ -1220,7 +1220,7 @@ pub fn get_next_l1_head(
     agent: &SyncAgent,
     last_proof_l1_head: &mut BTreeMap<u64, u64>,
     proposal: &Proposal,
-    #[cfg(feature = "devnet")] delay: u64,
+    #[cfg(feature = "devnet")] jump_back: u64,
 ) -> Option<B256> {
     // fetch next l1 head to use
     let l1_head = match last_proof_l1_head.get(&proposal.index) {
@@ -1241,7 +1241,7 @@ pub fn get_next_l1_head(
             .l1_heads
             .range(..block_no)
             .rev()
-            .take(delay as usize)
+            .take(jump_back as usize)
             .last()
             .map(|(_, (_, delayed_head))| *delayed_head)
             .unwrap_or(l1_head);

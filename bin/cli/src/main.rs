@@ -34,26 +34,33 @@ async fn main() -> anyhow::Result<()> {
     let data_dir = cli.data_dir().unwrap_or(tmp_dir.path().to_path_buf());
 
     let command_res = match cli {
-        KailuaCli::Config(args) => {
+        KailuaCli::Config { args, .. } => {
             await_tel!(context, kailua_cli::config::config(args))
         }
-        KailuaCli::FastTrack(args) => {
+        KailuaCli::FastTrack { args, .. } => {
             await_tel!(context, kailua_cli::fast_track::fast_track(args))
         }
-        KailuaCli::Propose(args) => {
+        KailuaCli::Propose { args, .. } => {
             await_tel!(context, kailua_cli::propose::propose(args, data_dir))
         }
-        KailuaCli::Validate(args) => {
-            await_tel!(context, kailua_cli::validate::validate(args, data_dir))
+        KailuaCli::Validate { args, cli } => {
+            await_tel!(
+                context,
+                kailua_cli::validate::validate(args, cli.v, data_dir)
+            )
         }
-        KailuaCli::TestFault(_args) => {
+        KailuaCli::TestFault {
+            #[cfg(feature = "devnet")]
+            args,
+            ..
+        } => {
             #[cfg(not(feature = "devnet"))]
             unimplemented!("Intentional faults are only available on devnet environments");
             #[cfg(feature = "devnet")]
-            await_tel!(context, kailua_cli::fault::fault(_args))
+            await_tel!(context, kailua_cli::fault::fault(args))
         }
-        KailuaCli::Benchmark(bench_args) => {
-            await_tel!(context, kailua_cli::bench::benchmark(bench_args))
+        KailuaCli::Benchmark { args, cli } => {
+            await_tel!(context, kailua_cli::bench::benchmark(args, cli.v))
         }
     };
 

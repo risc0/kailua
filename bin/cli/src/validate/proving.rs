@@ -44,6 +44,7 @@ pub struct Task {
 #[allow(clippy::too_many_arguments)]
 pub fn create_proving_args(
     args: &ValidateArgs,
+    verbosity: u8,
     data_dir: PathBuf,
     l2_chain_id: String,
     payout_recipient: Address,
@@ -55,11 +56,6 @@ pub fn create_proving_args(
     claimed_l2_output_root: B256,
 ) -> Vec<String> {
     // Prepare kailua-host parameters
-    let verbosity = [
-        String::from("-"),
-        (0..args.core.v).map(|_| 'v').collect::<String>(),
-    ]
-    .concat();
     let mut proving_args = vec![
         // wallet address for payouts
         String::from("--payout-recipient-address"),
@@ -146,8 +142,14 @@ pub fn create_proving_args(
         String::from("--native"),
     ]);
     // verbosity level
-    if args.core.v > 0 {
-        proving_args.push(verbosity);
+    if verbosity > 0 {
+        proving_args.push(
+            [
+                String::from("-"),
+                (0..verbosity).map(|_| 'v').collect::<String>(),
+            ]
+            .concat(),
+        );
     }
     proving_args
 }

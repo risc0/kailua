@@ -58,6 +58,10 @@ pub struct ValidateArgs {
     /// How many proofs to compute simultaneously
     #[clap(long, env, default_value_t = 1)]
     pub num_concurrent_hosts: u64,
+    /// The number of l1 heads to jump back when initially proving
+    #[cfg(feature = "devnet")]
+    #[clap(long, env, default_value_t = 0)]
+    pub l1_head_jump_back: u64,
 
     /// Secret key of L1 wallet to use for challenging and proving outputs
     #[clap(flatten)]
@@ -82,7 +86,7 @@ pub struct ValidateArgs {
     pub telemetry: TelemetryArgs,
 }
 
-pub async fn validate(args: ValidateArgs, data_dir: PathBuf) -> anyhow::Result<()> {
+pub async fn validate(args: ValidateArgs, verbosity: u8, data_dir: PathBuf) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("validate"));
 
@@ -94,8 +98,10 @@ pub async fn validate(args: ValidateArgs, data_dir: PathBuf) -> anyhow::Result<(
         proposals::handle_proposals(channel_pair.0, args.clone(), data_dir.clone())
             .with_context(context.clone()),
     );
-    let handle_proof_requests =
-        spawn(handle_proof_requests(channel_pair.1, args, data_dir).with_context(context.clone()));
+    let handle_proof_requests = spawn(
+        handle_proof_requests(channel_pair.1, args, verbosity, data_dir)
+            .with_context(context.clone()),
+    );
 
     let (proposals_task, proofs_task) = try_join!(handle_proposals, handle_proof_requests)?;
     proposals_task.context("handle_proposals")?;
@@ -123,6 +129,7 @@ pub enum Message {
 pub async fn handle_proof_requests(
     mut channel: DuplexChannel<Message>,
     args: ValidateArgs,
+    verbosity: u8,
     data_dir: PathBuf,
 ) -> anyhow::Result<()> {
     // Telemetry
@@ -205,6 +212,7 @@ pub async fn handle_proof_requests(
         // Prepare kailua-host proving args
         let proving_args = create_proving_args(
             &args,
+            verbosity,
             data_dir.clone(),
             l2_chain_id.clone(),
             payout_recipient,

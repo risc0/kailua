@@ -65,7 +65,7 @@ impl Ord for CandidateBlock {
     }
 }
 
-pub async fn benchmark(args: BenchArgs) -> anyhow::Result<()> {
+pub async fn benchmark(args: BenchArgs, verbosity: u8) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("benchmark"));
 
@@ -124,8 +124,8 @@ pub async fn benchmark(args: BenchArgs) -> anyhow::Result<()> {
             .append(true)
             .open(&output_file_name)?;
         // Pipe outputs to file
-        let verbosity_level = if args.core.v > 0 {
-            format!("-{}", "v".repeat(args.core.v as usize))
+        let verbosity_level = if verbosity > 0 {
+            format!("-{}", "v".repeat(verbosity as usize))
         } else {
             String::new()
         };
