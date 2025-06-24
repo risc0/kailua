@@ -49,6 +49,9 @@ async fn main() -> anyhow::Result<()> {
                 kailua_cli::validate::validate(args, cli.v, data_dir)
             )
         }
+        KailuaCli::Prove { args, .. } => {
+            await_tel!(context, kailua_prover::prove::prove(args))
+        }
         KailuaCli::TestFault {
             #[cfg(feature = "devnet")]
             args,

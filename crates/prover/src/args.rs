@@ -33,7 +33,7 @@ pub struct ProvingArgs {
     pub skip_await_proof: bool,
 }
 
-/// The host binary CLI application arguments.
+/// The prover arguments
 #[derive(Parser, Clone, Debug)]
 pub struct ProveArgs {
     #[clap(flatten)]

@@ -87,7 +87,6 @@ op-alloy-rpc-types-engine = { version = "0.15.1", default-features = false, feat
 kailua-build = { path = "build/risczero" }
 kailua-common = { path = "crates/common" }
 kailua-contracts = { path = "crates/contracts" }
-kailua-host = { path = "bin/host" }
 kailua-proposer = { path = "crates/proposer" }
 kailua-prover = { path = "crates/prover" }
 kailua-sync = { path = "crates/sync" }

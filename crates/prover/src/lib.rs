@@ -22,6 +22,7 @@ pub mod config;
 pub mod kv;
 pub mod preflight;
 pub mod proof;
+pub mod prove;
 pub mod tasks;
 
 #[derive(Debug, thiserror::Error)]

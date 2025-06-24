@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use kailua_proposer::args;
 use kailua_sync::telemetry::TelemetryArgs;
 use std::path::PathBuf;
 
@@ -43,13 +42,19 @@ pub enum KailuaCli {
     },
     Propose {
         #[clap(flatten)]
-        args: args::ProposeArgs,
+        args: kailua_proposer::args::ProposeArgs,
         #[clap(flatten)]
         cli: CliArgs,
     },
     Validate {
         #[clap(flatten)]
         args: validate::ValidateArgs,
+        #[clap(flatten)]
+        cli: CliArgs,
+    },
+    Prove {
+        #[clap(flatten)]
+        args: kailua_prover::args::ProveArgs,
         #[clap(flatten)]
         cli: CliArgs,
     },
@@ -80,6 +85,7 @@ impl KailuaCli {
             KailuaCli::FastTrack { cli, .. } => cli.v,
             KailuaCli::Propose { cli, .. } => cli.v,
             KailuaCli::Validate { cli, .. } => cli.v,
+            KailuaCli::Prove { cli, .. } => cli.v,
             KailuaCli::TestFault { cli, .. } => cli.v,
             KailuaCli::Benchmark { cli, .. } => cli.v,
         }
@@ -89,18 +95,8 @@ impl KailuaCli {
         match self {
             KailuaCli::Propose { args, .. } => args.sync.data_dir.clone(),
             KailuaCli::Validate { args, .. } => args.sync.data_dir.clone(),
+            KailuaCli::Prove { args, .. } => args.kona.data_dir.clone(),
             _ => None,
-        }
-    }
-
-    pub fn otlp_endpoint(&self) -> Option<String> {
-        match self {
-            KailuaCli::Config { args, .. } => args.telemetry.otlp_collector.clone(),
-            KailuaCli::FastTrack { args, .. } => args.telemetry.otlp_collector.clone(),
-            KailuaCli::Propose { args, .. } => args.telemetry.otlp_collector.clone(),
-            KailuaCli::Validate { args, .. } => args.telemetry.otlp_collector.clone(),
-            KailuaCli::TestFault { args, .. } => args.propose_args.telemetry.otlp_collector.clone(),
-            KailuaCli::Benchmark { args, .. } => args.telemetry.otlp_collector.clone(),
         }
     }
 
@@ -110,6 +106,7 @@ impl KailuaCli {
             KailuaCli::FastTrack { args, .. } => &args.telemetry,
             KailuaCli::Propose { args, .. } => &args.telemetry,
             KailuaCli::Validate { args, .. } => &args.telemetry,
+            KailuaCli::Prove { args, .. } => &args.telemetry,
             KailuaCli::TestFault { args, .. } => &args.propose_args.telemetry,
             KailuaCli::Benchmark { args, .. } => &args.telemetry,
         }
