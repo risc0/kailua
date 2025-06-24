@@ -25,7 +25,6 @@ serde_json.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-tracing-subscriber.workspace = true
 tokio.workspace = true
 
 alloy = { workspace = true, features = ["full", "kzg"] }
@@ -35,7 +34,6 @@ kailua-build.workspace = true
 kailua-common.workspace = true
 kailua-sync.workspace = true
 
-kona-cli.workspace = true
 kona-derive.workspace = true
 kona-genesis.workspace = true
 kona-host.workspace = true

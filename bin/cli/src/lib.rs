@@ -13,14 +13,13 @@
 // limitations under the License.
 
 use kailua_sync::telemetry::TelemetryArgs;
+use kailua_validator::args;
 use std::path::PathBuf;
 
 pub mod bench;
-pub mod channel;
 pub mod config;
 pub mod fast_track;
 pub mod fault;
-pub mod validate;
 
 #[derive(clap::Parser, Debug, Clone)]
 #[command(name = "kailua-cli")]
@@ -48,7 +47,7 @@ pub enum KailuaCli {
     },
     Validate {
         #[clap(flatten)]
-        args: validate::ValidateArgs,
+        args: args::ValidateArgs,
         #[clap(flatten)]
         cli: CliArgs,
     },

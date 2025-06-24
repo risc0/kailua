@@ -46,7 +46,7 @@ async fn main() -> anyhow::Result<()> {
         KailuaCli::Validate { args, cli } => {
             await_tel!(
                 context,
-                kailua_cli::validate::validate(args, cli.v, data_dir)
+                kailua_validator::validate::validate(args, cli.v, data_dir)
             )
         }
         KailuaCli::Prove { args, .. } => {

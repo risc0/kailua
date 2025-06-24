@@ -91,6 +91,7 @@ kailua-contracts = { path = "crates/contracts" }
 kailua-proposer = { path = "crates/proposer" }
 kailua-prover = { path = "crates/prover" }
 kailua-sync = { path = "crates/sync" }
+kailua-validator = { path = "crates/validator" }
 
 # Kona git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1"
 kona-cli = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1", default-features = false }

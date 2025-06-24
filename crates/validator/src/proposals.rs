@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::args::ValidateArgs;
 use crate::channel::DuplexChannel;
-use crate::validate::proving::encode_seal;
-use crate::validate::{Message, ValidateArgs};
+use crate::channel::Message;
+use crate::requests::{request_fault_proof, request_validity_proof};
 use alloy::network::{Ethereum, TxSigner};
 use alloy::primitives::Bytes;
 use alloy::primitives::B256;
-use anyhow::Context;
+use anyhow::{bail, Context};
 use kailua_common::blobs::hash_to_fe;
 use kailua_common::journal::ProofJournal;
 use kailua_common::precondition::validity_precondition_hash;
@@ -33,6 +34,8 @@ use opentelemetry::global::{meter, tracer};
 use opentelemetry::trace::FutureExt;
 use opentelemetry::trace::{TraceContextExt, Tracer};
 use opentelemetry::KeyValue;
+use risc0_zkvm::sha::Digestible;
+use risc0_zkvm::InnerReceipt;
 use std::collections::{BTreeMap, VecDeque};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -93,7 +96,7 @@ pub async fn handle_proposals(
         agent.cursor.next_factory_index
     );
     // init channel buffers
-    let mut output_fault_proof_buffer = VecDeque::new();
+    let mut computed_proof_buffer = VecDeque::new();
     let mut output_fault_buffer = VecDeque::new();
     let mut trail_fault_buffer = VecDeque::new();
     let mut valid_buffer = VecDeque::new();
@@ -412,13 +415,7 @@ pub async fn handle_proposals(
 
             if let Err(err) = await_tel!(
                 context,
-                crate::validate::proving::request_fault_proof(
-                    &agent,
-                    &mut channel,
-                    parent,
-                    proposal,
-                    l1_head
-                )
+                request_fault_proof(&agent, &mut channel, parent, proposal, l1_head)
             ) {
                 error!("Could not request fault proof for {proposal_index}: {err:?}");
                 output_fault_buffer.push_back(proposal_index);
@@ -491,13 +488,7 @@ pub async fn handle_proposals(
 
             if let Err(err) = await_tel!(
                 context,
-                crate::validate::proving::request_validity_proof(
-                    &agent,
-                    &mut channel,
-                    parent,
-                    proposal,
-                    l1_head
-                )
+                request_validity_proof(&agent, &mut channel, parent, proposal, l1_head)
             ) {
                 error!("Could not request validity proof for {proposal_index}: {err:?}");
                 valid_buffer.push_front(proposal_index);
@@ -519,14 +510,13 @@ pub async fn handle_proposals(
                 break;
             };
             meter_proofs_completed.add(1, &[]);
-            output_fault_proof_buffer.push_back(message);
+            computed_proof_buffer.push_back(message);
         }
 
         // publish computed output fault proofs
-        let computed_proofs = output_fault_proof_buffer.len();
+        let computed_proofs = computed_proof_buffer.len();
         for _ in 0..computed_proofs {
-            let Some(Message::Proof(proposal_index, receipt)) =
-                output_fault_proof_buffer.pop_front()
+            let Some(Message::Proof(proposal_index, receipt)) = computed_proof_buffer.pop_front()
             else {
                 error!("Validator loop received an unexpected message.");
                 continue;
@@ -534,7 +524,7 @@ pub async fn handle_proposals(
             let Some(proposal) = agent.proposals.get(&proposal_index) else {
                 if agent.cursor.last_resolved_game < proposal_index {
                     error!("Proposal {proposal_index} missing from database.");
-                    output_fault_proof_buffer.push_back(Message::Proof(proposal_index, receipt));
+                    computed_proof_buffer.push_back(Message::Proof(proposal_index, receipt));
                 } else {
                     warn!("Skipping proof submission for freed proposal {proposal_index}.")
                 }
@@ -543,7 +533,7 @@ pub async fn handle_proposals(
             let Some(parent) = agent.proposals.get(&proposal.parent) else {
                 if agent.cursor.last_resolved_game < proposal.parent {
                     error!("Parent proposal {} missing from database.", proposal.parent);
-                    output_fault_proof_buffer.push_back(Message::Proof(proposal_index, receipt));
+                    computed_proof_buffer.push_back(Message::Proof(proposal_index, receipt));
                 } else {
                     warn!(
                         "Skipping proof submission for proposal {} with freed parent {}.",
@@ -588,8 +578,7 @@ pub async fn handle_proposals(
             };
             // patch the proof if in dev mode
             #[cfg(feature = "devnet")]
-            let receipt =
-                crate::validate::proving::maybe_patch_proof(receipt, expected_fpvm_image_id)?;
+            let receipt = maybe_patch_proof(receipt, expected_fpvm_image_id)?;
             // verify that the zkvm receipt is valid
             if let Err(e) = receipt.verify(expected_fpvm_image_id) {
                 error!("Could not verify receipt against image id in contract: {e:?}");
@@ -605,7 +594,7 @@ pub async fn handle_proposals(
                     "Failed to look up proposal contract with l1 head {}",
                     proof_journal.l1_head
                 );
-                output_fault_proof_buffer.push_back(Message::Proof(proposal_index, Some(receipt)));
+                computed_proof_buffer.push_back(Message::Proof(proposal_index, Some(receipt)));
                 continue;
             };
             // encode seal data
@@ -754,7 +743,7 @@ pub async fn handle_proposals(
                                 KeyValue::new("msg", e.to_string()),
                             ],
                         );
-                        output_fault_proof_buffer
+                        computed_proof_buffer
                             .push_back(Message::Proof(proposal_index, Some(receipt)));
                     }
                 }
@@ -1034,8 +1023,7 @@ pub async fn handle_proposals(
                             KeyValue::new("msg", e.to_string()),
                         ],
                     );
-                    output_fault_proof_buffer
-                        .push_back(Message::Proof(proposal_index, Some(receipt)));
+                    computed_proof_buffer.push_back(Message::Proof(proposal_index, Some(receipt)));
                 }
             }
         }
@@ -1259,4 +1247,66 @@ pub fn get_next_l1_head(
     last_proof_l1_head.insert(proposal.index, block_no);
 
     Some(l1_head)
+}
+
+/// Encode the seal of the given receipt for use with EVM smart contract verifiers.
+///
+/// Appends the verifier selector, determined from the first 4 bytes of the verifier parameters
+/// including the Groth16 verification key and the control IDs that commit to the RISC Zero
+/// circuits.
+///
+/// Copied from crate risc0-ethereum-contracts v2.0.2
+pub fn encode_seal(receipt: &risc0_zkvm::Receipt) -> anyhow::Result<Vec<u8>> {
+    let seal = match receipt.inner.clone() {
+        InnerReceipt::Fake(receipt) => {
+            let seal = receipt.claim.digest().as_bytes().to_vec();
+            let selector = &[0xFFu8; 4];
+            // Create a new vector with the capacity to hold both selector and seal
+            let mut selector_seal = Vec::with_capacity(selector.len() + seal.len());
+            selector_seal.extend_from_slice(selector);
+            selector_seal.extend_from_slice(&seal);
+            selector_seal
+        }
+        InnerReceipt::Groth16(receipt) => {
+            let selector = &receipt.verifier_parameters.as_bytes()[..4];
+            // Create a new vector with the capacity to hold both selector and seal
+            let mut selector_seal = Vec::with_capacity(selector.len() + receipt.seal.len());
+            selector_seal.extend_from_slice(selector);
+            selector_seal.extend_from_slice(receipt.seal.as_ref());
+            selector_seal
+        }
+        _ => bail!("Unsupported receipt type"),
+        // TODO(victor): Add set verifier seal here.
+    };
+    Ok(seal)
+}
+
+#[cfg(feature = "devnet")]
+pub fn maybe_patch_proof(
+    mut receipt: risc0_zkvm::Receipt,
+    expected_fpvm_image_id: [u8; 32],
+) -> anyhow::Result<risc0_zkvm::Receipt> {
+    // Return the proof if we can't patch it
+    if !risc0_zkvm::is_dev_mode() {
+        return Ok(receipt);
+    }
+
+    let expected_fpvm_image_id = risc0_zkvm::sha::Digest::from(expected_fpvm_image_id);
+
+    // Patch the image id of the receipt to match the expected one
+    if let risc0_zkvm::InnerReceipt::Fake(fake_inner_receipt) = &mut receipt.inner {
+        if let risc0_zkvm::MaybePruned::Value(claim) = &mut fake_inner_receipt.claim {
+            tracing::warn!("DEV-MODE ONLY: Patching fake receipt image id to match game contract.");
+            claim.pre = risc0_zkvm::MaybePruned::Pruned(expected_fpvm_image_id);
+            if let risc0_zkvm::MaybePruned::Value(Some(output)) = &mut claim.output {
+                if let risc0_zkvm::MaybePruned::Value(journal) = &mut output.journal {
+                    let n = journal.len();
+                    journal[n - 32..n].copy_from_slice(expected_fpvm_image_id.as_bytes());
+                    receipt.journal.bytes[n - 32..n]
+                        .copy_from_slice(expected_fpvm_image_id.as_bytes());
+                }
+            }
+        }
+    }
+    Ok(receipt)
 }

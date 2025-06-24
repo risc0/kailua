@@ -1,5 +1,5 @@
 [package]
-name = "kailua-cli"
+name = "kailua-validator"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -15,42 +15,33 @@ anyhow.workspace = true
 async-channel.workspace = true
 bytemuck.workspace = true
 clap.workspace = true
-hex.workspace = true
 process_path.workspace = true
-tempfile.workspace = true
 tokio.workspace = true
 tokio-retry.workspace = true
-tracing-subscriber.workspace = true
 tracing.workspace = true
-
-opentelemetry.workspace = true
 
 alloy = { workspace = true, features = ["full", "kzg", "signer-aws", "signer-gcp"] }
 
 kailua-build.workspace = true
 kailua-common.workspace = true
 kailua-contracts.workspace = true
-kailua-proposer.workspace = true
 kailua-prover.workspace = true
 kailua-sync.workspace = true
-kailua-validator.workspace = true
 
-kona-cli.workspace = true
 kona-protocol.workspace = true
+
+opentelemetry.workspace = true
 
 risc0-zkvm.workspace = true
 
-[dev-dependencies]
-assert_cmd = "2.0.16"
-
 [features]
 devnet = [
-    "kailua-proposer/devnet",
-    "kailua-sync/devnet",
+    "kailua-prover/devnet",
+    "kailua-sync/devnet"
 ]
 prove = [
     "kailua-prover/prove",
-    "risc0-zkvm/prove",
+    "risc0-zkvm/prove"
 ]
 cuda = [
     "kailua-prover/cuda",
@@ -61,13 +52,10 @@ metal = [
     "risc0-zkvm/metal"
 ]
 disable-dev-mode = [
-    "kailua-build/disable-dev-mode",
     "kailua-prover/disable-dev-mode",
     "risc0-zkvm/disable-dev-mode"
 ]
 rebuild-fpvm = [
-    "kailua-build/rebuild-fpvm",
-    "kailua-proposer/rebuild-fpvm",
     "kailua-prover/rebuild-fpvm",
-    "kailua-sync/rebuild-fpvm",
+    "kailua-sync/rebuild-fpvm"
 ]

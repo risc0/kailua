@@ -5065,6 +5065,7 @@ dependencies = [
  "kailua-proposer",
  "kailua-prover",
  "kailua-sync",
+ "kailua-validator",
  "kona-cli",
  "kona-protocol",
  "opentelemetry",
@@ -5163,7 +5164,6 @@ dependencies = [
  "kailua-build",
  "kailua-common",
  "kailua-sync",
- "kona-cli",
  "kona-derive",
  "kona-genesis",
  "kona-host",
@@ -5180,7 +5180,6 @@ dependencies = [
  "thiserror 2.0.12",
  "tokio",
  "tracing",
- "tracing-subscriber 0.3.19",
 ]
 
 [[package]]
@@ -5212,6 +5211,29 @@ dependencies = [
  "rocksdb",
  "serde",
  "serde_json",
+ "tokio",
+ "tokio-retry",
+ "tracing",
+]
+
+[[package]]
+name = "kailua-validator"
+version = "1.0.0-rc.1"
+dependencies = [
+ "alloy",
+ "anyhow",
+ "async-channel 2.3.1",
+ "bytemuck",
+ "clap",
+ "kailua-build",
+ "kailua-common",
+ "kailua-contracts",
+ "kailua-prover",
+ "kailua-sync",
+ "kona-protocol",
+ "opentelemetry",
+ "process_path",
+ "risc0-zkvm",
  "tokio",
  "tokio-retry",
  "tracing",
