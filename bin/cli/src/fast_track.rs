@@ -289,11 +289,17 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
         .transact_with_context(context.clone(), "KailuaTreasury::propose")
         .await
         .context("KailuaTreasury::propose")?;
-    let kailua_treasury_instance_address = dispute_game_factory
-        .games(KAILUA_GAME_TYPE, root_claim, extra_data)
-        .stall_with_context(context.clone(), "DisputeGameFactory::games")
-        .await
-        .proxy_;
+    let kailua_treasury_instance_address = loop {
+        let result = dispute_game_factory
+            .games(KAILUA_GAME_TYPE, root_claim, extra_data.clone())
+            .stall_with_context(context.clone(), "DisputeGameFactory::games")
+            .await
+            .proxy_;
+
+        if !result.is_zero() {
+            break result;
+        }
+    };
     let kailua_treasury_instance =
         KailuaTreasury::new(kailua_treasury_instance_address, &owner_provider);
     info!("{:?}", &kailua_treasury_instance);

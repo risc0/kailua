@@ -16,6 +16,7 @@ fmt:
   cargo fmt --all --manifest-path build/risczero/fpvm/Cargo.toml
 
 clippy:
+  RISC0_SKIP_BUILD=true cargo clippy -F devnet --locked --workspace --all --all-targets -- -D warnings
   RISC0_SKIP_BUILD=true cargo clippy --locked --workspace --all --all-targets -- -D warnings
 
   cargo clippy --manifest-path build/risczero/fpvm/Cargo.toml --locked --workspace --all --all-targets -- -D warnings
