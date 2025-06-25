@@ -43,6 +43,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
+pub const FINAL_L2_BLOCK_RESOLVED: &str = "Last resolved proposal l2 block reached final l2 block.";
+
 /// A stateful agent object for synchronizing with an on-chain Kailua deployment.
 pub struct SyncAgent {
     /// RPC providers to use for querying chain data
@@ -217,6 +219,7 @@ impl SyncAgent {
     pub async fn sync(
         &mut self,
         #[cfg(feature = "devnet")] delay_l2_blocks: u64,
+        final_l2_block: Option<u64>,
     ) -> anyhow::Result<Vec<u64>> {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("SyncAgent::sync"));
@@ -393,6 +396,27 @@ impl SyncAgent {
         self.telemetry
             .sync_next
             .record(self.cursor.next_factory_index, &[]);
+
+        // check termination condition
+        if let Some(final_l2_block) = final_l2_block {
+            let last_resolved_proposal = self
+                .proposals
+                .get(&self.cursor.last_resolved_game)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "Last resolved proposal {} missing from database.",
+                        self.cursor.last_resolved_game
+                    )
+                })?;
+            if last_resolved_proposal.output_block_number >= final_l2_block {
+                error!(
+                    "Final L2 block termination condition satisfied: \
+                    Last resolved game at height {} >= {final_l2_block}.",
+                    last_resolved_proposal.output_block_number
+                );
+                bail!(FINAL_L2_BLOCK_RESOLVED);
+            }
+        }
 
         // Collect newly processed and retained proposals
         let proposals = (first_factory_index..self.cursor.next_factory_index)

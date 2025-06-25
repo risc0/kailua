@@ -15,10 +15,17 @@
 #![cfg(feature = "devnet")]
 
 use kailua_cli::fast_track::{fast_track, FastTrackArgs};
-use kailua_sync::transact::signer::{DeployerSignerArgs, GuardianSignerArgs, OwnerSignerArgs};
+use kailua_proposer::args::ProposeArgs;
+use kailua_proposer::propose::propose;
+use kailua_sync::args::SyncArgs;
+use kailua_sync::provider::ProviderArgs;
+use kailua_sync::transact::signer::{
+    DeployerSignerArgs, GuardianSignerArgs, OwnerSignerArgs, ProposerSignerArgs,
+};
 use kailua_sync::transact::TransactArgs;
 use std::env::set_var;
 use std::process::ExitStatus;
+use tempfile::tempdir;
 use tokio::io;
 use tokio::process::Command;
 use tracing_subscriber::EnvFilter;
@@ -102,8 +109,41 @@ async fn start_devnet_or_clean() {
 
 #[tokio::test]
 async fn devnet_happy_path() {
-    // Start the optimism devnet
+    // Start the upgraded optimism devnet
     start_devnet_or_clean().await;
+
+    // Run the proposer until block 60
+    let tmp_dir = tempdir().unwrap();
+    let data_dir = tmp_dir.path().to_path_buf();
+    propose(
+        ProposeArgs {
+            sync: SyncArgs {
+                provider: ProviderArgs {
+                    eth_rpc_url: "http://127.0.0.1:8545".to_string(),
+                    op_geth_url: "http://127.0.0.1:9545".to_string(),
+                    op_node_url: "http://127.0.0.1:7545".to_string(),
+                    beacon_rpc_url: "http://127.0.0.1:5052".to_string(),
+                },
+                kailua_game_implementation: None,
+                kailua_anchor_address: None,
+                delay_l2_blocks: 0,
+                final_l2_block: Some(60),
+                data_dir: Some(data_dir.clone()),
+                telemetry: Default::default(),
+            },
+            proposer_signer: ProposerSignerArgs::from(
+                "0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba".to_string(),
+            ),
+            txn_args: TransactArgs {
+                txn_timeout: 120,
+                exec_gas_premium: 25,
+                blob_gas_premium: 25,
+            },
+        },
+        data_dir,
+    )
+    .await
+    .unwrap();
 
     // Stop and discard the devnet
     stop_devnet().await;

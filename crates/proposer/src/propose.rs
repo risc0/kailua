@@ -26,7 +26,7 @@ use alloy::sol_types::SolValue;
 use anyhow::{bail, Context};
 use kailua_common::blobs::hash_to_fe;
 use kailua_contracts::*;
-use kailua_sync::agent::SyncAgent;
+use kailua_sync::agent::{SyncAgent, FINAL_L2_BLOCK_RESOLVED};
 use kailua_sync::proposal::Proposal;
 use kailua_sync::stall::Stall;
 use kailua_sync::transact::provider::SafeProvider;
@@ -99,11 +99,19 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             context,
             agent.sync(
                 #[cfg(feature = "devnet")]
-                args.sync.delay_l2_blocks
+                args.sync.delay_l2_blocks,
+                args.sync.final_l2_block
             )
         )
         .context("SyncAgent::sync")
         {
+            if err
+                .root_cause()
+                .to_string()
+                .contains(FINAL_L2_BLOCK_RESOLVED)
+            {
+                return Ok(());
+            }
             error!("Synchronization error: {err:?}");
         }
 
@@ -163,6 +171,17 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         let Some(canonical_tip) = agent.canonical_tip() else {
             bail!("Canonical tip proposal missing from database!");
         };
+
+        // Check termination condition
+        if let Some(final_l2_block) = args.sync.final_l2_block {
+            if canonical_tip.output_block_number >= final_l2_block {
+                warn!(
+                    "Final l2 block proposed. Canonical tip height {} >= {final_l2_block}",
+                    canonical_tip.output_block_number
+                );
+                continue;
+            }
+        }
 
         // Query op-node to get latest safe l2 head
         let sync_status = await_tel!(
