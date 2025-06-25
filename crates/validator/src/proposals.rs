@@ -67,8 +67,8 @@ pub async fn handle_proposals(
     let mut agent = SyncAgent::new(
         &args.sync.provider,
         data_dir,
-        args.kailua_game_implementation,
-        args.kailua_anchor_address,
+        args.sync.kailua_game_implementation,
+        args.sync.kailua_anchor_address,
     )
     .await?;
     info!("KailuaTreasury({:?})", agent.deployment.treasury);

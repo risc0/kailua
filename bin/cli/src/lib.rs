@@ -103,11 +103,11 @@ impl KailuaCli {
         match self {
             KailuaCli::Config { args, .. } => &args.telemetry,
             KailuaCli::FastTrack { args, .. } => &args.telemetry,
-            KailuaCli::Propose { args, .. } => &args.telemetry,
-            KailuaCli::Validate { args, .. } => &args.telemetry,
+            KailuaCli::Propose { args, .. } => &args.sync.telemetry,
+            KailuaCli::Validate { args, .. } => &args.sync.telemetry,
             KailuaCli::Prove { args, .. } => &args.telemetry,
-            KailuaCli::TestFault { args, .. } => &args.propose_args.telemetry,
-            KailuaCli::Benchmark { args, .. } => &args.telemetry,
+            KailuaCli::TestFault { args, .. } => &args.propose_args.sync.telemetry,
+            KailuaCli::Benchmark { args, .. } => &args.sync.telemetry,
         }
     }
 }
