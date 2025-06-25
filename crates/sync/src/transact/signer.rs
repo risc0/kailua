@@ -30,7 +30,7 @@ use std::str::FromStr;
 macro_rules! define_signer_args {
     ($vis: vis $struct_name: ident, $prefix: ident) => {
         paste::paste! {
-            #[derive(clap::Args, Debug, Clone)]
+            #[derive(clap::Args, Debug, Clone, Default)]
             $vis struct $struct_name {
                 /// Wallet private key
                 #[clap(long, env, required_unless_present_any = [stringify!([<$prefix aws_key_id>]), stringify!([<$prefix google_keyring>])])]
@@ -66,6 +66,15 @@ macro_rules! define_signer_args {
                         &self.[<$prefix google_key_name>],
                         chain_id
                     ).await
+                }
+            }
+
+            impl From<String> for $struct_name {
+                fn from(s: String) -> Self {
+                    Self {
+                        [<$prefix key>]: Some(s),
+                        ..Default::default()
+                    }
                 }
             }
         }
