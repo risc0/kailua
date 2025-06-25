@@ -24,7 +24,7 @@ use kailua_common::blobs::hash_to_fe;
 use kailua_common::journal::ProofJournal;
 use kailua_common::precondition::validity_precondition_hash;
 use kailua_contracts::*;
-use kailua_sync::agent::SyncAgent;
+use kailua_sync::agent::{SyncAgent, FINAL_L2_BLOCK_RESOLVED};
 use kailua_sync::proposal::Proposal;
 use kailua_sync::stall::Stall;
 use kailua_sync::transact::provider::SafeProvider;
@@ -105,18 +105,29 @@ pub async fn handle_proposals(
         // Wait for new data on every iteration
         sleep(Duration::from_secs(1)).await;
         // fetch latest games
-        let loaded_proposals = await_tel!(
+        let loaded_proposals = match await_tel!(
             context,
             agent.sync(
                 #[cfg(feature = "devnet")]
-                args.sync.delay_l2_blocks
+                args.sync.delay_l2_blocks,
+                args.sync.final_l2_block
             )
         )
         .context("SyncAgent::sync")
-        .unwrap_or_else(|err| {
-            error!("Synchronization error: {err:?}");
-            vec![]
-        });
+        {
+            Ok(result) => result,
+            Err(err) => {
+                if err
+                    .root_cause()
+                    .to_string()
+                    .contains(FINAL_L2_BLOCK_RESOLVED)
+                {
+                    return Ok(());
+                }
+                error!("Synchronization error: {err:?}");
+                vec![]
+            }
+        };
 
         // check new proposals for fault and queue potential responses
         for proposal_index in loaded_proposals {
@@ -176,6 +187,16 @@ pub async fn handle_proposals(
             };
             let parent_contract =
                 KailuaTournament::new(parent.contract, &agent.provider.l1_provider);
+            // Check termination condition
+            if let Some(final_l2_block) = args.sync.final_l2_block {
+                if parent.output_block_number >= final_l2_block {
+                    warn!(
+                        "Dropping proposal {} with parent output height {} past final l2 block {}.",
+                        proposal.index, parent.output_block_number, final_l2_block
+                    );
+                    continue;
+                }
+            }
             // Check that a validity proof has not already been posted
             let is_validity_proven = await_tel!(
                 context,
