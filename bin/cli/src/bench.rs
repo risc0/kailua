@@ -15,7 +15,6 @@
 use alloy::primitives::map::{Entry, HashMap};
 use alloy::providers::{Provider, ProviderBuilder};
 use kailua_sync::args::SyncArgs;
-use kailua_sync::telemetry::TelemetryArgs;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, Span, Status, TraceContextExt, Tracer};
 use risc0_zkvm::is_dev_mode;
@@ -42,9 +41,6 @@ pub struct BenchArgs {
     /// The number of top candidate L2 blocks to benchmark
     #[clap(long, env)]
     pub bench_count: u64,
-
-    #[clap(flatten)]
-    pub telemetry: TelemetryArgs,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
