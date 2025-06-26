@@ -19,7 +19,7 @@ use alloy::eips::eip4844::IndexedBlobHash;
 use alloy::network::primitives::HeaderResponse;
 use alloy::network::{BlockResponse, TxSigner};
 use alloy::primitives::B256;
-use anyhow::{anyhow, bail, Context};
+use anyhow::{bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::config::config_hash;
@@ -37,7 +37,7 @@ use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use std::path::PathBuf;
 use tokio::spawn;
-use tracing::{debug, info};
+use tracing::{debug, error, info, warn};
 
 pub async fn handle_proof_requests(
     mut channel: DuplexChannel<Message>,
@@ -92,10 +92,10 @@ pub async fn handle_proof_requests(
         )));
     }
 
-    // Run proof generator loop
+    // Run task generator loop
     loop {
         // Dequeue messages
-        let Message::Proposal {
+        let Some(Message::Proposal {
             index: proposal_index,
             precondition_validation_data,
             l1_head,
@@ -103,13 +103,10 @@ pub async fn handle_proof_requests(
             agreed_l2_output_root,
             claimed_l2_block_number,
             claimed_l2_output_root,
-        } = channel
-            .receiver
-            .recv()
-            .await
-            .ok_or(anyhow!("proof receiver channel closed"))?
+        }) = channel.receiver.recv().await
         else {
-            bail!("Unexpected message type.");
+            // The channel was closed because the handle_proposals loop ended
+            break;
         };
         info!("Processing proof for local index {proposal_index}.");
         // Compute proof file name
@@ -153,6 +150,19 @@ pub async fn handle_proof_requests(
             .await
             .context("task channel closed")?;
     }
+
+    // Close the task queuing channel to prevent retries
+    task_channel.0.close();
+
+    // Wait for all proving tasks to finish
+    for handler in proving_handlers {
+        if let Err(err) = handler.await {
+            error!("Error joining proving task handler: {err:?}");
+        }
+    }
+
+    warn!("handle_proof_requests terminated");
+    Ok(())
 }
 
 pub async fn request_fault_proof(

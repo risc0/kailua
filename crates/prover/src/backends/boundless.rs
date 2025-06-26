@@ -36,7 +36,7 @@ use std::time::Duration;
 use tracing::info;
 use tracing::log::warn;
 
-#[derive(Parser, Clone, Debug)]
+#[derive(Parser, Clone, Debug, Default)]
 pub struct BoundlessArgs {
     /// Market provider for proof requests
     #[clap(flatten)]

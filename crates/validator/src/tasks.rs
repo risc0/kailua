@@ -43,15 +43,16 @@ pub async fn handle_proving_tasks(
     let context = opentelemetry::Context::current_with_span(tracer.start("handle_proving_tasks"));
 
     loop {
-        let Task {
+        let Ok(Task {
             proposal_index,
             proving_args,
             proof_file_name,
-        } = task_channel
-            .1
-            .recv()
-            .await
-            .context("task receiver channel closed")?;
+        }) = task_channel.1.recv().await
+        else {
+            // The task queueing channel has been closed so no more work to do
+            warn!("handle_proving_tasks terminated");
+            break Ok(());
+        };
 
         // Prove (note: dev-mode/bonsai env vars are inherited!)
         let mut kailua_cli_command = Command::new(&kailua_cli);

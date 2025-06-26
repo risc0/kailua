@@ -122,6 +122,7 @@ pub async fn handle_proposals(
                     .to_string()
                     .contains(FINAL_L2_BLOCK_RESOLVED)
                 {
+                    warn!("handle_proposals terminated");
                     return Ok(());
                 }
                 error!("Synchronization error: {err:?}");

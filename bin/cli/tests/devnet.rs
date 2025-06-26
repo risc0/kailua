@@ -21,8 +21,11 @@ use kailua_sync::args::SyncArgs;
 use kailua_sync::provider::ProviderArgs;
 use kailua_sync::transact::signer::{
     DeployerSignerArgs, GuardianSignerArgs, OwnerSignerArgs, ProposerSignerArgs,
+    ValidatorSignerArgs,
 };
 use kailua_sync::transact::TransactArgs;
+use kailua_validator::args::ValidateArgs;
+use kailua_validator::validate::validate;
 use std::env::set_var;
 use std::process::ExitStatus;
 use tempfile::tempdir;
@@ -112,35 +115,62 @@ async fn devnet_happy_path() {
     // Start the upgraded optimism devnet
     start_devnet_or_clean().await;
 
-    // Run the proposer until block 60
+    // Instantiate sync arguments
     let tmp_dir = tempdir().unwrap();
     let data_dir = tmp_dir.path().to_path_buf();
+    let sync = SyncArgs {
+        provider: ProviderArgs {
+            eth_rpc_url: "http://127.0.0.1:8545".to_string(),
+            op_geth_url: "http://127.0.0.1:9545".to_string(),
+            op_node_url: "http://127.0.0.1:7545".to_string(),
+            beacon_rpc_url: "http://127.0.0.1:5052".to_string(),
+        },
+        kailua_game_implementation: None,
+        kailua_anchor_address: None,
+        delay_l2_blocks: 0,
+        final_l2_block: Some(60),
+        data_dir: Some(data_dir.clone()),
+        telemetry: Default::default(),
+    };
+
+    // Instantiate transacting arguments
+    let txn_args = TransactArgs {
+        txn_timeout: 30,
+        exec_gas_premium: 25,
+        blob_gas_premium: 25,
+    };
+
+    // Run the proposer until block 60
     propose(
         ProposeArgs {
-            sync: SyncArgs {
-                provider: ProviderArgs {
-                    eth_rpc_url: "http://127.0.0.1:8545".to_string(),
-                    op_geth_url: "http://127.0.0.1:9545".to_string(),
-                    op_node_url: "http://127.0.0.1:7545".to_string(),
-                    beacon_rpc_url: "http://127.0.0.1:5052".to_string(),
-                },
-                kailua_game_implementation: None,
-                kailua_anchor_address: None,
-                delay_l2_blocks: 0,
-                final_l2_block: Some(60),
-                data_dir: Some(data_dir.clone()),
-                telemetry: Default::default(),
-            },
+            sync: sync.clone(),
             proposer_signer: ProposerSignerArgs::from(
                 "0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba".to_string(),
             ),
-            txn_args: TransactArgs {
-                txn_timeout: 120,
-                exec_gas_premium: 25,
-                blob_gas_premium: 25,
-            },
+            txn_args: txn_args.clone(),
         },
-        data_dir,
+        data_dir.clone(),
+    )
+    .await
+    .unwrap();
+
+    // Run the validator until block 60
+    validate(
+        ValidateArgs {
+            sync: sync.clone(),
+            kailua_cli: None,
+            fast_forward_target: 0,
+            num_concurrent_provers: 1,
+            l1_head_jump_back: 0,
+            validator_signer: ValidatorSignerArgs::from(
+                "0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e".to_string(),
+            ),
+            txn_args: txn_args.clone(),
+            payout_recipient_address: None,
+            boundless: Default::default(),
+        },
+        3,
+        data_dir.clone(),
     )
     .await
     .unwrap();
