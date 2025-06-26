@@ -124,7 +124,7 @@ Running `kailua-cli validate` with these two environment variables should now de
 ### Boundless
 When delegating generation of Kailua Fault proofs to the decentralized [Boundless proving network](https://docs.beboundless.xyz/),
 for every fault proof, a proof request is submitted to the network, where it goes through the standard
-[proof life-cycle](https://docs.beboundless.xyz/introduction/proof-lifecycle) on boundless, before being published by
+[proof life-cycle](https://docs.beboundless.xyz/provers/proof-lifecycle) on boundless, before being published by
 your validator to settle a dispute.
 
 This functionality requires some additional parameters when starting the validator.
