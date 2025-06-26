@@ -25,12 +25,16 @@ use alloy_primitives::B256;
 use anyhow::{anyhow, bail, Context};
 use kailua_common::boot::StitchedBootInfo;
 use kailua_sync::provider::optimism::OpNodeProvider;
+use opentelemetry::global::tracer;
+use opentelemetry::trace::Tracer;
 use std::collections::BinaryHeap;
 use std::env::set_var;
 use tempfile::tempdir;
 use tracing::{error, info, warn};
 
 pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
+    tracer("kailua").start("prove");
+
     // fetch starting block number
     let l2_provider = if args.kona.is_offline() {
         None
@@ -74,11 +78,11 @@ pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
     // create concurrent db
     let disk_kv_store = create_disk_kv_store(&args.kona);
     // perform preflight to fetch data
-    if args.num_concurrent_preflights > 0 {
+    if args.proving.num_concurrent_preflights > 0 {
         // run parallelized preflight instances to populate kv store
         info!(
             "Running concurrent preflights with {} threads",
-            args.num_concurrent_preflights
+            args.proving.num_concurrent_preflights
         );
         concurrent_execution_preflight(
             &args,
@@ -93,7 +97,7 @@ pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
     // spin up proving workers
     let task_channel: AsyncChannel<Oneshot> = async_channel::unbounded();
     let mut proving_handlers = vec![];
-    for _ in 0..args.num_concurrent_proofs {
+    for _ in 0..args.proving.num_concurrent_proofs {
         proving_handlers.push(tokio::spawn(handle_oneshot_tasks(task_channel.1.clone())));
     }
 

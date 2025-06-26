@@ -225,7 +225,7 @@ pub async fn compute_fpvm_proof(
         // force attempting to compute the proof if it only combines boot infos
         stitching_only,
         // skip seeking a complete proof if skipping derivation
-        !args.proving.skip_derivation_proof,
+        !args.skip_derivation_proof,
         task_sender.clone(),
     )
     .await;
@@ -239,7 +239,7 @@ pub async fn compute_fpvm_proof(
     let (_, execution_cache) = split_executions(executed_blocks.clone());
 
     // perform a derivation-only run to check its provability
-    if !args.proving.skip_derivation_proof {
+    if !args.skip_derivation_proof {
         info!(
             "Performing derivation-only run for {} executions.",
             execution_cache.len()
@@ -394,7 +394,7 @@ pub async fn compute_fpvm_proof(
         .unzip();
 
     // Return no proof if derivation is not required
-    if args.proving.skip_derivation_proof {
+    if args.skip_derivation_proof {
         return Ok(None);
     }
 

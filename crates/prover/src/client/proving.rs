@@ -53,6 +53,7 @@ pub async fn run_proving_client<P, H>(
     prove_snark: bool,
     force_attempt: bool,
     seek_proof: bool,
+    skip_await_proof: bool,
 ) -> Result<(), ProvingError>
 where
     P: PreimageOracleClient + Send + Sync + Debug + Clone + 'static,
@@ -126,6 +127,7 @@ where
         [preloaded_frames, streamed_frames].concat(),
         stitched_proofs,
         prove_snark,
+        skip_await_proof,
     )
     .await
 }
@@ -181,6 +183,7 @@ pub async fn seek_fpvm_proof(
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Receipt>,
     prove_snark: bool,
+    skip_await_proof: bool,
 ) -> Result<(), ProvingError> {
     // compute the zkvm proof
     let proof = match boundless.market {
@@ -192,12 +195,19 @@ pub async fn seek_fpvm_proof(
                 witness_frames,
                 stitched_proofs,
                 proving,
+                skip_await_proof,
             )
             .await?
         }
         _ => {
             if should_use_bonsai() {
-                run_bonsai_client(witness_frames, stitched_proofs, prove_snark, proving).await?
+                run_bonsai_client(
+                    witness_frames,
+                    stitched_proofs,
+                    prove_snark,
+                    skip_await_proof,
+                )
+                .await?
             } else {
                 run_zkvm_client(
                     witness_frames,
