@@ -40,7 +40,7 @@ pub async fn validate(args: ValidateArgs, verbosity: u8, data_dir: PathBuf) -> a
 
     let (proposals_task, proofs_task) = try_join!(handle_proposals, handle_proof_requests)?;
     proposals_task.context("handle_proposals")?;
-    proofs_task.context("handle_proofs")?;
+    proofs_task.context("handle_proof_requests")?;
 
     Ok(())
 }
