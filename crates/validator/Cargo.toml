@@ -15,7 +15,6 @@ anyhow.workspace = true
 async-channel.workspace = true
 bytemuck.workspace = true
 clap.workspace = true
-process_path.workspace = true
 tokio.workspace = true
 tokio-retry.workspace = true
 tracing.workspace = true
@@ -29,6 +28,7 @@ kailua-prover.workspace = true
 kailua-sync.workspace = true
 
 kona-protocol.workspace = true
+kona-host.workspace = true
 
 opentelemetry.workspace = true
 

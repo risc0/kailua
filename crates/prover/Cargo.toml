@@ -46,6 +46,8 @@ kona-std-fpvm.workspace = true
 bonsai-sdk.workspace = true
 boundless-market.workspace = true
 
+opentelemetry.workspace = true
+
 risc0-ethereum-contracts.workspace = true
 risc0-zkvm.workspace = true
 

@@ -21,16 +21,21 @@ use std::cmp::Ordering;
 
 #[derive(Parser, Clone, Debug)]
 pub struct ProvingArgs {
+    /// Address of the recipient account to use for bond payouts
     #[clap(long, env, value_parser = parse_address)]
     pub payout_recipient_address: Option<Address>,
+    /// ZKVM Proving Segment Limit
     #[clap(long, env, required = false, default_value_t = 21)]
     pub segment_limit: u32,
+    /// Maximum input data size per proof
     #[clap(long, env, required = false, default_value_t = 2_684_354_560)]
     pub max_witness_size: usize,
-    #[clap(long, env, default_value_t = false)]
-    pub skip_derivation_proof: bool,
-    #[clap(long, env, default_value_t = false)]
-    pub skip_await_proof: bool,
+    /// How many threads to use for fetching preflight data
+    #[clap(long, env, default_value_t = 4)]
+    pub num_concurrent_preflights: u64,
+    /// How many threads to use for computing proofs
+    #[clap(long, env, default_value_t = 1)]
+    pub num_concurrent_proofs: u64,
 }
 
 /// The prover arguments
@@ -42,12 +47,10 @@ pub struct ProveArgs {
     /// Address of OP-NODE endpoint to use
     #[clap(long, env)]
     pub op_node_address: Option<String>,
-    /// How many threads to use for fetching preflight data
-    #[clap(long, env, default_value_t = 4)]
-    pub num_concurrent_preflights: u64,
-    /// How many threads to use for computing proofs
-    #[clap(long, env, default_value_t = 1)]
-    pub num_concurrent_proofs: u64,
+    #[clap(long, env, default_value_t = false)]
+    pub skip_derivation_proof: bool,
+    #[clap(long, env, default_value_t = false)]
+    pub skip_await_proof: bool,
 
     #[clap(flatten)]
     pub proving: ProvingArgs,

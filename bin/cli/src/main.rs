@@ -22,7 +22,7 @@ use tempfile::tempdir;
 use tracing::error;
 use tracing_subscriber::EnvFilter;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     let cli = KailuaCli::parse();
     kona_cli::init_tracing_subscriber(cli.verbosity(), None::<EnvFilter>)?;

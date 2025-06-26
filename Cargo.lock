@@ -5128,6 +5128,7 @@ dependencies = [
  "kona-protocol",
  "kona-registry",
  "kona-std-fpvm",
+ "opentelemetry",
  "risc0-ethereum-contracts",
  "risc0-zkvm",
  "rkyv",
@@ -5186,9 +5187,9 @@ dependencies = [
  "kailua-contracts",
  "kailua-prover",
  "kailua-sync",
+ "kona-host",
  "kona-protocol",
  "opentelemetry",
- "process_path",
  "risc0-zkvm",
  "tokio",
  "tokio-retry",
@@ -7111,16 +7112,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60946a68e5f9d28b0dc1c21bb8a97ee7d018a8b322fa57838ba31cc878e22d99"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "process_path"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f676f11eb0b3e2ea0fbaee218fa6b806689e2297b8c8adc5bf73df465c4f6171"
-dependencies = [
- "libc",
- "winapi",
 ]
 
 [[package]]
