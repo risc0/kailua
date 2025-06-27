@@ -36,7 +36,7 @@ use std::time::Duration;
 use tracing::info;
 use tracing::log::warn;
 
-#[derive(Parser, Clone, Debug)]
+#[derive(Parser, Clone, Debug, Default)]
 pub struct BoundlessArgs {
     /// Market provider for proof requests
     #[clap(flatten)]
@@ -209,6 +209,7 @@ pub async fn run_boundless_client(
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Receipt>,
     proving_args: &ProvingArgs,
+    skip_await_proof: bool,
 ) -> Result<Receipt, ProvingError> {
     info!("Running boundless client.");
     let proof_journal = Journal::new(journal.encode_packed());
@@ -286,7 +287,7 @@ pub async fn run_boundless_client(
 
         info!("Found matching request already submitted!");
 
-        if proving_args.skip_await_proof {
+        if skip_await_proof {
             warn!("Skipping awaiting proof on Boundless and exiting process.");
             std::process::exit(0);
         }
@@ -406,7 +407,7 @@ pub async fn run_boundless_client(
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     info!("Boundless request 0x{request_id:x} submitted");
 
-    if proving_args.skip_await_proof {
+    if skip_await_proof {
         warn!("Skipping awaiting proof on Boundless and exiting process.");
         std::process::exit(0);
     }

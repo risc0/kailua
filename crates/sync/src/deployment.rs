@@ -170,15 +170,6 @@ impl SyncDeployment {
         })
     }
 
-    pub fn allows_proposal(&self, proposal_block_number: u64, proposal_time: u64) -> bool {
-        self.time_to_propose(proposal_block_number, proposal_time) == 0
-    }
-
-    pub fn time_to_propose(&self, proposal_block_number: u64, proposal_time: u64) -> u64 {
-        self.min_proposal_time(proposal_block_number)
-            .saturating_sub(proposal_time)
-    }
-
     pub fn min_proposal_time(&self, proposal_block_number: u64) -> u64 {
         self.genesis_time + proposal_block_number * self.block_time + 1
     }

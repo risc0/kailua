@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::provider::ProviderArgs;
+use crate::telemetry::TelemetryArgs;
 use alloy::primitives::{Address, B256};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -22,13 +23,26 @@ pub struct SyncArgs {
     #[clap(flatten)]
     pub provider: ProviderArgs,
 
+    /// Address of the KailuaGame implementation to use
+    #[clap(long, env, value_parser = parse_address)]
+    pub kailua_game_implementation: Option<Address>,
+    /// Address of the anchor proposal to start synchronization from
+    #[clap(long, env, value_parser = parse_address)]
+    pub kailua_anchor_address: Option<Address>,
+    /// Number of L2 blocks to delay observation by
     #[cfg(feature = "devnet")]
     #[clap(long, env, default_value_t = 0)]
     pub delay_l2_blocks: u64,
+    /// L2 block number where synchronization stops
+    #[clap(long, env)]
+    pub final_l2_block: Option<u64>,
 
     /// Directory to use for caching data
     #[clap(long, env)]
     pub data_dir: Option<PathBuf>,
+
+    #[clap(flatten)]
+    pub telemetry: TelemetryArgs,
 }
 
 pub fn parse_address(s: &str) -> Result<Address, String> {

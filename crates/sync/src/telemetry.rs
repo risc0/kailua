@@ -19,7 +19,7 @@ use opentelemetry_otlp::{MetricExporter, SpanExporter, WithExportConfig};
 use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider, Temporality};
 use opentelemetry_sdk::{runtime::Tokio, trace::TracerProvider, Resource};
 
-#[derive(clap::Args, Debug, Clone)]
+#[derive(clap::Args, Debug, Clone, Default)]
 pub struct TelemetryArgs {
     /// OTLP Collector endpoint address
     #[clap(long, env, num_args = 0..=1, default_missing_value = "http://localhost:4317")]

@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy::primitives::Address;
-use kailua_sync::args::{parse_address, SyncArgs};
-use kailua_sync::telemetry::TelemetryArgs;
+use kailua_sync::args::SyncArgs;
 use kailua_sync::transact::signer::ProposerSignerArgs;
 use kailua_sync::transact::TransactArgs;
 
@@ -29,13 +27,4 @@ pub struct ProposeArgs {
     /// Transaction publication configuration
     #[clap(flatten)]
     pub txn_args: TransactArgs,
-    /// Address of the KailuaGame implementation to use
-    #[clap(long, env, value_parser = parse_address)]
-    pub kailua_game_implementation: Option<Address>,
-    /// Address of the anchor proposal to start synchronization from
-    #[clap(long, env, value_parser = parse_address)]
-    pub kailua_anchor_address: Option<Address>,
-
-    #[clap(flatten)]
-    pub telemetry: TelemetryArgs,
 }
