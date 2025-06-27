@@ -29,14 +29,21 @@ use kailua_sync::transact::signer::{
 use kailua_sync::transact::TransactArgs;
 use kailua_validator::args::ValidateArgs;
 use kailua_validator::validate::validate;
+use lazy_static::lazy_static;
 use std::env::set_var;
 use std::process::ExitStatus;
+use std::sync::Arc;
 use std::time::Duration;
 use tempfile::tempdir;
 use tokio::process::Command;
+use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tokio::{io, try_join};
 use tracing_subscriber::EnvFilter;
+
+lazy_static! {
+    static ref DEVNET: Arc<Mutex<()>> = Default::default();
+}
 
 async fn make(recipe: &str) -> io::Result<ExitStatus> {
     let mut cmd = Command::new("make");
@@ -48,11 +55,7 @@ async fn make(recipe: &str) -> io::Result<ExitStatus> {
         .await
 }
 
-async fn start_devnet() -> anyhow::Result<()> {
-    kona_cli::init_tracing_subscriber(3, None::<EnvFilter>)?;
-    // start optimism devnet
-    make("devnet-up").await?;
-    println!("Optimism devnet deployed.");
+async fn deploy_kailua_contracts(challenge_timeout: u64) -> anyhow::Result<()> {
     // fast-track upgrade w/ devmode proof support
     set_var("RISC0_DEV_MODE", "1");
     fast_track(FastTrackArgs {
@@ -69,7 +72,7 @@ async fn start_devnet() -> anyhow::Result<()> {
         output_block_span: 3,
         collateral_amount: 1,
         verifier_contract: None,
-        challenge_timeout: 60,
+        challenge_timeout,
         deployer_signer: DeployerSignerArgs::from(
             "0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356".to_string(),
         ),
@@ -84,7 +87,17 @@ async fn start_devnet() -> anyhow::Result<()> {
         respect_kailua_proposals: true,
         telemetry: Default::default(),
     })
-    .await?;
+    .await
+}
+
+async fn start_devnet(challenge_timeout: u64) -> anyhow::Result<()> {
+    // print out INFO logs
+    kona_cli::init_tracing_subscriber(3, None::<EnvFilter>)?;
+    // start optimism devnet
+    make("devnet-up").await?;
+    println!("Optimism devnet deployed.");
+    // update dgf to use kailua
+    deploy_kailua_contracts(challenge_timeout).await?;
     println!("Kailua contracts installed");
     Ok(())
 }
@@ -108,17 +121,20 @@ async fn stop_devnet() {
     }
 }
 
-async fn start_devnet_or_clean() {
-    if let Err(err) = start_devnet().await {
+async fn start_devnet_or_clean(challenge_timeout: u64) {
+    if let Err(err) = start_devnet(challenge_timeout).await {
         eprintln!("Error: {err}");
         stop_devnet().await;
     }
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn devnet_happy_path() {
+async fn local_devnet() {
+    // We can only run one of these dockerized devnets at a time
+    let _ = DEVNET.lock().await;
+
     // Start the upgraded optimism devnet
-    start_devnet_or_clean().await;
+    start_devnet_or_clean(60).await;
 
     // Instantiate sync arguments
     let tmp_dir = tempdir().unwrap();
@@ -208,13 +224,13 @@ async fn devnet_happy_path() {
     .await
     .unwrap();
 
-    // new sync target at block 75
+    // new sync target at block 90
     let sync = SyncArgs {
         final_l2_block: Some(90),
         ..sync
     };
 
-    // Run the proposer and validator until block 75
+    // Run the proposer and validator until block 90
     let validator_data_dir = tmp_dir.path().join("validator").to_path_buf();
     let validator_handle = tokio::task::spawn(validate(
         ValidateArgs {
@@ -225,6 +241,50 @@ async fn devnet_happy_path() {
             kailua_cli: None,
             fast_forward_target: 0,
             num_concurrent_provers: 1,
+            l1_head_jump_back: 0,
+            validator_signer: ValidatorSignerArgs::from(
+                "0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e".to_string(),
+            ),
+            txn_args: txn_args.clone(),
+            proving: ProvingArgs {
+                payout_recipient_address: None,
+                segment_limit: 21,
+                max_witness_size: 2_684_354_560,
+                num_concurrent_preflights: 1,
+                num_concurrent_proofs: 1,
+            },
+            boundless: Default::default(),
+        },
+        3,
+        validator_data_dir.clone(),
+    ));
+    let proposer_handle = tokio::task::spawn(propose(
+        ProposeArgs {
+            sync: sync.clone(),
+            proposer_signer: proposer_signer.clone(),
+            txn_args: txn_args.clone(),
+        },
+        proposer_data_dir.clone(),
+    ));
+    println!("Waiting for proposer and validator to terminate.");
+    // Wait for both agents to hit termination condition
+    let (validator, proposer) = try_join!(validator_handle, proposer_handle).unwrap();
+    validator.unwrap();
+    proposer.unwrap();
+
+    // Deploy new set of Kailua contracts for validity proving
+    deploy_kailua_contracts(u64::MAX).await.unwrap();
+    // Run the proposer and validator until block 90
+    let validator_data_dir = tmp_dir.path().join("validator").to_path_buf();
+    let validator_handle = tokio::task::spawn(validate(
+        ValidateArgs {
+            sync: SyncArgs {
+                data_dir: Some(validator_data_dir.clone()),
+                ..sync.clone()
+            },
+            kailua_cli: None,
+            fast_forward_target: 90, // run validity proofs until block 90 is finalized
+            num_concurrent_provers: 5,
             l1_head_jump_back: 0,
             validator_signer: ValidatorSignerArgs::from(
                 "0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e".to_string(),
