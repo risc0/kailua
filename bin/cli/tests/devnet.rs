@@ -14,11 +14,15 @@
 
 #![cfg(feature = "devnet")]
 
+use alloy::eips::{BlockId, BlockNumberOrTag};
+use alloy::network::BlockResponse;
+use alloy::providers::Provider;
 use kailua_cli::fast_track::{fast_track, FastTrackArgs};
 use kailua_cli::fault::{fault, FaultArgs};
 use kailua_proposer::args::ProposeArgs;
 use kailua_proposer::propose::propose;
-use kailua_prover::args::ProvingArgs;
+use kailua_prover::args::{ProveArgs, ProvingArgs};
+use kailua_prover::prove::prove;
 use kailua_sync::agent::SyncAgent;
 use kailua_sync::args::SyncArgs;
 use kailua_sync::provider::ProviderArgs;
@@ -87,18 +91,19 @@ async fn deploy_kailua_contracts(challenge_timeout: u64) -> anyhow::Result<()> {
         respect_kailua_proposals: true,
         telemetry: Default::default(),
     })
-    .await
+    .await?;
+    println!("Kailua contracts installed");
+    Ok(())
 }
 
-async fn start_devnet(challenge_timeout: u64) -> anyhow::Result<()> {
+async fn start_devnet() -> anyhow::Result<()> {
     // print out INFO logs
-    kona_cli::init_tracing_subscriber(3, None::<EnvFilter>)?;
+    if let Err(err) = kona_cli::init_tracing_subscriber(3, None::<EnvFilter>) {
+        eprintln!("Failed to set up tracing: {err:?}");
+    }
     // start optimism devnet
     make("devnet-up").await?;
     println!("Optimism devnet deployed.");
-    // update dgf to use kailua
-    deploy_kailua_contracts(challenge_timeout).await?;
-    println!("Kailua contracts installed");
     Ok(())
 }
 
@@ -121,20 +126,23 @@ async fn stop_devnet() {
     }
 }
 
-async fn start_devnet_or_clean(challenge_timeout: u64) {
-    if let Err(err) = start_devnet(challenge_timeout).await {
+async fn start_devnet_or_clean() {
+    if let Err(err) = start_devnet().await {
         eprintln!("Error: {err}");
         stop_devnet().await;
     }
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn local_devnet() {
+async fn proposer_validator() {
     // We can only run one of these dockerized devnets at a time
-    let _ = DEVNET.lock().await;
+    let devnet_lock = DEVNET.lock().await;
+    sleep(Duration::from_secs(5)).await;
 
-    // Start the upgraded optimism devnet
-    start_devnet_or_clean(60).await;
+    // Start the optimism devnet
+    start_devnet_or_clean().await;
+    // update dgf to use kailua
+    deploy_kailua_contracts(60).await.unwrap();
 
     // Instantiate sync arguments
     let tmp_dir = tempdir().unwrap();
@@ -318,4 +326,120 @@ async fn local_devnet() {
 
     // Stop and discard the devnet
     stop_devnet().await;
+    drop(devnet_lock);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn prover() {
+    // todo: set to 200
+    const PROOF_SIZE: u64 = 200;
+
+    // We can only run one of these dockerized devnets at a time
+    let devnet_lock = DEVNET.lock().await;
+    sleep(Duration::from_secs(5)).await;
+
+    // Start the optimism devnet
+    start_devnet_or_clean().await;
+    // update dgf to use kailua
+    deploy_kailua_contracts(60).await.unwrap();
+
+    // Instantiate sync arguments
+    let tmp_dir = tempdir().unwrap();
+    let data_dir = tmp_dir.path().join("agent").to_path_buf();
+    let sync = SyncArgs {
+        provider: ProviderArgs {
+            eth_rpc_url: "http://127.0.0.1:8545".to_string(),
+            op_geth_url: "http://127.0.0.1:9545".to_string(),
+            op_node_url: "http://127.0.0.1:7545".to_string(),
+            beacon_rpc_url: "http://127.0.0.1:5052".to_string(),
+        },
+        kailua_game_implementation: None,
+        kailua_anchor_address: None,
+        delay_l2_blocks: 0,
+        final_l2_block: Some(60),
+        data_dir: Some(data_dir.clone()),
+        telemetry: Default::default(),
+    };
+
+    // Wait for 200 blocks to be provable
+    println!("Waiting for l2 block #{PROOF_SIZE} to be safe.");
+    let mut agent = SyncAgent::new(&sync.provider, data_dir.clone(), None, None)
+        .await
+        .unwrap();
+    loop {
+        agent.sync(0, Some(PROOF_SIZE)).await.unwrap();
+        if agent.cursor.last_output_index >= PROOF_SIZE {
+            break;
+        }
+        // Wait for more blocks to be confirmed
+        sleep(Duration::from_secs(2)).await;
+    }
+    println!("Proving l2 block #{PROOF_SIZE} since genesis");
+
+    // Prove 200 blocks with very little memory
+    let l1_head = agent
+        .provider
+        .l1_provider
+        .get_block(BlockId::Number(BlockNumberOrTag::Latest))
+        .await
+        .unwrap()
+        .unwrap()
+        .header()
+        .hash;
+    let agreed_l2_head_hash = agent
+        .provider
+        .l2_provider
+        .get_block(BlockId::Number(BlockNumberOrTag::Number(0)))
+        .await
+        .unwrap()
+        .unwrap()
+        .header()
+        .hash;
+    let agreed_l2_output_root = agent.provider.op_provider.output_at_block(0).await.unwrap();
+    let claimed_l2_output_root = agent
+        .provider
+        .op_provider
+        .output_at_block(PROOF_SIZE)
+        .await
+        .unwrap();
+    prove(ProveArgs {
+        kona: kona_host::single::SingleChainHost {
+            l1_head,
+            agreed_l2_head_hash,
+            agreed_l2_output_root,
+            claimed_l2_output_root,
+            claimed_l2_block_number: PROOF_SIZE,
+            l2_node_address: Some(sync.provider.op_geth_url),
+            l1_node_address: Some(sync.provider.eth_rpc_url),
+            l1_beacon_address: Some(sync.provider.beacon_rpc_url),
+            data_dir: Some(tmp_dir.path().join("prover").to_path_buf()),
+            native: true,
+            server: false,
+            l2_chain_id: Some(agent.config.l2_chain_id),
+            rollup_config_path: None,
+            enable_experimental_witness_endpoint: false,
+        },
+        op_node_address: Some(sync.provider.op_node_url),
+        skip_derivation_proof: false,
+        skip_await_proof: false,
+        proving: ProvingArgs {
+            payout_recipient_address: None,
+            segment_limit: 21,
+            max_witness_size: 5 * 1024 * 1024, // 5 MB witness maximum
+            num_concurrent_preflights: 4,
+            num_concurrent_proofs: 2,
+        },
+        boundless: Default::default(),
+        bypass_chain_registry: false,
+        precondition_params: vec![],
+        precondition_block_hashes: vec![],
+        precondition_blob_hashes: vec![],
+        telemetry: Default::default(),
+    })
+    .await
+    .unwrap();
+
+    // Stop and discard the devnet
+    stop_devnet().await;
+    drop(devnet_lock);
 }
