@@ -37,6 +37,9 @@ kona-cli.workspace = true
 
 risc0-zkvm.workspace = true
 
+[dev-dependencies]
+lazy_static.workspace = true
+
 [features]
 devnet = [
     "kailua-proposer/devnet",
