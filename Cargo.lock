@@ -5026,6 +5026,7 @@ dependencies = [
  "kailua-sync",
  "kailua-validator",
  "kona-cli",
+ "kona-host",
  "lazy_static",
  "opentelemetry",
  "risc0-zkvm",

@@ -38,6 +38,7 @@ kona-cli.workspace = true
 risc0-zkvm.workspace = true
 
 [dev-dependencies]
+kona-host.workspace = true
 lazy_static.workspace = true
 
 [features]
