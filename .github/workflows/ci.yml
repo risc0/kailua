@@ -83,6 +83,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+      - uses: actions/checkout@v4
+        with:
+          repository: 'ethereum-optimism/optimism'
+          ref: 'v1.9.1'
+          path: 'optimism'
+          submodules: recursive
+          fetch-depth: '1'
       - uses: risc0/risc0/.github/actions/rustup@main
       - name: Install svm-rs
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
