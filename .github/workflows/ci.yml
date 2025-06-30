@@ -107,7 +107,7 @@ jobs:
       - run: svm use $SOLC_VERSION
 #      - uses: foundry-rs/foundry-toolchain@v1
       - run: curl -L https://foundry.paradigm.xyz | bash
-      - run: source /home/ubuntu/.bashrc && foundryup
+      - run: $HOME/.foundry/bin/foundryup -b v1.0.0
       - name: cargo test kailua
         run: cargo test --locked --workspace --all --all-targets -F devnet -- --test-threads 1
 
