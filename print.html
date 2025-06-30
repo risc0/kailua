@@ -491,10 +491,6 @@ commands from the root project directory:</p>
 <p>If you have modified the FPVM binary, you will need to build/install using <code>-F rebuild-fpvm</code>.</p>
 </div>
 </div>
-<h3 id="cli-binary"><a class="header" href="#cli-binary">CLI Binary</a></h3>
-<pre><code class="language-shell">cargo install kailua-cli --path bin/cli --locked
-</code></pre>
-<h3 id="prover-binary"><a class="header" href="#prover-binary">Prover Binary</a></h3>
 <div id="admonition-info" class="admonition admonish-info" role="note" aria-labelledby="admonition-info-title">
 <div class="admonition-title">
 <div id="admonition-info-title">
@@ -503,9 +499,9 @@ commands from the root project directory:</p>
 <a class="admonition-anchor-link" href="setup.html#admonition-info"></a>
 </div>
 <div>
-<p>At the cost of longer compilation time, you can embed the RISC Zero prover logic into <code>kailua-host</code> instead of having
-it utilize your locally installed RISC Zero <code>r0vm</code>.
-To do this, add <code>-F prove</code> to the command below.</p>
+<p>At the cost of longer compilation time, you can embed the RISC Zero zkvm prover logic into <code>kailua-cli</code> instead of
+having it utilize your locally installed RISC Zero <code>r0vm</code> for proving.
+To do this, add <code>-F prove</code> to the install command below.</p>
 </div>
 </div>
 <div id="admonition-tip-1" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-1-title">
@@ -523,7 +519,8 @@ To do this, add <code>-F prove</code> to the command below.</p>
 </ul>
 </div>
 </div>
-<pre><code class="language-shell">cargo install kailua-host --path bin/host --locked
+<h3 id="cli-binary"><a class="header" href="#cli-binary">CLI Binary</a></h3>
+<pre><code class="language-shell">cargo install kailua-cli --path bin/cli --locked
 </code></pre>
 <h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
 <p>Once your installation is successful, you should be able to run the following command to fetch the Kailua configuration
@@ -1742,7 +1739,6 @@ Node software other than <code>op-geth</code> is not as reliable for the necessa
   --op-geth-url [YOUR_OP_GETH_URL] \
   --op-node-url [YOUR_OP_NODE_URL] \
   --data-dir [YOUR_VALIDATOR_DATA_CACHE_PATH] \
-  --kailua-host [YOUR_KAILUA_HOST_BINARY_PATH] \
   --validator-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY] \
   --payout-recipient-address [YOUR_FAULT_PROOF_PAYOUT_RECIPIENT] \
   --txn-timeout [YOUR_TRANSACTION_TIMEOUT_SECONDS] \
@@ -1778,9 +1774,10 @@ This allows it to restart quickly without requesting a lot of old on-chain data 
 </li>
 </ul>
 <h3 id="prover"><a class="header" href="#prover">Prover</a></h3>
-<p>To create a fault proof, the validator invokes the <code>kailua-host</code> binary.</p>
+<p>To create a fault proof, the validator invokes the <code>kailua-cli</code> binary with the <code>prove</code> command.</p>
 <ul>
-<li><code>kailua-host</code>: The path to the <code>kailua-host</code> binary to call for proof generation.</li>
+<li><code>kailua-cli</code>: The path to the binary to call for proof generation.
+Defaults to the path of the invoked <code>kailua-cli</code> executable.</li>
 </ul>
 <h3 id="wallet-1"><a class="header" href="#wallet-1">Wallet</a></h3>
 <p>The validator requires a funded wallet to be able to publish fault proofs on chain, and an (optional) alternative address
@@ -1980,9 +1977,9 @@ The default scale values give a 1 MHz prover 3x the amount of time it needs to f
 <h2 id="advanced-settings"><a class="header" href="#advanced-settings">Advanced Settings</a></h2>
 <p>Fault/Validity proof generation can be fine-tuned via the two following environment variables:</p>
 <ul>
-<li><code>NUM_CONCURRENT_HOSTS</code>: (default 1) The maximum number of kailua-host instances to run concurrently in the validator.</li>
+<li><code>NUM_CONCURRENT_PROVERS</code>: (default 1) The maximum number of prover instances to run concurrently in the validator.</li>
 <li><code>NUM_CONCURRENT_PREFLIGHTS</code>: (default 4) Sets the number of concurrent data preflights per proving task.</li>
-<li><code>NUM_CONCURRENT_PROOFS</code>: (default 1) Sets the number of concurrent proofs to seek per proving task.</li>
+<li><code>NUM_CONCURRENT_PROOFS</code>: (default 1) Sets the number of concurrent proofs to seek per prover instance.</li>
 <li><code>SEGMENT_LIMIT</code>: The <a href="https://docs.rs/risc0-zkvm/1.2.3/risc0_zkvm/struct.ExecutorEnvBuilder.html#method.segment_limit_po2">segment size limit</a> used for local proving (Default 21).</li>
 <li><code>MAX_WITNESS_SIZE</code>: The maximum input size per single proof (Default 2.5GB).</li>
 </ul>

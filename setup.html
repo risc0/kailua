@@ -190,10 +190,6 @@ commands from the root project directory:</p>
 <p>If you have modified the FPVM binary, you will need to build/install using <code>-F rebuild-fpvm</code>.</p>
 </div>
 </div>
-<h3 id="cli-binary"><a class="header" href="#cli-binary">CLI Binary</a></h3>
-<pre><code class="language-shell">cargo install kailua-cli --path bin/cli --locked
-</code></pre>
-<h3 id="prover-binary"><a class="header" href="#prover-binary">Prover Binary</a></h3>
 <div id="admonition-info" class="admonition admonish-info" role="note" aria-labelledby="admonition-info-title">
 <div class="admonition-title">
 <div id="admonition-info-title">
@@ -202,9 +198,9 @@ commands from the root project directory:</p>
 <a class="admonition-anchor-link" href="#admonition-info"></a>
 </div>
 <div>
-<p>At the cost of longer compilation time, you can embed the RISC Zero prover logic into <code>kailua-host</code> instead of having
-it utilize your locally installed RISC Zero <code>r0vm</code>.
-To do this, add <code>-F prove</code> to the command below.</p>
+<p>At the cost of longer compilation time, you can embed the RISC Zero zkvm prover logic into <code>kailua-cli</code> instead of
+having it utilize your locally installed RISC Zero <code>r0vm</code> for proving.
+To do this, add <code>-F prove</code> to the install command below.</p>
 </div>
 </div>
 <div id="admonition-tip-1" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-1-title">
@@ -222,7 +218,8 @@ To do this, add <code>-F prove</code> to the command below.</p>
 </ul>
 </div>
 </div>
-<pre><code class="language-shell">cargo install kailua-host --path bin/host --locked
+<h3 id="cli-binary"><a class="header" href="#cli-binary">CLI Binary</a></h3>
+<pre><code class="language-shell">cargo install kailua-cli --path bin/cli --locked
 </code></pre>
 <h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
 <p>Once your installation is successful, you should be able to run the following command to fetch the Kailua configuration
