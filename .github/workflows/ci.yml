@@ -91,11 +91,14 @@ jobs:
           path: 'optimism'
           submodules: recursive
           fetch-depth: '1'
-      - name: Install Go
+      - name: Install Go 1.22.6
         uses: actions/setup-go@v5
         with:
           go-version: '=1.22.6'
-      - run: go version
+      - name: Install Python 3.13.1
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.1'
       - uses: risc0/risc0/.github/actions/rustup@main
       - name: Install svm-rs
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
