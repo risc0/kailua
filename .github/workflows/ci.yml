@@ -92,9 +92,9 @@ jobs:
           submodules: recursive
           fetch-depth: '1'
       - name: Install Go
-        uses: actions/setup-go
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.22.6'
+          go-version: '=1.22.6'
       - run: go version
       - uses: risc0/risc0/.github/actions/rustup@main
       - name: Install svm-rs
