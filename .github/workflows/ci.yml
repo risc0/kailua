@@ -70,9 +70,6 @@ jobs:
           RUSTFLAGS: -Dwarnings
 
   cargo-test:
-    needs:
-      - cargo-clippy
-      - cargo-llvm-cov
     strategy:
       matrix:
         include:
