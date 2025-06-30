@@ -78,12 +78,13 @@ jobs:
         include:
           - os: Linux
             feature: default
-    runs-on: [ self-hosted, prod, "${{ matrix.os }}" ]
+    runs-on: [ self-hosted, prod, docker, "${{ matrix.os }}" ]
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: actions/checkout@v4
+      - name: Fetch optimism devnet
+        uses: actions/checkout@v4
         with:
           repository: 'ethereum-optimism/optimism'
           ref: 'v1.9.1'
