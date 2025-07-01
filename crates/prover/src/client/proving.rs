@@ -186,11 +186,11 @@ pub async fn seek_fpvm_proof(
     skip_await_proof: bool,
 ) -> Result<(), ProvingError> {
     // compute the zkvm proof
-    let proof = match boundless.market {
-        Some(marked_provider_config) if !is_dev_mode() => {
+    let proof = match (boundless.market, boundless.storage) {
+        (Some(marked_provider_config), Some(storage_provider_config)) if !is_dev_mode() => {
             run_boundless_client(
                 marked_provider_config,
-                boundless.storage,
+                storage_provider_config,
                 proof_journal,
                 witness_frames,
                 stitched_proofs,
