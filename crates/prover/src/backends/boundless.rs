@@ -261,6 +261,7 @@ pub async fn run_boundless_client(
 
     // Instantiate storage provider
     let storage_provider = StandardStorageProvider::from_config(&storage)
+        .context("StandardStorageProvider::from_config")
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
 
     // Override deployment configuration if set
@@ -303,6 +304,7 @@ pub async fn run_boundless_client(
         })
         .build()
         .await
+        .context("ClientBuilder::build()")
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
 
     // Set the proof request requirements
@@ -346,6 +348,7 @@ pub async fn run_boundless_client(
             .boundless_market
             .get_status(request_id, Some(request.expires_at()))
             .await
+            .context("get_status")
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
 
         if matches!(request_status, RequestStatus::Expired) {
@@ -372,6 +375,7 @@ pub async fn run_boundless_client(
             request.expires_at(),
         )
         .await
+        .context("retrieve_proof")
         .map_err(|e| ProvingError::OtherError(anyhow!(e)));
     }
 
@@ -397,6 +401,7 @@ pub async fn run_boundless_client(
         Ok::<_, anyhow::Error>(session_info)
     })
     .await
+    .context("spawn_blocking")
     .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
     .map_err(|e| ProvingError::ExecutionError(anyhow!(e)))?;
     let cycle_count = session_info
@@ -405,7 +410,7 @@ pub async fn run_boundless_client(
         .map(|segment| 1 << segment.po2)
         .sum::<u64>();
 
-    // Upload input
+    // Pass in input frames
     let mut guest_env_builder = GuestEnv::builder();
     for frame in &witness_frames {
         guest_env_builder = guest_env_builder.write_frame(frame);
@@ -414,11 +419,13 @@ pub async fn run_boundless_client(
     for proof in &stitched_proofs {
         guest_env_builder = guest_env_builder
             .write(proof)
+            .context("GuestEnvBuilder::write")
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     }
     // Build input vector
     let input = guest_env_builder
         .build_vec()
+        .context("GuestEnvBuilder::build_vec")
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
 
     // Build final request
@@ -434,6 +441,7 @@ pub async fn run_boundless_client(
                 .lock_timeout((market.boundless_order_lock_timeout_factor * mc_segments) as u32)
                 .timeout((market.boundless_order_timeout_factor * mc_segments) as u32)
                 .build()
+                .context("OfferParamsBuilder::build()")
                 .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
         )
         .with_request_id(RequestId::new(
@@ -443,14 +451,18 @@ pub async fn run_boundless_client(
 
     // Send the request and wait for it to be completed.
     let (request_id, expires_at) = if market.boundless_order_stream_url.is_some() {
+        info!("Submitting offchain request.");
         boundless_client
             .submit_offchain(request)
             .await
+            .context("Client::submit_offchain()")
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
     } else {
+        info!("Submitting onchain request.");
         boundless_client
             .submit_onchain(request)
             .await
+            .context("Client::submit_onchain()")
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
     };
     info!("Boundless request 0x{request_id:x} submitted");
@@ -467,6 +479,7 @@ pub async fn run_boundless_client(
         expires_at,
     )
     .await
+    .context("retrieve_proof")
     .map_err(|e| ProvingError::OtherError(anyhow!(e)))
 }
 
