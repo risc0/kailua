@@ -31,6 +31,7 @@ use risc0_zkvm::sha::Digestible;
 use risc0_zkvm::{default_executor, ExecutorEnv, Journal, Receipt};
 use std::borrow::Cow;
 use std::time::Duration;
+use tokio::time::sleep;
 use tracing::info;
 use tracing::log::warn;
 
@@ -379,6 +380,14 @@ pub async fn run_boundless_client(
         .map_err(|e| ProvingError::OtherError(anyhow!(e)));
     }
 
+    // Upload program
+    info!("Uploading Kailua binary.");
+    let program_url = boundless_client
+        .upload_program(KAILUA_FPVM_ELF)
+        .await
+        .context("Client::upload_program")
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+
     // Preflight execution to get cycle count
     info!("Preflighting execution.");
     let preflight_witness_frames = witness_frames.clone();
@@ -428,12 +437,25 @@ pub async fn run_boundless_client(
         .context("GuestEnvBuilder::build_vec")
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
 
+    // Upload input
+    info!("Uploading input data.");
+    let input_url = boundless_client
+        .upload_input(&input)
+        .await
+        .context("Client::upload_input")
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+    sleep(Duration::from_secs(2)).await;
+
     // Build final request
     let mc_segments = cycle_count.div_ceil(1 << 20) as f64;
     let request = boundless_client
         .new_request()
-        .with_program(KAILUA_FPVM_ELF)
-        .with_stdin(input)
+        .with_program_url(program_url)
+        .context("RequestParams::with_program_url")
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
+        .with_input_url(input_url)
+        .context("RequestParams::with_input_url")
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
         .with_requirements(requirements)
         .with_offer(
             OfferParams::builder()
