@@ -21,6 +21,7 @@ clap.workspace = true
 hex.workspace = true
 human_bytes.workspace = true
 rkyv.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true

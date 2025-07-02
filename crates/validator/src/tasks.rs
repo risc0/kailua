@@ -16,7 +16,7 @@ use crate::channel::Message;
 use anyhow::Context;
 use kailua_prover::args::ProveArgs;
 use kailua_prover::channel::AsyncChannel;
-use kailua_prover::proof::read_proof_file;
+use kailua_prover::proof::read_bincoded_file;
 use kailua_prover::prove::prove;
 use kailua_sync::await_tel_res;
 use opentelemetry::global::tracer;
@@ -107,7 +107,7 @@ pub async fn handle_proving_tasks(
 
         // wait for io then read computed proof from disk
         sleep(Duration::from_secs(1)).await;
-        match read_proof_file(&proof_file_name).await {
+        match read_bincoded_file(&proof_file_name).await {
             Ok(proof) => {
                 // Send proof via the channel
                 proof_sender
