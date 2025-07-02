@@ -35,8 +35,8 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::time::Duration;
 use tokio::time::sleep;
-use tracing::info;
 use tracing::log::warn;
+use tracing::{debug, info};
 
 #[derive(Parser, Clone, Debug, Default)]
 pub struct BoundlessArgs {
@@ -304,6 +304,13 @@ pub async fn run_boundless_client(
         .await
         .context("ClientBuilder::build()")
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+
+    // Report boundless deployment info
+    info!(
+        "Using BoundlessMarket at {}",
+        boundless_client.deployment.boundless_market_address,
+    );
+    debug!("Deployment: {:?}", boundless_client.deployment);
 
     // Set the proof request requirements
     let requirements = Requirements::new(KAILUA_FPVM_ID, Predicate::digest_match(journal.digest()))
