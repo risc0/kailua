@@ -57,19 +57,20 @@ tracing = "0.1.40"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Alloy
-alloy = { version = "0.15.6", default-features = false, features = ["json"] }
-alloy-consensus = { version = "0.15.6", default-features = false, features = ["serde"] }
-alloy-eips = { version = "0.15.6", default-features = false, features = ["kzg"] }
-alloy-evm = { version = "0.6.0", default-features = false, features = ["op"] }
-alloy-op-evm = { version = "0.6.0", default-features = false }
-alloy-rlp = "0.3.11"
-alloy-primitives = { version = "1.1.0", default-features = false, features = ["map-hashbrown"] }
-alloy-rpc-types-beacon = "0.15.6"
-alloy-rpc-types-engine = { version = "0.15.6", default-features = false }
+alloy = { version = "1.0.9", default-features = false, features = ["json"] }
+alloy-consensus = { version = "1.0.9", default-features = false, features = ["serde"] }
+alloy-eips = { version = "1.0.9", default-features = false, features = ["kzg"] }
+alloy-evm = { version = "0.10.0", default-features = false, features = ["op"] }
+alloy-op-evm = { version = "0.10.0", default-features = false }
+alloy-rlp = "0.3.12"
+alloy-primitives = { version = "1.1.2", default-features = false, features = ["map-hashbrown"] }
+alloy-rpc-types-beacon = "1.0.9"
+alloy-rpc-types-engine = { version = "1.0.9", default-features = false }
+alloy-trie = { version = "0.8.1", default-features = false, features = ["std", "ethereum"] }
 
 # OP Alloy
-op-alloy-consensus = { version = "0.15.1", default-features = false, features = ["serde"] }
-op-alloy-rpc-types-engine = { version = "0.15.1", default-features = false, features = ["serde"] }
+op-alloy-consensus = { version = "0.17.2", default-features = false, features = ["serde"] }
+op-alloy-rpc-types-engine = { version = "0.17.2", default-features = false, features = ["serde"] }
 
 # Kailua
 kailua-build = { path = "build/risczero" }
@@ -80,19 +81,19 @@ kailua-prover = { path = "crates/prover" }
 kailua-sync = { path = "crates/sync" }
 kailua-validator = { path = "crates/validator" }
 
-# Kona git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1"
-kona-cli = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1", default-features = false }
-kona-derive = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1", default-features = false, features = ["serde"] }
-kona-driver = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
-kona-executor = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
-kona-genesis = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
-kona-host = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1", default-features = false, features = ["single"] }
-kona-mpt = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1", features = ["serde"] }
-kona-preimage = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1", features = ["serde", "rkyv", "std"] }
-kona-proof = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
-kona-protocol = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
-kona-registry = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
-kona-std-fpvm = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.1" }
+# Kona git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2"
+kona-cli = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2", default-features = false }
+kona-derive = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2", default-features = false, features = ["serde"] }
+kona-driver = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
+kona-executor = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
+kona-genesis = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
+kona-host = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2", default-features = false, features = ["single"] }
+kona-mpt = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2", features = ["serde"] }
+kona-preimage = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2", features = ["serde", "rkyv", "std"] }
+kona-proof = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
+kona-protocol = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
+kona-registry = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
+kona-std-fpvm = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
 
 # Bonsai
 bonsai-sdk = { version = "1.4.0", features = ["non_blocking"] }

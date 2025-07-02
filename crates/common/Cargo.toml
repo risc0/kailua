@@ -27,6 +27,7 @@ alloy-op-evm.workspace = true
 alloy-primitives.workspace = true
 alloy-rpc-types-beacon.workspace = true
 alloy-rpc-types-engine.workspace = true
+alloy-trie.workspace = true
 
 op-alloy-consensus.workspace = true
 op-alloy-rpc-types-engine.workspace = true
