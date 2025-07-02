@@ -482,7 +482,6 @@ pub async fn run_boundless_client(
                 .min_price(min_price)
                 .max_price(max_price)
                 .ramp_up_period((market.boundless_order_ramp_up_factor * segment_count) as u32)
-                // todo: .lock_stake(max_price)
                 .lock_timeout((lock_timeout_factor * segment_count) as u32)
                 .timeout((expiry_factor * segment_count) as u32)
                 .build()
@@ -549,24 +548,9 @@ pub async fn retrieve_proof(
     Ok(*receipt)
 }
 
-pub fn request_file_name(
-    proof_journal: &ProofJournal,
-    // boundless_chain_id: u64,
-    // boundless_market_address: Address,
-    // set_verifier_address: Address,
-    // verifier_router_address: Option<Address>,
-) -> String {
+pub fn request_file_name(proof_journal: &ProofJournal) -> String {
     let journal_hash = keccak256(proof_journal.encode_packed());
-    // todo: integrate market config
-    // let verifier_router_address = verifier_router_address.unwrap_or_default();
-    // let data = [
-    //     journal_hash.0.as_slice(),
-    //     boundless_chain_id.to_be_bytes().as_slice(),
-    //     boundless_market_address.0.as_slice(),
-    //     set_verifier_address.0.as_slice(),
-    //     verifier_router_address.as_slice()
-    // ].concat();
-    format!("boundless-{}.req", journal_hash)
+    format!("boundless-{journal_hash}.req")
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
