@@ -114,14 +114,14 @@ pub struct MarketProviderConfig {
     #[clap(long, env, required = false, default_value = "200000000")]
     pub boundless_cycle_max_wei: U256,
     /// Duration in seconds for the price to ramp up from min to max.
-    #[clap(long, env, required = false, default_value_t = 60)]
-    pub boundless_order_ramp_up_period: u32,
+    #[clap(long, env, required = false, default_value_t = 0.25)]
+    pub boundless_order_ramp_up_factor: f64,
     /// Multiplier for order fulfillment timeout (seconds/segment) after locking
     #[clap(long, env, required = false, default_value_t = 3.0)]
     pub boundless_order_lock_timeout_factor: f64,
-    /// Multiplier for order expiry timeout (seconds/segment) after creation
-    #[clap(long, env, required = false, default_value_t = 10.0)]
-    pub boundless_order_timeout_factor: f64,
+    /// Multiplier for order expiry timeout (seconds/segment) after lock timeout
+    #[clap(long, env, required = false, default_value_t = 2.0)]
+    pub boundless_order_expiry_factor: f64,
     /// Time in seconds between attempts to check order status
     #[clap(long, env, required = false, default_value_t = 12)]
     pub boundless_order_check_interval: u64,
@@ -184,12 +184,12 @@ impl MarketProviderConfig {
             self.boundless_cycle_min_wei.to_string(),
             String::from("--boundless-cycle-max-wei"),
             self.boundless_cycle_max_wei.to_string(),
-            String::from("--boundless-order-ramp-up-period"),
-            self.boundless_order_ramp_up_period.to_string(),
+            String::from("--boundless-order-ramp-up-factor"),
+            self.boundless_order_ramp_up_factor.to_string(),
             String::from("--boundless-order-lock-timeout-factor"),
             self.boundless_order_lock_timeout_factor.to_string(),
             String::from("--boundless-order-timeout-factor"),
-            self.boundless_order_timeout_factor.to_string(),
+            self.boundless_order_expiry_factor.to_string(),
             String::from("--boundless-order-check-interval"),
             self.boundless_order_check_interval.to_string(),
         ]);
@@ -463,6 +463,9 @@ pub async fn run_boundless_client(
     let cycles = U256::from(cycle_count);
     let min_price = market.boundless_cycle_min_wei * cycles;
     let max_price = market.boundless_cycle_max_wei * cycles;
+    let lock_timeout_factor =
+        market.boundless_order_lock_timeout_factor + market.boundless_order_ramp_up_factor;
+    let expiry_factor = lock_timeout_factor + market.boundless_order_expiry_factor;
     let request = boundless_client
         .new_request()
         .with_journal(journal)
@@ -478,10 +481,10 @@ pub async fn run_boundless_client(
             OfferParams::builder()
                 .min_price(min_price)
                 .max_price(max_price)
-                .ramp_up_period(market.boundless_order_ramp_up_period)
-                .lock_stake(max_price)
-                .lock_timeout((market.boundless_order_lock_timeout_factor * segment_count) as u32)
-                .timeout((market.boundless_order_timeout_factor * segment_count) as u32)
+                .ramp_up_period((market.boundless_order_ramp_up_factor * segment_count) as u32)
+                // todo: .lock_stake(max_price)
+                .lock_timeout((lock_timeout_factor * segment_count) as u32)
+                .timeout((expiry_factor * segment_count) as u32)
                 .build()
                 .context("OfferParamsBuilder::build()")
                 .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
