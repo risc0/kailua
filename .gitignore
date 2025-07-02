@@ -16,3 +16,4 @@ optimism/
 profiling/*
 kailua-elf
 kailua-input
+.req

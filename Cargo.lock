@@ -5523,6 +5523,7 @@ dependencies = [
  "risc0-ethereum-contracts",
  "risc0-zkvm",
  "rkyv",
+ "serde",
  "serde_json",
  "tempfile",
  "thiserror 2.0.12",

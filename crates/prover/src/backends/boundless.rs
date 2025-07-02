@@ -13,9 +13,11 @@
 // limitations under the License.
 
 use crate::args::ProvingArgs;
+use crate::client::proving::save_to_bincoded_file;
+use crate::proof::read_bincoded_file;
 use crate::ProvingError;
 use alloy::transports::http::reqwest::Url;
-use alloy_primitives::{Address, U256};
+use alloy_primitives::{keccak256, Address, U256};
 use anyhow::{anyhow, bail, Context};
 use boundless_market::alloy::providers::Provider;
 use boundless_market::alloy::signers::local::PrivateKeySigner;
@@ -29,6 +31,7 @@ use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use kailua_common::journal::ProofJournal;
 use risc0_zkvm::sha::Digestible;
 use risc0_zkvm::{default_executor, ExecutorEnv, Journal, Receipt};
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -251,14 +254,14 @@ impl MarketProviderConfig {
 pub async fn run_boundless_client(
     market: MarketProviderConfig,
     storage: StorageProviderConfig,
-    journal: ProofJournal,
+    proof_journal: ProofJournal,
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Receipt>,
     proving_args: &ProvingArgs,
     skip_await_proof: bool,
 ) -> Result<Receipt, ProvingError> {
     info!("Running boundless client.");
-    let proof_journal = Journal::new(journal.encode_packed());
+    let journal = Journal::new(proof_journal.encode_packed());
 
     // Instantiate storage provider
     let storage_provider = StandardStorageProvider::from_config(&storage)
@@ -297,23 +300,14 @@ pub async fn run_boundless_client(
         .with_rpc_url(market.boundless_rpc_url)
         .with_deployment(market_deployment)
         .with_storage_provider(Some(storage_provider))
-        .config_offer_layer(|config| {
-            config
-                .min_price_per_cycle(market.boundless_cycle_min_wei)
-                .max_price_per_cycle(market.boundless_cycle_max_wei)
-                .ramp_up_period(market.boundless_order_ramp_up_period)
-        })
         .build()
         .await
         .context("ClientBuilder::build()")
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
 
     // Set the proof request requirements
-    let requirements = Requirements::new(
-        KAILUA_FPVM_ID,
-        Predicate::digest_match(proof_journal.digest()),
-    )
-    .with_groth16_proof();
+    let requirements = Requirements::new(KAILUA_FPVM_ID, Predicate::digest_match(journal.digest()))
+        .with_groth16_proof();
 
     // Check if an unexpired request had already been made recently
     let boundless_wallet_address = boundless_client.signer.as_ref().unwrap().address();
@@ -389,35 +383,46 @@ pub async fn run_boundless_client(
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
 
     // Preflight execution to get cycle count
-    info!("Preflighting execution.");
-    let preflight_witness_frames = witness_frames.clone();
-    let preflight_stitched_proofs = stitched_proofs.clone();
-    let segment_limit = proving_args.segment_limit;
-    let session_info = tokio::task::spawn_blocking(move || {
-        let mut builder = ExecutorEnv::builder();
-        // Set segment po2
-        builder.segment_limit_po2(segment_limit);
-        // Pass in witness data
-        for frame in &preflight_witness_frames {
-            builder.write_frame(frame);
+    let req_file_name = request_file_name(&proof_journal);
+    let cycle_count = match read_bincoded_file::<BoundlessRequest>(&req_file_name).await {
+        Ok(request) => request.cycle_count,
+        Err(err) => {
+            warn!("Preflighting execution: {err:?}");
+            let preflight_witness_frames = witness_frames.clone();
+            let preflight_stitched_proofs = stitched_proofs.clone();
+            let segment_limit = proving_args.segment_limit;
+            let session_info = tokio::task::spawn_blocking(move || {
+                let mut builder = ExecutorEnv::builder();
+                // Set segment po2
+                builder.segment_limit_po2(segment_limit);
+                // Pass in witness data
+                for frame in &preflight_witness_frames {
+                    builder.write_frame(frame);
+                }
+                // Pass in proofs
+                for proof in &preflight_stitched_proofs {
+                    builder.write(proof)?;
+                }
+                let env = builder.build()?;
+                let session_info = default_executor().execute(env, KAILUA_FPVM_ELF)?;
+                Ok::<_, anyhow::Error>(session_info)
+            })
+            .await
+            .context("spawn_blocking")
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
+            .map_err(|e| ProvingError::ExecutionError(anyhow!(e)))?;
+            let cycle_count = session_info
+                .segments
+                .iter()
+                .map(|segment| 1 << segment.po2)
+                .sum::<u64>();
+            let cached_data = BoundlessRequest { cycle_count };
+            if let Err(err) = save_to_bincoded_file(&cached_data, &req_file_name).await {
+                warn!("Failed to cache cycle count data: {err:?}");
+            }
+            cycle_count
         }
-        // Pass in proofs
-        for proof in &preflight_stitched_proofs {
-            builder.write(proof)?;
-        }
-        let env = builder.build()?;
-        let session_info = default_executor().execute(env, KAILUA_FPVM_ELF)?;
-        Ok::<_, anyhow::Error>(session_info)
-    })
-    .await
-    .context("spawn_blocking")
-    .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
-    .map_err(|e| ProvingError::ExecutionError(anyhow!(e)))?;
-    let cycle_count = session_info
-        .segments
-        .iter()
-        .map(|segment| 1 << segment.po2)
-        .sum::<u64>();
+    };
 
     // Pass in input frames
     let mut guest_env_builder = GuestEnv::builder();
@@ -447,9 +452,14 @@ pub async fn run_boundless_client(
     sleep(Duration::from_secs(2)).await;
 
     // Build final request
-    let mc_segments = cycle_count.div_ceil(1 << 20) as f64;
+    let segment_count = cycle_count.div_ceil(1 << 20) as f64;
+    let cycles = U256::from(cycle_count);
+    let min_price = market.boundless_cycle_min_wei * cycles;
+    let max_price = market.boundless_cycle_max_wei * cycles;
     let request = boundless_client
         .new_request()
+        .with_journal(journal)
+        .with_cycles(cycle_count)
         .with_program_url(program_url)
         .context("RequestParams::with_program_url")
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
@@ -459,9 +469,12 @@ pub async fn run_boundless_client(
         .with_requirements(requirements)
         .with_offer(
             OfferParams::builder()
-                .lock_stake(market.boundless_cycle_max_wei * U256::from(cycle_count))
-                .lock_timeout((market.boundless_order_lock_timeout_factor * mc_segments) as u32)
-                .timeout((market.boundless_order_timeout_factor * mc_segments) as u32)
+                .min_price(min_price)
+                .max_price(max_price)
+                .ramp_up_period(market.boundless_order_ramp_up_period)
+                .lock_stake(max_price)
+                .lock_timeout((market.boundless_order_lock_timeout_factor * segment_count) as u32)
+                .timeout((market.boundless_order_timeout_factor * segment_count) as u32)
                 .build()
                 .context("OfferParamsBuilder::build()")
                 .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
@@ -475,14 +488,14 @@ pub async fn run_boundless_client(
     let (request_id, expires_at) = if market.boundless_order_stream_url.is_some() {
         info!("Submitting offchain request.");
         boundless_client
-            .submit_offchain(request)
+            .submit_offchain(request.clone())
             .await
             .context("Client::submit_offchain()")
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
     } else {
         info!("Submitting onchain request.");
         boundless_client
-            .submit_onchain(request)
+            .submit_onchain(request.clone())
             .await
             .context("Client::submit_onchain()")
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
@@ -524,4 +537,30 @@ pub async fn retrieve_proof(
     };
 
     Ok(*receipt)
+}
+
+pub fn request_file_name(
+    proof_journal: &ProofJournal,
+    // boundless_chain_id: u64,
+    // boundless_market_address: Address,
+    // set_verifier_address: Address,
+    // verifier_router_address: Option<Address>,
+) -> String {
+    let journal_hash = keccak256(proof_journal.encode_packed());
+    // todo: integrate market config
+    // let verifier_router_address = verifier_router_address.unwrap_or_default();
+    // let data = [
+    //     journal_hash.0.as_slice(),
+    //     boundless_chain_id.to_be_bytes().as_slice(),
+    //     boundless_market_address.0.as_slice(),
+    //     set_verifier_address.0.as_slice(),
+    //     verifier_router_address.as_slice()
+    // ].concat();
+    format!("boundless-{}.req", journal_hash)
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BoundlessRequest {
+    /// Number of cycles that require proving
+    pub cycle_count: u64,
 }

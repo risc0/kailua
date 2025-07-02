@@ -15,7 +15,7 @@
 use alloy_primitives::keccak256;
 use anyhow::{bail, Context};
 use kailua_common::journal::ProofJournal;
-use risc0_zkvm::Receipt;
+use serde::de::DeserializeOwned;
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -27,38 +27,23 @@ pub fn proof_file_name(proof_journal: &ProofJournal) -> String {
     } else {
         "zkp"
     };
-    let claimed_l2_block_number = proof_journal.claimed_l2_block_number.to_be_bytes();
-    let data = [
-        proof_journal.payout_recipient.as_slice(),
-        proof_journal.precondition_hash.as_slice(),
-        proof_journal.l1_head.as_slice(),
-        proof_journal.agreed_l2_output_root.as_slice(),
-        proof_journal.claimed_l2_output_root.as_slice(),
-        claimed_l2_block_number.as_slice(),
-        proof_journal.config_hash.as_slice(),
-        proof_journal.fpvm_image_id.as_slice(),
-    ]
-    .concat();
-    let file_name = keccak256(data);
+    let file_name = keccak256(proof_journal.encode_packed());
     format!("risc0-{version}-{file_name}.{suffix}")
 }
 
-pub async fn read_proof_file(proof_file_name: &str) -> anyhow::Result<Receipt> {
+pub async fn read_bincoded_file<T: DeserializeOwned>(file_name: &str) -> anyhow::Result<T> {
     // Read receipt file
-    if !Path::new(proof_file_name).exists() {
-        bail!("Proof file {proof_file_name} not found.");
+    if !Path::new(file_name).exists() {
+        bail!("File {file_name} not found.");
     }
-    let mut proof_file = File::open(proof_file_name)
+    let mut file = File::open(file_name)
         .await
-        .context(format!("Failed to open proof file {proof_file_name}."))?;
-    let mut proof_data = Vec::new();
-    proof_file
-        .read_to_end(&mut proof_data)
+        .context(format!("Failed to open file {file_name}."))?;
+    let mut data = Vec::new();
+    file.read_to_end(&mut data)
         .await
-        .context(format!(
-            "Failed to read proof file {proof_file_name} data until end."
-        ))?;
-    bincode::deserialize::<Receipt>(&proof_data).context(format!(
-        "Failed to deserialize proof file {proof_file_name} data with bincode"
+        .context(format!("Failed to read file {file_name} data until end."))?;
+    bincode::deserialize::<T>(&data).context(format!(
+        "Failed to deserialize file {file_name} data with bincode."
     ))
 }

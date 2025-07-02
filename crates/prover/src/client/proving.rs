@@ -31,6 +31,7 @@ use kona_preimage::{HintWriterClient, PreimageOracleClient};
 use kona_proof::l1::OracleBlobProvider;
 use kona_proof::CachingOracle;
 use risc0_zkvm::{is_dev_mode, Receipt};
+use serde::Serialize;
 use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::fs::File;
@@ -221,25 +222,25 @@ pub async fn seek_fpvm_proof(
     };
 
     // Save proof file to disk
-    save_proof_to_disk(&proof).await;
+    let proof_journal = ProofJournal::decode_packed(proof.journal.as_ref());
+    save_to_bincoded_file(&proof, &proof_file_name(&proof_journal))
+        .await
+        .context("save_to_bincoded_file")
+        .map_err(ProvingError::OtherError)?;
 
     Ok(())
 }
 
-pub async fn save_proof_to_disk(proof: &Receipt) {
-    // Save proof file to disk
-    let proof_journal = ProofJournal::decode_packed(proof.journal.as_ref());
-    let mut output_file = File::create(proof_file_name(&proof_journal))
+pub async fn save_to_bincoded_file<T: Serialize>(value: &T, file_name: &str) -> anyhow::Result<()> {
+    let mut file = File::create(file_name)
         .await
-        .expect("Failed to create proof output file");
-    // Write proof data to file
-    let proof_bytes = bincode::serialize(proof).expect("Could not serialize proof.");
-    output_file
-        .write_all(proof_bytes.as_slice())
+        .context("Failed to create output file.")?;
+    let data = bincode::serialize(value).context("Could not serialize proving data.")?;
+    file.write_all(data.as_slice())
         .await
-        .expect("Failed to write proof to file");
-    output_file
-        .flush()
+        .context("Failed to write proof to file")?;
+    file.flush()
         .await
-        .expect("Failed to flush proof output file data.");
+        .context("Failed to flush proof output file data.")?;
+    Ok(())
 }

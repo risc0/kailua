@@ -14,7 +14,7 @@
 
 use crate::args::ProveArgs;
 use crate::kv::RWLKeyValueStore;
-use crate::proof::{proof_file_name, read_proof_file};
+use crate::proof::{proof_file_name, read_bincoded_file};
 use crate::ProvingError;
 use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
@@ -531,7 +531,7 @@ pub async fn compute_cached_proof(
         .await?;
     }
 
-    read_proof_file(&proof_file_name)
+    read_bincoded_file(&proof_file_name)
         .await
         .context(format!(
             "Failed to read proof file {proof_file_name} contents."
