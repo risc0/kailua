@@ -46,9 +46,9 @@ pub struct SyncArgs {
 }
 
 pub fn parse_address(s: &str) -> Result<Address, String> {
-    Address::from_str(s).map_err(|_| format!("Invalid Address value: {}", s))
+    Address::from_str(s).map_err(|_| format!("Invalid Address value: {s}"))
 }
 
 pub fn parse_b256(s: &str) -> Result<B256, String> {
-    B256::from_str(s).map_err(|_| format!("Invalid B256 value: {}", s))
+    B256::from_str(s).map_err(|_| format!("Invalid B256 value: {s}"))
 }

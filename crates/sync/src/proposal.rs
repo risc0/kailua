@@ -34,7 +34,6 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::future::IntoFuture;
-use std::iter::repeat;
 use tracing::{error, info};
 
 pub const ELIMINATIONS_LIMIT: u64 = 128;
@@ -408,10 +407,8 @@ impl Proposal {
             signature: signature.await?,
             children: Default::default(),
             successor: None,
-            correct_io: repeat(None)
-                .take((proposal_output_count - 1) as usize)
-                .collect(),
-            correct_trail: repeat(None).take(trail_len).collect(),
+            correct_io: vec![None; (proposal_output_count - 1) as usize],
+            correct_trail: vec![None; trail_len],
             correct_claim: None,
             correct_parent: None,
             canonical: None,

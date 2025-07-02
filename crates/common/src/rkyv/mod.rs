@@ -59,7 +59,7 @@ macro_rules! to_bytes_with {
 /// # Arguments
 ///
 /// - `$with`: The custom type implementing the `rkyv::with::ArchiveWith` and
-///     `rkyv::with::DeserializeWith` traits.
+///   `rkyv::with::DeserializeWith` traits.
 /// - `$orig`: The original type that the input will be deserialized into.
 /// - `$bytes`: A reference to the byte slice which contains the archived data to deserialize.
 ///
