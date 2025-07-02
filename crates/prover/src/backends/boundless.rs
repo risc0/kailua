@@ -188,7 +188,7 @@ impl MarketProviderConfig {
             self.boundless_order_ramp_up_factor.to_string(),
             String::from("--boundless-order-lock-timeout-factor"),
             self.boundless_order_lock_timeout_factor.to_string(),
-            String::from("--boundless-order-timeout-factor"),
+            String::from("--boundless-order-expiry-factor"),
             self.boundless_order_expiry_factor.to_string(),
             String::from("--boundless-order-check-interval"),
             self.boundless_order_check_interval.to_string(),
