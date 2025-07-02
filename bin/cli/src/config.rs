@@ -143,7 +143,7 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
         hex::encode_upper(portal_address.as_slice())
     );
     // report game type
-    println!("KAILUA_GAME_TYPE: {}", KAILUA_GAME_TYPE);
+    println!("KAILUA_GAME_TYPE: {KAILUA_GAME_TYPE}");
 
     context.span().set_status(Status::Ok);
     Ok(())
