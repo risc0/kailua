@@ -14,6 +14,7 @@
 
 use crate::await_tel;
 use crate::transact::rpc::get_block;
+use alloy::consensus::transaction::SignerRecoverable;
 use alloy::consensus::{BlockHeader, Transaction};
 use alloy::eips::{BlockId, BlockNumberOrTag};
 use alloy::network::{BlockResponse, Ethereum, Network, TransactionBuilder4844};

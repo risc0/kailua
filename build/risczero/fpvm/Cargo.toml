@@ -23,6 +23,7 @@ opt-level = 3
 
 [dependencies]
 blst = { version = "=0.3.14", features = ["no-threads"] }
+c-kzg = { version = "2.1.1", features = ["eip-7594"] }
 rkyv = "0.8.9"
 substrate-bn = "=0.6.0"
 
