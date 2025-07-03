@@ -41,7 +41,7 @@ impl OpNodeProvider {
             "optimism_outputAtBlock",
             self.0.client().request(
                 "optimism_outputAtBlock",
-                (format!("0x{:x}", output_block_number),),
+                (format!("0x{output_block_number:x}"),),
             )
         )
         .context(format!("optimism_outputAtBlock {output_block_number}"))?;

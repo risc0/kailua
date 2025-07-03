@@ -93,7 +93,7 @@ impl BlobProvider {
             opentelemetry::Context::current_with_span(tracer.start("BlobProvider::client_get"));
 
         client
-            .get(format!("{}/{}", endpoint, path))
+            .get(format!("{endpoint}/{path}"))
             .send()
             .with_context(context.with_span(tracer.start_with_context("Client::send", &context)))
             .await
