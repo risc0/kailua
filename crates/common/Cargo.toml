@@ -17,7 +17,10 @@ c-kzg.workspace = true
 lazy_static.workspace = true
 pot.workspace = true
 rkyv.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 spin.workspace = true
+tracing.workspace = true
 
 alloy-consensus.workspace = true
 alloy-eips.workspace = true
@@ -43,8 +46,9 @@ kona-protocol.workspace = true
 
 risc0-zkvm.workspace = true
 
-serde.workspace = true
-tracing.workspace = true
+hokulea-eigenda = { workspace = true, optional = true }
+hokulea-proof = { workspace = true, optional = true }
+eigenda-cert = { workspace = true, optional = true }
 
 [dev-dependencies]
 copy_dir.workspace = true
@@ -57,3 +61,6 @@ tracing-subscriber.workspace = true
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage,coverage_nightly)'] }
+
+[features]
+eigen-da = ["dep:hokulea-eigenda", "dep:hokulea-proof", "dep:eigenda-cert"]

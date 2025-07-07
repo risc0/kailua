@@ -30,10 +30,15 @@ substrate-bn = "=0.6.0"
 kailua-common = { path = "../../../crates/common" }
 
 risc0-zkvm = { version = "2.2.0", features = ["std", "heap-embedded-alloc", "unstable"] }
+hokulea-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "c336a3203211d7de41a554a571646a368a34da6c", default-features = false, optional = true }
 
 [features]
 disable-dev-mode = [
     "risc0-zkvm/disable-dev-mode"
+]
+eigen-da = [
+    "dep:hokulea-proof",
+    "kailua-common/eigen-da",
 ]
 
 [patch.crates-io]

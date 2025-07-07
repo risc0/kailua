@@ -83,16 +83,19 @@ use {
 pub fn run_stitching_client<
     O: CommsClient + FlushableCache + Send + Sync + Debug,
     B: BlobProvider + Send + Sync + Debug + Clone,
+    #[cfg(feature = "eigen-da")] E: hokulea_eigenda::EigenDABlobProvider + Send + Sync + Debug + Clone,
 >(
     precondition_validation_data_hash: B256,
     oracle: Arc<O>,
     stream: Arc<O>,
     beacon: B,
+    #[cfg(feature = "eigen-da")] eigen_da: E,
     fpvm_image_id: B256,
+    #[cfg(feature = "eigen-da")] canoe_image_id: B256,
     payout_recipient_address: Address,
     stitched_executions: Vec<Vec<Execution>>,
     stitched_boot_info: Vec<StitchedBootInfo>,
-) -> ProofJournal
+) -> (BootInfo, ProofJournal)
 where
     <B as BlobProvider>::Error: Debug,
 {
@@ -106,6 +109,8 @@ where
         oracle,
         stream,
         beacon,
+        #[cfg(feature = "eigen-da")]
+        eigen_da,
         execution_cache,
         None,
     )
@@ -119,6 +124,8 @@ where
     stitch_executions(
         &boot,
         fpvm_image_id,
+        #[cfg(feature = "eigen-da")]
+        canoe_image_id,
         payout_recipient_address,
         &stitched_executions,
         #[cfg(target_os = "zkvm")]
@@ -127,8 +134,10 @@ where
 
     // Stitch recursively composed proofs
     stitch_boot_info(
-        &boot,
+        boot,
         fpvm_image_id,
+        #[cfg(feature = "eigen-da")]
+        canoe_image_id,
         payout_recipient_address,
         precondition_hash,
         stitched_boot_info,
@@ -304,6 +313,7 @@ pub fn split_executions(
 pub fn stitch_executions(
     boot: &BootInfo,
     fpvm_image_id: B256,
+    #[cfg(feature = "eigen-da")] canoe_image_id: B256,
     payout_recipient_address: Address,
     stitched_executions: &Vec<Vec<Arc<Execution>>>,
     #[cfg(target_os = "zkvm")] proven_fpvm_journals: &HashSet<Digest>,
@@ -338,6 +348,8 @@ pub fn stitch_executions(
         // Construct expected proof journal
         let encoded_journal = ProofJournal::new_stitched(
             fpvm_image_id,
+            #[cfg(feature = "eigen-da")]
+            canoe_image_id,
             payout_recipient_address,
             precondition_hash,
             B256::from(config_hash),
@@ -421,19 +433,22 @@ pub fn stitch_executions(
 /// * On `zkvm` platforms, the function requires access to `proven_fpvm_journals` to verify stitching
 ///   proofs. On other platforms, the verification step is omitted.
 pub fn stitch_boot_info(
-    boot: &BootInfo,
+    boot: BootInfo,
     fpvm_image_id: B256,
+    #[cfg(feature = "eigen-da")] canoe_image_id: B256,
     payout_recipient_address: Address,
     precondition_hash: B256,
     stitched_boot_info: Vec<StitchedBootInfo>,
     #[cfg(target_os = "zkvm")] proven_fpvm_journals: &HashSet<Digest>,
-) -> ProofJournal {
+) -> (BootInfo, ProofJournal) {
     // Stitch boots together into a journal
     let mut stitched_journal = ProofJournal::new(
         fpvm_image_id,
+        #[cfg(feature = "eigen-da")]
+        canoe_image_id,
         payout_recipient_address,
         precondition_hash,
-        boot,
+        &boot,
     );
 
     for stitched_boot in stitched_boot_info {
@@ -449,6 +464,8 @@ pub fn stitch_boot_info(
             fpvm_image_id,
             ProofJournal::new_stitched(
                 fpvm_image_id,
+                #[cfg(feature = "eigen-da")]
+                canoe_image_id,
                 payout_recipient_address,
                 precondition_hash,
                 stitched_journal.config_hash,
@@ -471,10 +488,11 @@ pub fn stitch_boot_info(
         }
     }
 
-    stitched_journal
+    (boot, stitched_journal)
 }
 
 #[cfg(test)]
+#[cfg(not(feature = "eigen-da"))]
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
@@ -517,7 +535,7 @@ pub mod tests {
             assert_eq!(proof_journal.precondition_hash, expected_precondition_hash);
         }
         assert!(proof_journal.payout_recipient.is_zero());
-        assert!(proof_journal.fpvm_image_id.is_zero());
+        assert!(proof_journal.fpvm_version.is_zero());
     }
 
     pub fn test_stitching(
@@ -559,6 +577,7 @@ pub mod tests {
             stitched_executions,
             stitched_boot_info,
         )
+        .1
     }
 
     pub fn test_stitching_boots(

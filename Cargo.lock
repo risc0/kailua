@@ -2659,9 +2659,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "bytes"
-version = "1.10.0"
+version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f61dac84819c6588b558454b194026eb1f09c293b9036ae9b159e74e73ab6cf9"
+checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 dependencies = [
  "serde",
 ]
@@ -2709,6 +2709,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b96ec4966b5813e2c0507c1f86115c8c5abaadc3980879c3424042a02fd1ad3"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "canoe-bindings"
+version = "0.1.0"
+source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
+dependencies = [
+ "alloy-sol-types",
 ]
 
 [[package]]
@@ -3503,6 +3511,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.98",
+]
+
+[[package]]
+name = "eigenda-cert"
+version = "0.1.0"
+source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
+dependencies = [
+ "alloy-primitives 1.2.0",
+ "alloy-rlp",
+ "anyhow",
+ "canoe-bindings",
+ "serde",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -4439,6 +4460,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "hokulea-eigenda"
+version = "0.1.0"
+source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
+dependencies = [
+ "alloy-primitives 1.2.0",
+ "async-trait",
+ "bytes",
+ "eigenda-cert",
+ "kona-derive",
+ "kona-protocol",
+ "rust-kzg-bn254-primitives",
+ "thiserror 2.0.12",
+ "tracing",
+]
+
+[[package]]
+name = "hokulea-proof"
+version = "0.1.0"
+source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
+dependencies = [
+ "alloy-primitives 1.2.0",
+ "alloy-sol-types",
+ "ark-bn254",
+ "ark-ff 0.5.0",
+ "async-trait",
+ "canoe-bindings",
+ "cfg-if",
+ "eigenda-cert",
+ "hokulea-eigenda",
+ "kona-preimage",
+ "kona-proof",
+ "rust-kzg-bn254-primitives",
+ "rust-kzg-bn254-verifier",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.12",
+ "tracing",
+]
+
+[[package]]
 name = "home"
 version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5287,6 +5348,9 @@ dependencies = [
  "async-trait",
  "c-kzg",
  "copy_dir",
+ "eigenda-cert",
+ "hokulea-eigenda",
+ "hokulea-proof",
  "kona-cli",
  "kona-derive",
  "kona-driver",
@@ -5305,6 +5369,7 @@ dependencies = [
  "risc0-zkvm",
  "rkyv",
  "serde",
+ "serde_json",
  "spin 0.10.0",
  "tempfile",
  "tokio",
@@ -5995,9 +6060,9 @@ dependencies = [
 
 [[package]]
 name = "libm"
-version = "0.2.11"
+version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8355be11b20d696c8f18f6cc018c4e372165b1fa8126cef092399c9951984ffa"
+checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 
 [[package]]
 name = "libredox"
@@ -8565,6 +8630,38 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48fd7bd8a6377e15ad9d42a8ec25371b94ddc67abe7c8b9127bec79bebaaae18"
 
 [[package]]
+name = "rust-kzg-bn254-primitives"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a986f25bc8871261f26f4ec74ef9215d0920ec140f2ef2dfd441b33fd121738b"
+dependencies = [
+ "ark-bn254",
+ "ark-ec",
+ "ark-ff 0.5.0",
+ "ark-poly",
+ "ark-serialize 0.5.0",
+ "ark-std 0.5.0",
+ "libm",
+ "num-traits",
+ "serde",
+ "sha2 0.10.8",
+ "thiserror 2.0.12",
+]
+
+[[package]]
+name = "rust-kzg-bn254-verifier"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13b1a1996f1d61c05d732aac54b1ecfc11abbf73a47b3e4ca72f92ecdd75214f"
+dependencies = [
+ "ark-bn254",
+ "ark-ec",
+ "ark-ff 0.5.0",
+ "ark-serialize 0.5.0",
+ "rust-kzg-bn254-primitives",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9472,7 +9569,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.8",
  "tempfile",
- "thiserror 2.0.12",
+ "thiserror 1.0.69",
  "url",
  "zip",
 ]

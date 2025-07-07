@@ -81,11 +81,13 @@ use std::sync::{Arc, Mutex};
 pub fn run_core_client<
     O: CommsClient + FlushableCache + Send + Sync + Debug,
     B: BlobProvider + Send + Sync + Debug + Clone,
+    #[cfg(feature = "eigen-da")] E: hokulea_eigenda::EigenDABlobProvider + Send + Sync + Debug + Clone,
 >(
     precondition_validation_data_hash: B256,
     oracle: Arc<O>,
     stream: Arc<O>,
     mut beacon: B,
+    #[cfg(feature = "eigen-da")] eigen_da: E,
     execution_cache: Vec<Arc<Execution>>,
     collection_target: Option<Arc<Mutex<Vec<Execution>>>>,
 ) -> anyhow::Result<(BootInfo, B256)>
@@ -215,6 +217,13 @@ where
 
         let da_provider =
             EthereumDataSource::new_from_parts(l1_provider.clone(), beacon, &rollup_config);
+
+        #[cfg(feature = "eigen-da")]
+        let da_provider = hokulea_eigenda::EigenDADataSource::new(
+            da_provider,
+            hokulea_eigenda::EigenDABlobSource::new(eigen_da),
+        );
+
         let pipeline = OraclePipeline::new(
             rollup_config.clone(),
             cursor.clone(),
@@ -356,6 +365,7 @@ pub fn recover_collected_executions(
 }
 
 #[cfg(test)]
+#[cfg(not(feature = "eigen-da"))]
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;

@@ -47,7 +47,11 @@ use std::sync::Arc;
 /// * Logs the count of preimages provided via the `oracle_witness`.
 /// * Logs the count of blobs contained in the `blobs_witness`.
 /// * Logs a warning if any extra preimages are found during execution.
-pub fn run_stateless_client<O: WitnessOracle>(witness: Witness<O>) -> ProofJournal {
+pub fn run_stateless_client<O: WitnessOracle>(
+    witness: Witness<O>,
+    #[cfg(feature = "eigen-da")]
+    eigen_da_witness: hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData,
+) -> ProofJournal {
     log(&format!(
         "ORACLE: {} PREIMAGES",
         witness.oracle_witness.preimage_count()
@@ -65,12 +69,26 @@ pub fn run_stateless_client<O: WitnessOracle>(witness: Witness<O>) -> ProofJourn
     ));
     let beacon = PreloadedBlobProvider::from(witness.blobs_witness);
 
-    let proof_journal = crate::client::stitching::run_stitching_client(
+    #[cfg(feature = "eigen-da")]
+    let eigen_da_precondition = crate::eigen::da_witness_precondition(&eigen_da_witness);
+
+    #[cfg(feature = "eigen-da")]
+    let eigen_da =
+        hokulea_proof::preloaded_eigenda_provider::PreloadedEigenDABlobProvider::from_witness(
+            eigen_da_witness,
+            crate::eigen::KailuaCanoeVerifier(witness.canoe_image_id.0),
+        );
+
+    let stitching_output = crate::client::stitching::run_stitching_client(
         witness.precondition_validation_data_hash,
         oracle.clone(),
         stream,
         beacon,
+        #[cfg(feature = "eigen-da")]
+        eigen_da,
         witness.fpvm_image_id,
+        #[cfg(feature = "eigen-da")]
+        witness.canoe_image_id,
         witness.payout_recipient_address,
         witness.stitched_executions,
         witness.stitched_boot_info,
@@ -80,10 +98,14 @@ pub fn run_stateless_client<O: WitnessOracle>(witness: Witness<O>) -> ProofJourn
         log(&format!("EXTRA PREIMAGES: {}", oracle.preimage_count()));
     }
 
-    proof_journal
+    #[cfg(feature = "eigen-da")]
+    crate::eigen::da_witness_postcondition(eigen_da_precondition, stitching_output.0);
+
+    stitching_output.1
 }
 
 #[cfg(test)]
+#[cfg(not(feature = "eigen-da"))]
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;

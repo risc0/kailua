@@ -1,3 +1,4 @@
+// Copyright 2024, 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,6 +24,9 @@ pub mod boot;
 pub mod client;
 /// Procedures for generating secure cryptographic commitments to rollup configuration settings.
 pub mod config;
+/// A module for eigen-da support
+#[cfg(feature = "eigen-da")]
+pub mod eigen;
 /// Implementation for an execution engine with caching support.
 pub mod executor;
 /// A tightly packed representation for extended execution trace results.
