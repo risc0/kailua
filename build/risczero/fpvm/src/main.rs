@@ -19,6 +19,10 @@ use risc0_zkvm::guest::env;
 use rkyv::rancor::Error;
 
 fn main() {
+    // Load eigen-da blob witness
+    #[cfg(feature = "eigen-da")]
+    let eigen_da: hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData = env::read();
+
     // Load main witness
     let witness = {
         // Read serialized witness data
@@ -46,7 +50,11 @@ fn main() {
     }
 
     // Run client using witness data
-    let proof_journal = run_stateless_client(witness);
+    let proof_journal = run_stateless_client(
+        witness,
+        #[cfg(feature = "eigen-da")]
+        eigen_da,
+    );
 
     // Prevent provability of insufficient data
     assert!(

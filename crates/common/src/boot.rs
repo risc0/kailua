@@ -68,6 +68,7 @@ impl From<&Receipt> for StitchedBootInfo {
 }
 
 #[cfg(test)]
+#[cfg(not(feature = "eigen-da"))]
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;

@@ -52,6 +52,10 @@ pub struct Witness<O: WitnessOracle> {
     /// Represents the fault-proof virtual machine program image id.
     #[rkyv(with = B256Def)]
     pub fpvm_image_id: B256,
+    /// Represents the Hokulea-Canoe image id.
+    #[rkyv(with = B256Def)]
+    #[cfg(feature = "eigen-da")]
+    pub canoe_image_id: B256,
 }
 
 impl Witness<VecOracle> {
@@ -73,6 +77,7 @@ impl Witness<VecOracle> {
 }
 
 #[cfg(test)]
+#[cfg(not(feature = "eigen-da"))]
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
