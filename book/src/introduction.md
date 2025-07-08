@@ -4,10 +4,6 @@
 
 This document is a guide to the design, implementation, and usage of RISC Zero's Kailua.
 
-```admonish note
-Kailua is in active development and has not yet been reviewed for use in production.
-```
-
 ## Introduction
 
 Kailua is suite of tools and contracts for upgrading Optimistic rollups to use ZK Fault Proofs powered by the RISC Zero zkVM.

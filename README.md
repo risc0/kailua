@@ -10,11 +10,12 @@ Kailua's Fault Proving Game is designed to require constant collateral lockups f
 The fault proofs are estimated to require on the order of 100 billion cycles to prove in the worst case, which, on Bonsai, would cost on the order of 100 USD and take around an hour to prove.
 All proving costs are borne by the dishonest party in the protocol, whether that is the proposer or validator.
 
-## Development Status
+## Audits
 
-> [!CAUTION]
-> 
-> `Kailua` as well as `kona` are still in active development and are NOT recommended for production usage.
+Kailua has undergone the following audits throughout its development:
+* [18 FEB 2025](https://github.com/risc0/rz-security/blob/main/audits/kailua/veridise-kailua-20250217.pdf)
+* [22 MAY 2025](https://github.com/risc0/rz-security/blob/main/audits/kailua/veridise-kailua-20250522.pdf)
+* [16 JUN 2025](https://github.com/risc0/rz-security/blob/main/audits/kailua/veridise-kailua-20250616.pdf)
 
 ## Fraud/Validity Proofs
 
