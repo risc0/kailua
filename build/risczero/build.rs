@@ -32,6 +32,7 @@ fn main() {
                     let mut opts = opts;
                     opts.use_docker = Some(
                         risc0_build::DockerOptionsBuilder::default()
+                            .docker_container_tag("r0.1.88.0")
                             .root_dir(root_dir)
                             .build()
                             .unwrap(),
