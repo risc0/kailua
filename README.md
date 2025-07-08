@@ -1,14 +1,42 @@
+<img width="100%" src="https://github.com/user-attachments/assets/c71a1018-d970-49c0-af37-ba8a66d00bea" />
+
 # Kailua
+Unlock faster finality and stronger security for your OP chain.
 
 > [!NOTE]
 > Documentation: https://risc0.github.io/kailua/
 
-Kailua uses the RISC-Zero zkVM to verifiably run Optimism's [Kona][kona] and secure rollups with cryptographic proofs enabling faster finality and reduced operational costs.
 
-Kailua's Fault Proving Game is designed to require constant collateral lockups from both proposers and validators (challengers), whereas the Bisection-based fault dispute game backed by Cannon requires a linear number of deposits proportional to the number of proposals/challenges.
+## Intro
 
-The fault proofs are estimated to require on the order of 100 billion cycles to prove in the worst case, which, on Bonsai, would cost on the order of 100 USD and take around an hour to prove.
-All proving costs are borne by the dishonest party in the protocol, whether that is the proposer or validator.
+OP Kailua lets OP chains upgrade to ZK with minimal friction, unlocking faster finality and enhanced security. With two configurable modes, rollups can adopt ZK at their own pace while meeting the proving requirements for stage 2 decentralization.
+
+* Hybrid Mode → Uses ZK Fraud Proofs for faster finality and lower operational costs.
+* Validity Mode → Uses ZK Validity Proofs for 1-Hour finality and maximum security.
+
+## Why OP Kailua?
+✅ **Pick Your Security Model**: Start with Hybrid Mode, upgrade to Validity Mode when ready. \
+✅ **Fast & Easy Integration**: Works with Optimism’s Bedrock contracts (v1.4.0+).\
+✅ **Stage 2 Ready**: Future-proof your rollup and accelerate your track to Stage 2 Decentralization
+
+## How does OP Kailua Work?
+**Hybrid Mode**: ZK Fraud Proofs for Faster Dispute Resolution
+
+OP Kailua Hybrid Mode replaces traditional fault-proof mechanisms with ZK Fraud proofs, improving security without requiring rollups to immediately switch to full validity proofs.
+
+- Uses the RISC-Zero zkVM to verifiably run Optimism's [Kona][kona] and secure rollups with cryptographic proofs enabling faster finality and reduced operational costs.
+- Designed to require constant collateral lockups from both proposers and validators (challengers), whereas the Bisection-based fault dispute game backed by Cannon requires a linear number of deposits proportional to the number of proposals/challenges.
+- The fault proofs are estimated to require on the order of 100 billion cycles to prove in the worst case, which, on Bonsai, would cost on the order of 100 USD and take around an hour to prove.
+- All proving costs are borne by the dishonest party in the protocol, whether that is the proposer or validator.
+
+
+**Validity Mode**: ZK Validity Proofs for 1-Hour Finality
+
+Validity Mode turns OP chains into a ZK Rollup, eliminating disputes entirely since every transaction is validity proven.
+
+- Unlocks 1-hour finality
+- No challenges, no disputes—ZK Validity Proofs replace interactive fault proofs.
+
 
 ## Audits
 
@@ -16,12 +44,6 @@ Kailua has undergone the following audits throughout its development:
 * [18 FEB 2025](https://github.com/risc0/rz-security/blob/main/audits/kailua/veridise-kailua-20250217.pdf)
 * [22 MAY 2025](https://github.com/risc0/rz-security/blob/main/audits/kailua/veridise-kailua-20250522.pdf)
 * [16 JUN 2025](https://github.com/risc0/rz-security/blob/main/audits/kailua/veridise-kailua-20250616.pdf)
-
-## Fraud/Validity Proofs
-
-Kailua enables rollup operators to add a new fault proof contract, compatible with Bedrock contracts `v1.4.0` and above, using the `DisputeGameFactory` rollup instance to their deployment that relies on RISC-Zero zkVM proofs to finalize/dismiss output proposals.
-
-`KailuaGame` optimistically allows outputs to be accepted after a timeout if no fraud proof is published against it, or if the output is challenged, waits for a proof to be submitted to decide whether to dismiss the output.
 
 ## Prerequisites
 1. [rust](https://www.rust-lang.org/tools/install)
