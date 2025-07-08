@@ -17,6 +17,7 @@ use crate::backends::bonsai::{run_bonsai_client, should_use_bonsai};
 use crate::backends::boundless::{run_boundless_client, BoundlessArgs};
 use crate::backends::zkvm::run_zkvm_client;
 use crate::client::witgen;
+use crate::client::witgen::WitgenResult;
 use crate::proof::proof_file_name;
 use crate::ProvingError;
 use alloy_primitives::B256;
@@ -67,7 +68,7 @@ where
         execution_cache.len(),
         stitched_executions.len()
     );
-    let (proof_journal, mut witness_vec): (ProofJournal, Witness<VecOracle>) = {
+    let mut witgen_result: WitgenResult<VecOracle> = {
         // Instantiate oracles
         let preimage_oracle = Arc::new(CachingOracle::new(
             ORACLE_LRU_SIZE,
@@ -90,14 +91,17 @@ where
         .map_err(ProvingError::OtherError)?
     };
 
-    let execution_trace =
-        core::mem::replace(&mut witness_vec.stitched_executions, stitched_executions);
+    let execution_trace = core::mem::replace(
+        &mut witgen_result.1.stitched_executions,
+        stitched_executions,
+    );
 
     // sanity check kzg proofs
-    let _ = kailua_common::blobs::PreloadedBlobProvider::from(witness_vec.blobs_witness.clone());
+    let _ =
+        kailua_common::blobs::PreloadedBlobProvider::from(witgen_result.1.blobs_witness.clone());
 
     // check if we can prove this workload
-    let (preloaded_wit_size, streamed_wit_size) = sum_witness_size(&witness_vec);
+    let (preloaded_wit_size, streamed_wit_size) = sum_witness_size(&witgen_result.1);
     let total_wit_size = preloaded_wit_size + streamed_wit_size;
     info!(
         "Witness size: {} ({} preloaded, {} streamed.)",
@@ -129,13 +133,25 @@ where
         ));
     }
 
+    // collect input frames
     let (preloaded_frames, streamed_frames) =
-        encode_witness_frames(witness_vec).expect("Failed to encode VecOracle");
+        encode_witness_frames(witgen_result.1).expect("Failed to encode VecOracle");
+    #[cfg(feature = "eigen-da")]
+    let eigen_da_frame = bytemuck::cast_vec(
+        risc0_zkvm::serde::to_vec(&witgen_result.2)
+            .expect("Failed to serialize EigenDABlobWitnessData"),
+    );
     seek_fpvm_proof(
         &proving,
         boundless,
-        proof_journal,
-        [preloaded_frames, streamed_frames].concat(),
+        witgen_result.0,
+        [
+            #[cfg(feature = "eigen-da")]
+            vec![eigen_da_frame],
+            preloaded_frames,
+            streamed_frames,
+        ]
+        .concat(),
         stitched_proofs,
         prove_snark,
     )

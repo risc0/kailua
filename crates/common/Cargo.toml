@@ -46,9 +46,9 @@ kona-protocol.workspace = true
 
 risc0-zkvm.workspace = true
 
+eigenda-cert = { workspace = true, optional = true }
 hokulea-eigenda = { workspace = true, optional = true }
 hokulea-proof = { workspace = true, optional = true }
-eigenda-cert = { workspace = true, optional = true }
 
 [dev-dependencies]
 copy_dir.workspace = true

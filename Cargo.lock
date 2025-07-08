@@ -1169,6 +1169,7 @@ dependencies = [
  "num-bigint 0.4.6",
  "num-integer",
  "num-traits",
+ "rayon",
  "zeroize",
 ]
 
@@ -1227,6 +1228,7 @@ dependencies = [
  "num-bigint 0.4.6",
  "num-traits",
  "paste",
+ "rayon",
  "zeroize",
 ]
 
@@ -1326,6 +1328,7 @@ dependencies = [
  "educe",
  "fnv",
  "hashbrown 0.15.2",
+ "rayon",
 ]
 
 [[package]]
@@ -1389,6 +1392,7 @@ dependencies = [
  "arrayvec",
  "digest 0.10.7",
  "num-bigint 0.4.6",
+ "rayon",
 ]
 
 [[package]]
@@ -1442,6 +1446,7 @@ checksum = "246a225cc6131e9ee4f24619af0f19d67761fff15d7ccc22e42b80846e69449a"
 dependencies = [
  "num-traits",
  "rand 0.8.5",
+ "rayon",
 ]
 
 [[package]]
@@ -2720,6 +2725,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "canoe-provider"
+version = "0.1.0"
+source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
+dependencies = [
+ "alloy-primitives 1.2.0",
+ "alloy-sol-types",
+ "anyhow",
+ "async-trait",
+ "canoe-bindings",
+ "eigenda-cert",
+ "serde",
+]
+
+[[package]]
+name = "canoe-steel-methods"
+version = "0.1.0"
+source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
+dependencies = [
+ "hex",
+ "risc0-build",
+ "risc0-build-ethereum",
+ "risc0-zkp",
+]
+
+[[package]]
 name = "cargo-platform"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3042,6 +3072,15 @@ name = "critical-section"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
+
+[[package]]
+name = "crossbeam-channel"
+version = "0.5.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82b8f8f868b36967f9606790d1903570de9ceaf870a7bf9fbbd3016d636a2cb2"
+dependencies = [
+ "crossbeam-utils",
+]
 
 [[package]]
 name = "crossbeam-deque"
@@ -4460,6 +4499,54 @@ dependencies = [
 ]
 
 [[package]]
+name = "hokulea-client"
+version = "0.1.0"
+source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
+dependencies = [
+ "alloy-consensus",
+ "alloy-evm",
+ "hokulea-eigenda",
+ "kona-client",
+ "kona-derive",
+ "kona-driver",
+ "kona-executor",
+ "kona-preimage",
+ "kona-proof",
+ "op-alloy-consensus",
+ "op-revm",
+ "tracing",
+]
+
+[[package]]
+name = "hokulea-client-bin"
+version = "0.1.0"
+source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
+dependencies = [
+ "alloy-evm",
+ "cfg-if",
+ "hokulea-client",
+ "hokulea-proof",
+ "kona-client",
+ "kona-preimage",
+ "kona-proof",
+ "kona-std-fpvm",
+ "kona-std-fpvm-proc",
+ "op-alloy-consensus",
+ "op-revm",
+]
+
+[[package]]
+name = "hokulea-compute-proof"
+version = "0.1.0"
+source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
+dependencies = [
+ "alloy-primitives 1.2.0",
+ "num",
+ "rust-kzg-bn254-primitives",
+ "rust-kzg-bn254-prover",
+]
+
+[[package]]
 name = "hokulea-eigenda"
 version = "0.1.0"
 source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
@@ -4473,6 +4560,32 @@ dependencies = [
  "rust-kzg-bn254-primitives",
  "thiserror 2.0.12",
  "tracing",
+]
+
+[[package]]
+name = "hokulea-host-bin"
+version = "0.1.0"
+source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
+dependencies = [
+ "alloy-primitives 1.2.0",
+ "anyhow",
+ "async-trait",
+ "clap",
+ "eigenda-cert",
+ "hokulea-client-bin",
+ "hokulea-eigenda",
+ "hokulea-proof",
+ "kona-cli",
+ "kona-client",
+ "kona-host",
+ "kona-preimage",
+ "kona-proof",
+ "kona-std-fpvm",
+ "reqwest",
+ "serde",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.19",
 ]
 
 [[package]]
@@ -4497,6 +4610,26 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.12",
  "tracing",
+]
+
+[[package]]
+name = "hokulea-witgen"
+version = "0.1.0"
+source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
+dependencies = [
+ "alloy-consensus",
+ "alloy-primitives 1.2.0",
+ "alloy-rlp",
+ "anyhow",
+ "async-trait",
+ "canoe-provider",
+ "eigenda-cert",
+ "hokulea-compute-proof",
+ "hokulea-eigenda",
+ "hokulea-proof",
+ "kona-preimage",
+ "kona-proof",
+ "rust-kzg-bn254-primitives",
 ]
 
 [[package]]
@@ -5415,8 +5548,14 @@ dependencies = [
  "boundless-market",
  "bytemuck",
  "c-kzg",
+ "canoe-steel-methods",
  "clap",
+ "eigenda-cert",
  "hex",
+ "hokulea-eigenda",
+ "hokulea-host-bin",
+ "hokulea-proof",
+ "hokulea-witgen",
  "human_bytes",
  "kailua-build",
  "kailua-common",
@@ -8183,6 +8322,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "risc0-build-ethereum"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9cdb18356de486112b9734b829ea982a943bce7a391711fa0aa76eb287e2b199"
+dependencies = [
+ "anyhow",
+ "bytemuck",
+ "hex",
+ "risc0-build",
+ "risc0-zkp",
+ "risc0-zkvm",
+]
+
+[[package]]
 name = "risc0-build-kernel"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8646,6 +8799,24 @@ dependencies = [
  "serde",
  "sha2 0.10.8",
  "thiserror 2.0.12",
+]
+
+[[package]]
+name = "rust-kzg-bn254-prover"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed1af11c66ca1e505ef959e398e86c39d9b2b20d0aa9a45a62e053a8a9044209"
+dependencies = [
+ "ark-bn254",
+ "ark-ec",
+ "ark-ff 0.5.0",
+ "ark-poly",
+ "ark-std 0.5.0",
+ "crossbeam-channel",
+ "num-traits",
+ "num_cpus",
+ "rayon",
+ "rust-kzg-bn254-primitives",
 ]
 
 [[package]]
@@ -9569,7 +9740,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.8",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "url",
  "zip",
 ]

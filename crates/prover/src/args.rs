@@ -45,6 +45,17 @@ pub struct ProvingArgs {
     /// Whether to skip waiting for the proof generation process to complete
     #[clap(long, env, default_value_t = false)]
     pub skip_await_proof: bool,
+    /// URL of the EigenDA RPC endpoint.
+    #[clap(
+        long,
+        visible_alias = "eigenda",
+        requires = "l2_node_address",
+        requires = "l1_node_address",
+        requires = "l1_beacon_address",
+        env
+    )]
+    #[cfg(feature = "eigen-da")]
+    pub eigenda_proxy_address: Option<String>,
 }
 
 impl ProvingArgs {

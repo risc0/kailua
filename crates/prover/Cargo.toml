@@ -46,6 +46,13 @@ kona-proof.workspace = true
 kona-protocol.workspace = true
 kona-std-fpvm.workspace = true
 
+canoe-steel-methods = { workspace = true, optional = true }
+eigenda-cert = { workspace = true, optional = true }
+hokulea-eigenda = { workspace = true, optional = true }
+hokulea-host-bin = { workspace = true, optional = true }
+hokulea-proof = { workspace = true, optional = true }
+hokulea-witgen = { workspace = true, optional = true }
+
 bonsai-sdk.workspace = true
 boundless-market.workspace = true
 
@@ -74,4 +81,14 @@ disable-dev-mode = [
 rebuild-fpvm = [
     "kailua-build/rebuild-fpvm",
     "kailua-sync/rebuild-fpvm"
+]
+eigen-da = [
+    "dep:canoe-steel-methods",
+    "dep:eigenda-cert",
+    "dep:hokulea-eigenda",
+    "dep:hokulea-host-bin",
+    "dep:hokulea-proof",
+    "dep:hokulea-witgen",
+    "kailua-build/eigen-da",
+    "kailua-common/eigen-da",
 ]

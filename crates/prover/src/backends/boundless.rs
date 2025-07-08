@@ -830,7 +830,7 @@ pub fn request_file_name(proof_journal: &ProofJournal) -> String {
 }
 
 pub fn binary_file_name(proof_journal: &ProofJournal) -> String {
-    format!("boundless-{}.req", proof_journal.fpvm_image_id)
+    format!("boundless-{}.req", proof_journal.fpvm_version)
 }
 
 pub fn input_file_name(proof_journal: &ProofJournal) -> String {

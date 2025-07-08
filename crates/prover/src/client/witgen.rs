@@ -34,6 +34,16 @@ use std::sync::{Arc, Mutex};
 use tracing::info;
 use tracing::log::error;
 
+#[cfg(feature = "eigen-da")]
+pub type WitgenResult<O> = (
+    ProofJournal,
+    Witness<O>,
+    hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData,
+);
+
+#[cfg(not(feature = "eigen-da"))]
+pub type WitgenResult<O> = (ProofJournal, Witness<O>);
+
 pub async fn run_witgen_client<P, B, O>(
     preimage_oracle: Arc<P>,
     preimage_oracle_shard_size: usize,
@@ -42,7 +52,7 @@ pub async fn run_witgen_client<P, B, O>(
     precondition_validation_data_hash: B256,
     execution_cache: Vec<Arc<Execution>>,
     stitched_boot_info: Vec<StitchedBootInfo>,
-) -> anyhow::Result<(ProofJournal, Witness<O>)>
+) -> anyhow::Result<WitgenResult<O>>
 where
     P: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
     B: BlobProvider + Send + Sync + Debug + Clone,
@@ -52,19 +62,27 @@ where
     let oracle_witness = Arc::new(Mutex::new(O::default()));
     let stream_witness = Arc::new(Mutex::new(O::default()));
     let blobs_witness = Arc::new(Mutex::new(BlobWitnessData::default()));
+    #[cfg(feature = "eigen-da")]
+    let eigen_witness = Arc::new(Mutex::new(Default::default()));
     info!("Preamble");
     let oracle = Arc::new(OracleWitnessProvider {
         oracle: preimage_oracle.clone(),
         witness: oracle_witness.clone(),
     });
     let stream = Arc::new(OracleWitnessProvider {
-        oracle: preimage_oracle,
+        oracle: preimage_oracle.clone(),
         witness: stream_witness.clone(),
     });
     let beacon = BlobWitnessProvider {
         provider: blob_provider,
         witness: blobs_witness.clone(),
     };
+    #[cfg(feature = "eigen-da")]
+    let eigen = hokulea_witgen::witness_provider::OracleEigenDAWitnessProvider {
+        provider: hokulea_proof::eigenda_provider::OracleEigenDAProvider::new(preimage_oracle),
+        witness: eigen_witness.clone(),
+    };
+
     // Run client
     let collection_target = Arc::new(Mutex::new(Vec::new()));
     let (boot, precondition_hash) = kailua_common::client::core::run_core_client(
@@ -72,6 +90,8 @@ where
         oracle,
         stream,
         beacon,
+        #[cfg(feature = "eigen-da")]
+        eigen,
         execution_cache,
         Some(collection_target.clone()),
     )?;
@@ -87,6 +107,10 @@ where
     let stitched_executions = vec![core::mem::take(executions.deref_mut())];
     // Construct witness
     let fpvm_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(KAILUA_FPVM_ID));
+    #[cfg(feature = "eigen-da")]
+    let canoe_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(
+        canoe_steel_methods::CERT_VERIFICATION_ID,
+    ));
     let mut witness = Witness {
         oracle_witness: core::mem::take(oracle_witness.lock().unwrap().deref_mut()),
         stream_witness: core::mem::take(stream_witness.lock().unwrap().deref_mut()),
@@ -96,6 +120,8 @@ where
         stitched_executions,
         stitched_boot_info,
         fpvm_image_id,
+        #[cfg(feature = "eigen-da")]
+        canoe_image_id,
     };
     witness
         .oracle_witness
@@ -103,9 +129,25 @@ where
     witness
         .stream_witness
         .finalize_preimages(preimage_oracle_shard_size, false);
-    let journal_output =
-        ProofJournal::new(fpvm_image_id, payout_recipient, precondition_hash, &boot);
-    Ok((journal_output, witness))
+    let journal_output = ProofJournal::new(
+        fpvm_image_id,
+        #[cfg(feature = "eigen-da")]
+        canoe_image_id,
+        payout_recipient,
+        precondition_hash,
+        &boot,
+    );
+
+    #[cfg(feature = "eigen-da")]
+    let result = Ok((
+        journal_output,
+        witness,
+        core::mem::take(eigen_witness.lock().unwrap().deref_mut()),
+    ));
+    #[cfg(not(feature = "eigen-da"))]
+    let result = Ok((journal_output, witness));
+
+    result
 }
 
 #[derive(Clone, Debug)]
