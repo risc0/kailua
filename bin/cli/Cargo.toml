@@ -35,6 +35,7 @@ kailua-validator.workspace = true
 
 kona-cli.workspace = true
 
+risc0-circuit-recursion.workspace = true
 risc0-zkvm.workspace = true
 
 [dev-dependencies]

@@ -16,7 +16,7 @@ use alloy::primitives::address;
 use alloy::providers::ProviderBuilder;
 use anyhow::Context;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
-use kailua_common::config::{config_hash, BN254_CONTROL_ID, CONTROL_ROOT};
+use kailua_common::config::config_hash;
 use kailua_contracts::SystemConfig;
 use kailua_sync::provider::optimism::fetch_rollup_config;
 use kailua_sync::stall::Stall;
@@ -24,8 +24,9 @@ use kailua_sync::telemetry::TelemetryArgs;
 use kailua_sync::{await_tel, KAILUA_GAME_TYPE};
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, Status, TraceContextExt, Tracer};
-use risc0_zkvm::compute_image_id;
+use risc0_circuit_recursion::control_id::BN254_IDENTITY_CONTROL_ID;
 use risc0_zkvm::sha::Digest;
+use risc0_zkvm::{compute_image_id, ALLOWED_CONTROL_ROOT};
 use tracing::debug;
 
 #[derive(clap::Args, Debug, Clone)]
@@ -86,11 +87,18 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
     // Report expected Groth16 verifier parameters
     println!(
         "CONTROL_ROOT: 0x{}",
-        hex::encode_upper(CONTROL_ROOT.as_slice()),
+        hex::encode_upper(ALLOWED_CONTROL_ROOT.as_bytes()),
     );
     println!(
         "CONTROL_ID: 0x{}",
-        hex::encode_upper(BN254_CONTROL_ID.as_slice()),
+        hex::encode_upper(
+            BN254_IDENTITY_CONTROL_ID
+                .as_bytes()
+                .iter()
+                .rev()
+                .copied()
+                .collect::<Vec<_>>()
+        ),
     );
     // report verifier address
     let verifier_address = match config.l1_chain_id {
@@ -98,6 +106,7 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
         1 => Some(address!("8EaB2D97Dfce405A1692a21b3ff3A172d593D319")),
         11155111 => Some(address!("925d8331ddc0a1F0d96E68CF073DFE1d92b69187")),
         17000 => Some(address!("f70aBAb028Eb6F4100A24B203E113D94E87DE93C")),
+        560048 => Some(address!("32Db7dc407AC886807277636a1633A1381748DD8")),
         // arb
         42161 => Some(address!("0b144e07a0826182b6b59788c34b32bfa86fb711")),
         421614 => Some(address!("0b144e07a0826182b6b59788c34b32bfa86fb711")),
@@ -112,7 +121,8 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
         11155420 => Some(address!("B369b4dd27FBfb59921d3A4a3D23AC2fc32FB908")),
         // linea
         59144 => Some(address!("0b144e07a0826182b6b59788c34b32bfa86fb711")),
-        // ploygon
+        59141 => Some(address!("27983ee173aD10E171D17C9c5C14d5baFE997609")),
+        // polygon
         1101 => Some(address!("0b144e07a0826182b6b59788c34b32bfa86fb711")),
         _ => None,
     };

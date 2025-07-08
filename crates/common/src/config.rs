@@ -12,16 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy_primitives::{b256, Address, B256};
+use alloy_primitives::Address;
 use anyhow::Context;
 use kona_genesis::{AltDAConfig, RollupConfig, SystemConfig};
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use std::fmt::Debug;
-
-pub const CONTROL_ROOT: B256 =
-    b256!("539032186827b06719244873b17b2d4c122e2d02cfb1994fe958b2523b844576");
-pub const BN254_CONTROL_ID: B256 =
-    b256!("04446e66d300eb7fb45c9726bb53c793dda407a62e9601618bb43c5c14657ac0");
 
 /// Returns a value based on the provided `Option` and a default value, with safety checks.
 ///
@@ -382,7 +377,7 @@ mod tests {
     use alloy_eips::BlockNumHash;
     use std::collections::HashSet;
 
-    use alloy_primitives::U256;
+    use alloy_primitives::{B256, U256};
     use kona_genesis::{AltDAConfig, BaseFeeConfig, ChainGenesis, HardForkConfig, SystemConfig};
 
     #[test]

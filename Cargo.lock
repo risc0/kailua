@@ -4991,6 +4991,7 @@ dependencies = [
  "kona-host",
  "lazy_static",
  "opentelemetry",
+ "risc0-circuit-recursion",
  "risc0-zkvm",
  "tempfile",
  "tokio",

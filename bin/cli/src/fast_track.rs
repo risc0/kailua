@@ -13,12 +13,12 @@
 // limitations under the License.
 
 use alloy::network::{Ethereum, Network, ReceiptResponse, TxSigner};
-use alloy::primitives::{Address, Bytes, U256};
+use alloy::primitives::{Address, Bytes, B256, U256};
 use alloy::providers::{Provider, RootProvider};
 use alloy::sol_types::SolValue;
 use anyhow::{anyhow, bail, Context};
 use kailua_build::KAILUA_FPVM_ID;
-use kailua_common::config::{config_hash, BN254_CONTROL_ID, CONTROL_ROOT};
+use kailua_common::config::config_hash;
 use kailua_contracts::*;
 use kailua_sync::provider::optimism::fetch_rollup_config;
 use kailua_sync::provider::optimism::OpNodeProvider;
@@ -30,6 +30,8 @@ use kailua_sync::transact::{Transact, TransactArgs};
 use kailua_sync::{await_tel, await_tel_res, retry_res_ctx_timeout, KAILUA_GAME_TYPE};
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, Status, TraceContextExt, Tracer};
+use risc0_circuit_recursion::control_id::BN254_IDENTITY_CONTROL_ID;
+use risc0_zkvm::ALLOWED_CONTROL_ROOT;
 use std::str::FromStr;
 use tracing::info;
 
@@ -465,11 +467,18 @@ pub async fn deploy_verifier<P1: Provider<N>, P2: Provider<N>, N: Network>(
 
     // Deploy RiscZeroGroth16Verifier contract
     info!("Deploying RiscZeroGroth16Verifier contract to L1.");
-    let receipt =
-        RiscZeroGroth16Verifier::deploy_builder(&deployer_provider, CONTROL_ROOT, BN254_CONTROL_ID)
-            .transact_with_context(context.clone(), "RiscZeroGroth16Verifier::deploy")
-            .await
-            .context("RiscZeroGroth16Verifier::deploy")?;
+    let receipt = RiscZeroGroth16Verifier::deploy_builder(
+        &deployer_provider,
+        B256::from_slice(ALLOWED_CONTROL_ROOT.as_bytes()),
+        {
+            let mut control_id = B256::from_slice(BN254_IDENTITY_CONTROL_ID.as_bytes());
+            control_id.reverse();
+            control_id
+        },
+    )
+    .transact_with_context(context.clone(), "RiscZeroGroth16Verifier::deploy")
+    .await
+    .context("RiscZeroGroth16Verifier::deploy")?;
     info!(
         "RiscZeroGroth16Verifier::deploy: {} gas",
         receipt.gas_used()
