@@ -174,17 +174,6 @@
                         <h1 id="kailua"><a class="header" href="#kailua">Kailua</a></h1>
 <p><a href="https://github.com/risc0/kailua"><img src="https://img.shields.io/badge/GitHub-kailua-green?logo=github" alt="Static Badge" /></a></p>
 <p>This document is a guide to the design, implementation, and usage of RISC Zero's Kailua.</p>
-<div id="admonition-note" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-title">
-<div class="admonition-title">
-<div id="admonition-note-title">
-<p>Note</p>
-</div>
-<a class="admonition-anchor-link" href="introduction.html#admonition-note"></a>
-</div>
-<div>
-<p>Kailua is in active development and has not yet been reviewed for use in production.</p>
-</div>
-</div>
 <h2 id="introduction"><a class="header" href="#introduction">Introduction</a></h2>
 <p>Kailua is suite of tools and contracts for upgrading Optimistic rollups to use ZK Fault Proofs powered by the RISC Zero zkVM.
 Kailua introduces its own novel fault proof game design which provides the best in class security guarantees for sequencing rollup transactions.
@@ -528,10 +517,10 @@ parameters for your rollup instance:</p>
 <pre><code class="language-shell">kailua-cli config --op-node-url [YOUR_OP_NODE_URL] --op-geth-url [YOUR_OP_GETH_URL] --eth-rpc-url [YOUR_ETH_RPC_URL]
 </code></pre>
 <p>Running the above command against the respective Base mainnet endpoints should produce the following output:</p>
-<pre><code>RISC0_VERSION: 2.1.0
-FPVM_IMAGE_ID: 0x45CAF5B9B4BDB78DD80BB6551DF58117DB690AEB4FAD4D6904967BA0F3B5A62A
-FPVM_ELF_SIZE: 31827560
-CONTROL_ROOT: 0x539032186827B06719244873B17B2D4C122E2D02CFB1994FE958B2523B844576
+<pre><code>RISC0_VERSION: 2.2.0
+FPVM_IMAGE_ID: 0x3918344017507B670B2DE3344D656D74E4B7A82C6E10C6C693A824AF3598CC24
+FPVM_ELF_SIZE: 36289160
+CONTROL_ROOT: 0xCE52BF56033842021AF3CF6DB8A50D1B7535C125A34F1A22C6FDCF002C5A1529
 CONTROL_ID: 0x04446E66D300EB7FB45C9726BB53C793DDA407A62E9601618BB43C5C14657AC0
 RISC_ZERO_VERIFIER: 0x8EAB2D97DFCE405A1692A21B3FF3A172D593D319
 GENESIS_TIMESTAMP: 1686789347
@@ -1914,7 +1903,7 @@ making this process safe to delegate.</p>
 <h3 id="boundless"><a class="header" href="#boundless">Boundless</a></h3>
 <p>When delegating generation of Kailua Fault proofs to the decentralized <a href="https://docs.beboundless.xyz/">Boundless proving network</a>,
 for every fault proof, a proof request is submitted to the network, where it goes through the standard
-<a href="https://docs.beboundless.xyz/introduction/proof-lifecycle">proof life-cycle</a> on boundless, before being published by
+<a href="https://docs.beboundless.xyz/provers/proof-lifecycle">proof life-cycle</a> on boundless, before being published by
 your validator to settle a dispute.</p>
 <p>This functionality requires some additional parameters when starting the validator.
 These parameters can be passed in as CLI arguments or set as environment variables</p>
