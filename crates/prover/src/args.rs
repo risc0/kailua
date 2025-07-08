@@ -36,6 +36,17 @@ pub struct ProvingArgs {
     /// How many threads to use for computing proofs
     #[clap(long, env, default_value_t = 1)]
     pub num_concurrent_proofs: u64,
+    /// URL of the EigenDA RPC endpoint.
+    #[clap(
+        long,
+        visible_alias = "eigenda",
+        requires = "l2_node_address",
+        requires = "l1_node_address",
+        requires = "l1_beacon_address",
+        env
+    )]
+    #[cfg(feature = "eigen-da")]
+    pub eigenda_proxy_address: Option<String>,
 }
 
 /// The prover arguments
