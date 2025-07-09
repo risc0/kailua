@@ -139,11 +139,14 @@ where
     );
 
     #[cfg(feature = "eigen-da")]
-    let result = Ok((
-        journal_output,
-        witness,
-        core::mem::take(eigen_witness.lock().unwrap().deref_mut()),
-    ));
+    let result = {
+        let mut eigen_witness = core::mem::take(eigen_witness.lock().unwrap().deref_mut());
+        for (_, validity) in &mut eigen_witness.validity {
+            validity.l1_head_block_hash = boot.l1_head;
+            validity.l1_chain_id = boot.rollup_config.l1_chain_id;
+        }
+        Ok((journal_output, witness, eigen_witness))
+    };
     #[cfg(not(feature = "eigen-da"))]
     let result = Ok((journal_output, witness));
 
