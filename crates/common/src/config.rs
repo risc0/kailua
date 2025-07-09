@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy_primitives::Address;
+use alloy_primitives::{address, Address};
 use anyhow::Context;
 use kona_genesis::{AltDAConfig, RollupConfig, SystemConfig};
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
@@ -168,10 +168,13 @@ pub fn genesis_system_config_hash(system_config: &SystemConfig) -> anyhow::Resul
 /// - Returns an error if any of the fields of `AltDAConfig` fail to resolve to valid default or non-default values.
 pub fn alt_da_config_hash(alt_da_config: &AltDAConfig) -> anyhow::Result<[u8; 32]> {
     let fields = [
-        safe_default(alt_da_config.da_challenge_address, Address::ZERO)
-            .context("da_challenge_address")?
-            .0
-            .as_slice(),
+        safe_default(
+            alt_da_config.da_challenge_address,
+            address!("0123456789abcdef0123456789abcdef00000000"),
+        )
+        .context("da_challenge_address")?
+        .0
+        .as_slice(),
         safe_default(alt_da_config.da_challenge_window, u64::MAX)
             .context("da_challenge_window")?
             .to_be_bytes()
@@ -329,10 +332,13 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
             .to_be_bytes()
             .as_slice(),
         // da_challenge_address
-        safe_default(rollup_config.da_challenge_address, Address::ZERO)
-            .context("da_challenge_address")?
-            .0
-            .as_slice(),
+        safe_default(
+            rollup_config.da_challenge_address,
+            address!("0123456789abcdef0123456789abcdef00000000"),
+        )
+        .context("da_challenge_address")?
+        .0
+        .as_slice(),
         // interop_message_expiry_window
         rollup_config
             .interop_message_expiry_window

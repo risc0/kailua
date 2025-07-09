@@ -69,17 +69,17 @@ where
         execution_cache.len(),
         stitched_executions.len()
     );
+    let preimage_oracle = Arc::new(CachingOracle::new(
+        ORACLE_LRU_SIZE,
+        oracle_client,
+        hint_client,
+    ));
     let mut witgen_result: WitgenResult<VecOracle> = {
         // Instantiate oracles
-        let preimage_oracle = Arc::new(CachingOracle::new(
-            ORACLE_LRU_SIZE,
-            oracle_client,
-            hint_client,
-        ));
         let blob_provider = OracleBlobProvider::new(preimage_oracle.clone());
         // Run witness generation with oracles
         witgen::run_witgen_client(
-            preimage_oracle,
+            preimage_oracle.clone(),
             10 * 1024 * 1024, // default to 10MB chunks
             blob_provider,
             proving.payout_recipient_address.unwrap_or_default(),
@@ -141,6 +141,7 @@ where
     #[cfg(feature = "eigen-da")]
     let eigen_da_frame = {
         use canoe_provider::CanoeProvider;
+        use kona_derive::prelude::ChainProvider;
 
         // todo: compute canoe proof and append to eigen witness
         let canoe_provider = canoe_steel_apps::apps::CanoeSteelProvider {
@@ -151,13 +152,21 @@ where
             if validity.canoe_proof.is_some() {
                 continue;
             }
+            let mut provider = kona_proof::l1::OracleL1ChainProvider::new(
+                validity.l1_head_block_hash,
+                preimage_oracle.clone(),
+            );
+            let l1_head_block = provider
+                .header_by_hash(validity.l1_head_block_hash)
+                .await
+                .expect("Failed to get l1 head block for canoe");
             // todo: call local/bonsai/boundless prover w/ receipt caching
             let proof = canoe_provider
                 .create_cert_validity_proof(canoe_provider::CanoeInput {
                     altda_commitment: commitment.clone(),
                     claimed_validity: validity.claimed_validity,
                     l1_head_block_hash: validity.l1_head_block_hash,
-                    l1_head_block_number: 0,
+                    l1_head_block_number: l1_head_block.number,
                     l1_chain_id: validity.l1_chain_id,
                 })
                 .await
