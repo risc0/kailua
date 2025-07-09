@@ -111,6 +111,8 @@ pub async fn run_native_client(
 
     // Start the client program in a separate thread
     let client_task = tokio::spawn(crate::client::proving::run_proving_client(
+        #[cfg(feature = "eigen-da")]
+        args.kona.l1_node_address,
         args.proving,
         args.boundless,
         OracleReader::new(preimage.client),

@@ -54,7 +54,7 @@ impl ProofJournal {
         boot_info: &BootInfo,
     ) -> Self {
         #[cfg(feature = "eigen-da")]
-        let fpvm_image_id = crate::eigen::fpvm_version(fpvm_image_id, canoe_image_id);
+        let fpvm_image_id = crate::hokulea::fpvm_version(fpvm_image_id, canoe_image_id);
         Self {
             fpvm_version: fpvm_image_id,
             payout_recipient,
@@ -77,7 +77,7 @@ impl ProofJournal {
         stitched_boot_info: &StitchedBootInfo,
     ) -> Self {
         #[cfg(feature = "eigen-da")]
-        let fpvm_image_id = crate::eigen::fpvm_version(fpvm_image_id, canoe_image_id);
+        let fpvm_image_id = crate::hokulea::fpvm_version(fpvm_image_id, canoe_image_id);
         Self {
             fpvm_version: fpvm_image_id,
             payout_recipient,
