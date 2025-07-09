@@ -60,7 +60,7 @@ impl CanoeVerifier for KailuaCanoeVerifier {
 
 pub fn da_witness_precondition(
     eigen_da: &hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData,
-) -> Option<(alloy_primitives::B256, u64, u64)> {
+) -> Option<(B256, u64, u64)> {
     // Enforce strict length equality requirements
     assert_eq!(eigen_da.blob.len(), eigen_da.validity.len());
     assert_eq!(eigen_da.validity.len(), eigen_da.recency.len());
@@ -82,7 +82,7 @@ pub fn da_witness_precondition(
 }
 
 pub fn da_witness_postcondition(
-    precondition: Option<(alloy_primitives::B256, u64, u64)>,
+    precondition: Option<(B256, u64, u64)>,
     boot_info: kona_proof::BootInfo,
 ) {
     if let Some((l1_head, l1_chain_id, recency)) = precondition {
@@ -97,7 +97,7 @@ pub fn da_witness_postcondition(
 }
 
 pub fn fpvm_version(fpvm_image_id: B256, canoe_image_id: B256) -> B256 {
-    alloy_primitives::B256::from_slice(
+    B256::from_slice(
         [fpvm_image_id.0, canoe_image_id.0]
             .concat()
             .digest()

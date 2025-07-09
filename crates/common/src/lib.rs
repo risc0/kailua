@@ -24,11 +24,11 @@ pub mod boot;
 pub mod client;
 /// Procedures for generating secure cryptographic commitments to rollup configuration settings.
 pub mod config;
-/// A module for eigen-da support
-#[cfg(feature = "eigen-da")]
-pub mod eigen;
 /// Implementation for an execution engine with caching support.
 pub mod executor;
+/// A module for eigen-da support
+#[cfg(feature = "eigen-da")]
+pub mod hokulea;
 /// A tightly packed representation for extended execution trace results.
 pub mod journal;
 /// A modified `kona_proof::l1::chain_provider` with caching support.

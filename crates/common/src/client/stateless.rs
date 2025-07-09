@@ -70,13 +70,13 @@ pub fn run_stateless_client<O: WitnessOracle>(
     let beacon = PreloadedBlobProvider::from(witness.blobs_witness);
 
     #[cfg(feature = "eigen-da")]
-    let eigen_da_precondition = crate::eigen::da_witness_precondition(&eigen_da_witness);
+    let eigen_da_precondition = crate::hokulea::da_witness_precondition(&eigen_da_witness);
 
     #[cfg(feature = "eigen-da")]
     let eigen_da =
         hokulea_proof::preloaded_eigenda_provider::PreloadedEigenDABlobProvider::from_witness(
             eigen_da_witness,
-            crate::eigen::KailuaCanoeVerifier(witness.canoe_image_id.0),
+            crate::hokulea::KailuaCanoeVerifier(witness.canoe_image_id.0),
         );
 
     let stitching_output = crate::client::stitching::run_stitching_client(
@@ -99,7 +99,7 @@ pub fn run_stateless_client<O: WitnessOracle>(
     }
 
     #[cfg(feature = "eigen-da")]
-    crate::eigen::da_witness_postcondition(eigen_da_precondition, stitching_output.0);
+    crate::hokulea::da_witness_postcondition(eigen_da_precondition, stitching_output.0);
 
     stitching_output.1
 }

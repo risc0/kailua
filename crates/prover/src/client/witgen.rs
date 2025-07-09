@@ -109,7 +109,7 @@ where
     let fpvm_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(KAILUA_FPVM_ID));
     #[cfg(feature = "eigen-da")]
     let canoe_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(
-        canoe_steel_methods::CERT_VERIFICATION_ID,
+        canoe_steel_methods::CERT_VERIFICATION_ID, // todo: stable image id
     ));
     let mut witness = Witness {
         oracle_witness: core::mem::take(oracle_witness.lock().unwrap().deref_mut()),

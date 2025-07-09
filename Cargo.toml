@@ -99,6 +99,8 @@ kona-registry = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0
 kona-std-fpvm = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
 
 # Hokulea git = "https://github.com/Layr-Labs/hokulea", rev = "c336a3203211d7de41a554a571646a368a34da6c"
+canoe-provider = { git = "https://github.com/Layr-Labs/hokulea", rev = "c336a3203211d7de41a554a571646a368a34da6c" }
+canoe-steel-apps = { git = "https://github.com/Layr-Labs/hokulea", rev = "c336a3203211d7de41a554a571646a368a34da6c" }
 canoe-steel-methods = { git = "https://github.com/Layr-Labs/hokulea", rev = "c336a3203211d7de41a554a571646a368a34da6c" }
 eigenda-cert = { git = "https://github.com/Layr-Labs/hokulea", rev = "c336a3203211d7de41a554a571646a368a34da6c" }
 hokulea-host-bin = { git = "https://github.com/Layr-Labs/hokulea", rev = "c336a3203211d7de41a554a571646a368a34da6c", default-features = false }
