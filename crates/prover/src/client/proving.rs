@@ -17,6 +17,7 @@ use crate::backends::bonsai::{run_bonsai_client, should_use_bonsai};
 use crate::backends::boundless::{run_boundless_client, BoundlessArgs};
 use crate::backends::zkvm::run_zkvm_client;
 use crate::client::witgen;
+use crate::client::witgen::WitgenResult;
 use crate::proof::proof_file_name;
 use crate::ProvingError;
 use alloy_primitives::B256;
@@ -43,6 +44,7 @@ pub const ORACLE_LRU_SIZE: usize = 1024;
 
 #[allow(clippy::too_many_arguments)]
 pub async fn run_proving_client<P, H>(
+    #[cfg(feature = "eigen-da")] l1_node_address: Option<String>,
     proving: ProvingArgs,
     boundless: BoundlessArgs,
     oracle_client: P,
@@ -67,17 +69,17 @@ where
         execution_cache.len(),
         stitched_executions.len()
     );
-    let (proof_journal, mut witness_vec): (ProofJournal, Witness<VecOracle>) = {
+    let preimage_oracle = Arc::new(CachingOracle::new(
+        ORACLE_LRU_SIZE,
+        oracle_client,
+        hint_client,
+    ));
+    let mut witgen_result: WitgenResult<VecOracle> = {
         // Instantiate oracles
-        let preimage_oracle = Arc::new(CachingOracle::new(
-            ORACLE_LRU_SIZE,
-            oracle_client,
-            hint_client,
-        ));
         let blob_provider = OracleBlobProvider::new(preimage_oracle.clone());
         // Run witness generation with oracles
         witgen::run_witgen_client(
-            preimage_oracle,
+            preimage_oracle.clone(),
             10 * 1024 * 1024, // default to 10MB chunks
             blob_provider,
             proving.payout_recipient_address.unwrap_or_default(),
@@ -90,14 +92,17 @@ where
         .map_err(ProvingError::OtherError)?
     };
 
-    let execution_trace =
-        core::mem::replace(&mut witness_vec.stitched_executions, stitched_executions);
+    let execution_trace = core::mem::replace(
+        &mut witgen_result.1.stitched_executions,
+        stitched_executions,
+    );
 
     // sanity check kzg proofs
-    let _ = kailua_common::blobs::PreloadedBlobProvider::from(witness_vec.blobs_witness.clone());
+    let _ =
+        kailua_common::blobs::PreloadedBlobProvider::from(witgen_result.1.blobs_witness.clone());
 
     // check if we can prove this workload
-    let (main_witness_size, witness_size) = sum_witness_size(&witness_vec);
+    let (main_witness_size, witness_size) = sum_witness_size(&witgen_result.1);
     info!("Witness size: {witness_size} ({main_witness_size} main)");
     if witness_size > proving.max_witness_size {
         warn!(
@@ -119,13 +124,70 @@ where
         return Err(ProvingError::NotSeekingProof(witness_size, execution_trace));
     }
 
+    // collect input frames
     let (preloaded_frames, streamed_frames) =
-        encode_witness_frames(witness_vec).expect("Failed to encode VecOracle");
+        encode_witness_frames(witgen_result.1).expect("Failed to encode VecOracle");
+
+    #[cfg(feature = "eigen-da")]
+    let (eigen_da_frame, stitched_proofs) = {
+        use canoe_provider::CanoeProvider;
+        use kona_derive::prelude::ChainProvider;
+
+        // todo: compute canoe proof and append to eigen witness
+        let canoe_provider = canoe_steel_apps::apps::CanoeSteelProvider {
+            eth_rpc_url: l1_node_address.expect("l1-node-address is required for Canoe"),
+        };
+        // todo: concurrency via generic prover pool
+        let mut eigen_assumptions = Vec::new();
+        for (commitment, validity) in &mut witgen_result.2.validity {
+            if validity.canoe_proof.is_some() {
+                continue;
+            }
+            let mut provider = kona_proof::l1::OracleL1ChainProvider::new(
+                validity.l1_head_block_hash,
+                preimage_oracle.clone(),
+            );
+            let l1_head_block = provider
+                .header_by_hash(validity.l1_head_block_hash)
+                .await
+                .expect("Failed to get l1 head block for canoe");
+            // todo: call local/bonsai/boundless prover w/ receipt caching
+            let receipt = canoe_provider
+                .create_cert_validity_proof(canoe_provider::CanoeInput {
+                    altda_commitment: commitment.clone(),
+                    claimed_validity: validity.claimed_validity,
+                    l1_head_block_hash: validity.l1_head_block_hash,
+                    l1_head_block_number: l1_head_block.number,
+                    l1_chain_id: validity.l1_chain_id,
+                })
+                .await
+                .expect("Canoe proof creation failed");
+            // use manual recursion only when necessary
+            if matches!(receipt.inner, risc0_zkvm::InnerReceipt::Groth16(_)) {
+                validity.canoe_proof =
+                    Some(serde_json::to_vec(&receipt).expect("Canoe proof serialization failed"));
+            } else {
+                eigen_assumptions.push(receipt);
+            }
+        }
+
+        (
+            bincode::serialize(&witgen_result.2)
+                .expect("Failed to serialize EigenDABlobWitnessData"),
+            [stitched_proofs, eigen_assumptions].concat(),
+        )
+    };
     seek_fpvm_proof(
         &proving,
         boundless,
-        proof_journal,
-        [preloaded_frames, streamed_frames].concat(),
+        witgen_result.0,
+        [
+            #[cfg(feature = "eigen-da")]
+            vec![eigen_da_frame],
+            preloaded_frames,
+            streamed_frames,
+        ]
+        .concat(),
         stitched_proofs,
         prove_snark,
         skip_await_proof,

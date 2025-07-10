@@ -17,8 +17,10 @@ fmt:
 
 clippy:
   RISC0_SKIP_BUILD=true cargo clippy -F devnet --locked --workspace --all --all-targets -- -D warnings
+  RISC0_SKIP_BUILD=true cargo clippy -F eigen-da --locked --workspace --all --all-targets -- -D warnings
   RISC0_SKIP_BUILD=true cargo clippy --locked --workspace --all --all-targets -- -D warnings
 
+  cargo clippy --manifest-path build/risczero/fpvm/Cargo.toml -F eigen-da --locked --workspace --all --all-targets -- -D warnings
   cargo clippy --manifest-path build/risczero/fpvm/Cargo.toml --locked --workspace --all --all-targets -- -D warnings
 
 coverage:

@@ -1,3 +1,4 @@
+// Copyright 2024, 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,6 +26,9 @@ pub mod client;
 pub mod config;
 /// Implementation for an execution engine with caching support.
 pub mod executor;
+/// A module for eigen-da support
+#[cfg(feature = "eigen-da")]
+pub mod hokulea;
 /// A tightly packed representation for extended execution trace results.
 pub mod journal;
 /// A modified `kona_proof::l1::chain_provider` with caching support.
