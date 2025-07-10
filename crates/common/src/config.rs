@@ -18,6 +18,8 @@ use kona_genesis::{AltDAConfig, RollupConfig, SystemConfig};
 use risc0_zkvm::sha::{Impl as SHA2, Sha256};
 use std::fmt::Debug;
 
+pub const SAFE_DEFAULT_ADDRESS: Address = address!("4bfa59be6b388d77d213ce997acb0370b55157df");
+
 /// Returns a value based on the provided `Option` and a default value, with safety checks.
 ///
 /// This function takes an optional value `opt` and a default value `default`.
@@ -168,13 +170,10 @@ pub fn genesis_system_config_hash(system_config: &SystemConfig) -> anyhow::Resul
 /// - Returns an error if any of the fields of `AltDAConfig` fail to resolve to valid default or non-default values.
 pub fn alt_da_config_hash(alt_da_config: &AltDAConfig) -> anyhow::Result<[u8; 32]> {
     let fields = [
-        safe_default(
-            alt_da_config.da_challenge_address,
-            address!("0123456789abcdef0123456789abcdef00000000"),
-        )
-        .context("da_challenge_address")?
-        .0
-        .as_slice(),
+        safe_default(alt_da_config.da_challenge_address, SAFE_DEFAULT_ADDRESS)
+            .context("da_challenge_address")?
+            .0
+            .as_slice(),
         safe_default(alt_da_config.da_challenge_window, u64::MAX)
             .context("da_challenge_window")?
             .to_be_bytes()
@@ -322,23 +321,23 @@ pub fn config_hash(rollup_config: &RollupConfig) -> anyhow::Result<[u8; 32]> {
         // protocol_versions_address
         rollup_config.protocol_versions_address.0.as_slice(),
         // superchain_config_address
-        safe_default(rollup_config.superchain_config_address, Address::ZERO)
-            .context("superchain_config_address")?
-            .0
-            .as_slice(),
+        safe_default(
+            rollup_config.superchain_config_address,
+            SAFE_DEFAULT_ADDRESS,
+        )
+        .context("superchain_config_address")?
+        .0
+        .as_slice(),
         // blobs_enabled_l1_timestamp
         safe_default(rollup_config.blobs_enabled_l1_timestamp, u64::MAX)
             .context("blobs_enabled_l1_timestamp")?
             .to_be_bytes()
             .as_slice(),
         // da_challenge_address
-        safe_default(
-            rollup_config.da_challenge_address,
-            address!("0123456789abcdef0123456789abcdef00000000"),
-        )
-        .context("da_challenge_address")?
-        .0
-        .as_slice(),
+        safe_default(rollup_config.da_challenge_address, SAFE_DEFAULT_ADDRESS)
+            .context("da_challenge_address")?
+            .0
+            .as_slice(),
         // interop_message_expiry_window
         rollup_config
             .interop_message_expiry_window
@@ -768,7 +767,7 @@ mod tests {
         });
 
         test_safe_default_err(&rollup_config, |r| {
-            r.superchain_config_address = Some(Address::ZERO)
+            r.superchain_config_address = Some(SAFE_DEFAULT_ADDRESS)
         });
 
         test_safe_default_err(&rollup_config, |r| {
@@ -776,11 +775,11 @@ mod tests {
         });
 
         test_safe_default_err(&rollup_config, |r| {
-            r.da_challenge_address = Some(Address::ZERO)
+            r.da_challenge_address = Some(SAFE_DEFAULT_ADDRESS)
         });
 
         test_safe_default_err(&rollup_config, |r| {
-            r.alt_da_config.as_mut().unwrap().da_challenge_address = Some(Address::ZERO)
+            r.alt_da_config.as_mut().unwrap().da_challenge_address = Some(SAFE_DEFAULT_ADDRESS)
         });
 
         test_safe_default_err(&rollup_config, |r| {
