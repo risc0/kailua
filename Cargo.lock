@@ -1496,7 +1496,7 @@ dependencies = [
  "alloy-transport 0.14.0",
  "futures",
  "http 1.2.0",
- "rustls 0.23.23",
+ "rustls 0.23.29",
  "serde_json",
  "tokio",
  "tokio-tungstenite 0.26.1",
@@ -5970,7 +5970,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fa4f5daed39f982a1bb9d15449a28347490ad42b212f8eaa2a2a344a0dce9e9"
 dependencies = [
  "heck 0.5.0",
- "proc-macro-crate",
+ "proc-macro-crate 3.2.0",
  "proc-macro2",
  "quote",
  "syn 2.0.98",
@@ -6245,7 +6245,7 @@ dependencies = [
 name = "kailua-rpc"
 version = "1.0.2"
 dependencies = [
- "alloy",
+ "alloy 1.0.9",
  "anyhow",
  "async-trait",
  "clap",

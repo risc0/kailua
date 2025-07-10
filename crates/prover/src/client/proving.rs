@@ -180,11 +180,10 @@ where
                 eigen_assumptions.push(receipt);
             }
         }
-        let eigen_witness_frame = bincode::serialize(&witgen_result.2)
-            .expect("Failed to serialize EigenDABlobWitnessData");
 
         (
-            eigen_witness_frame,
+            bincode::serialize(&witgen_result.2)
+                .expect("Failed to serialize EigenDABlobWitnessData"),
             [stitched_proofs, eigen_assumptions].concat(),
         )
     };
