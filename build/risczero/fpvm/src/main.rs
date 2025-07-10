@@ -21,8 +21,10 @@ use rkyv::rancor::Error;
 fn main() {
     // Load eigen-da blob witness
     #[cfg(feature = "eigen-da")]
-    let eigen_da: hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData =
-        env::read_framed().expect("Failed to decode framed EigenDABlobWitnessData.");
+    let eigen_da: hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData = {
+        let data = env::read_frame();
+        bincode::deserialize(&data).expect("EigenDABlobWitnessData deserialization failed")
+    };
 
     // Load main witness
     let witness = {

@@ -2483,6 +2483,7 @@ dependencies = [
 name = "kailua-fpvm"
 version = "1.0.0"
 dependencies = [
+ "bincode",
  "blst",
  "c-kzg",
  "hokulea-proof",
