@@ -61,9 +61,9 @@ impl CanoeVerifier for KailuaCanoeVerifier {
 pub fn da_witness_precondition(
     eigen_da: &hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData,
 ) -> Option<(B256, u64, u64)> {
-    // Enforce strict length equality requirements
-    assert_eq!(eigen_da.blob.len(), eigen_da.validity.len());
-    assert_eq!(eigen_da.validity.len(), eigen_da.recency.len());
+    // Enforce sufficient data requirements
+    assert!(eigen_da.recency.len() >= eigen_da.validity.len());
+    assert!(eigen_da.validity.len() >= eigen_da.blob.len());
     // Enforce L1 chain consistency
     let (l1_head, l1_chain_id) = eigen_da
         .validity

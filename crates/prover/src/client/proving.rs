@@ -139,7 +139,7 @@ where
         encode_witness_frames(witgen_result.1).expect("Failed to encode VecOracle");
 
     #[cfg(feature = "eigen-da")]
-    let eigen_da_frame = {
+    let (eigen_da_frame, stitched_proofs) = {
         use canoe_provider::CanoeProvider;
         use kona_derive::prelude::ChainProvider;
 
@@ -148,6 +148,7 @@ where
             eth_rpc_url: l1_node_address.expect("l1-node-address is required for Canoe"),
         };
         // todo: concurrency via generic prover pool
+        let mut eigen_assumptions = Vec::new();
         for (commitment, validity) in &mut witgen_result.2.validity {
             if validity.canoe_proof.is_some() {
                 continue;
@@ -161,7 +162,7 @@ where
                 .await
                 .expect("Failed to get l1 head block for canoe");
             // todo: call local/bonsai/boundless prover w/ receipt caching
-            let proof = canoe_provider
+            let receipt = canoe_provider
                 .create_cert_validity_proof(canoe_provider::CanoeInput {
                     altda_commitment: commitment.clone(),
                     claimed_validity: validity.claimed_validity,
@@ -171,13 +172,20 @@ where
                 })
                 .await
                 .expect("Canoe proof creation failed");
-            validity.canoe_proof =
-                Some(serde_json::to_vec(&proof).expect("Canoe proof serialization failed"));
+            // use manual recursion only when necessary
+            if matches!(receipt.inner, risc0_zkvm::InnerReceipt::Groth16(_)) {
+                validity.canoe_proof =
+                    Some(serde_json::to_vec(&receipt).expect("Canoe proof serialization failed"));
+            } else {
+                eigen_assumptions.push(receipt);
+            }
         }
+        let eigen_witness_frame = bincode::serialize(&witgen_result.2)
+            .expect("Failed to serialize EigenDABlobWitnessData");
 
-        bytemuck::cast_vec(
-            risc0_zkvm::serde::to_vec(&witgen_result.2)
-                .expect("Failed to serialize EigenDABlobWitnessData"),
+        (
+            eigen_witness_frame,
+            [stitched_proofs, eigen_assumptions].concat(),
         )
     };
     seek_fpvm_proof(
