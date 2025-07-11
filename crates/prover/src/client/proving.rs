@@ -223,10 +223,14 @@ pub async fn seek_fpvm_proof(
 
     // Save proof file to disk
     let proof_journal = ProofJournal::decode_packed(proof.journal.as_ref());
-    save_to_bincoded_file(&proof, &proof_file_name(&proof_journal))
+    dbg!(&proof_journal);
+    let file_name = proof_file_name(&proof_journal);
+    dbg!(&file_name);
+    save_to_bincoded_file(&proof, &file_name)
         .await
         .context("save_to_bincoded_file")
         .map_err(ProvingError::OtherError)?;
+    info!("Saved proof to file {file_name}");
 
     Ok(())
 }

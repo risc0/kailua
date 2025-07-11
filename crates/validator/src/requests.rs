@@ -120,7 +120,9 @@ pub async fn handle_proof_requests(
             config_hash,
             fpvm_image_id,
         };
-        let proof_file_name = proof_file_name(&proof_journal);
+        dbg!(&proof_journal);
+        let file_name = proof_file_name(&proof_journal);
+        dbg!(&file_name);
         // Prepare proving args
         let (precondition_params, precondition_block_hashes, precondition_blob_hashes) =
             precondition_validation_data
@@ -186,7 +188,7 @@ pub async fn handle_proof_requests(
             .send(Task {
                 proposal_index,
                 prove_args,
-                proof_file_name,
+                proof_file_name: file_name,
             })
             .await
             .context("task channel closed")?;
