@@ -18,6 +18,7 @@ use anyhow::Context;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use kailua_common::config::config_hash;
 use kailua_contracts::SystemConfig;
+use kailua_prover::config::load_registry_config;
 use kailua_sync::provider::optimism::fetch_rollup_config;
 use kailua_sync::stall::Stall;
 use kailua_sync::telemetry::TelemetryArgs;
@@ -56,6 +57,15 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
     .context("fetch_rollup_config")?;
     debug!("{config:?}");
     let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
+
+    if let Some(registry_config) = load_registry_config(config.l2_chain_id) {
+        debug!("{registry_config:?}");
+        let registry_config_hash =
+            config_hash(&registry_config).expect("Registry config hash derivation error");
+        if rollup_config_hash != registry_config_hash {
+            eprintln!("FETCHED ROLLUP CONFIG DOES NOT MATCH REGISTRY ROLLUP CONFIG.");
+        }
+    }
 
     let eth_rpc_provider =
         ProviderBuilder::new().connect_http(args.eth_rpc_url.as_str().try_into()?);

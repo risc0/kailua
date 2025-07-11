@@ -28,20 +28,19 @@ pub async fn generate_rollup_config_file(
     Ok(match args.kona.read_rollup_config().ok() {
         Some(rollup_config) => rollup_config,
         None => {
-            let registry = Registry::from_chain_list();
             let tmp_cfg_file = tmp_dir.path().join("rollup-config.json");
             if let Some(rollup_config) = args.kona.l2_chain_id.and_then(|chain_id| {
-                if args.bypass_chain_registry {
+                if args.proving.bypass_chain_registry {
                     None
                 } else {
-                    registry.rollup_configs.get(&chain_id)
+                    load_registry_config(chain_id)
                 }
             }) {
                 info!(
                     "Loaded config for rollup with chain id {} from registry",
                     rollup_config.l2_chain_id
                 );
-                let ser_config = serde_json::to_string(rollup_config)?;
+                let ser_config = serde_json::to_string(&rollup_config)?;
                 fs::write(&tmp_cfg_file, &ser_config).await?;
             } else {
                 info!("Fetching rollup config from nodes.");
@@ -61,4 +60,9 @@ pub async fn generate_rollup_config_file(
             args.kona.read_rollup_config()?
         }
     })
+}
+
+pub fn load_registry_config(chain_id: u64) -> Option<RollupConfig> {
+    let registry = Registry::from_chain_list();
+    registry.rollup_configs.get(&chain_id).cloned()
 }

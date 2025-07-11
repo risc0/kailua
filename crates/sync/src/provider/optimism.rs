@@ -119,6 +119,9 @@ pub async fn fetch_rollup_config(
         "fjordTime",
         "graniteTime",
         "holoceneTime",
+        "isthmusTime",
+        "interopTime",
+        "pectraBlobScheduleTime",
     ] {
         if let Some(value) = chain_config[fork].as_str() {
             rollup_config[fork] = json!(value);

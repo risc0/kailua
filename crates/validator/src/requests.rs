@@ -120,9 +120,7 @@ pub async fn handle_proof_requests(
             config_hash,
             fpvm_image_id,
         };
-        dbg!(&proof_journal);
         let file_name = proof_file_name(&proof_journal);
-        dbg!(&file_name);
         // Prepare proving args
         let (precondition_params, precondition_block_hashes, precondition_blob_hashes) =
             precondition_validation_data
@@ -176,7 +174,6 @@ pub async fn handle_proof_requests(
                 ..args.proving.clone()
             },
             boundless: args.boundless.clone(),
-            bypass_chain_registry: false,
             precondition_params,
             precondition_block_hashes,
             precondition_blob_hashes,

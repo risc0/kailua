@@ -510,9 +510,7 @@ pub async fn compute_cached_proof(
         stitched_boot_info.clone(),
     );
     // Skip computation if previously saved to disk
-    dbg!(&proof_journal);
     let file_name = proof_file_name(&proof_journal);
-    dbg!(&file_name);
     if Path::new(&file_name).try_exists().is_ok_and(identity) && seek_proof {
         info!("Proving skipped. Proof file {file_name} already exists.");
     } else {

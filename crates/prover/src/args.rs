@@ -36,6 +36,9 @@ pub struct ProvingArgs {
     /// How many threads to use for computing proofs
     #[clap(long, env, default_value_t = 1)]
     pub num_concurrent_proofs: u64,
+    /// Whether to bypass loading rollup chain configurations from the kona registry
+    #[clap(long, env, default_value_t = false)]
+    pub bypass_chain_registry: bool,
 }
 
 /// The prover arguments
@@ -56,8 +59,6 @@ pub struct ProveArgs {
     pub proving: ProvingArgs,
     #[clap(flatten)]
     pub boundless: BoundlessArgs,
-    #[clap(long, env, default_value_t = false)]
-    pub bypass_chain_registry: bool,
 
     #[clap(long, env, value_delimiter = ',')]
     pub precondition_params: Vec<u64>,

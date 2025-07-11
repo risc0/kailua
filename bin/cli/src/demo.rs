@@ -78,6 +78,7 @@ pub async fn demo(args: DemoArgs, verbosity: u8, data_dir: PathBuf) -> anyhow::R
             provider: args.provider,
             kailua_game_implementation: None,
             kailua_anchor_address: None,
+            #[cfg(feature = "devnet")]
             delay_l2_blocks: 0,
             final_l2_block: None,
             data_dir: args.data_dir,
@@ -86,6 +87,7 @@ pub async fn demo(args: DemoArgs, verbosity: u8, data_dir: PathBuf) -> anyhow::R
         kailua_cli: args.kailua_cli,
         fast_forward_target: 0,
         num_concurrent_provers: args.num_concurrent_provers,
+        #[cfg(feature = "devnet")]
         l1_head_jump_back: 0,
         validator_signer: ValidatorSignerArgs {
             validator_key: Some(String::from(
