@@ -18,6 +18,7 @@ use std::path::PathBuf;
 
 pub mod bench;
 pub mod config;
+pub mod demo;
 pub mod fast_track;
 pub mod fault;
 
@@ -69,6 +70,12 @@ pub enum KailuaCli {
         #[clap(flatten)]
         cli: CliArgs,
     },
+    Demo {
+        #[clap(flatten)]
+        args: demo::DemoArgs,
+        #[clap(flatten)]
+        cli: CliArgs,
+    },
 }
 
 #[derive(clap::Args, Debug, Clone)]
@@ -87,6 +94,7 @@ impl KailuaCli {
             KailuaCli::Prove { cli, .. } => cli.v,
             KailuaCli::TestFault { cli, .. } => cli.v,
             KailuaCli::Benchmark { cli, .. } => cli.v,
+            KailuaCli::Demo { cli, .. } => cli.v,
         }
     }
 
@@ -95,6 +103,7 @@ impl KailuaCli {
             KailuaCli::Propose { args, .. } => args.sync.data_dir.clone(),
             KailuaCli::Validate { args, .. } => args.sync.data_dir.clone(),
             KailuaCli::Prove { args, .. } => args.kona.data_dir.clone(),
+            KailuaCli::Demo { args, .. } => args.data_dir.clone(),
             _ => None,
         }
     }
@@ -108,6 +117,7 @@ impl KailuaCli {
             KailuaCli::Prove { args, .. } => &args.telemetry,
             KailuaCli::TestFault { args, .. } => &args.propose_args.sync.telemetry,
             KailuaCli::Benchmark { args, .. } => &args.sync.telemetry,
+            KailuaCli::Demo { args, .. } => &args.telemetry,
         }
     }
 }

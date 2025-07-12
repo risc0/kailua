@@ -105,6 +105,17 @@ devnet-validate fastforward="0" target="debug" verbosity="" l1_rpc="http://127.0
 
 devnet-prove block_number block_count="1" target="debug" seq_window="50" verbosity="" data=".localtestdata": (prove block_number block_count "http://localhost:8545" "http://localhost:5052" "http://localhost:9545" "http://localhost:7545" data target seq_window verbosity)
 
+demo size l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data target="release" verbosity="":
+    ./target/{{target}}/kailua-cli demo \
+          --eth-rpc-url {{l1_rpc}} \
+          --beacon-rpc-url {{l1_beacon_rpc}} \
+          --op-geth-url {{l2_rpc}} \
+          --op-node-url {{rollup_node_rpc}} \
+          --data-dir {{data}} \
+          --num-blocks-per-proof {{size}} \
+          {{verbosity}}
+
+
 bench l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data start length range count target="release" verbosity="":
     ./target/{{target}}/kailua-cli benchmark \
           --eth-rpc-url {{l1_rpc}} \

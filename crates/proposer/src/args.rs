@@ -21,6 +21,10 @@ pub struct ProposeArgs {
     #[clap(flatten)]
     pub sync: SyncArgs,
 
+    /// Whether to bypass loading rollup chain configurations from the kona registry
+    #[clap(long, env, default_value_t = false)]
+    pub bypass_chain_registry: bool,
+
     /// L1 wallet to use for proposing outputs
     #[clap(flatten)]
     pub proposer_signer: ProposerSignerArgs,

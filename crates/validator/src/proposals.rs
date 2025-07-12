@@ -69,6 +69,7 @@ pub async fn handle_proposals(
         data_dir,
         args.sync.kailua_game_implementation,
         args.sync.kailua_anchor_address,
+        args.proving.bypass_chain_registry,
     )
     .await?;
     info!("KailuaTreasury({:?})", agent.deployment.treasury);

@@ -77,6 +77,7 @@ impl SyncAgent {
         mut data_dir: PathBuf,
         game_impl_address: Option<Address>,
         anchor_address: Option<Address>,
+        bypass_chain_registry: bool,
     ) -> anyhow::Result<Self> {
         let tracer = tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("SymcAgemt::new"));
@@ -94,7 +95,12 @@ impl SyncAgent {
         info!("Fetching rollup configuration from rpc endpoints.");
         let config = await_tel_res!(
             context,
-            fetch_rollup_config(&provider_args.op_node_url, &provider_args.op_geth_url, None),
+            fetch_rollup_config(
+                &provider_args.op_node_url,
+                &provider_args.op_geth_url,
+                None,
+                bypass_chain_registry
+            ),
             "fetch_rollup_config"
         )?;
         let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");

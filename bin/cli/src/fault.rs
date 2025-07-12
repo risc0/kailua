@@ -75,6 +75,7 @@ pub async fn fault(args: FaultArgs) -> anyhow::Result<()> {
             &args.propose_args.sync.provider.op_node_url,
             &args.propose_args.sync.provider.op_geth_url,
             None,
+            args.propose_args.bypass_chain_registry
         )
     )
     .context("fetch_rollup_config")?;

@@ -5127,6 +5127,7 @@ dependencies = [
  "kailua-common",
  "kailua-contracts",
  "kona-genesis",
+ "kona-registry",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",

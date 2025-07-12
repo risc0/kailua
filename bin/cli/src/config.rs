@@ -19,6 +19,7 @@ use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use kailua_common::config::config_hash;
 use kailua_contracts::SystemConfig;
 use kailua_sync::provider::optimism::fetch_rollup_config;
+use kailua_sync::provider::optimism::load_registry_config;
 use kailua_sync::stall::Stall;
 use kailua_sync::telemetry::TelemetryArgs;
 use kailua_sync::{await_tel, KAILUA_GAME_TYPE};
@@ -40,6 +41,9 @@ pub struct ConfigArgs {
     /// Address of the ethereum rpc endpoint to use (eth namespace required)
     #[clap(long, env)]
     pub eth_rpc_url: String,
+    /// Whether to bypass loading rollup chain configurations from the kona registry
+    #[clap(long, env, default_value_t = false)]
+    pub bypass_chain_registry: bool,
 
     #[clap(flatten)]
     pub telemetry: TelemetryArgs,
@@ -51,26 +55,25 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
 
     let config = await_tel!(
         context,
-        fetch_rollup_config(&args.op_node_url, &args.op_geth_url, None)
+        fetch_rollup_config(
+            &args.op_node_url,
+            &args.op_geth_url,
+            None,
+            args.bypass_chain_registry
+        )
     )
     .context("fetch_rollup_config")?;
     debug!("{config:?}");
     let rollup_config_hash = config_hash(&config).expect("Configuration hash derivation error");
 
-    let eth_rpc_provider =
-        ProviderBuilder::new().connect_http(args.eth_rpc_url.as_str().try_into()?);
-    // load system config
-    let system_config = SystemConfig::new(config.l1_system_config_address, &eth_rpc_provider);
-    let portal_address = system_config
-        .optimismPortal()
-        .stall_with_context(context.clone(), "SystemConfig::optimismPortal")
-        .await
-        .0;
-    let dgf_address = system_config
-        .disputeGameFactory()
-        .stall_with_context(context.clone(), "SystemConfig::disputeGameFactory")
-        .await
-        .0;
+    if let Some(registry_config) = load_registry_config(config.l2_chain_id) {
+        debug!("{registry_config:?}");
+        let registry_config_hash =
+            config_hash(&registry_config).expect("Registry config hash derivation error");
+        if rollup_config_hash != registry_config_hash {
+            eprintln!("LOADED ROLLUP CONFIG DOES NOT MATCH REGISTRY ROLLUP CONFIG.");
+        }
+    }
 
     // report risc0 version
     println!("RISC0_VERSION: {}", risc0_zkvm::get_version()?);
@@ -142,6 +145,23 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
         "ROLLUP_CONFIG_HASH: 0x{}",
         hex::encode_upper(rollup_config_hash)
     );
+    // load system config
+    let eth_rpc_provider =
+        ProviderBuilder::new().connect_http(args.eth_rpc_url.as_str().try_into()?);
+    let system_config = SystemConfig::new(config.l1_system_config_address, &eth_rpc_provider);
+    debug!("{system_config:?}");
+    let portal_address = system_config
+        .optimismPortal()
+        .stall_with_context(context.clone(), "SystemConfig::optimismPortal")
+        .await
+        .0;
+    debug!("{portal_address}");
+    let dgf_address = system_config
+        .disputeGameFactory()
+        .stall_with_context(context.clone(), "SystemConfig::disputeGameFactory")
+        .await
+        .0;
+    debug!("{dgf_address}");
     // report factory address
     println!(
         "DISPUTE_GAME_FACTORY: 0x{}",

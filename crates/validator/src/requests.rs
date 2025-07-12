@@ -56,7 +56,8 @@ pub async fn handle_proof_requests(
         fetch_rollup_config(
             &args.sync.provider.op_node_url,
             &args.sync.provider.op_geth_url,
-            None
+            None,
+            args.proving.bypass_chain_registry
         )
     )
     .context("fetch_rollup_config")?;
@@ -120,7 +121,7 @@ pub async fn handle_proof_requests(
             config_hash,
             fpvm_image_id,
         };
-        let proof_file_name = proof_file_name(&proof_journal);
+        let file_name = proof_file_name(&proof_journal);
         // Prepare proving args
         let (precondition_params, precondition_block_hashes, precondition_blob_hashes) =
             precondition_validation_data
@@ -174,7 +175,6 @@ pub async fn handle_proof_requests(
                 ..args.proving.clone()
             },
             boundless: args.boundless.clone(),
-            bypass_chain_registry: false,
             precondition_params,
             precondition_block_hashes,
             precondition_blob_hashes,
@@ -186,7 +186,7 @@ pub async fn handle_proof_requests(
             .send(Task {
                 proposal_index,
                 prove_args,
-                proof_file_name,
+                proof_file_name: file_name,
             })
             .await
             .context("task channel closed")?;

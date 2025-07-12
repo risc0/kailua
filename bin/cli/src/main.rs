@@ -65,6 +65,9 @@ async fn main() -> anyhow::Result<()> {
         KailuaCli::Benchmark { args, cli } => {
             await_tel!(context, kailua_cli::bench::benchmark(args, cli.v))
         }
+        KailuaCli::Demo { args, cli } => {
+            await_tel!(context, kailua_cli::demo::demo(args, cli.v, data_dir))
+        }
     };
 
     let span = context.span();
