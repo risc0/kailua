@@ -62,6 +62,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         data_dir,
         args.sync.kailua_game_implementation,
         args.sync.kailua_anchor_address,
+        args.bypass_chain_registry,
     )
     .await?;
     info!("KailuaTreasury({:?})", agent.deployment.treasury);

@@ -43,6 +43,7 @@ kailua-common.workspace = true
 kailua-contracts.workspace = true
 
 kona-genesis.workspace = true
+kona-registry.workspace = true
 
 [features]
 devnet = []

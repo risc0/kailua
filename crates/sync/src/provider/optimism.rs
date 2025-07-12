@@ -17,13 +17,13 @@ use alloy::primitives::B256;
 use alloy::providers::{Provider, ProviderBuilder, RootProvider};
 use anyhow::Context;
 use kona_genesis::RollupConfig;
+use kona_registry::Registry;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use serde_json::{json, Value};
-use std::path::PathBuf;
 use std::str::FromStr;
-use tokio::fs;
-use tracing::debug;
+use tracing::log::warn;
+use tracing::{debug, info};
 
 #[derive(Clone)]
 pub struct OpNodeProvider(pub RootProvider);
@@ -82,10 +82,28 @@ impl OpNodeProvider {
 pub async fn fetch_rollup_config(
     op_node_address: &str,
     l2_node_address: &str,
-    json_file_path: Option<&PathBuf>,
+    chain_id: Option<u64>,
+    bypass_chain_registry: bool,
 ) -> anyhow::Result<RollupConfig> {
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("fetch_rollup_config"));
+
+    // warn about bypassing chain registry
+    if bypass_chain_registry {
+        warn!("Bypassing registered rollup config in kona-registry crate.");
+    }
+
+    // if we have an l2 chain id and we can find it in the registry, return it if preferable
+    if let Some(chain_config) = (!bypass_chain_registry)
+        .then(|| chain_id.and_then(load_registry_config))
+        .flatten()
+    {
+        info!(
+            "Loaded config for rollup with chain id {} from registry",
+            chain_config.l2_chain_id
+        );
+        return Ok(chain_config);
+    }
 
     let op_node_provider = OpNodeProvider(RootProvider::new_http(op_node_address.try_into()?));
     let l2_node_provider = ProviderBuilder::new().connect_http(l2_node_address.try_into()?);
@@ -98,6 +116,23 @@ pub async fn fetch_rollup_config(
 
     debug!("Rollup config: {:?}", rollup_config);
 
+    // if we prefer the registry config, return it if available
+    if let Some(chain_config) = (!bypass_chain_registry)
+        .then(|| {
+            rollup_config["l2_chain_id"]
+                .as_u64()
+                .and_then(load_registry_config)
+        })
+        .flatten()
+    {
+        info!(
+            "Loaded config for rollup with chain id {} from registry",
+            chain_config.l2_chain_id
+        );
+        return Ok(chain_config);
+    }
+
+    // load chain config for fork info
     let chain_config: Value =
         l2_node_provider
             .client()
@@ -128,11 +163,10 @@ pub async fn fetch_rollup_config(
         }
     }
 
-    // export
-    let ser_config = serde_json::to_string(&rollup_config)?;
-    if let Some(json_file_path) = json_file_path {
-        fs::write(json_file_path, &ser_config).await?;
-    }
+    Ok(serde_json::from_value(rollup_config)?)
+}
 
-    Ok(serde_json::from_str(&ser_config)?)
+pub fn load_registry_config(chain_id: u64) -> Option<RollupConfig> {
+    let registry = Registry::from_chain_list();
+    registry.rollup_configs.get(&chain_id).cloned()
 }

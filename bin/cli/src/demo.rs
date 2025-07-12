@@ -31,7 +31,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tokio::time::sleep;
 use tokio::{spawn, try_join};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct DemoArgs {
@@ -67,6 +67,8 @@ pub struct DemoArgs {
 pub async fn demo(args: DemoArgs, verbosity: u8, data_dir: PathBuf) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("demo"));
+
+    debug!("{args:?}");
 
     let channel_pair = DuplexChannel::new_pair(4096);
 

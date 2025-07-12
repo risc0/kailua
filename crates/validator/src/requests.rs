@@ -56,7 +56,8 @@ pub async fn handle_proof_requests(
         fetch_rollup_config(
             &args.sync.provider.op_node_url,
             &args.sync.provider.op_geth_url,
-            None
+            None,
+            args.proving.bypass_chain_registry
         )
     )
     .context("fetch_rollup_config")?;

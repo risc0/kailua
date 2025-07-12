@@ -46,6 +46,9 @@ pub struct FastTrackArgs {
     /// Address of the ethereum rpc endpoint to use (eth namespace required)
     #[clap(long, env)]
     pub eth_rpc_url: String,
+    /// Whether to bypass loading rollup chain configurations from the kona registry
+    #[clap(long, env, default_value_t = false)]
+    pub bypass_chain_registry: bool,
 
     /// Transaction publication configuration
     #[clap(flatten)]
@@ -110,7 +113,12 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     // fetch rollup config
     let config = await_tel!(
         context,
-        fetch_rollup_config(&args.op_node_url, &args.op_geth_url, None)
+        fetch_rollup_config(
+            &args.op_node_url,
+            &args.op_geth_url,
+            None,
+            args.bypass_chain_registry
+        )
     )
     .context("fetch_rollup_config")?;
     let rollup_config_hash = config_hash(&config).context("config_hash")?;

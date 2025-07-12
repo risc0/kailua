@@ -90,6 +90,7 @@ async fn deploy_kailua_contracts(challenge_timeout: u64) -> anyhow::Result<()> {
         vanguard_advantage: Some(60),
         respect_kailua_proposals: true,
         telemetry: Default::default(),
+        bypass_chain_registry: false,
     })
     .await?;
     println!("Kailua contracts installed");
@@ -178,6 +179,7 @@ async fn proposer_validator() {
     propose(
         ProposeArgs {
             sync: sync.clone(),
+            bypass_chain_registry: false,
             proposer_signer: proposer_signer.clone(),
             txn_args: txn_args.clone(),
         },
@@ -187,7 +189,7 @@ async fn proposer_validator() {
     .unwrap();
 
     // wait until block 75 is available
-    let mut agent = SyncAgent::new(&sync.provider, proposer_data_dir.clone(), None, None)
+    let mut agent = SyncAgent::new(&sync.provider, proposer_data_dir.clone(), None, None, false)
         .await
         .unwrap();
     loop {
@@ -206,6 +208,7 @@ async fn proposer_validator() {
     fault(FaultArgs {
         propose_args: ProposeArgs {
             sync: sync.clone(),
+            bypass_chain_registry: false,
             proposer_signer: ProposerSignerArgs::from(
                 "0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356".to_string(),
             ),
@@ -221,6 +224,7 @@ async fn proposer_validator() {
     fault(FaultArgs {
         propose_args: ProposeArgs {
             sync: sync.clone(),
+            bypass_chain_registry: false,
             proposer_signer: ProposerSignerArgs::from(
                 "0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97".to_string(),
             ),
@@ -270,6 +274,7 @@ async fn proposer_validator() {
     let proposer_handle = tokio::task::spawn(propose(
         ProposeArgs {
             sync: sync.clone(),
+            bypass_chain_registry: false,
             proposer_signer: proposer_signer.clone(),
             txn_args: txn_args.clone(),
         },
@@ -315,6 +320,7 @@ async fn proposer_validator() {
     let proposer_handle = tokio::task::spawn(propose(
         ProposeArgs {
             sync: sync.clone(),
+            bypass_chain_registry: false,
             proposer_signer: proposer_signer.clone(),
             txn_args: txn_args.clone(),
         },
@@ -333,7 +339,6 @@ async fn proposer_validator() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn prover() {
-    // todo: set to 200
     const PROOF_SIZE: u64 = 200;
 
     // We can only run one of these dockerized devnets at a time
@@ -365,7 +370,7 @@ async fn prover() {
 
     // Wait for 200 blocks to be provable
     println!("Waiting for l2 block #{PROOF_SIZE} to be safe.");
-    let mut agent = SyncAgent::new(&sync.provider, data_dir.clone(), None, None)
+    let mut agent = SyncAgent::new(&sync.provider, data_dir.clone(), None, None, false)
         .await
         .unwrap();
     loop {
