@@ -450,7 +450,7 @@ pub async fn run_boundless_client(
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
 
     // Upload input
-    info!("Uploading input data.");
+    info!("Uploading input data ({} bytes).", input.len());
     let input_url = boundless_client
         .upload_input(&input)
         .await
