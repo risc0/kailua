@@ -70,6 +70,8 @@ pub async fn demo(args: DemoArgs, verbosity: u8, data_dir: PathBuf) -> anyhow::R
 
     debug!("{args:?}");
 
+    // todo: update versioning to 1.0.1
+
     let channel_pair = DuplexChannel::new_pair(4096);
 
     let handle_blocks =

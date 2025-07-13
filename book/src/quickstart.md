@@ -13,6 +13,16 @@ Optimism's Bedrock contracts `v1.4.0` and above.
 4. [svm](https://github.com/alloy-rs/svm-rs)
 5. [foundry](https://book.getfoundry.sh/getting-started/installation)
 
+## Live Chain
+
+You can test out Kailua's validity proving on a running chain through the following commands:
+
+1. `just build`
+   * Compiles a release build of Kailua
+2. `just demo [BLOCKS_PER_PROOF] [L1_RPC] [BEACON_RPC] [L2_RPC] [OP_NODE_RPC]:`
+   * Runs the release build against the target chain endpoints.
+   * See [here](validator.md#delegated-proof-generation) for advanced proving configuration
+
 ## Local Devnet
 
 You can deploy a local optimism devnet equipped with Kailua through the following commands:

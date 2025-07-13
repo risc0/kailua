@@ -514,7 +514,7 @@ pub async fn compute_cached_proof(
     if Path::new(&file_name).try_exists().is_ok_and(identity) && seek_proof {
         info!("Proving skipped. Proof file {file_name} already exists.");
     } else {
-        info!("Computing uncached proof.");
+        info!("Computing uncached proof {file_name}.");
 
         // generate a proof using the kailua client and kona server
         crate::client::native::run_native_client(
