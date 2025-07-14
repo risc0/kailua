@@ -265,6 +265,21 @@ Optimism's Bedrock contracts <code>v1.4.0</code> and above.</p>
 <li><a href="https://github.com/alloy-rs/svm-rs">svm</a></li>
 <li><a href="https://book.getfoundry.sh/getting-started/installation">foundry</a></li>
 </ol>
+<h2 id="live-chain"><a class="header" href="#live-chain">Live Chain</a></h2>
+<p>You can test out Kailua's validity proving on a running chain through the following commands:</p>
+<ol>
+<li><code>just build</code>
+<ul>
+<li>Compiles a release build of Kailua</li>
+</ul>
+</li>
+<li><code>just demo [BLOCKS_PER_PROOF] [L1_RPC] [BEACON_RPC] [L2_RPC] [OP_NODE_RPC]:</code>
+<ul>
+<li>Runs the release build against the target chain endpoints.</li>
+<li>See <a href="validator.html#delegated-proof-generation">here</a> for advanced proving configuration</li>
+</ul>
+</li>
+</ol>
 <h2 id="local-devnet"><a class="header" href="#local-devnet">Local Devnet</a></h2>
 <p>You can deploy a local optimism devnet equipped with Kailua through the following commands:</p>
 <ol>
@@ -422,23 +437,26 @@ The timeout period for <code>E</code> had passed before <code>E'</code> was intr
 <p>Kailua's project structure is primarily as follows:</p>
 <pre><code>kailua                      // Root project directory
 ├── bin                     
-│   ├── cli                 // Main Kailua CLI
-│   ├── client              // FPVM Client
-│   └── host                // FPVM Host
+│   └── cli                 // Main Kailua CLI
 ├── book                    // This document
 ├── build                   
 │   └── risczero            // RISC Zero zkVM proving backend
 ├── crates                  
 │   ├── common              // Fault proving primitives
-│   └── contracts           // Fault proof contracts
+│   ├── contracts           // Fault proof contracts
+│   ├── proposer            // Sequencing proposal submitter
+│   ├── prover              // Proof generation orcherstrator
+│   ├── sync                // Sequencing proposal tracker
+│   └── validator           // Sequencing proposal validator
 ├── justfile                // Convenience commands
 └── testdata
     └── 16491249            // Example FPVM test data for op-sepolia block
 </code></pre>
 <h2 id="cli"><a class="header" href="#cli">CLI</a></h2>
-<p>The CLI for Kailua is designed to support six commands:</p>
+<p>The CLI for Kailua is designed to support seven commands:</p>
 <ul>
 <li><code>config</code>: Outputs configuration information required for migration.</li>
+<li><code>demo</code>: Automatically generate validity proofs for any running L2 chain.</li>
 <li><code>fast-track</code>: Automatically upgrades an existing rollup deployment to utilize Kailua for fault proving.</li>
 <li><code>propose</code>: Monitor a rollup for sequencing state and publish proposals on-chain (akin to op-proposer).</li>
 <li><code>validate</code>: Monitor a rollup for disputes and publish the necessary FPVM proofs for resolution.</li>
@@ -458,10 +476,9 @@ The timeout period for <code>E</code> had passed before <code>E'</code> was intr
 <p>The Kailua FPVM executes Optimism's <code>Kona</code> inside the RISC Zero zkVM to derive and execute optimism blocks and create fault proofs.
 The following project components work together to enable this functionality:</p>
 <ul>
-<li><code>bin/host</code>: A modified version of <code>Kona</code>'s host binary, which acts as an oracle for the witness data required to create a fault proof.</li>
-<li><code>bin/client</code>: A modified version of <code>Kona</code>'s client binary, which executes the <code>fpvm</code> while querying the host for the necessary chain data.</li>
 <li><code>build/risczero/fpvm</code>: The zkVM binary to create ZK fault proofs with <code>Kona</code>.</li>
 <li><code>crates/common</code>: A wrapper crate around <code>Kona</code> with utilities for efficient ZK fault proving.</li>
+<li><code>crates/prover</code>: An orchestrator for proof generation locally, remotely on Bonsai, or through Boundless.</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="setup"><a class="header" href="#setup">Setup</a></h1>
 <p>Make sure to first install the <a href="quickstart.html#prerequisites">prerequisites</a> from the quickstart
