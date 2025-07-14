@@ -164,7 +164,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
             .await;
         if latest_game_impl_addr != agent.deployment.game {
-            warn!("Not proposing. Implementation {} outdated. Found new implementation {latest_game_impl_addr}.", agent.deployment.game);
+            warn!("Not proposing. Deployment {} outdated. Found new deployment {latest_game_impl_addr}.", agent.deployment.game);
             continue;
         }
 

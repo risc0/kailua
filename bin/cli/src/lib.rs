@@ -21,6 +21,7 @@ pub mod config;
 pub mod demo;
 pub mod fast_track;
 pub mod fault;
+pub mod track;
 
 #[derive(clap::Parser, Debug, Clone)]
 #[command(name = "kailua-cli")]
@@ -76,6 +77,12 @@ pub enum KailuaCli {
         #[clap(flatten)]
         cli: CliArgs,
     },
+    Track {
+        #[clap(flatten)]
+        args: track::TrackArgs,
+        #[clap(flatten)]
+        cli: CliArgs,
+    },
 }
 
 #[derive(clap::Args, Debug, Clone)]
@@ -95,6 +102,7 @@ impl KailuaCli {
             KailuaCli::TestFault { cli, .. } => cli.v,
             KailuaCli::Benchmark { cli, .. } => cli.v,
             KailuaCli::Demo { cli, .. } => cli.v,
+            KailuaCli::Track { cli, .. } => cli.v,
         }
     }
 
@@ -104,6 +112,7 @@ impl KailuaCli {
             KailuaCli::Validate { args, .. } => args.sync.data_dir.clone(),
             KailuaCli::Prove { args, .. } => args.kona.data_dir.clone(),
             KailuaCli::Demo { args, .. } => args.data_dir.clone(),
+            KailuaCli::Track { args, .. } => args.sync.data_dir.clone(),
             _ => None,
         }
     }
@@ -118,6 +127,7 @@ impl KailuaCli {
             KailuaCli::TestFault { args, .. } => &args.propose_args.sync.telemetry,
             KailuaCli::Benchmark { args, .. } => &args.sync.telemetry,
             KailuaCli::Demo { args, .. } => &args.telemetry,
+            KailuaCli::Track { args, .. } => &args.sync.telemetry,
         }
     }
 }
