@@ -115,8 +115,8 @@ demo size l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data=".localtestdata" targ
           --num-blocks-per-proof {{size}} \
           {{verbosity}}
 
-track l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data=".localtestdata" target="release" verbosity="":
-    ./target/{{target}}/kailua-cli track \
+rpc l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data=".localtestdata" target="release" verbosity="":
+    ./target/{{target}}/kailua-cli rpc \
           --eth-rpc-url {{l1_rpc}} \
           --beacon-rpc-url {{l1_beacon_rpc}} \
           --op-geth-url {{l2_rpc}} \

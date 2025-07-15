@@ -12,7 +12,9 @@ categories.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+async-trait.workspace = true
 clap.workspace = true
+jsonrpsee.workspace = true
 tokio.workspace = true
 tokio-retry.workspace = true
 

@@ -12,111 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::api::KailuaServerCache;
 use crate::args::RpcArgs;
+use crate::{api, sync};
 use anyhow::Context;
-use kailua_contracts::*;
-use kailua_sync::agent::{SyncAgent, FINAL_L2_BLOCK_RESOLVED};
-use kailua_sync::stall::Stall;
-use kailua_sync::{await_tel, KAILUA_GAME_TYPE};
 use opentelemetry::global::tracer;
-use opentelemetry::trace::FutureExt;
-use opentelemetry::trace::{TraceContextExt, Tracer};
+use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use std::path::PathBuf;
-use std::time::Duration;
-use tokio::time::sleep;
-use tracing::{error, info, warn};
+use tokio::{spawn, try_join};
 
 pub async fn rpc(args: RpcArgs, data_dir: PathBuf) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
-    let context = opentelemetry::Context::current_with_span(tracer.start("sync"));
+    let context = opentelemetry::Context::current_with_span(tracer.start("rpc"));
 
-    // todo: auto update deployment
-    // check dgf for set implementation events
-    // order by their game index
+    let server_cache: KailuaServerCache = Default::default();
 
-    // initialize sync agent
-    let mut agent = SyncAgent::new(
-        &args.sync.provider,
-        data_dir,
-        args.sync.kailua_game_implementation,
-        args.sync.kailua_anchor_address,
-        args.bypass_chain_registry,
-    )
-    .await?;
-    info!("KailuaTreasury({:?})", agent.deployment.treasury);
+    let handle_sync = spawn(
+        sync::handle_sync(args.clone(), data_dir.clone(), server_cache.clone())
+            .with_context(context.clone()),
+    );
+    let handle_requests = spawn(
+        api::handle_requests(args.clone(), server_cache.clone()).with_context(context.clone()),
+    );
 
-    // Check if deployment is still valid
-    let dispute_game_factory =
-        IDisputeGameFactory::new(agent.deployment.factory, &agent.provider.l1_provider);
-    let latest_game_impl_addr = dispute_game_factory
-        .gameImpls(KAILUA_GAME_TYPE)
-        .stall_with_context(context.clone(), "DisputeGameFactory::gameImpls")
-        .await;
-    if latest_game_impl_addr != agent.deployment.game {
-        warn!(
-            "Deployment {} outdated. Found new deployment {latest_game_impl_addr}.",
-            agent.deployment.game
-        );
-    }
+    let (sync_task, requests_task) = try_join!(handle_sync, handle_requests)?;
+    sync_task.context("handle_sync")?;
+    requests_task.context("handle_requests")?;
 
-    loop {
-        // Wait for new data on every iteration
-        sleep(Duration::from_secs(1)).await;
-        // fetch latest games
-        let loaded_proposals = match await_tel!(
-            context,
-            agent.sync(
-                #[cfg(feature = "devnet")]
-                args.sync.delay_l2_blocks,
-                args.sync.final_l2_block
-            )
-        )
-        .context("SyncAgent::sync")
-        {
-            Ok(result) => result,
-            Err(err) => {
-                if err
-                    .root_cause()
-                    .to_string()
-                    .contains(FINAL_L2_BLOCK_RESOLVED)
-                {
-                    warn!("handle_proposals terminated");
-                    return Ok(());
-                }
-                error!("Synchronization error: {err:?}");
-                vec![]
-            }
-        };
-
-        for proposal_index in loaded_proposals {
-            // Load proposal from db
-            let Some(proposal) = agent.proposals.get(&proposal_index) else {
-                error!("Proposal {proposal_index} missing from database.");
-                continue;
-            };
-            // Ignore non-canonical proposals that will never be resolved
-            if !proposal.canonical.unwrap_or_default() {
-                warn!(
-                    "Ignoring non-canonical proposal {proposal_index} at {}",
-                    proposal.contract
-                );
-                continue;
-            }
-            // Check termination condition
-            if let Some(final_l2_block) = args.sync.final_l2_block {
-                if proposal.output_block_number >= final_l2_block {
-                    warn!(
-                        "Dropping proposal {} with output height {} past final l2 block {}.",
-                        proposal.index, proposal.output_block_number, final_l2_block
-                    );
-                    continue;
-                }
-            }
-            // Print proposal index/address/height/output to stdout
-            println!(
-                "TRACKED\t{proposal_index}\t{}\t{}\t{}",
-                proposal.contract, proposal.output_block_number, proposal.output_root
-            );
-        }
-    }
+    Ok(())
 }

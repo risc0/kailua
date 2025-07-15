@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use kailua_sync::args::SyncArgs;
+use std::net::SocketAddr;
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct RpcArgs {
@@ -21,4 +22,6 @@ pub struct RpcArgs {
     /// Whether to bypass loading rollup chain configurations from the kona registry
     #[clap(long, env, default_value_t = false)]
     pub bypass_chain_registry: bool,
+    /// Socket for http and ws connections. (default: 127.0.0.1:1337).
+    pub rpc_socket: Option<SocketAddr>,
 }
