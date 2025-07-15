@@ -14,5 +14,6 @@
 
 pub mod api;
 pub mod args;
+pub mod requests;
 pub mod rpc;
 pub mod sync;

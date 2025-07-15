@@ -22,6 +22,12 @@ pub struct RpcArgs {
     /// Whether to bypass loading rollup chain configurations from the kona registry
     #[clap(long, env, default_value_t = false)]
     pub bypass_chain_registry: bool,
-    /// Socket for http and ws connections. (default: 127.0.0.1:1337).
-    pub rpc_socket: Option<SocketAddr>,
+    /// Socket for http or ws connections. (default: 127.0.0.1:1337).
+    pub socket_addr: Option<SocketAddr>,
+    /// Disables listening for RPC requests over HTTP
+    #[clap(long, env, default_value_t = false)]
+    pub disable_http: bool,
+    /// Disables listening for RPC requests over WS
+    #[clap(long, env, default_value_t = false)]
+    pub disable_ws: bool,
 }

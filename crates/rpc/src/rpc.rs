@@ -14,7 +14,7 @@
 
 use crate::api::KailuaServerCache;
 use crate::args::RpcArgs;
-use crate::{api, sync};
+use crate::{requests, sync};
 use anyhow::Context;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
@@ -32,7 +32,7 @@ pub async fn rpc(args: RpcArgs, data_dir: PathBuf) -> anyhow::Result<()> {
             .with_context(context.clone()),
     );
     let handle_requests = spawn(
-        api::handle_requests(args.clone(), server_cache.clone()).with_context(context.clone()),
+        requests::handle_requests(args.clone(), server_cache.clone()).with_context(context.clone()),
     );
 
     let (sync_task, requests_task) = try_join!(handle_sync, handle_requests)?;

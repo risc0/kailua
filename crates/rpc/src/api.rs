@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::args::RpcArgs;
 use alloy::primitives::Address;
 use jsonrpsee::core::{async_trait, RpcResult};
 use jsonrpsee::proc_macros::rpc;
 use std::collections::BTreeMap;
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::trace;
@@ -47,21 +45,4 @@ impl KailuaApiServer for KailuaApiHandler {
             .next()
             .map(|(_, addr)| *addr))
     }
-}
-
-pub async fn handle_requests(args: RpcArgs, cache: KailuaServerCache) -> anyhow::Result<()> {
-    let kailua_api_handler = KailuaApiHandler { cache }.into_rpc();
-
-    let rpc_server = jsonrpsee::server::Server::builder()
-        .build(
-            args.rpc_socket
-                .unwrap_or(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 1337))),
-        )
-        .await
-        .expect("RPC Server creation failed");
-
-    // run until stopped
-    rpc_server.start(kailua_api_handler).stopped().await;
-
-    Ok(())
 }
