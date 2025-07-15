@@ -35,6 +35,7 @@ hex = "0.4.3"
 human_bytes = "0.4.3"
 itertools = "0.14.0"
 lazy_static = "1.5.0"
+jsonrpsee = { version = "0.25.1", features = ["full"] }
 paste = "1.0.15"
 pot = "3.0.1"
 rayon = "1.10.0"
@@ -78,6 +79,7 @@ kailua-common = { path = "crates/common" }
 kailua-contracts = { path = "crates/contracts" }
 kailua-proposer = { path = "crates/proposer" }
 kailua-prover = { path = "crates/prover" }
+kailua-rpc = { path = "crates/rpc" }
 kailua-sync = { path = "crates/sync" }
 kailua-validator = { path = "crates/validator" }
 

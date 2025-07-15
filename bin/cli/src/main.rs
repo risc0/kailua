@@ -68,8 +68,8 @@ async fn main() -> anyhow::Result<()> {
         KailuaCli::Demo { args, cli } => {
             await_tel!(context, kailua_cli::demo::demo(args, cli.v, data_dir))
         }
-        KailuaCli::Track { args, .. } => {
-            await_tel!(context, kailua_cli::track::track(args, data_dir))
+        KailuaCli::Rpc { args, .. } => {
+            await_tel!(context, kailua_rpc::rpc::rpc(args, data_dir))
         }
     };
 

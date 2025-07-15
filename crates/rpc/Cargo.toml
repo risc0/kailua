@@ -1,0 +1,34 @@
+[package]
+name = "kailua-rpc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+tokio.workspace = true
+tokio-retry.workspace = true
+
+alloy = { workspace = true, features = ["full", "kzg", "signer-aws", "signer-gcp"] }
+
+opentelemetry.workspace = true
+tracing.workspace = true
+
+kailua-contracts.workspace = true
+kailua-sync.workspace = true
+
+
+[features]
+devnet = [
+    "kailua-sync/devnet"
+]
+rebuild-fpvm = [
+    "kailua-sync/rebuild-fpvm"
+]

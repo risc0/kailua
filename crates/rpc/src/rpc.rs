@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::args::RpcArgs;
 use anyhow::Context;
 use kailua_contracts::*;
 use kailua_sync::agent::{SyncAgent, FINAL_L2_BLOCK_RESOLVED};
-use kailua_sync::args::SyncArgs;
 use kailua_sync::stall::Stall;
 use kailua_sync::{await_tel, KAILUA_GAME_TYPE};
 use opentelemetry::global::tracer;
@@ -26,16 +26,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
-#[derive(clap::Args, Debug, Clone)]
-pub struct TrackArgs {
-    #[clap(flatten)]
-    pub sync: SyncArgs,
-    /// Whether to bypass loading rollup chain configurations from the kona registry
-    #[clap(long, env, default_value_t = false)]
-    pub bypass_chain_registry: bool,
-}
-
-pub async fn track(args: TrackArgs, data_dir: PathBuf) -> anyhow::Result<()> {
+pub async fn rpc(args: RpcArgs, data_dir: PathBuf) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("sync"));
 
