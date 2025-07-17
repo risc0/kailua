@@ -103,11 +103,11 @@ bonsai-sdk = { version = "1.4.0", features = ["non_blocking"] }
 # RISC Zero
 risc0-build = { version = "2.2.0", features = ["unstable"] }
 risc0-circuit-recursion = "3.0.0"
-risc0-ethereum-contracts = "2.2.1"
+risc0-ethereum-contracts = "2.2.2"
 risc0-zkvm = { version = "2.2.0", features = ["heap-embedded-alloc", "unstable"] }
 
 # Boundless
-boundless-market = "0.11.0"
+boundless-market = "0.12.1"
 
 [profile.dev]
 opt-level = 3

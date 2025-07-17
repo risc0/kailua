@@ -2524,9 +2524,9 @@ dependencies = [
 
 [[package]]
 name = "boundless-market"
-version = "0.11.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbbcd8220a3c1ae1740ee7f4df3c78512dc8798ad05308c596aac4844d124087"
+checksum = "d13339eb1dc53dcd3abc25a39a87ccbdafc5261519333684c46205d2dc27dbbe"
 dependencies = [
  "alloy",
  "alloy-chains",
@@ -8267,9 +8267,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-ethereum-contracts"
-version = "2.2.1"
+version = "2.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ce9bff70d4e50abcdae7f25aaac0460f39badca2d01f4a328320bf2564c1f06"
+checksum = "0d3a6978f67c13fcf3e9123d28882368a3a3d686f881a35bb0caaebc585f93d6"
 dependencies = [
  "alloy",
  "alloy-primitives 1.2.0",

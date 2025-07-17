@@ -29,6 +29,7 @@ use boundless_market::{Deployment, GuestEnv, StandardStorageProvider};
 use clap::Parser;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use kailua_common::journal::ProofJournal;
+use risc0_ethereum_contracts::selector::Selector;
 use risc0_zkvm::sha::Digestible;
 use risc0_zkvm::{default_executor, ExecutorEnv, Journal, Receipt};
 use serde::{Deserialize, Serialize};
@@ -314,7 +315,8 @@ pub async fn run_boundless_client(
 
     // Set the proof request requirements
     let requirements = Requirements::new(KAILUA_FPVM_ID, Predicate::digest_match(journal.digest()))
-        .with_groth16_proof();
+        // manually choose latest Groth16 receipt selector
+        .with_selector((Selector::groth16_latest() as u32).into());
 
     // Check if an unexpired request had already been made recently
     let boundless_wallet_address = boundless_client.signer.as_ref().unwrap().address();
