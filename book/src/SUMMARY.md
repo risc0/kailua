@@ -17,7 +17,7 @@
 - [Off-chain](./operate.md)
   - [Proposer](./proposer.md)
   - [Validator](./validator.md)
-  - [Bridge RPC](./rpc.md)
+  - [RPC](./rpc.md)
 
 # Specification
 - [Sequencing]()

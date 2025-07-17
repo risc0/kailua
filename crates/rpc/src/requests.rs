@@ -17,7 +17,7 @@ use crate::args::RpcArgs;
 use jsonrpsee::server::ServerConfig;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
-pub async fn handle_requests(args: RpcArgs, cache: KailuaServerCache) -> anyhow::Result<()> {
+pub async fn handle_rpc_requests(args: RpcArgs, cache: KailuaServerCache) -> anyhow::Result<()> {
     // Actual handler for requests
     let kailua_api_handler = KailuaApiHandler { cache }.into_rpc();
 

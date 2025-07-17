@@ -46,8 +46,8 @@ You can deploy a local optimism devnet equipped with Kailua through the followin
     * (VALIDITY PROVING) Use `just devnet-validate [block-height]` to generate validity proofs to fast-forward finality until the specified L2 block height.
     * (DEVELOPMENT MODE): Use `RISC0_DEV_MODE=1` to use fake proofs.
 7. `just devnet-rpc`
-    * Launches the Kailua Bridge RPC.
-    * This provides utility RPC methods for bridges to initiate withdrawals.
+    * Launches the Kailua RPC.
+    * This provides utility RPC methods for initiating withdrawals.
     * Listens on http://127.0.0.1:1337 and ws://127.0.0.1:1337 by default.
 8. `just devnet-fault`
     * Deploys a single `KailuaGame` instance with a faulty sequencing proposal.

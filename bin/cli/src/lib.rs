@@ -22,6 +22,7 @@ pub mod demo;
 pub mod fast_track;
 pub mod fault;
 
+/// The Kailua all-in-one CLI utility suite for securing rollups
 #[derive(clap::Parser, Debug, Clone)]
 #[command(name = "kailua-cli")]
 #[command(bin_name = "kailua-cli")]

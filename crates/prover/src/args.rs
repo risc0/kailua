@@ -41,7 +41,7 @@ pub struct ProvingArgs {
     pub bypass_chain_registry: bool,
 }
 
-/// The prover arguments
+/// Run the prover to generate a fault/validity proof
 #[derive(Parser, Clone, Debug)]
 pub struct ProveArgs {
     #[clap(flatten)]

@@ -33,6 +33,7 @@ use tokio::time::sleep;
 use tokio::{spawn, try_join};
 use tracing::{debug, error, info};
 
+/// Validity prove any running OP Stack rollup
 #[derive(clap::Args, Debug, Clone)]
 pub struct DemoArgs {
     #[clap(flatten)]

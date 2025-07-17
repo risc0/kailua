@@ -19,6 +19,7 @@ use kailua_sync::transact::signer::ValidatorSignerArgs;
 use kailua_sync::transact::TransactArgs;
 use std::path::PathBuf;
 
+/// Start the agent for resolving on-chain Kailua disputes
 #[derive(clap::Args, Debug, Clone)]
 pub struct ValidateArgs {
     #[clap(flatten)]

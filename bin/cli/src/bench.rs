@@ -24,6 +24,7 @@ use std::fs::OpenOptions;
 use std::process::Command;
 use tracing::{info, warn};
 
+/// Benchmark proving cost and performance
 #[derive(clap::Args, Debug, Clone)]
 pub struct BenchArgs {
     #[clap(flatten)]

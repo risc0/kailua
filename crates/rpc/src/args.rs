@@ -15,6 +15,7 @@
 use kailua_sync::args::SyncArgs;
 use std::net::SocketAddr;
 
+/// Start the RPC server for assisting withdrawals
 #[derive(clap::Args, Debug, Clone)]
 pub struct RpcArgs {
     #[clap(flatten)]

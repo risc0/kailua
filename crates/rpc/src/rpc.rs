@@ -32,7 +32,8 @@ pub async fn rpc(args: RpcArgs, data_dir: PathBuf) -> anyhow::Result<()> {
             .with_context(context.clone()),
     );
     let handle_requests = spawn(
-        requests::handle_requests(args.clone(), server_cache.clone()).with_context(context.clone()),
+        requests::handle_rpc_requests(args.clone(), server_cache.clone())
+            .with_context(context.clone()),
     );
 
     let (sync_task, requests_task) = try_join!(handle_sync, handle_requests)?;

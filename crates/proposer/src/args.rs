@@ -16,6 +16,7 @@ use kailua_sync::args::SyncArgs;
 use kailua_sync::transact::signer::ProposerSignerArgs;
 use kailua_sync::transact::TransactArgs;
 
+/// Start the agent for publishing on-chain sequencing proposals
 #[derive(clap::Args, Debug, Clone)]
 pub struct ProposeArgs {
     #[clap(flatten)]
