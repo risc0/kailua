@@ -64,6 +64,8 @@ You can test out Kailua's validity proving on a running chain through the follow
 
 ## Local Devnet
 
+You can deploy a local optimism devnet equipped with Kailua through the following commands:
+
 1. `just devnet-fetch`
     * Fetches `v1.9.1` of the `optimism` monorepo.
 2. `just devnet-build`
@@ -80,12 +82,17 @@ You can test out Kailua's validity proving on a running chain through the follow
 6. `just devnet-validate`
     * Launches the Kailua validator.
     * This monitors `KailuaGame` instances for disputes and creates proofs to resolve them.
-    * Note: Use `RISC0_DEV_MODE=1` to use fake proofs.
-7. `just devnet-fault`
+    * (VALIDITY PROVING) Use `just devnet-validate [block-height]` to generate validity proofs to fast-forward finality until the specified L2 block height.
+    * (DEVELOPMENT MODE): Use `RISC0_DEV_MODE=1` to use fake proofs.
+7. `just devnet-rpc`
+    * Launches the Kailua Bridge RPC.
+    * This provides utility RPC methods for bridges to initiate withdrawals.
+    * Listens on http://127.0.0.1:1337 and ws://127.0.0.1:1337 by default.
+8. `just devnet-fault`
     * Deploys a single `KailuaGame` instance with a faulty sequencing proposal.
     * Tests the validator's fault proving functionality.
     * Tests the proposer's canonical chain tracking functionality.
-8. After you're done:
+9. After you're done:
     * `just devnet-down` to stop the running docker containers.
     * `just devnet-clean` to cleanup the docker volumes.
 

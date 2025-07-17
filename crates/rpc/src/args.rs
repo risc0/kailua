@@ -23,6 +23,7 @@ pub struct RpcArgs {
     #[clap(long, env, default_value_t = false)]
     pub bypass_chain_registry: bool,
     /// Socket for http or ws connections. (default: 127.0.0.1:1337).
+    #[clap(long, env)]
     pub socket_addr: Option<SocketAddr>,
     /// Disables listening for RPC requests over HTTP
     #[clap(long, env, default_value_t = false)]
