@@ -191,4 +191,5 @@ Running `kailua-cli validate` with the above extra arguments should now delegate
 ## Advanced Settings
 
 When manually computing individual proofs, the following parameters (or equiv. env. vars) take effect:
+* `SKIP_AWAIT_PROOF`: Skips waiting for the proving process to complete on Bonsai/Boundless.
 * `SKIP_DERIVATION_PROOF`: Skips provably deriving L2 transactions using L1 data.

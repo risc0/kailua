@@ -168,8 +168,6 @@ pub async fn handle_proof_requests(
                 enable_experimental_witness_endpoint: false,
             },
             op_node_address: Some(args.sync.provider.op_node_url.clone()),
-            skip_derivation_proof: false,
-            skip_await_proof: false,
             proving: ProvingArgs {
                 payout_recipient_address: Some(payout_recipient),
                 ..args.proving.clone()

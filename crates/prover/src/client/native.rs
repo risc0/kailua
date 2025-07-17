@@ -81,7 +81,6 @@ pub async fn run_native_client(
         prove_snark,
         force_attempt,
         seek_proof,
-        args.skip_await_proof,
     ));
     // Wait for both tasks to complete.
     info!("Starting preimage server and client program.");

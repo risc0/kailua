@@ -259,7 +259,6 @@ pub async fn run_boundless_client(
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Receipt>,
     proving_args: &ProvingArgs,
-    skip_await_proof: bool,
 ) -> Result<Receipt, ProvingError> {
     info!("Running boundless client.");
     let journal = Journal::new(proof_journal.encode_packed());
@@ -367,7 +366,7 @@ pub async fn run_boundless_client(
 
         info!("Found matching request already submitted!");
 
-        if skip_await_proof {
+        if proving_args.skip_await_proof {
             warn!("Skipping awaiting proof on Boundless and exiting process.");
             std::process::exit(0);
         }
@@ -513,7 +512,7 @@ pub async fn run_boundless_client(
     };
     info!("Boundless request 0x{request_id:x} submitted");
 
-    if skip_await_proof {
+    if proving_args.skip_await_proof {
         warn!("Skipping awaiting proof on Boundless and exiting process.");
         std::process::exit(0);
     }
