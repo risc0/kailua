@@ -30,6 +30,7 @@ use risc0_zkvm::sha::Digest;
 use risc0_zkvm::{compute_image_id, ALLOWED_CONTROL_ROOT};
 use tracing::debug;
 
+/// Inspect the configuration of a running rollup
 #[derive(clap::Args, Debug, Clone)]
 pub struct ConfigArgs {
     /// URL of OP-NODE endpoint to use

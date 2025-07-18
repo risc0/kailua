@@ -29,6 +29,7 @@ use boundless_market::{Deployment, GuestEnv, StandardStorageProvider};
 use clap::Parser;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use kailua_common::journal::ProofJournal;
+use risc0_ethereum_contracts::selector::Selector;
 use risc0_zkvm::sha::Digestible;
 use risc0_zkvm::{default_executor, ExecutorEnv, Journal, Receipt};
 use serde::{Deserialize, Serialize};
@@ -258,7 +259,6 @@ pub async fn run_boundless_client(
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Receipt>,
     proving_args: &ProvingArgs,
-    skip_await_proof: bool,
 ) -> Result<Receipt, ProvingError> {
     info!("Running boundless client.");
     let journal = Journal::new(proof_journal.encode_packed());
@@ -314,7 +314,8 @@ pub async fn run_boundless_client(
 
     // Set the proof request requirements
     let requirements = Requirements::new(KAILUA_FPVM_ID, Predicate::digest_match(journal.digest()))
-        .with_groth16_proof();
+        // manually choose latest Groth16 receipt selector
+        .with_selector((Selector::groth16_latest() as u32).into());
 
     // Check if an unexpired request had already been made recently
     let boundless_wallet_address = boundless_client.signer.as_ref().unwrap().address();
@@ -365,7 +366,7 @@ pub async fn run_boundless_client(
 
         info!("Found matching request already submitted!");
 
-        if skip_await_proof {
+        if proving_args.skip_await_proof {
             warn!("Skipping awaiting proof on Boundless and exiting process.");
             std::process::exit(0);
         }
@@ -511,7 +512,7 @@ pub async fn run_boundless_client(
     };
     info!("Boundless request 0x{request_id:x} submitted");
 
-    if skip_await_proof {
+    if proving_args.skip_await_proof {
         warn!("Skipping awaiting proof on Boundless and exiting process.");
         std::process::exit(0);
     }

@@ -30,6 +30,7 @@ kailua-common.workspace = true
 kailua-contracts.workspace = true
 kailua-proposer.workspace = true
 kailua-prover.workspace = true
+kailua-rpc.workspace = true
 kailua-sync.workspace = true
 kailua-validator.workspace = true
 

@@ -39,9 +39,15 @@ pub struct ProvingArgs {
     /// Whether to bypass loading rollup chain configurations from the kona registry
     #[clap(long, env, default_value_t = false)]
     pub bypass_chain_registry: bool,
+    /// Whether to only prove L2 block execution without referring to the L1
+    #[clap(long, env, default_value_t = false)]
+    pub skip_derivation_proof: bool,
+    /// Whether to skip waiting for the proof generation process to complete
+    #[clap(long, env, default_value_t = false)]
+    pub skip_await_proof: bool,
 }
 
-/// The prover arguments
+/// Run the prover to generate an execution/fault/validity proof
 #[derive(Parser, Clone, Debug)]
 pub struct ProveArgs {
     #[clap(flatten)]
@@ -50,10 +56,6 @@ pub struct ProveArgs {
     /// Address of OP-NODE endpoint to use
     #[clap(long, env)]
     pub op_node_address: Option<String>,
-    #[clap(long, env, default_value_t = false)]
-    pub skip_derivation_proof: bool,
-    #[clap(long, env, default_value_t = false)]
-    pub skip_await_proof: bool,
 
     #[clap(flatten)]
     pub proving: ProvingArgs,

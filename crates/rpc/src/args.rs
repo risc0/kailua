@@ -1,4 +1,4 @@
-// Copyright 2024, 2025 RISC Zero, Inc.
+// Copyright 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,23 +13,23 @@
 // limitations under the License.
 
 use kailua_sync::args::SyncArgs;
-use kailua_sync::transact::signer::ProposerSignerArgs;
-use kailua_sync::transact::TransactArgs;
+use std::net::SocketAddr;
 
-/// Start the agent for publishing on-chain sequencing proposals
+/// Start the RPC server for assisting withdrawals
 #[derive(clap::Args, Debug, Clone)]
-pub struct ProposeArgs {
+pub struct RpcArgs {
     #[clap(flatten)]
     pub sync: SyncArgs,
-
     /// Whether to bypass loading rollup chain configurations from the kona registry
     #[clap(long, env, default_value_t = false)]
     pub bypass_chain_registry: bool,
-
-    /// L1 wallet to use for proposing outputs
-    #[clap(flatten)]
-    pub proposer_signer: ProposerSignerArgs,
-    /// Transaction publication configuration
-    #[clap(flatten)]
-    pub txn_args: TransactArgs,
+    /// Socket for http or ws connections. (default: 127.0.0.1:1337).
+    #[clap(long, env)]
+    pub socket_addr: Option<SocketAddr>,
+    /// Disables listening for RPC requests over HTTP
+    #[clap(long, env, default_value_t = false)]
+    pub disable_http: bool,
+    /// Disables listening for RPC requests over WS
+    #[clap(long, env, default_value_t = false)]
+    pub disable_ws: bool,
 }

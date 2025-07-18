@@ -253,6 +253,7 @@ async fn proposer_validator() {
             kailua_cli: None,
             fast_forward_target: 0,
             num_concurrent_provers: 1,
+            enable_experimental_witness_endpoint: true,
             l1_head_jump_back: 0,
             validator_signer: ValidatorSignerArgs::from(
                 "0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e".to_string(),
@@ -265,6 +266,8 @@ async fn proposer_validator() {
                 num_concurrent_preflights: 1,
                 num_concurrent_proofs: 1,
                 bypass_chain_registry: true,
+                skip_derivation_proof: false,
+                skip_await_proof: false,
             },
             boundless: Default::default(),
         },
@@ -299,6 +302,7 @@ async fn proposer_validator() {
             kailua_cli: None,
             fast_forward_target: 90, // run validity proofs until block 90 is finalized
             num_concurrent_provers: 5,
+            enable_experimental_witness_endpoint: true,
             l1_head_jump_back: 0,
             validator_signer: ValidatorSignerArgs::from(
                 "0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e".to_string(),
@@ -311,6 +315,8 @@ async fn proposer_validator() {
                 num_concurrent_preflights: 1,
                 num_concurrent_proofs: 1,
                 bypass_chain_registry: true,
+                skip_derivation_proof: false,
+                skip_await_proof: false,
             },
             boundless: Default::default(),
         },
@@ -427,8 +433,6 @@ async fn prover() {
             enable_experimental_witness_endpoint: false,
         },
         op_node_address: Some(sync.provider.op_node_url),
-        skip_derivation_proof: false,
-        skip_await_proof: false,
         proving: ProvingArgs {
             payout_recipient_address: None,
             segment_limit: 21,
@@ -436,6 +440,8 @@ async fn prover() {
             num_concurrent_preflights: 4,
             num_concurrent_proofs: 2,
             bypass_chain_registry: false,
+            skip_derivation_proof: false,
+            skip_await_proof: false,
         },
         boundless: Default::default(),
         precondition_params: vec![],

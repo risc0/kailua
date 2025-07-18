@@ -22,6 +22,7 @@ pub mod demo;
 pub mod fast_track;
 pub mod fault;
 
+/// The Kailua all-in-one CLI utility suite for securing rollups
 #[derive(clap::Parser, Debug, Clone)]
 #[command(name = "kailua-cli")]
 #[command(bin_name = "kailua-cli")]
@@ -76,6 +77,12 @@ pub enum KailuaCli {
         #[clap(flatten)]
         cli: CliArgs,
     },
+    Rpc {
+        #[clap(flatten)]
+        args: kailua_rpc::args::RpcArgs,
+        #[clap(flatten)]
+        cli: CliArgs,
+    },
 }
 
 #[derive(clap::Args, Debug, Clone)]
@@ -95,6 +102,7 @@ impl KailuaCli {
             KailuaCli::TestFault { cli, .. } => cli.v,
             KailuaCli::Benchmark { cli, .. } => cli.v,
             KailuaCli::Demo { cli, .. } => cli.v,
+            KailuaCli::Rpc { cli, .. } => cli.v,
         }
     }
 
@@ -104,6 +112,7 @@ impl KailuaCli {
             KailuaCli::Validate { args, .. } => args.sync.data_dir.clone(),
             KailuaCli::Prove { args, .. } => args.kona.data_dir.clone(),
             KailuaCli::Demo { args, .. } => args.data_dir.clone(),
+            KailuaCli::Rpc { args, .. } => args.sync.data_dir.clone(),
             _ => None,
         }
     }
@@ -118,6 +127,7 @@ impl KailuaCli {
             KailuaCli::TestFault { args, .. } => &args.propose_args.sync.telemetry,
             KailuaCli::Benchmark { args, .. } => &args.sync.telemetry,
             KailuaCli::Demo { args, .. } => &args.telemetry,
+            KailuaCli::Rpc { args, .. } => &args.sync.telemetry,
         }
     }
 }

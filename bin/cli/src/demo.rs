@@ -33,6 +33,7 @@ use tokio::time::sleep;
 use tokio::{spawn, try_join};
 use tracing::{debug, error, info};
 
+/// Validity prove any running OP Stack rollup
 #[derive(clap::Args, Debug, Clone)]
 pub struct DemoArgs {
     #[clap(flatten)]
@@ -44,6 +45,10 @@ pub struct DemoArgs {
     /// How many proofs to compute simultaneously
     #[clap(long, env, default_value_t = 1)]
     pub num_concurrent_provers: u64,
+    /// Optionally enables the use of `debug_executePayload` to collect the execution witness from
+    /// the execution layer.
+    #[arg(long, env, default_value_t = false)]
+    pub enable_experimental_witness_endpoint: bool,
 
     /// The L2 block to start proving from. Defaults to latest safe block.
     #[clap(long, env)]
@@ -89,6 +94,7 @@ pub async fn demo(args: DemoArgs, verbosity: u8, data_dir: PathBuf) -> anyhow::R
         kailua_cli: args.kailua_cli,
         fast_forward_target: 0,
         num_concurrent_provers: args.num_concurrent_provers,
+        enable_experimental_witness_endpoint: args.enable_experimental_witness_endpoint,
         #[cfg(feature = "devnet")]
         l1_head_jump_back: 0,
         validator_signer: ValidatorSignerArgs {

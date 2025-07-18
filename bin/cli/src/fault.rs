@@ -32,6 +32,7 @@ use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use tracing::{error, info};
 
+/// Publish a faulty sequencing proposal to test fault proofs
 #[derive(clap::Args, Debug, Clone)]
 pub struct FaultArgs {
     #[clap(flatten)]
