@@ -154,7 +154,7 @@ prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data 
 
   # Query the chain id
   echo "Fetching chain id"
-  L2_CHAIN_ID=$(cast chain-id --rpc-url $OP_NODE_ADDRESS)
+  L2_CHAIN_ID=$(cast chain-id --rpc-url $L2_NODE_ADDRESS)
 
   # Get output root for block
   echo "Fetching data for block #$CLAIMED_L2_BLOCK_NUMBER..."
@@ -166,7 +166,7 @@ prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data 
   # Get the info for the parent l2 block
   echo "Fetching data for parent of block #$L2_BLOCK_NUMBER..."
   AGREED_L2_OUTPUT_ROOT=$(cast rpc --rpc-url $OP_NODE_ADDRESS "optimism_outputAtBlock" $(cast 2h $((L2_BLOCK_NUMBER - 1))) | jq -r .outputRoot)
-  AGREED_L2_HEAD=$(cast block --rpc-url $OP_NODE_ADDRESS $((L2_BLOCK_NUMBER - 1)) --json | jq -r .hash)
+  AGREED_L2_HEAD=$(cast block --rpc-url $L2_NODE_ADDRESS $((L2_BLOCK_NUMBER - 1)) --json | jq -r .hash)
 
   echo "Running host program with zk client program..."
   ./target/{{target}}/kailua-cli prove {{verbosity}} \
