@@ -93,7 +93,6 @@ devnet-fault offset parent target="debug" proposer="0x47e179ec197488593b187f80a0
 
 devnet-validate fastforward="0" target="debug" verbosity="" l1_rpc="http://127.0.0.1:8545" l1_beacon_rpc="http://127.0.0.1:5052" l2_rpc="http://127.0.0.1:9545" rollup_node_rpc="http://127.0.0.1:7545" data_dir=".localtestdata/validate" validator="0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e":
   ./target/{{target}}/kailua-cli validate \
-      --kailua-cli ./target/{{target}}/kailua-cli \
       --fast-forward-target {{fastforward}} \
       --eth-rpc-url {{l1_rpc}} \
       --beacon-rpc-url {{l1_beacon_rpc}} \
