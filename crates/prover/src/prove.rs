@@ -233,6 +233,7 @@ pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
                         {
                             // we use this special exit code to signal an insufficient l1 head
                             error!("Insufficient L1 head.");
+                            // todo: revisit
                             std::process::exit(111);
                         }
                         bail!("Irrecoverable proving error: {e:?}")

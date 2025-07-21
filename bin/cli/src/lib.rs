@@ -17,6 +17,7 @@ use kailua_validator::args;
 use std::path::PathBuf;
 
 pub mod bench;
+pub mod bonsai;
 pub mod config;
 pub mod demo;
 pub mod fast_track;
@@ -83,6 +84,12 @@ pub enum KailuaCli {
         #[clap(flatten)]
         cli: CliArgs,
     },
+    Bonsai {
+        #[clap(flatten)]
+        args: bonsai::BonsaiArgs,
+        #[clap(flatten)]
+        cli: CliArgs,
+    },
 }
 
 #[derive(clap::Args, Debug, Clone)]
@@ -103,6 +110,7 @@ impl KailuaCli {
             KailuaCli::Benchmark { cli, .. } => cli.v,
             KailuaCli::Demo { cli, .. } => cli.v,
             KailuaCli::Rpc { cli, .. } => cli.v,
+            KailuaCli::Bonsai { cli, .. } => cli.v,
         }
     }
 
@@ -128,6 +136,7 @@ impl KailuaCli {
             KailuaCli::Benchmark { args, .. } => &args.sync.telemetry,
             KailuaCli::Demo { args, .. } => &args.telemetry,
             KailuaCli::Rpc { args, .. } => &args.sync.telemetry,
+            KailuaCli::Bonsai { args, .. } => &args.telemetry,
         }
     }
 }

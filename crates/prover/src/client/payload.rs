@@ -43,6 +43,12 @@ pub async fn run_payload_client(
     let kv = create_split_kv_store(&Default::default(), disk_kv_store)
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
 
+    /* todo:
+       1. Test endpoint success/failure automatically
+       2. abort any attempt to use executionWitness endpoint if failure confirmed
+
+    */
+
     while boot_info.claimed_l2_output_root != boot_info.agreed_l2_output_root {
         // Read block hash
         let block_hash = await_tel!(

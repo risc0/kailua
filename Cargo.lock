@@ -5244,6 +5244,8 @@ version = "1.0.2"
 dependencies = [
  "alloy",
  "anyhow",
+ "bincode",
+ "bonsai-sdk",
  "bytemuck",
  "clap",
  "hex",

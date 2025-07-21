@@ -22,8 +22,8 @@ use risc0_zkvm::serde::to_vec;
 use risc0_zkvm::sha::Digest;
 use risc0_zkvm::{is_dev_mode, InnerReceipt, Receipt};
 use std::time::Duration;
-use tracing::info;
 use tracing::log::warn;
+use tracing::{error, info};
 
 pub async fn run_bonsai_client(
     witness_frames: Vec<Vec<u8>>,
@@ -76,20 +76,24 @@ pub async fn run_bonsai_client(
         human_bytes(elf.len() as f64).to_string()
     );
     let image_id_hex = hex::encode(Digest::from(KAILUA_FPVM_ID));
-    client
-        .upload_img(&image_id_hex, elf)
-        .await
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+    loop {
+        let Err(err) = client.upload_img(&image_id_hex, elf.clone()).await else {
+            break;
+        };
+        error!("Failed to upload Kailua ELF to Bonsai: {err:?}");
+    }
 
     // Upload the input data
     info!(
         "Uploading {} input data to Bonsai.",
         human_bytes(input.len() as f64).to_string()
     );
-    let input_id = client
-        .upload_input(input)
-        .await
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+    let input_id = loop {
+        match client.upload_input(input.clone()).await {
+            Ok(result) => break result,
+            Err(err) => error!("Failed to upload input data to Bonsai: {err:?}"),
+        }
+    };
 
     // Create session on Bonsai
     info!("Creating Bonsai proving session.");
@@ -121,16 +125,18 @@ pub async fn run_bonsai_client(
             .status(&client)
             .await
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+
         if res.status == "RUNNING" {
-            std::thread::sleep(polling_interval);
+            tokio::time::sleep(polling_interval).await;
             continue;
         }
+
         if res.status == "SUCCEEDED" {
             // Download the receipt, containing the output
-            info!("Downloading receipt from Bonsai.");
             let receipt_url = res.receipt_url.ok_or(ProvingError::OtherError(anyhow!(
                 "API error, missing receipt on completed session"
             )))?;
+            info!("Downloading Bonsai receipt from {receipt_url}.");
 
             let stats = res
                 .stats
@@ -165,7 +171,7 @@ pub async fn run_bonsai_client(
                 },
             };
         } else {
-            return Err(ProvingError::OtherError(anyhow!(
+            return Err(ProvingError::ExecutionError(anyhow!(
                 "Bonsai prover workflow [{}] exited: {} err: {}",
                 session.uuid,
                 res.status,

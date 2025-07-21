@@ -56,6 +56,7 @@ pub async fn handle_proving_tasks(
             warn!("handle_proving_tasks terminated");
             break Ok(());
         };
+        info!("Handling proof request for local index {proposal_index}.");
 
         let insufficient_l1_data = if let Some(kailua_cli) = &kailua_cli {
             info!("Invoking prover binary.");
@@ -125,6 +126,7 @@ pub async fn handle_proving_tasks(
                     warn!("Cannot prove local index {proposal_index} due to insufficient l1 head.");
                 } else {
                     // retry proving task
+                    info!("Resubmitting proving task for local index {proposal_index}.");
                     task_channel
                         .0
                         .send(Task {

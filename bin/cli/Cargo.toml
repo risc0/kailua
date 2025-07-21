@@ -12,6 +12,7 @@ categories.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+bincode.workspace = true
 bytemuck.workspace = true
 clap.workspace = true
 hex.workspace = true
@@ -33,6 +34,8 @@ kailua-prover.workspace = true
 kailua-rpc.workspace = true
 kailua-sync.workspace = true
 kailua-validator.workspace = true
+
+bonsai-sdk.workspace = true
 
 kona-cli.workspace = true
 
