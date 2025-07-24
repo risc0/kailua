@@ -21,6 +21,7 @@ use crate::proof::proof_file_name;
 use crate::ProvingError;
 use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
+use human_bytes::human_bytes;
 use kailua_common::boot::StitchedBootInfo;
 use kailua_common::client::stitching::split_executions;
 use kailua_common::executor::Execution;
@@ -96,17 +97,24 @@ where
     let _ = kailua_common::blobs::PreloadedBlobProvider::from(witness_vec.blobs_witness.clone());
 
     // check if we can prove this workload
-    let (main_witness_size, witness_size) = sum_witness_size(&witness_vec);
-    info!("Witness size: {witness_size} ({main_witness_size} main)");
-    if witness_size > proving.max_witness_size {
+    let (preloaded_wit_size, streamed_wit_size) = sum_witness_size(&witness_vec);
+    let total_wit_size = preloaded_wit_size + streamed_wit_size;
+    info!(
+        "Witness size: {} ({} preloaded, {} streamed.)",
+        human_bytes(total_wit_size as f64),
+        human_bytes(preloaded_wit_size as f64),
+        human_bytes(streamed_wit_size as f64)
+    );
+    if total_wit_size > proving.max_witness_size {
         warn!(
             "Witness size {} exceeds limit {}.",
-            witness_size, proving.max_witness_size
+            human_bytes(total_wit_size as f64),
+            human_bytes(proving.max_witness_size as f64)
         );
         if !force_attempt {
             warn!("Aborting.");
             return Err(ProvingError::WitnessSizeError(
-                witness_size,
+                total_wit_size,
                 proving.max_witness_size,
                 execution_trace,
             ));
@@ -115,7 +123,10 @@ where
     }
 
     if !seek_proof {
-        return Err(ProvingError::NotSeekingProof(witness_size, execution_trace));
+        return Err(ProvingError::NotSeekingProof(
+            total_wit_size,
+            execution_trace,
+        ));
     }
 
     let (preloaded_frames, streamed_frames) =
@@ -168,11 +179,11 @@ pub fn shard_witness_data(data: &mut [PreimageVecEntry]) -> anyhow::Result<Vec<V
 }
 
 pub fn sum_witness_size(witness: &Witness<VecOracle>) -> (usize, usize) {
-    let (witness_frames, _) =
+    let (witness_frames, streamed_frames) =
         encode_witness_frames(witness.deep_clone()).expect("Failed to encode VecOracle");
     (
-        witness_frames.first().map(|f| f.len()).unwrap(),
         witness_frames.iter().map(|f| f.len()).sum::<usize>(),
+        streamed_frames.iter().map(|f| f.len()).sum::<usize>(),
     )
 }
 pub async fn seek_fpvm_proof(

@@ -20,6 +20,7 @@ use alloy::providers::RootProvider;
 use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
 use async_channel::{Receiver, Sender};
+use human_bytes::human_bytes;
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_common::boot::StitchedBootInfo;
 use kailua_common::client::stitching::{split_executions, stitch_boot_info};
@@ -198,6 +199,11 @@ pub async fn compute_fpvm_proof(
     prove_snark: bool,
     task_sender: Sender<Oneshot>,
 ) -> Result<Option<Receipt>, ProvingError> {
+    // let log_tag = format!(
+    //     "{}..{}",
+    //     args.kona.agreed_l2_output_root.to_string(),
+    //     args.kona.claimed_l2_output_root.to_string()
+    // );
     // report transaction count
     if !stitched_boot_info.is_empty() {
         info!("Stitching {} sub-proofs", stitched_boot_info.len());
@@ -273,7 +279,13 @@ pub async fn compute_fpvm_proof(
         if witness_size > args.proving.max_witness_size {
             warn!(
                 "Derivation-only witness size {} exceeds limit {}.",
-                witness_size, args.proving.max_witness_size
+                human_bytes(witness_size as f64),
+                human_bytes(args.proving.max_witness_size as f64)
+            );
+        } else {
+            info!(
+                "Derivation-only witness size {}.",
+                human_bytes(witness_size as f64)
             );
         }
     }
@@ -321,9 +333,18 @@ pub async fn compute_fpvm_proof(
         match err {
             ProvingError::WitnessSizeError(f, t, e) => {
                 if force_attempt {
+                    error!(
+                        "Proof witness size {} above safety threshold {}.",
+                        human_bytes(f as f64),
+                        human_bytes(t as f64)
+                    );
                     return Err(ProvingError::WitnessSizeError(f, t, e));
                 }
-                warn!("Proof witness size {f} above safety threshold {t}. Splitting workload.")
+                warn!(
+                    "Proof witness size {} above safety threshold {}. Splitting workload.",
+                    human_bytes(f as f64),
+                    human_bytes(t as f64)
+                )
             }
             ProvingError::ExecutionError(e) => {
                 if force_attempt {
@@ -482,7 +503,7 @@ pub fn create_cached_execution_task(
 
 #[allow(clippy::too_many_arguments)]
 pub async fn compute_cached_proof(
-    args: ProveArgs,
+    mut args: ProveArgs,
     rollup_config: RollupConfig,
     disk_kv_store: Option<RWLKeyValueStore>,
     precondition_hash: B256,
@@ -550,14 +571,19 @@ pub async fn compute_cached_proof(
                     ))
                 })
                 .unwrap();
-            crate::client::payload::run_payload_client(
+            if crate::client::payload::run_payload_client(
                 boot,
                 l2_provider,
                 op_node_provider,
                 disk_kv_store.clone(),
             )
             .await
-            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
+            {
+                // If we have used debug_executionWitness sucessfully then don't use Kona's
+                // debug_executePayload logic as it doesn't have caching
+                args.kona.enable_experimental_witness_endpoint = false;
+            }
         }
 
         // generate a proof using the kailua client and kona server

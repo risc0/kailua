@@ -46,6 +46,7 @@ impl BlobProvider {
             tracer,
             "BlobProvider::client_get (genesis)",
             retry_res_timeout!(
+                10,
                 Self::client_get::<Value>(&client, &cl_node_endpoint, "eth/v1/beacon/genesis")
                     .with_context(context.clone())
                     .await
@@ -61,6 +62,7 @@ impl BlobProvider {
             tracer,
             "BlobProvider::client_get (spec)",
             retry_res_timeout!(
+                10,
                 Self::client_get::<Value>(&client, &cl_node_endpoint, "eth/v1/config/spec")
                     .with_context(context.clone())
                     .await
@@ -119,6 +121,7 @@ impl BlobProvider {
             tracer,
             "BlobProvider::get",
             retry_res_timeout!(
+                10,
                 self.get::<BeaconBlobBundle>(&format!("eth/v1/beacon/blob_sidecars/{slot}"))
                     .with_context(context.clone())
                     .await

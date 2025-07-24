@@ -103,5 +103,6 @@ pub fn build_zkvm_env<'a>(
             builder.add_assumption(receipt);
         }
     }
+
     builder.build()
 }

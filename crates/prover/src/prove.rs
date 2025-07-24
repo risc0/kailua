@@ -23,6 +23,7 @@ use alloy::eips::BlockNumberOrTag;
 use alloy::providers::{Provider, RootProvider};
 use alloy_primitives::B256;
 use anyhow::{anyhow, bail, Context};
+use human_bytes::human_bytes;
 use kailua_common::boot::StitchedBootInfo;
 use kailua_sync::provider::optimism::OpNodeProvider;
 use kailua_sync::{await_tel, retry_res_ctx_timeout};
@@ -57,11 +58,13 @@ pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
     if args.kona.data_dir.is_none() {
         args.kona.data_dir = Some(tmp_dir.path().to_path_buf());
     }
+
     // fetch rollup config
     let rollup_config = generate_rollup_config_file(&mut args, &tmp_dir)
         .await
         .context("generate_rollup_config")
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+
     // preload precondition data into KV store
     let (precondition_hash, precondition_validation_data_hash) =
         match fetch_precondition_data(&args)
@@ -78,6 +81,7 @@ pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
             }
             None => (B256::ZERO, B256::ZERO),
         };
+
     // create concurrent db
     let disk_kv_store = create_disk_kv_store(&args.kona);
     // perform preflight to fetch data
@@ -96,6 +100,8 @@ pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
         .await
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     }
+    // We only use executionWitness/executePayload during preflight.
+    args.kona.enable_experimental_witness_endpoint = false;
 
     // spin up proving workers
     let task_channel: AsyncChannel<Oneshot> = async_channel::unbounded();
@@ -103,12 +109,13 @@ pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
     for _ in 0..args.proving.num_concurrent_proofs {
         proving_handlers.push(tokio::spawn(handle_oneshot_tasks(task_channel.1.clone())));
     }
-
-    // create proofs channel
-    let result_channel = async_channel::unbounded();
-    let prover_channel = async_channel::unbounded();
     let mut result_pq = BinaryHeap::new();
     let mut num_proofs = 1;
+
+    // create channel for receiving proving results from handlers
+    let result_channel = async_channel::unbounded();
+    // create channel for receiving proof requests to process and dispatch to handlers
+    let prover_channel = async_channel::unbounded();
     prover_channel
         .0
         .send((false, args.clone()))
@@ -143,7 +150,7 @@ pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
             let num_blocks = job_args.kona.claimed_l2_block_number - starting_block;
             if starting_block > 0 {
                 info!(
-                    "Processing job with {} blocks from block {}",
+                    "Processing (split={have_split}) job with {} blocks from block {}",
                     num_blocks, starting_block
                 );
             }
@@ -189,6 +196,11 @@ pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
         match result {
             Ok(proof) => {
                 if let Some(proof) = proof {
+                    info!(
+                        "Successfully proved {} blocks ({starting_block}..{})",
+                        job_args.kona.claimed_l2_block_number - starting_block,
+                        job_args.kona.claimed_l2_block_number
+                    );
                     result_pq.push(OneshotResult {
                         cached: Cached {
                             // used for sorting
@@ -218,7 +230,11 @@ pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
                                 "Received WitnessSizeError({f},{t}) for a forced proving attempt: {err:?}"
                                 );
                         }
-                        warn!("Proof witness size {f} above safety threshold {t}. Splitting workload.")
+                        warn!(
+                            "Proof witness size {} above safety threshold {}. Splitting workload.",
+                            human_bytes(f as f64),
+                            human_bytes(t as f64),
+                        )
                     }
                     ProvingError::ExecutionError(e) => {
                         if force_attempt {
@@ -292,6 +308,7 @@ pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
             }
         }
     }
+
     // gather sorted proofs into vec
     let proofs = result_pq
         .into_sorted_vec()

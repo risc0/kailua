@@ -92,6 +92,7 @@ pub async fn demo(args: DemoArgs, verbosity: u8, data_dir: PathBuf) -> anyhow::R
             telemetry: args.telemetry,
         },
         kailua_cli: args.kailua_cli,
+        fast_forward_start: 0,
         fast_forward_target: 0,
         num_concurrent_provers: args.num_concurrent_provers,
         enable_experimental_witness_endpoint: args.enable_experimental_witness_endpoint,

@@ -232,4 +232,4 @@ cleanup:
     rm ./*.fake
 
 grep-proving-log log:
-    grep -v -e block_builder -e batch_validator -e attributes_queue -e client_derivation_driver -e single_hint_handler -e kailua_common -e complete, -e client_blob_oracle -e agent -e channel_assembler -e kailua_sync {{log}}
+    grep -v -e kona_protocol -e R0VM -e block_builder -e batch_validator -e attributes_queue -e client_derivation_driver -e single_hint_handler -e kailua_common -e complete, -e client_blob_oracle -e agent -e channel_assembler -e kailua_sync {{log}}
