@@ -111,7 +111,7 @@ pub struct MarketProviderConfig {
     pub boundless_look_back: u32,
 
     /// Starting price (wei) per cycle of the proving order
-    #[clap(long, env, required = false, default_value = "100000000")]
+    #[clap(long, env, required = false, default_value = "0")]
     pub boundless_cycle_min_wei: U256,
     /// Maximum price (wei) per cycle of the proving order
     #[clap(long, env, required = false, default_value = "200000000")]
@@ -325,9 +325,9 @@ pub async fn run_boundless_client(
         // manually choose latest Groth16 receipt selector
         .with_selector((Selector::groth16_latest() as u32).into());
 
-    // Wait for a market requesto be fulfilled
+    // Wait for a market request to be fulfilled
     loop {
-        // todo: price increase over time
+        // todo: price increase over time ?
         match request_proof(
             &market,
             &boundless_client,
@@ -343,7 +343,7 @@ pub async fn run_boundless_client(
                 error!("(Retrying) Boundless request failed: {e:?}");
                 sleep(Duration::from_secs(1)).await;
             }
-            // this will return successful results or execution errors
+            // this will return successful results or propagatable errors
             result => break result,
         }
     }
@@ -359,7 +359,7 @@ pub async fn request_proof(
     requirements: &Requirements,
 ) -> Result<Receipt, ProvingError> {
     // Check prior requests
-    if let Some(proof) = look_back(market, boundless_client, proving_args, requirements).await {
+    if let Ok(Some(proof)) = look_back(market, boundless_client, proving_args, requirements).await {
         return Ok(proof);
     }
 
@@ -509,9 +509,8 @@ pub async fn request_proof(
     info!("Boundless request 0x{request_id:x} submitted");
 
     if proving_args.skip_await_proof {
-        warn!("Skipping awaiting proof on Boundless and exiting process.");
-        // todo: revisit this signal
-        std::process::exit(0);
+        warn!("Skipping awaiting proof on Boundless.");
+        return Err(ProvingError::NotAwaitingProof);
     }
 
     retrieve_proof(
@@ -530,7 +529,7 @@ pub async fn look_back(
     boundless_client: &Client,
     proving_args: &ProvingArgs,
     requirements: &Requirements,
-) -> Option<Receipt> {
+) -> Result<Option<Receipt>, ProvingError> {
     // Check if an unexpired request had already been made recently
     let boundless_wallet_address = boundless_client.signer.as_ref().unwrap().address();
     let boundless_wallet_nonce = retry_res_timeout!(boundless_client
@@ -583,13 +582,12 @@ pub async fn look_back(
         info!("Found matching request already submitted!");
 
         if proving_args.skip_await_proof {
-            warn!("Skipping awaiting proof on Boundless and exiting process.");
-            // todo bubble up NotSeekingProof
-            std::process::exit(0);
+            warn!("Skipping awaiting proof on Boundless.");
+            return Err(ProvingError::NotAwaitingProof);
         }
 
         // Return result unless expired
-        return retrieve_proof(
+        return Ok(retrieve_proof(
             boundless_client,
             request_id,
             market.boundless_order_check_interval,
@@ -597,9 +595,9 @@ pub async fn look_back(
         )
         .await
         .context("retrieve_proof")
-        .ok();
+        .ok());
     }
-    None
+    Ok(None)
 }
 
 pub async fn retrieve_proof(

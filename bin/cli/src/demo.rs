@@ -50,7 +50,8 @@ pub struct DemoArgs {
     #[arg(long, env, default_value_t = false)]
     pub enable_experimental_witness_endpoint: bool,
 
-    /// The L2 block to start proving from. Defaults to latest safe block.
+    /// The L2 block to start proving from.
+    /// Defaults to three times `num_blocks_per_proof` before latest safe block.
     #[clap(long, env)]
     pub starting_block_height: Option<u64>,
     /// The number of L2 blocks to cover per proof
@@ -172,7 +173,7 @@ pub async fn handle_blocks(
         );
         // start from most recent block if unspecified
         if last_proven.is_none() {
-            last_proven = Some(safe_l2_number);
+            last_proven = Some(safe_l2_number.saturating_sub(3 * args.num_blocks_per_proof + 1));
         }
         // queue required proofs
         while last_proven.unwrap() + args.num_blocks_per_proof < safe_l2_number {

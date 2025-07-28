@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::args::ProvingArgs;
 use crate::backends::{KailuaProveInfo, KailuaSessionStats};
 use crate::ProvingError;
 use anyhow::{anyhow, Context};
@@ -24,9 +25,15 @@ pub async fn run_zkvm_client(
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Receipt>,
     prove_snark: bool,
-    segment_limit: u32,
+    proving_args: &ProvingArgs,
 ) -> Result<Receipt, ProvingError> {
     info!("Running zkvm client.");
+    if proving_args.skip_await_proof {
+        warn!("Skipping awaiting proof locally.");
+        return Err(ProvingError::NotAwaitingProof);
+    }
+
+    let segment_limit = proving_args.segment_limit;
     let prove_info = tokio::task::spawn_blocking(move || {
         let env = build_zkvm_env(witness_frames, stitched_proofs, segment_limit)?;
         let prover = default_prover();

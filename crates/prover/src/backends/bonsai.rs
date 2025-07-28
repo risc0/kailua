@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::args::ProvingArgs;
 use crate::ProvingError;
 use anyhow::{anyhow, Context};
 use bonsai_sdk::non_blocking::{Client, SessionId, SnarkId};
@@ -31,7 +32,7 @@ pub async fn run_bonsai_client(
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Receipt>,
     prove_snark: bool,
-    skip_await_proof: bool,
+    proving_args: &ProvingArgs,
 ) -> Result<Receipt, ProvingError> {
     info!("Running Bonsai client.");
     // Instantiate client
@@ -75,9 +76,9 @@ pub async fn run_bonsai_client(
     let mut stark_session =
         create_stark_session(&client, input.clone(), assumption_receipt_ids.clone()).await;
 
-    if skip_await_proof {
-        warn!("Skipping awaiting proof on Bonsai and exiting process.");
-        std::process::exit(0);
+    if proving_args.skip_await_proof {
+        warn!("Skipping awaiting proof on Bonsai.");
+        return Err(ProvingError::NotAwaitingProof);
     }
 
     let polling_interval = if let Ok(ms) = std::env::var("BONSAI_POLL_INTERVAL_MS") {

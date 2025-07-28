@@ -209,21 +209,9 @@ pub async fn seek_fpvm_proof(
         }
         _ => {
             if should_use_bonsai() {
-                run_bonsai_client(
-                    witness_frames,
-                    stitched_proofs,
-                    prove_snark,
-                    proving.skip_await_proof,
-                )
-                .await?
+                run_bonsai_client(witness_frames, stitched_proofs, prove_snark, proving).await?
             } else {
-                run_zkvm_client(
-                    witness_frames,
-                    stitched_proofs,
-                    prove_snark,
-                    proving.segment_limit,
-                )
-                .await?
+                run_zkvm_client(witness_frames, stitched_proofs, prove_snark, proving).await?
             }
         }
     };

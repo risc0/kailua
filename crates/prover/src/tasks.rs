@@ -199,11 +199,6 @@ pub async fn compute_fpvm_proof(
     prove_snark: bool,
     task_sender: Sender<Oneshot>,
 ) -> Result<Option<Receipt>, ProvingError> {
-    // let log_tag = format!(
-    //     "{}..{}",
-    //     args.kona.agreed_l2_output_root.to_string(),
-    //     args.kona.claimed_l2_output_root.to_string()
-    // );
     // report transaction count
     if !stitched_boot_info.is_empty() {
         info!("Stitching {} sub-proofs", stitched_boot_info.len());
@@ -355,6 +350,11 @@ pub async fn compute_fpvm_proof(
             ProvingError::OtherError(e) => {
                 return Err(ProvingError::OtherError(e));
             }
+            ProvingError::NotAwaitingProof => {
+                // reduce required proofs by two to cancel out prior addition and one more proof
+                num_proofs -= 2;
+                continue;
+            }
             ProvingError::NotSeekingProof(_, _) => {
                 unreachable!("Sought proof, found NotSeekingProof {err:?}")
             }
@@ -416,15 +416,20 @@ pub async fn compute_fpvm_proof(
         })
         .unzip();
 
-    // Return no proof if derivation is not required
-    if args.proving.skip_derivation_proof {
-        return Ok(None);
+    // Return proof count without stitching if derivation is not required
+    if args.proving.skip_await_proof {
+        warn!("Skipping stitching unawaited execution proofs with derivation.");
+        return Err(ProvingError::NotAwaitingProof);
+    } else if args.proving.skip_derivation_proof {
+        let num_proofs = proofs.len();
+        warn!("Skipping stitching {num_proofs} execution proofs with derivation.");
+        return Err(ProvingError::DerivationProofError(num_proofs));
     }
 
     // Combine execution proofs with derivation proof
     let total_blocks = stitched_executions.iter().map(|e| e.len()).sum::<usize>();
     info!(
-        "Combining {}/{} execution proofs for {total_blocks} blocks with derivation proof.",
+        "Stitching {}/{} execution proofs for {total_blocks} blocks with derivation proof.",
         proofs.len(),
         stitched_executions.len()
     );
@@ -532,6 +537,7 @@ pub async fn compute_cached_proof(
         precondition_hash,
         stitched_boot_info.clone(),
     );
+    let skip_await_proof = args.proving.skip_await_proof;
     // Skip computation if previously saved to disk
     let file_name = proof_file_name(&proof_journal);
     if Path::new(&file_name).try_exists().is_ok_and(identity) && seek_proof {
@@ -599,6 +605,11 @@ pub async fn compute_cached_proof(
             seek_proof,
         )
         .await?;
+    }
+
+    if skip_await_proof {
+        // this can be reached if proof file is cached
+        return Err(ProvingError::NotAwaitingProof);
     }
 
     read_bincoded_file(&file_name)

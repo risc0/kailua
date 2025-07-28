@@ -106,6 +106,12 @@ pub async fn handle_proving_tasks(
             }
         };
 
+        // we do not get a stitched proof w/o all proofs
+        if !insufficient_l1_data && prove_args.proving.skip_stitching() {
+            info!("Skipping proving task.");
+            continue;
+        }
+
         // wait for io then read computed proof from disk
         sleep(Duration::from_secs(1)).await;
         match read_bincoded_file(&proof_file_name).await {

@@ -47,6 +47,12 @@ pub struct ProvingArgs {
     pub skip_await_proof: bool,
 }
 
+impl ProvingArgs {
+    pub fn skip_stitching(&self) -> bool {
+        self.skip_derivation_proof || self.skip_await_proof
+    }
+}
+
 /// Run the prover to generate an execution/fault/validity proof
 #[derive(Parser, Clone, Debug)]
 pub struct ProveArgs {

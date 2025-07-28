@@ -32,11 +32,11 @@ pub async fn validate(
 
     // Sanitize proving arguments
     if args.proving.skip_await_proof {
-        warn!("Validator cannot accept skip-await-proof flag.");
+        warn!("Validator ignores the skip-await-proof flag.");
         args.proving.skip_await_proof = false;
     }
     if args.proving.skip_derivation_proof {
-        warn!("Validator cannot accept skip-derivation-proof flag.");
+        warn!("Validator ignores the skip-derivation-proof flag.");
         args.proving.skip_derivation_proof = false;
     }
 
