@@ -28,15 +28,19 @@ use boundless_market::request_builder::OfferParams;
 use boundless_market::storage::{StorageProviderConfig, StorageProviderType};
 use boundless_market::{Deployment, GuestEnv, StandardStorageProvider};
 use clap::Parser;
+use human_bytes::human_bytes;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
 use kailua_common::journal::ProofJournal;
 use kailua_sync::{retry_res, retry_res_timeout};
+use lazy_static::lazy_static;
 use risc0_ethereum_contracts::selector::Selector;
 use risc0_zkvm::sha::Digestible;
 use risc0_zkvm::{default_executor, ExecutorEnv, Journal, Receipt};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tracing::log::warn;
 use tracing::{debug, error, info};
@@ -110,6 +114,9 @@ pub struct MarketProviderConfig {
     #[clap(long, env, required = false, default_value_t = 5)]
     pub boundless_look_back: u32,
 
+    /// Whether to skip preflighting execution and assume a fixed cycle count.
+    #[clap(long, env, required = false)]
+    pub boundless_assume_cycle_count: Option<u64>,
     /// Starting price (wei) per cycle of the proving order
     #[clap(long, env, required = false, default_value = "0")]
     pub boundless_cycle_min_wei: U256,
@@ -257,6 +264,11 @@ impl MarketProviderConfig {
     }
 }
 
+lazy_static! {
+    static ref BOUNDLESS_REQ: Arc<Mutex<()>> = Default::default();
+    static ref BOUNDLESS_BIN: Arc<Mutex<()>> = Default::default();
+}
+
 pub async fn run_boundless_client(
     market: MarketProviderConfig,
     storage: StorageProviderConfig,
@@ -364,22 +376,60 @@ pub async fn request_proof(
     }
 
     // Upload program
-    info!("Uploading Kailua binary.");
-    let program_url = retry_res!(boundless_client
-        .upload_program(KAILUA_FPVM_ELF)
-        .await
-        .context("Client::upload_program"))
-    .await;
+    let bin_file_name = binary_file_name(proof_journal);
+    let program_url = loop {
+        match read_bincoded_file::<String>(&bin_file_name)
+            .await
+            .map(|s| Url::parse(&s))
+        {
+            Ok(Ok(url)) => {
+                info!("Using Kailua binary previously uploaded to {url}.");
+                break url;
+            }
+            _ => {
+                // Only one prover may upload the binary at a time
+                let Ok(boundless_bin_lock) = BOUNDLESS_BIN.try_lock() else {
+                    sleep(Duration::from_secs(1)).await;
+                    continue;
+                };
+
+                info!(
+                    "Uploading {} Kailua ELF.",
+                    human_bytes(KAILUA_FPVM_ELF.len() as f64)
+                );
+                let program_url = retry_res!(boundless_client
+                    .upload_program(KAILUA_FPVM_ELF)
+                    .await
+                    .context("Client::upload_program"))
+                .await;
+                if let Err(err) =
+                    save_to_bincoded_file(&program_url.to_string(), &bin_file_name).await
+                {
+                    warn!("Failed to cache Kailua program url: {err:?}");
+                }
+                drop(boundless_bin_lock);
+                break program_url;
+            }
+        };
+    };
 
     // Preflight execution to get cycle count
     let req_file_name = request_file_name(proof_journal);
-    let cycle_count = match read_bincoded_file::<BoundlessRequest>(&req_file_name).await {
-        Ok(request) => {
+    let cycle_count = match (
+        market.boundless_assume_cycle_count,
+        read_bincoded_file::<BoundlessRequest>(&req_file_name).await,
+    ) {
+        (_, Ok(request)) => {
             // we sleep here so to avoid pinata api rate limits
             sleep(Duration::from_secs(2)).await;
             request.cycle_count
         }
-        Err(err) => {
+        (Some(cycle_count), _) => {
+            // we sleep here so to avoid pinata api rate limits
+            sleep(Duration::from_secs(2)).await;
+            cycle_count
+        }
+        (None, Err(err)) => {
             warn!("Preflighting execution: {err:?}");
             let preflight_witness_frames = witness_frames.clone();
             let preflight_stitched_proofs = stitched_proofs.clone();
@@ -418,33 +468,52 @@ pub async fn request_proof(
     };
 
     // Pass in input frames
-    let mut guest_env_builder = GuestEnv::builder();
-    for frame in witness_frames {
-        guest_env_builder = guest_env_builder.write_frame(frame);
-    }
-    // Pass in proofs
-    for proof in stitched_proofs {
-        guest_env_builder = guest_env_builder
-            .write(proof)
-            .context("GuestEnvBuilder::write")
-            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-    }
-    // Build input vector
-    let input = guest_env_builder
-        .build_vec()
-        .context("GuestEnvBuilder::build_vec")
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-
-    // Upload input
-    info!("Uploading input data ({} bytes).", input.len());
-    let input_url = retry_res!(boundless_client
-        .upload_input(&input)
+    let inp_file_name = input_file_name(proof_journal);
+    let input_url = match read_bincoded_file::<String>(&inp_file_name)
         .await
-        .context("Client::upload_input"))
-    .await;
-    // avoid api rate limits
-    sleep(Duration::from_secs(2)).await;
+        .map(|s| Url::parse(&s))
+    {
+        Ok(Ok(url)) => {
+            info!("Using input data previously uploaded to {url}.");
+            url
+        }
+        _ => {
+            // Pass in input frames
+            let mut guest_env_builder = GuestEnv::builder();
+            for frame in witness_frames {
+                guest_env_builder = guest_env_builder.write_frame(frame);
+            }
+            // Pass in proofs
+            for proof in stitched_proofs {
+                guest_env_builder = guest_env_builder
+                    .write(proof)
+                    .context("GuestEnvBuilder::write")
+                    .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+            }
+            // Build input vector
+            let input = guest_env_builder
+                .build_vec()
+                .context("GuestEnvBuilder::build_vec")
+                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
 
+            // Upload input
+            info!("Uploading {} input data.", human_bytes(input.len() as f64));
+            let input_url = retry_res!(boundless_client
+                .upload_input(&input)
+                .await
+                .context("Client::upload_input"))
+            .await;
+            // avoid api rate limits
+            sleep(Duration::from_secs(2)).await;
+            if let Err(err) = save_to_bincoded_file(&input_url.to_string(), &inp_file_name).await {
+                warn!("Failed to cache Kailua input url: {err:?}");
+            }
+            input_url
+        }
+    };
+
+    // Only one prover may submit a request at a time
+    let boundless_req_lock = BOUNDLESS_REQ.lock().await;
     // Build final request
     let boundless_wallet_address = boundless_client.signer.as_ref().unwrap().address();
     let boundless_wallet_nonce = retry_res_timeout!(boundless_client
@@ -507,6 +576,7 @@ pub async fn request_proof(
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
     };
     info!("Boundless request 0x{request_id:x} submitted");
+    drop(boundless_req_lock);
 
     if proving_args.skip_await_proof {
         warn!("Skipping awaiting proof on Boundless.");
@@ -639,6 +709,15 @@ pub async fn retrieve_proof(
 
 pub fn request_file_name(proof_journal: &ProofJournal) -> String {
     let journal_hash = keccak256(proof_journal.encode_packed());
+    format!("boundless-{journal_hash}.req")
+}
+
+pub fn binary_file_name(proof_journal: &ProofJournal) -> String {
+    format!("boundless-{}.req", proof_journal.fpvm_image_id)
+}
+
+pub fn input_file_name(proof_journal: &ProofJournal) -> String {
+    let journal_hash = !keccak256(proof_journal.encode_packed());
     format!("boundless-{journal_hash}.req")
 }
 

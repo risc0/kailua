@@ -5364,6 +5364,7 @@ dependencies = [
  "kona-protocol",
  "kona-registry",
  "kona-std-fpvm",
+ "lazy_static",
  "opentelemetry",
  "risc0-ethereum-contracts",
  "risc0-zkvm",
