@@ -51,7 +51,7 @@ pub struct DemoArgs {
     pub enable_experimental_witness_endpoint: bool,
 
     /// The L2 block to start proving from.
-    /// Defaults to three times `num_blocks_per_proof` before latest safe block.
+    /// Defaults to `nth_proof_to_process` times `num_blocks_per_proof` before latest safe block.
     #[clap(long, env)]
     pub starting_block_height: Option<u64>,
     /// The number of L2 blocks to cover per proof
@@ -149,6 +149,7 @@ pub async fn handle_blocks(
 
     let mut last_proven = args.starting_block_height;
     let mut last_wait = 0;
+    let mut n = 1u64;
     loop {
         // Wait for new data on every iteration
         sleep(Duration::from_secs(6)).await;
@@ -176,10 +177,12 @@ pub async fn handle_blocks(
         );
         // start from most recent block if unspecified
         if last_proven.is_none() {
-            last_proven = Some(safe_l2_number.saturating_sub(3 * args.num_blocks_per_proof + 1));
+            last_proven = Some(
+                safe_l2_number
+                    .saturating_sub(args.nth_proof_to_process * args.num_blocks_per_proof + 1),
+            );
         }
         // queue required proofs
-        let mut n = 1u64;
         while last_proven.unwrap() + args.num_blocks_per_proof < safe_l2_number {
             let agreed_l2_block_number = last_proven.unwrap();
             let agreed_l2_block = await_tel!(
@@ -233,12 +236,12 @@ pub async fn handle_blocks(
                     })
                     .await?;
                 info!(
-                    "Requested proof for blocks {} to {}",
+                    "Requested proof for blocks {} to {}. (N={n})",
                     agreed_l2_block_number, claimed_l2_block_number
                 );
             } else {
                 info!(
-                    "Skipped proof for blocks {} to {}",
+                    "Skipped proof for blocks {} to {}. (N={n})",
                     agreed_l2_block_number, claimed_l2_block_number
                 );
             }
