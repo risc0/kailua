@@ -57,6 +57,9 @@ pub struct DemoArgs {
     /// The number of L2 blocks to cover per proof
     #[clap(long, env)]
     pub num_blocks_per_proof: u64,
+    /// The nth proof to process. Defaults to every proof (=1).
+    #[clap(long, env, default_value_t = 1)]
+    pub nth_proof_to_process: u64,
 
     /// Directory to use for caching data
     #[clap(long, env)]
@@ -176,6 +179,7 @@ pub async fn handle_blocks(
             last_proven = Some(safe_l2_number.saturating_sub(3 * args.num_blocks_per_proof + 1));
         }
         // queue required proofs
+        let mut n = 1u64;
         while last_proven.unwrap() + args.num_blocks_per_proof < safe_l2_number {
             let agreed_l2_block_number = last_proven.unwrap();
             let agreed_l2_block = await_tel!(
@@ -213,22 +217,31 @@ pub async fn handle_blocks(
                 )
             );
             // request proof
-            channel
-                .sender
-                .send(Message::Proposal {
-                    index: last_proven.unwrap(),
-                    precondition_validation_data: None,
-                    l1_head: l1_head.header.hash,
-                    agreed_l2_head_hash: agreed_l2_block.header.hash,
-                    agreed_l2_output_root,
-                    claimed_l2_block_number,
-                    claimed_l2_output_root,
-                })
-                .await?;
-            info!(
-                "Requested proof for blocks {} to {}",
-                agreed_l2_block_number, claimed_l2_block_number
-            );
+            n = n.saturating_sub(1u64);
+            if n == 0 {
+                n = args.nth_proof_to_process;
+                channel
+                    .sender
+                    .send(Message::Proposal {
+                        index: last_proven.unwrap(),
+                        precondition_validation_data: None,
+                        l1_head: l1_head.header.hash,
+                        agreed_l2_head_hash: agreed_l2_block.header.hash,
+                        agreed_l2_output_root,
+                        claimed_l2_block_number,
+                        claimed_l2_output_root,
+                    })
+                    .await?;
+                info!(
+                    "Requested proof for blocks {} to {}",
+                    agreed_l2_block_number, claimed_l2_block_number
+                );
+            } else {
+                info!(
+                    "Skipped proof for blocks {} to {}",
+                    agreed_l2_block_number, claimed_l2_block_number
+                );
+            }
             // update state
             last_proven = Some(claimed_l2_block_number);
         }
@@ -251,7 +264,6 @@ pub async fn handle_blocks(
             };
             let ending_block = starting_block + args.num_blocks_per_proof;
             info!("Computed proof for blocks {starting_block} to {ending_block}.");
-            // let blocks = (starting_block..=ending_block)
         }
     }
 }
