@@ -19,6 +19,7 @@ use kailua_sync::transact::signer::ValidatorSignerArgs;
 use kailua_sync::transact::TransactArgs;
 use std::path::PathBuf;
 
+/// Start the agent for resolving on-chain Kailua disputes
 #[derive(clap::Args, Debug, Clone)]
 pub struct ValidateArgs {
     #[clap(flatten)]
@@ -33,6 +34,11 @@ pub struct ValidateArgs {
     /// How many proofs to compute simultaneously
     #[clap(long, env, default_value_t = 1)]
     pub num_concurrent_provers: u64,
+    /// Optionally enables the use of `debug_executePayload` to collect the execution witness from
+    /// the execution layer.
+    #[arg(long, env, default_value_t = false)]
+    pub enable_experimental_witness_endpoint: bool,
+
     /// The number of l1 heads to jump back when initially proving
     #[cfg(feature = "devnet")]
     #[clap(long, env, default_value_t = 0)]

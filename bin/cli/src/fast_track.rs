@@ -35,6 +35,7 @@ use risc0_zkvm::ALLOWED_CONTROL_ROOT;
 use std::str::FromStr;
 use tracing::info;
 
+/// Fast-track migrate a rollup to use Kailua
 #[derive(clap::Args, Debug, Clone)]
 pub struct FastTrackArgs {
     /// Address of the OP-NODE endpoint to use

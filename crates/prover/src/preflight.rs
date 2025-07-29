@@ -20,13 +20,17 @@ use alloy::eips::eip4844::IndexedBlobHash;
 use alloy::eips::BlockNumberOrTag;
 use alloy::providers::{Provider, RootProvider};
 use alloy_primitives::B256;
-use anyhow::bail;
+use anyhow::{anyhow, bail, Context};
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::precondition::PreconditionValidationData;
 use kailua_sync::provider::optimism::OpNodeProvider;
+use kailua_sync::{await_tel, retry_res_ctx_timeout};
 use kona_genesis::RollupConfig;
 use kona_preimage::{PreimageKey, PreimageKeyType};
 use kona_protocol::BlockInfo;
+use opentelemetry::global::tracer;
+use opentelemetry::trace::FutureExt;
+use opentelemetry::trace::{TraceContextExt, Tracer};
 use std::env::set_var;
 use std::iter::zip;
 use tracing::{error, info, warn};
@@ -36,11 +40,20 @@ pub async fn get_blob_fetch_request(
     block_hash: B256,
     blob_hash: B256,
 ) -> anyhow::Result<BlobFetchRequest> {
-    let block = l1_provider
-        .get_block_by_hash(block_hash)
-        .full()
-        .await?
-        .expect("Failed to fetch block {block_hash}.");
+    let tracer = tracer("kailua");
+    let context = opentelemetry::Context::current_with_span(tracer.start("get_blob_fetch_request"));
+
+    let block = await_tel!(
+        context,
+        tracer,
+        "get_block_by_hash",
+        retry_res_ctx_timeout!(l1_provider
+            .get_block_by_hash(block_hash)
+            .full()
+            .await
+            .context("get_block_by_hash")?
+            .ok_or_else(|| anyhow!("Failed to fetch starting block")))
+    );
     let mut blob_index = 0;
     let mut blob_found = false;
     for blob in block.transactions.into_transactions().flat_map(|tx| {
@@ -139,13 +152,24 @@ pub async fn concurrent_execution_preflight(
     op_node_provider: &OpNodeProvider,
     disk_kv_store: Option<RWLKeyValueStore>,
 ) -> anyhow::Result<()> {
+    let tracer = tracer("kailua");
+    let context =
+        opentelemetry::Context::current_with_span(tracer.start("concurrent_execution_preflight"));
+
     let l2_provider = args.kona.create_providers().await?.l2;
-    let starting_block = l2_provider
-        .get_block_by_hash(args.kona.agreed_l2_head_hash)
-        .await?
-        .unwrap()
-        .header
-        .number;
+    let starting_block = await_tel!(
+        context,
+        tracer,
+        "l2_provider get_block_by_hash agreed_l2_head_hash",
+        retry_res_ctx_timeout!(l2_provider
+            .get_block_by_hash(args.kona.agreed_l2_head_hash)
+            .await
+            .context("l2_provider get_block_by_hash agreed_l2_head_hash")?
+            .ok_or_else(|| anyhow!("Failed to fetch agreed l2 block")))
+    )
+    .header
+    .number;
+
     let mut num_blocks = args.kona.claimed_l2_block_number - starting_block;
     if num_blocks == 0 {
         return Ok(());
@@ -164,12 +188,18 @@ pub async fn concurrent_execution_preflight(
         num_blocks = num_blocks.saturating_sub(processed_blocks);
 
         // update ending block
-        args.kona.claimed_l2_block_number = l2_provider
-            .get_block_by_hash(args.kona.agreed_l2_head_hash)
-            .await?
-            .unwrap()
-            .header
-            .number
+        args.kona.claimed_l2_block_number = await_tel!(
+            context,
+            tracer,
+            "l2_provider get_block_by_hash agreed_l2_head_hash",
+            retry_res_ctx_timeout!(l2_provider
+                .get_block_by_hash(args.kona.agreed_l2_head_hash)
+                .await
+                .context("l2_provider get_block_by_hash agreed_l2_head_hash")?
+                .ok_or_else(|| anyhow!("Failed to fetch agreed l2 block")))
+        )
+        .header
+        .number
             + processed_blocks;
         args.kona.claimed_l2_output_root = op_node_provider
             .output_at_block(args.kona.claimed_l2_block_number)
@@ -191,12 +221,21 @@ pub async fn concurrent_execution_preflight(
         // jobs.push(args.clone());
         // update starting block for next job
         if num_blocks > 0 {
-            args.kona.agreed_l2_head_hash = l2_provider
-                .get_block_by_number(BlockNumberOrTag::Number(args.kona.claimed_l2_block_number))
-                .await?
-                .unwrap()
-                .header
-                .hash;
+            args.kona.agreed_l2_head_hash = await_tel!(
+                context,
+                tracer,
+                "l2_provider get_block_by_number claimed_l2_block_number",
+                retry_res_ctx_timeout!(l2_provider
+                    .get_block_by_number(BlockNumberOrTag::Number(
+                        args.kona.claimed_l2_block_number
+                    ))
+                    .await
+                    .context("l2_provider get_block_by_number claimed_l2_block_number")?
+                    .ok_or_else(|| anyhow!("Failed to claimed l2 block")))
+            )
+            .header
+            .hash;
+
             args.kona.agreed_l2_output_root = args.kona.claimed_l2_output_root;
         }
     }

@@ -20,10 +20,25 @@ use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 use std::path::PathBuf;
 use tokio::{spawn, try_join};
+use tracing::warn;
 
-pub async fn validate(args: ValidateArgs, verbosity: u8, data_dir: PathBuf) -> anyhow::Result<()> {
+pub async fn validate(
+    mut args: ValidateArgs,
+    verbosity: u8,
+    data_dir: PathBuf,
+) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("validate"));
+
+    // Sanitize proving arguments
+    if args.proving.skip_await_proof {
+        warn!("Validator cannot accept skip-await-proof flag.");
+        args.proving.skip_await_proof = false;
+    }
+    if args.proving.skip_derivation_proof {
+        warn!("Validator cannot accept skip-derivation-proof flag.");
+        args.proving.skip_derivation_proof = false;
+    }
 
     // We run two concurrent tasks, one for the chain, and one for the prover.
     // Both tasks communicate using the duplex channel

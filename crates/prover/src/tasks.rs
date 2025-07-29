@@ -16,6 +16,7 @@ use crate::args::ProveArgs;
 use crate::kv::RWLKeyValueStore;
 use crate::proof::{proof_file_name, read_bincoded_file};
 use crate::ProvingError;
+use alloy::providers::RootProvider;
 use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
 use async_channel::{Receiver, Sender};
@@ -23,6 +24,7 @@ use kailua_build::KAILUA_FPVM_ID;
 use kailua_common::boot::StitchedBootInfo;
 use kailua_common::client::stitching::{split_executions, stitch_boot_info};
 use kailua_common::executor::{exec_precondition_hash, Execution};
+use kailua_sync::provider::optimism::OpNodeProvider;
 use kona_genesis::RollupConfig;
 use kona_proof::BootInfo;
 use risc0_zkvm::Receipt;
@@ -225,7 +227,7 @@ pub async fn compute_fpvm_proof(
         // force attempting to compute the proof if it only combines boot infos
         stitching_only,
         // skip seeking a complete proof if skipping derivation
-        !args.skip_derivation_proof,
+        !args.proving.skip_derivation_proof,
         task_sender.clone(),
     )
     .await;
@@ -239,7 +241,7 @@ pub async fn compute_fpvm_proof(
     let (_, execution_cache) = split_executions(executed_blocks.clone());
 
     // perform a derivation-only run to check its provability
-    if !args.skip_derivation_proof {
+    if !args.proving.skip_derivation_proof {
         info!(
             "Performing derivation-only run for {} executions.",
             execution_cache.len()
@@ -394,7 +396,7 @@ pub async fn compute_fpvm_proof(
         .unzip();
 
     // Return no proof if derivation is not required
-    if args.skip_derivation_proof {
+    if args.proving.skip_derivation_proof {
         return Ok(None);
     }
 
@@ -518,6 +520,44 @@ pub async fn compute_cached_proof(
             info!("Computing uncached proof {file_name}.");
         } else {
             info!("Running native client.");
+        }
+
+        // preflight
+        if args.kona.enable_experimental_witness_endpoint
+            && !args.kona.is_offline()
+            && args.op_node_address.is_some()
+        {
+            let l2_provider = args
+                .kona
+                .l2_node_address
+                .as_ref()
+                .map(|addr| {
+                    RootProvider::new_http(
+                        addr.as_str()
+                            .try_into()
+                            .expect("Failed to parse l2_node_address"),
+                    )
+                })
+                .unwrap();
+            let op_node_provider = args
+                .op_node_address
+                .as_ref()
+                .map(|addr| {
+                    OpNodeProvider(RootProvider::new_http(
+                        addr.as_str()
+                            .try_into()
+                            .expect("Failed to parse op_node_address"),
+                    ))
+                })
+                .unwrap();
+            crate::client::payload::run_payload_client(
+                boot,
+                l2_provider,
+                op_node_provider,
+                disk_kv_store.clone(),
+            )
+            .await
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
         }
 
         // generate a proof using the kailua client and kona server

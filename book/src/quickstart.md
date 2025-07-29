@@ -45,10 +45,14 @@ You can deploy a local optimism devnet equipped with Kailua through the followin
     * This monitors `KailuaGame` instances for disputes and creates proofs to resolve them.
     * (VALIDITY PROVING) Use `just devnet-validate [block-height]` to generate validity proofs to fast-forward finality until the specified L2 block height.
     * (DEVELOPMENT MODE): Use `RISC0_DEV_MODE=1` to use fake proofs.
-7. `just devnet-fault`
+7. `just devnet-rpc`
+    * Launches the Kailua RPC.
+    * This provides utility RPC methods for initiating withdrawals.
+    * Listens on http://127.0.0.1:1337 and ws://127.0.0.1:1337 by default.
+8. `just devnet-fault`
     * Deploys a single `KailuaGame` instance with a faulty sequencing proposal.
     * Tests the validator's fault proving functionality.
     * Tests the proposer's canonical chain tracking functionality.
-8. After you're done:
+9. After you're done:
     * `just devnet-down` to stop the running docker containers.
     * `just devnet-clean` to cleanup the docker volumes.

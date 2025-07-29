@@ -16,6 +16,7 @@ use kona_preimage::{HintWriter, OracleReader};
 use kona_std_fpvm::{FileChannel, FileDescriptor};
 
 pub mod native;
+pub mod payload;
 pub mod proving;
 pub mod witgen;
 

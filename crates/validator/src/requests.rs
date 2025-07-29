@@ -165,11 +165,9 @@ pub async fn handle_proof_requests(
                 server: false,
                 l2_chain_id: Some(rollup_config.l2_chain_id),
                 rollup_config_path: None,
-                enable_experimental_witness_endpoint: false,
+                enable_experimental_witness_endpoint: args.enable_experimental_witness_endpoint,
             },
             op_node_address: Some(args.sync.provider.op_node_url.clone()),
-            skip_derivation_proof: false,
-            skip_await_proof: false,
             proving: ProvingArgs {
                 payout_recipient_address: Some(payout_recipient),
                 ..args.proving.clone()
