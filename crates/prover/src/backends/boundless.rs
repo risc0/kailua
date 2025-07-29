@@ -541,8 +541,10 @@ pub async fn request_proof(
     let min_price = market.boundless_cycle_min_wei * cycles;
     let max_price = market.boundless_cycle_max_wei * cycles;
     let bid_delay_time = (market.boundless_order_bid_delay_factor * segment_count) as u64;
+    let corrected_lock_timeout_factor =
+        market.boundless_order_ramp_up_factor + market.boundless_order_lock_timeout_factor;
     let corrected_expiry_factor =
-        market.boundless_order_lock_timeout_factor + market.boundless_order_expiry_factor;
+        corrected_lock_timeout_factor + market.boundless_order_expiry_factor;
     let request = boundless_client
         .new_request()
         .with_journal(Journal::new(proof_journal.encode_packed()))
@@ -561,7 +563,7 @@ pub async fn request_proof(
                 .bidding_start(boundless_rpc_time + bid_delay_time)
                 .lock_stake(market.boundless_mega_cycle_stake * U256::from(segment_count))
                 .ramp_up_period((market.boundless_order_ramp_up_factor * segment_count) as u32)
-                .lock_timeout((market.boundless_order_lock_timeout_factor * segment_count) as u32)
+                .lock_timeout((corrected_lock_timeout_factor * segment_count) as u32)
                 .timeout((corrected_expiry_factor * segment_count) as u32)
                 .build()
                 .context("OfferParamsBuilder::build()")

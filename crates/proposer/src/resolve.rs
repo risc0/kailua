@@ -83,8 +83,7 @@ pub async fn resolve_next_pending_proposal<P: Provider>(
     let is_validity_proven = await_tel!(
         context,
         resolved_parent.fetch_is_successor_validity_proven(&agent.provider.l1_provider)
-    )
-    .context("is_validity_proven")?;
+    );
     if !is_validity_proven && challenger_duration > 0 {
         info!("Waiting for {challenger_duration} more seconds of chain time before resolution of proposal {unresolved_successor_index}.");
         return Ok(false);
