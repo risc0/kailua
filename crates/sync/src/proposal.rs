@@ -672,16 +672,16 @@ impl Proposal {
     pub async fn fetch_is_successor_validity_proven<P: Provider<N>, N: Network>(
         &self,
         provider: P,
-    ) -> anyhow::Result<bool> {
+    ) -> bool {
         let tracer = tracer("kailua");
         let context =
             opentelemetry::Context::current_with_span(tracer.start("Proposal::fetch_finality"));
 
-        Ok(!self
+        !self
             .tournament_contract_instance(provider)
             .validChildSignature()
             .stall_with_context(context.clone(), "KailuaTournament::validChildSignature")
             .await
-            .is_zero())
+            .is_zero()
     }
 }

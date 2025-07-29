@@ -15,6 +15,7 @@ anyhow.workspace = true
 async-channel.workspace = true
 bytemuck.workspace = true
 clap.workspace = true
+rand.workspace = true
 tokio.workspace = true
 tokio-retry.workspace = true
 tracing.workspace = true
