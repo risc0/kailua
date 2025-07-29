@@ -37,6 +37,7 @@
             const path_to_root = "";
             const default_light_theme = "ayu";
             const default_dark_theme = "ayu";
+            window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc.js"></script>
@@ -93,10 +94,13 @@
                 sidebar = sidebar || 'visible';
             } else {
                 sidebar = 'hidden';
+                sidebar_toggle.checked = false;
             }
-            sidebar_toggle.checked = sidebar === 'visible';
-            html.classList.remove('sidebar-visible');
-            html.classList.add("sidebar-" + sidebar);
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
@@ -144,7 +148,7 @@
                         <a href="https://github.com/risc0/kailua" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
-                        <a href="https://github.com/risc0/kailua/edit/main/book/src/operate.md" title="Suggest an edit" aria-label="Suggest an edit">
+                        <a href="https://github.com/risc0/kailua/edit/main/book/src/operate.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
                             <i id="git-edit-button" class="fa fa-edit"></i>
                         </a>
 
@@ -153,7 +157,12 @@
 
                 <div id="search-wrapper" class="hidden">
                     <form id="searchbar-outer" class="searchbar-outer">
-                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
                     </form>
                     <div id="searchresults-outer" class="searchresults-outer hidden">
                         <div id="searchresults-header" class="searchresults-header"></div>
@@ -174,33 +183,10 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="off-chain-agents"><a class="header" href="#off-chain-agents">Off-chain Agents</a></h1>
-<p>Once your chain contracts are upgraded to integrate Kailua, this section describes what you need to do for sequencing
-and fault proving to take place in your rollup using Kailua.
-Kailua provides two agents to take on the role of the standard Optimism <code>op-proposer</code> and <code>op-challenger</code> agents.</p>
-<div id="admonition-tip" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-title">
-<div class="admonition-title">
-<div id="admonition-tip-title">
-<p>Tip</p>
-</div>
-<a class="admonition-anchor-link" href="#admonition-tip"></a>
-</div>
-<div>
-<p>If you will only be using Kailua for sequencing (and withdrawals), you should terminate your <code>op-proposer</code> and
-<code>op-challenger</code> agent processes if you plan on reusing their wallets to avoid transaction errors.</p>
-</div>
-</div>
-<div id="admonition-warning" class="admonition admonish-warning" role="note" aria-labelledby="admonition-warning-title">
-<div class="admonition-title">
-<div id="admonition-warning-title">
-<p>Warning</p>
-</div>
-<a class="admonition-anchor-link" href="#admonition-warning"></a>
-</div>
-<div>
-<p>Just like their optimism counterparts, the Kailua agents must remain online and their wallets sufficiently funded to
-guarantee the safety and liveness of your rollup.</p>
-</div>
-</div>
+<p>Once your chain contracts are upgraded to integrate Kailua, this section describes what you need to do for sequencing,
+withdrawals, and fault proving to take place in your rollup using Kailua.
+Kailua provides two agents to take on the role of the standard Optimism <code>op-proposer</code> and <code>op-challenger</code> agents, and
+one RPC server to facilitate dispute game contract selection during withdrawals.</p>
 <div id="admonition-danger" class="admonition admonish-danger" role="note" aria-labelledby="admonition-danger-title">
 <div class="admonition-title">
 <div id="admonition-danger-title">
@@ -211,6 +197,31 @@ guarantee the safety and liveness of your rollup.</p>
 <div>
 <p>Without a Vanguard, sequencing in Kailua is fully permissionless at all time.
 Anyone can run these Kailua agents for your rollup and publish proposals when possible.</p>
+</div>
+</div>
+<div id="admonition-warning" class="admonition admonish-warning" role="note" aria-labelledby="admonition-warning-title">
+<div class="admonition-title">
+<div id="admonition-warning-title">
+<p>Warning</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-warning"></a>
+</div>
+<div>
+<p>Just like their optimism counterparts, the Kailua Proposer and Validator must remain online and their wallets
+sufficiently funded to guarantee the safety and liveness of your rollup.</p>
+</div>
+</div>
+<div id="admonition-info" class="admonition admonish-info" role="note" aria-labelledby="admonition-info-title">
+<div class="admonition-title">
+<div id="admonition-info-title">
+<p>Info</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-info"></a>
+</div>
+<div>
+<p>When using the <code>proveWithdrawalTransaction</code>/<code>finalizeWithdrawalTransaction</code> functions in <code>OptimismPortal2</code> with Kailua
+games, you cannot just use any sequencing proposal that has a valid root claim and assume it can be eventually resolved.
+The Kailua RPC can be used to query which dispute game contract can be used to initiate a prove a withdrawal transaction.</p>
 </div>
 </div>
 
@@ -262,6 +273,7 @@ Anyone can run these Kailua agents for your rollup and publish proposals when po
         <!-- Custom JS scripts -->
         <script src="mermaid.min.js"></script>
         <script src="mermaid-init.js"></script>
+
 
 
     </div>

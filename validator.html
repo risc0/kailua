@@ -37,6 +37,7 @@
             const path_to_root = "";
             const default_light_theme = "ayu";
             const default_dark_theme = "ayu";
+            window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc.js"></script>
@@ -93,10 +94,13 @@
                 sidebar = sidebar || 'visible';
             } else {
                 sidebar = 'hidden';
+                sidebar_toggle.checked = false;
             }
-            sidebar_toggle.checked = sidebar === 'visible';
-            html.classList.remove('sidebar-visible');
-            html.classList.add("sidebar-" + sidebar);
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
@@ -144,7 +148,7 @@
                         <a href="https://github.com/risc0/kailua" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
-                        <a href="https://github.com/risc0/kailua/edit/main/book/src/validator.md" title="Suggest an edit" aria-label="Suggest an edit">
+                        <a href="https://github.com/risc0/kailua/edit/main/book/src/validator.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
                             <i id="git-edit-button" class="fa fa-edit"></i>
                         </a>
 
@@ -153,7 +157,12 @@
 
                 <div id="search-wrapper" class="hidden">
                     <form id="searchbar-outer" class="searchbar-outer">
-                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
                     </form>
                     <div id="searchresults-outer" class="searchresults-outer hidden">
                         <div id="searchresults-header" class="searchresults-header"></div>
@@ -190,16 +199,7 @@ Node software other than <code>op-geth</code> is not as reliable for the necessa
 </div>
 <h2 id="usage"><a class="header" href="#usage">Usage</a></h2>
 <p>Starting the Kailua validator is straightforward:</p>
-<pre><code class="language-shell">kailua-cli validate \
-  --eth-rpc-url [YOUR_ETH_RPC_URL] \
-  --beacon-rpc-url [YOUR_BEACON_RPC_URL] \
-  --op-geth-url [YOUR_OP_GETH_URL] \
-  --op-node-url [YOUR_OP_NODE_URL] \
-  --data-dir [YOUR_VALIDATOR_DATA_CACHE_PATH] \
-  --validator-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY] \
-  --payout-recipient-address [YOUR_FAULT_PROOF_PAYOUT_RECIPIENT] \
-  --txn-timeout [YOUR_TRANSACTION_TIMEOUT_SECONDS] \
-  --exec-gas-premium [YOUR_EXECUTION_GAS_PREMIUM_PERCENTAGE]
+<pre><code class="language-shell">kailua-cli validate [OPTIONS] --op-node-url &lt;OP_NODE_URL&gt; --op-geth-url &lt;OP_GETH_URL&gt; --eth-rpc-url &lt;ETH_RPC_URL&gt; --beacon-rpc-url &lt;BEACON_RPC_URL&gt;
 </code></pre>
 <div id="admonition-tip" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-title">
 <div class="admonition-title">
@@ -209,20 +209,20 @@ Node software other than <code>op-geth</code> is not as reliable for the necessa
 <a class="admonition-anchor-link" href="#admonition-tip"></a>
 </div>
 <div>
-<p>All the parameters in this section can be provided as environment variables.</p>
+<p>All the parameters above can be provided as environment variables.</p>
 </div>
 </div>
-<h3 id="endpoints"><a class="header" href="#endpoints">Endpoints</a></h3>
-<p>The first four arguments specify the endpoints that the validator should use to generate fault proofs:</p>
+<h3 id="remote-endpoints"><a class="header" href="#remote-endpoints">Remote Endpoints</a></h3>
+<p>The mandatory arguments specify the endpoints that the validator should use to resolve disputes:</p>
 <ul>
-<li><code>eth-rpc-url</code>: The parent chain (ethereum) endpoint for reading proposals and publishing proofs.</li>
+<li><code>eth-rpc-url</code>: The parent chain (ethereum) endpoint for reading proposals.</li>
 <li><code>beacon-rpc-url</code>: The DA layer (eth-beacon chain) endpoint for retrieving rollup data.</li>
-<li><code>op-geth-url</code>: The (archive) rollup <code>op-geth</code> endpoint to read fault proving witness data from.</li>
+<li><code>op-geth-url</code>: The rollup <code>op-geth</code> endpoint to read configuration data from.</li>
 <li><code>op-node-url</code>: The rollup <code>op-node</code> endpoint to read sequencing proposals from.</li>
 </ul>
-<h3 id="cache-directory-optional"><a class="header" href="#cache-directory-optional">Cache Directory (Optional)</a></h3>
+<h3 id="cache-directory"><a class="header" href="#cache-directory">Cache Directory</a></h3>
 <p>The validator saves data to disk as it tracks on-chain proposals.
-This allows it to restart quickly without requesting a lot of old on-chain data if terminated.</p>
+This allows it to restart quickly.</p>
 <ul>
 <li><code>data-dir</code>: Optional directory to save data to.
 <ul>
@@ -230,18 +230,45 @@ This allows it to restart quickly without requesting a lot of old on-chain data 
 </ul>
 </li>
 </ul>
-<h3 id="prover"><a class="header" href="#prover">Prover</a></h3>
-<p>To create a fault proof, the validator invokes the <code>kailua-cli</code> binary with the <code>prove</code> command.</p>
+<h3 id="kailua-deployment"><a class="header" href="#kailua-deployment">Kailua Deployment</a></h3>
+<p>These arguments manually determine the Kailua contract deployment to use and the termination condition.</p>
 <ul>
-<li><code>kailua-cli</code>: The path to the binary to call for proof generation.
-Defaults to the path of the invoked <code>kailua-cli</code> executable.</li>
+<li><code>kailua-game-implementation</code>: The <code>KailuaGame</code> contract address.</li>
+<li><code>kailua-anchor-address</code>: Address of the first proposal to synchronize from.</li>
+<li><code>final-l2-block</code>: The last L2 block number to reach and then stop.</li>
+</ul>
+<h3 id="telemetry"><a class="header" href="#telemetry">Telemetry</a></h3>
+<p>Telemetry data can be exported to an <a href="https://opentelemetry.io/docs/collector/">OTLP Collector</a>.</p>
+<ul>
+<li><code>otlp-collector</code>: The OTLP collector endpoint.</li>
+</ul>
+<h3 id="rollup-config"><a class="header" href="#rollup-config">Rollup Config</a></h3>
+<p>These arguments tell Kailua how to read the rollup configuration.</p>
+<ul>
+<li><code>bypass-chain-registry</code>: This flag forces the rollup configuration to be fetched from <code>op-node</code> and <code>op-geth</code>.</li>
+</ul>
+<h3 id="prover"><a class="header" href="#prover">Prover</a></h3>
+<p>The validator proving behavior can be customized through the following arguments:</p>
+<ul>
+<li><code>kailua-cli</code>: The optional path of the external binary to call for custom proof generation.</li>
+<li><code>num-concurrent-provers</code>: Number of provers to run simultaneously (Default: 1)</li>
+<li><code>num-concurrent-preflights</code>: Number of threads per prover to use for fetching preflight data (Default: 4)</li>
+<li><code>num-concurrent-proofs</code>: Number of threads per prover to use for computing sub-proofs (Default: 1)</li>
+<li><code>segment-limit</code>: ZKVM Proving Segment Limit (Default 21)</li>
+<li><code>max-witness-size</code>: Maximum input data byte size per sub-proof (Default 2684354560)</li>
 </ul>
 <h3 id="wallet"><a class="header" href="#wallet">Wallet</a></h3>
 <p>The validator requires a funded wallet to be able to publish fault proofs on chain, and an (optional) alternative address
-to direct fault proof submission payouts towards</p>
+to direct fault proof submission payouts towards.
+This wallet can be specified directly as a private key or as an external AWS/GCP signer.</p>
 <ul>
 <li><code>validator-key</code>: The private key for the validator wallet.</li>
 <li><code>payout-recipient-address</code>: The ethereum address to use as the recipient of fault proof payouts.</li>
+<li><code>validator-aws-key-id</code>: AWS KMS Key ID</li>
+<li><code>validator-google-project-id</code>: GCP KMS Project ID</li>
+<li><code>validator-google-location</code>: GCP KMS Location</li>
+<li><code>validator-google-keyring</code>: GCP KMS Keyring Name</li>
+<li><code>validator-google-key-name</code>: GCP KMS Key name</li>
 </ul>
 <div id="admonition-tip-1" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-1-title">
 <div class="admonition-title">
@@ -380,16 +407,18 @@ These parameters can be passed in as CLI arguments or set as environment variabl
 <ul>
 <li><code>boundless-rpc-url</code>: The rpc endpoint of the L1 chain where the Boundless network is deployed.</li>
 <li><code>boundless-wallet-key</code>: The wallet private key to use to send proof request transactions.</li>
-<li><code>boundless-offchain</code>: (Optional) Flag instructing whether to submit proofs off-chain.</li>
 <li><code>boundless-order-stream-url</code>: (Optional) The URL to use for off-chain order submission.</li>
+<li><code>boundless-chain-id</code>: EIP-155 chain ID of the network hosting Boundless.</li>
+<li><code>boundless-verifier-router-address</code>: Address of the RiscZeroVerifierRouter contract.</li>
 <li><code>boundless-set-verifier-address</code>: The address of the RISC Zero verifier supporting aggregated proofs for order validation.</li>
 <li><code>boundless-market-address</code>: The address of the Boundless market contract.</li>
+<li><code>boundless-stake-token-address</code>: Address of the stake token contract. The staking token is an ERC-20.</li>
 <li><code>boundless-lookback</code>: (Defaults to <code>5</code>) The number of previous proof requests to inspect for duplicates before making a new proof request.</li>
-<li><code>boundless-order-min-price-eth</code>: (Defaults to <code>0.0001</code>) Starting price per megacycle of proving orders.</li>
-<li><code>boundless-order-max-price-eth</code>: (Defaults to <code>0.0002</code>) Maximum price per megacycle of proving orders.</li>
-<li><code>boundless-order-ramp-up-period</code>: (Defaults to <code>60</code>) Time in seconds before order pricing increases.</li>
+<li><code>boundless-cycle-min-wei</code>: (Defaults to <code>100000000</code>) Starting price (wei) per cycle of proving.</li>
+<li><code>boundless-cycle-max-wei</code>: (Defaults to <code>200000000</code>) Maximum price (wei) per cycle of proving.</li>
+<li><code>boundless-order-ramp-up-factor</code>: (Defaults to <code>0.25</code>) Multiplier for order price to ramp up to maximum.</li>
 <li><code>boundless-order-lock-timeout-factor</code>: (Defaults to <code>3</code>) Multiplier for order fulfillment timeout after locking.</li>
-<li><code>boundless-order-timeout-factor</code>: (Defaults to <code>10</code>) Multiplier for order expiry timeout after creation.</li>
+<li><code>boundless-order-expiry-factor</code>: (Defaults to <code>10</code>) Multiplier for order expiry timeout after creation.</li>
 <li><code>boundless-order-check-interval</code>: (Defaults to <code>12</code>) Time in seconds between attempts to check order status.</li>
 </ul>
 <div id="admonition-note-4" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-4-title">
@@ -414,6 +443,7 @@ The default scale values give a 1 MHz prover 3x the amount of time it needs to f
 <li><code>s3-secret-key</code>: The <code>s3</code> secret key.</li>
 <li><code>s3-bucket</code>: The <code>s3</code> bucket.</li>
 <li><code>s3-url</code>: The <code>s3</code> url.</li>
+<li><code>s3-use-presigned</code>: Use presigned URLs for S3.</li>
 <li><code>aws-region</code>: The <code>s3</code> region.</li>
 <li><code>pinata-jwt</code>: The private <code>pinata</code> jwt.</li>
 <li><code>pinata-api-url</code>: The <code>pinata</code> api URL.</li>
@@ -432,16 +462,9 @@ The default scale values give a 1 MHz prover 3x the amount of time it needs to f
 </div>
 </div>
 <h2 id="advanced-settings"><a class="header" href="#advanced-settings">Advanced Settings</a></h2>
-<p>Fault/Validity proof generation can be fine-tuned via the two following environment variables:</p>
-<ul>
-<li><code>NUM_CONCURRENT_PROVERS</code>: (default 1) The maximum number of prover instances to run concurrently in the validator.</li>
-<li><code>NUM_CONCURRENT_PREFLIGHTS</code>: (default 4) Sets the number of concurrent data preflights per proving task.</li>
-<li><code>NUM_CONCURRENT_PROOFS</code>: (default 1) Sets the number of concurrent proofs to seek per prover instance.</li>
-<li><code>SEGMENT_LIMIT</code>: The <a href="https://docs.rs/risc0-zkvm/1.2.3/risc0_zkvm/struct.ExecutorEnvBuilder.html#method.segment_limit_po2">segment size limit</a> used for local proving (Default 21).</li>
-<li><code>MAX_WITNESS_SIZE</code>: The maximum input size per single proof (Default 2.5GB).</li>
-</ul>
 <p>When manually computing individual proofs, the following parameters (or equiv. env. vars) take effect:</p>
 <ul>
+<li><code>SKIP_AWAIT_PROOF</code>: Skips waiting for the proving process to complete on Bonsai/Boundless.</li>
 <li><code>SKIP_DERIVATION_PROOF</code>: Skips provably deriving L2 transactions using L1 data.</li>
 </ul>
 
@@ -453,6 +476,9 @@ The default scale values give a 1 MHz prover 3x the amount of time it needs to f
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
+                            <a rel="next prefetch" href="rpc.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
 
                         <div style="clear: both"></div>
                     </nav>
@@ -464,6 +490,9 @@ The default scale values give a 1 MHz prover 3x the amount of time it needs to f
                         <i class="fa fa-angle-left"></i>
                     </a>
 
+                    <a rel="next prefetch" href="rpc.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
             </nav>
 
         </div>
@@ -487,6 +516,7 @@ The default scale values give a 1 MHz prover 3x the amount of time it needs to f
         <!-- Custom JS scripts -->
         <script src="mermaid.min.js"></script>
         <script src="mermaid-init.js"></script>
+
 
 
     </div>

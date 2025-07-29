@@ -37,6 +37,7 @@
             const path_to_root = "";
             const default_light_theme = "ayu";
             const default_dark_theme = "ayu";
+            window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc.js"></script>
@@ -93,10 +94,13 @@
                 sidebar = sidebar || 'visible';
             } else {
                 sidebar = 'hidden';
+                sidebar_toggle.checked = false;
             }
-            sidebar_toggle.checked = sidebar === 'visible';
-            html.classList.remove('sidebar-visible');
-            html.classList.add("sidebar-" + sidebar);
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
@@ -144,7 +148,7 @@
                         <a href="https://github.com/risc0/kailua" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
-                        <a href="https://github.com/risc0/kailua/edit/main/book/src/proposer.md" title="Suggest an edit" aria-label="Suggest an edit">
+                        <a href="https://github.com/risc0/kailua/edit/main/book/src/proposer.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
                             <i id="git-edit-button" class="fa fa-edit"></i>
                         </a>
 
@@ -153,7 +157,12 @@
 
                 <div id="search-wrapper" class="hidden">
                     <form id="searchbar-outer" class="searchbar-outer">
-                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
                     </form>
                     <div id="searchresults-outer" class="searchresults-outer hidden">
                         <div id="searchresults-header" class="searchresults-header"></div>
@@ -179,16 +188,7 @@ a format that is compatible with the Kailua ZK fault dispute mechanism.
 It also attempts to resolve any finalizeable proposals.</p>
 <h2 id="usage"><a class="header" href="#usage">Usage</a></h2>
 <p>Starting the Kailua proposer is straightforward:</p>
-<pre><code class="language-shell">kailua-cli propose \
-  --eth-rpc-url [YOUR_ETH_RPC_URL] \
-  --beacon-rpc-url [YOUR_BEACON_RPC_URL] \
-  --op-geth-url [YOUR_OP_GETH_URL] \
-  --op-node-url [YOUR_OP_NODE_URL] \
-  --data-dir [YOUR_PROPOSER_DATA_CACHE_PATH] \
-  --proposer-key [YOUR_PROPOSER_WALLET_PRIVATE_KEY] \
-  --txn-timeout [YOUR_TRANSACTION_TIMEOUT_SECONDS] \
-  --exec-gas-premium [YOUR_EXECUTION_GAS_PREMIUM_PERCENTAGE] \
-  --blob-gas-premium [YOUR_BLOB_GAS_PREMIUM_PERCENTAGE]
+<pre><code class="language-shell">Usage: kailua-cli propose [OPTIONS] --op-node-url &lt;OP_NODE_URL&gt; --op-geth-url &lt;OP_GETH_URL&gt; --eth-rpc-url &lt;ETH_RPC_URL&gt; --beacon-rpc-url &lt;BEACON_RPC_URL&gt;
 </code></pre>
 <div id="admonition-tip" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-title">
 <div class="admonition-title">
@@ -202,16 +202,16 @@ It also attempts to resolve any finalizeable proposals.</p>
 </div>
 </div>
 <h3 id="endpoints"><a class="header" href="#endpoints">Endpoints</a></h3>
-<p>The first four arguments specify the endpoints that the proposer should use for sequencing:</p>
+<p>The mandatory arguments specify the endpoints that the proposer should use for sequencing:</p>
 <ul>
 <li><code>eth-rpc-url</code>: The parent chain (ethereum) endpoint for reading/publishing proposals.</li>
 <li><code>beacon-rpc-url</code>: The DA layer (eth-beacon chain) endpoint for retrieving published proposal data.</li>
 <li><code>op-geth-url</code>: The rollup <code>op-geth</code> endpoint to read configuration data from.</li>
 <li><code>op-node-url</code>: The rollup <code>op-node</code> endpoint to read sequencing proposals from.</li>
 </ul>
-<h3 id="cache-directory-optional"><a class="header" href="#cache-directory-optional">Cache Directory (Optional)</a></h3>
+<h3 id="cache-directory"><a class="header" href="#cache-directory">Cache Directory</a></h3>
 <p>The proposer saves data to disk as it tracks on-chain proposals.
-This allows it to restart quickly without requesting a lot of old on-chain data if terminated.</p>
+This allows it to restart quickly.</p>
 <ul>
 <li><code>data-dir</code>: Optional directory to save data to.
 <ul>
@@ -219,10 +219,32 @@ This allows it to restart quickly without requesting a lot of old on-chain data 
 </ul>
 </li>
 </ul>
+<h3 id="kailua-deployment"><a class="header" href="#kailua-deployment">Kailua Deployment</a></h3>
+<p>These arguments manually determine the Kailua contract deployment to use and the termination condition.</p>
+<ul>
+<li><code>kailua-game-implementation</code>: The <code>KailuaGame</code> contract address.</li>
+<li><code>kailua-anchor-address</code>: Address of the first proposal to synchronize from.</li>
+<li><code>final-l2-block</code>: The last L2 block number to reach and then stop.</li>
+</ul>
+<h3 id="telemetry"><a class="header" href="#telemetry">Telemetry</a></h3>
+<p>Telemetry data can be exported to an <a href="https://opentelemetry.io/docs/collector/">OTLP Collector</a>.</p>
+<ul>
+<li><code>otlp-collector</code>: The OTLP collector endpoint.</li>
+</ul>
+<h3 id="rollup-config"><a class="header" href="#rollup-config">Rollup Config</a></h3>
+<p>These arguments tell Kailua how to read the rollup configuration.</p>
+<ul>
+<li><code>bypass-chain-registry</code>: This flag forces the rollup configuration to be fetched from <code>op-node</code> and <code>op-geth</code>.</li>
+</ul>
 <h3 id="wallet"><a class="header" href="#wallet">Wallet</a></h3>
 <p>The proposer requires a funded wallet to be able to publish new sequencing proposals on-chain.</p>
 <ul>
 <li><code>proposer-key</code>: The private key for the proposer wallet.</li>
+<li><code>proposer-aws-key-id</code>: AWS KMS Key ID</li>
+<li><code>proposer-google-project-id</code>: GCP KMS Project ID</li>
+<li><code>proposer-google-location</code>: GCP KMS Location</li>
+<li><code>proposer-google-keyring</code>: GCP KMS Keyring Name</li>
+<li><code>proposer-google-key-name</code>: GCP KMS Key name</li>
 </ul>
 <div id="admonition-tip-1" class="admonition admonish-tip" role="note" aria-labelledby="admonition-tip-1-title">
 <div class="admonition-title">
@@ -347,6 +369,7 @@ possible.</p>
         <!-- Custom JS scripts -->
         <script src="mermaid.min.js"></script>
         <script src="mermaid-init.js"></script>
+
 
 
     </div>
