@@ -33,6 +33,9 @@ pub enum ProvingError {
     #[error("NotSeekingProof error: witness {0}")]
     NotSeekingProof(usize, Vec<Vec<Execution>>),
 
+    #[error("NotAwaitingProof error")]
+    NotAwaitingProof,
+
     #[error("WitnessSizeError error: size {0} limit {0}")]
     WitnessSizeError(usize, usize, Vec<Vec<Execution>>),
 

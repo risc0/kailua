@@ -251,6 +251,7 @@ async fn proposer_validator() {
                 ..sync.clone()
             },
             kailua_cli: None,
+            fast_forward_start: 0,
             fast_forward_target: 0,
             num_concurrent_provers: 1,
             enable_experimental_witness_endpoint: true,
@@ -300,6 +301,7 @@ async fn proposer_validator() {
                 ..sync.clone()
             },
             kailua_cli: None,
+            fast_forward_start: 0,
             fast_forward_target: 90, // run validity proofs until block 90 is finalized
             num_concurrent_provers: 5,
             enable_experimental_witness_endpoint: true,

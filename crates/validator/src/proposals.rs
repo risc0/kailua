@@ -233,8 +233,10 @@ pub async fn handle_proposals(
                 error!("Canonical status of proposal {proposal_index} unknown");
                 continue;
             };
-            // utilize validity proofs for proposals of height below the ff target
-            if proposal.output_block_number <= args.fast_forward_target {
+            // utilize validity proofs for proposals of height within the ff range
+            if (args.fast_forward_start..=args.fast_forward_target)
+                .contains(&proposal.output_block_number)
+            {
                 // prove the validity of this proposal if it is canon
                 if is_proposal_canonical {
                     // Prove full validity

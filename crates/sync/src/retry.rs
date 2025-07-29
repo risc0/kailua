@@ -88,7 +88,7 @@ macro_rules! retry_res_ctx {
 #[macro_export]
 macro_rules! retry_timeout {
     ($e:expr) => {
-        $crate::retry_timeout!(2, 250, 1000, $e)
+        $crate::retry_timeout!(5, 250, 1000, $e)
     };
     ($t:expr, $e:expr) => {
         $crate::retry_timeout!($t, 250, 1000, $e)
@@ -108,7 +108,7 @@ macro_rules! retry_timeout {
 #[macro_export]
 macro_rules! retry_res_timeout {
     ($e:expr) => {
-        $crate::retry_res_timeout!(2, 250, 1000, $e)
+        $crate::retry_res_timeout!(5, 250, 1000, $e)
     };
     ($t:expr, $e:expr) => {
         $crate::retry_res_timeout!($t, 250, 1000, $e)
@@ -134,7 +134,7 @@ macro_rules! retry_res_timeout {
 #[macro_export]
 macro_rules! retry_res_ctx_timeout {
     ($e:expr) => {
-        $crate::retry_res_ctx_timeout!(2, 250, 1000, $e)
+        $crate::retry_res_ctx_timeout!(5, 250, 1000, $e)
     };
     ($t:expr, $e:expr) => {
         $crate::retry_res_ctx_timeout!($t, 250, 1000, $e)

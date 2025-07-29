@@ -19,6 +19,7 @@ use alloy::providers::{Provider, RootProvider};
 use alloy_primitives::hex::FromHex;
 use alloy_primitives::keccak256;
 use anyhow::{anyhow, Context};
+use human_bytes::human_bytes;
 use kailua_sync::provider::optimism::OpNodeProvider;
 use kailua_sync::{await_tel, retry_res_ctx_timeout};
 use kona_host::KeyValueStore;
@@ -31,17 +32,24 @@ use std::error::Error;
 use std::ops::DerefMut;
 use tracing::{error, info};
 
+/// Returns true iff preflight using `debug_executionWitness` was successful.
 pub async fn run_payload_client(
     mut boot_info: BootInfo,
     l2_provider: RootProvider,
     op_node_provider: OpNodeProvider,
     disk_kv_store: Option<RWLKeyValueStore>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<bool> {
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("run_payload_client"));
 
     let kv = create_split_kv_store(&Default::default(), disk_kv_store)
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+
+    /* todo:
+       1. Test endpoint success/failure automatically
+       2. abort any attempt to use executionWitness endpoint if failure confirmed
+
+    */
 
     while boot_info.claimed_l2_output_root != boot_info.agreed_l2_output_root {
         // Read block hash
@@ -103,45 +111,47 @@ pub async fn run_payload_client(
                 "Failed to fetch payload for {} (Skip).",
                 boot_info.claimed_l2_block_number + 1
             );
-            continue;
+            return Ok(false);
         };
 
         // dump preimages into kv store
         let mut kv_lock = kv.write().await;
-        dump_payload_to_kv_store(&execution_witness, kv_lock.deref_mut());
+        let payload_size = dump_payload_to_kv_store(&execution_witness, kv_lock.deref_mut());
         // Mark block payload as processed in kv store
         kv_lock.set(exec_wit_key.into(), vec![])?;
         info!(
-            "Fetched payload for {}.",
+            "Saved {} payload for {}.",
+            human_bytes(payload_size as f64),
             boot_info.claimed_l2_block_number + 1
         );
         drop(kv_lock);
     }
 
-    Ok(())
+    Ok(true)
 }
 
-fn dump_payload_to_kv_store(payload: &serde_json::Value, kv: &mut dyn KeyValueStore) {
+fn dump_payload_to_kv_store(payload: &serde_json::Value, kv: &mut dyn KeyValueStore) -> u64 {
     if let Some(obj) = payload.as_object() {
-        for (k, v) in obj {
-            save_hex_preimage_to_kv(k, kv);
-            dump_payload_to_kv_store(v, kv);
-        }
-    }
-    if let Some(seq) = payload.as_array() {
-        for v in seq {
-            dump_payload_to_kv_store(v, kv);
-        }
-    }
-    if let Some(v) = payload.as_str() {
-        save_hex_preimage_to_kv(v, kv);
+        obj.iter()
+            .map(|(k, v)| save_hex_preimage_to_kv(k, kv) + dump_payload_to_kv_store(v, kv))
+            .sum()
+    } else if let Some(seq) = payload.as_array() {
+        seq.iter().map(|v| dump_payload_to_kv_store(v, kv)).sum()
+    } else if let Some(v) = payload.as_str() {
+        save_hex_preimage_to_kv(v, kv)
+    } else {
+        0
     }
 }
 
-fn save_hex_preimage_to_kv(preimage: &str, kv: &mut dyn KeyValueStore) {
-    if let Ok(preimage) = alloy_primitives::Bytes::from_hex(preimage) {
-        let computed_hash = keccak256(preimage.as_ref());
-        let key = PreimageKey::new_keccak256(*computed_hash);
-        kv.set(key.into(), preimage.into()).unwrap();
-    }
+fn save_hex_preimage_to_kv(preimage: &str, kv: &mut dyn KeyValueStore) -> u64 {
+    alloy_primitives::Bytes::from_hex(preimage)
+        .map(|preimage| {
+            let computed_hash = keccak256(preimage.as_ref());
+            let key = PreimageKey::new_keccak256(*computed_hash);
+            let size = preimage.len() as u64;
+            kv.set(key.into(), preimage.into()).unwrap();
+            size
+        })
+        .unwrap_or(0)
 }

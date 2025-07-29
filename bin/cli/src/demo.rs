@@ -50,12 +50,16 @@ pub struct DemoArgs {
     #[arg(long, env, default_value_t = false)]
     pub enable_experimental_witness_endpoint: bool,
 
-    /// The L2 block to start proving from. Defaults to latest safe block.
+    /// The L2 block to start proving from.
+    /// Defaults to `nth_proof_to_process` times `num_blocks_per_proof` before latest safe block.
     #[clap(long, env)]
     pub starting_block_height: Option<u64>,
     /// The number of L2 blocks to cover per proof
     #[clap(long, env)]
     pub num_blocks_per_proof: u64,
+    /// The nth proof to process. Defaults to every proof (=1).
+    #[clap(long, env, default_value_t = 1)]
+    pub nth_proof_to_process: u64,
 
     /// Directory to use for caching data
     #[clap(long, env)]
@@ -92,6 +96,7 @@ pub async fn demo(args: DemoArgs, verbosity: u8, data_dir: PathBuf) -> anyhow::R
             telemetry: args.telemetry,
         },
         kailua_cli: args.kailua_cli,
+        fast_forward_start: 0,
         fast_forward_target: 0,
         num_concurrent_provers: args.num_concurrent_provers,
         enable_experimental_witness_endpoint: args.enable_experimental_witness_endpoint,
@@ -144,6 +149,7 @@ pub async fn handle_blocks(
 
     let mut last_proven = args.starting_block_height;
     let mut last_wait = 0;
+    let mut n = 1u64;
     loop {
         // Wait for new data on every iteration
         sleep(Duration::from_secs(6)).await;
@@ -171,7 +177,10 @@ pub async fn handle_blocks(
         );
         // start from most recent block if unspecified
         if last_proven.is_none() {
-            last_proven = Some(safe_l2_number);
+            last_proven = Some(
+                safe_l2_number
+                    .saturating_sub(args.nth_proof_to_process * args.num_blocks_per_proof + 1),
+            );
         }
         // queue required proofs
         while last_proven.unwrap() + args.num_blocks_per_proof < safe_l2_number {
@@ -211,22 +220,31 @@ pub async fn handle_blocks(
                 )
             );
             // request proof
-            channel
-                .sender
-                .send(Message::Proposal {
-                    index: last_proven.unwrap(),
-                    precondition_validation_data: None,
-                    l1_head: l1_head.header.hash,
-                    agreed_l2_head_hash: agreed_l2_block.header.hash,
-                    agreed_l2_output_root,
-                    claimed_l2_block_number,
-                    claimed_l2_output_root,
-                })
-                .await?;
-            info!(
-                "Requested proof for blocks {} to {}",
-                agreed_l2_block_number, claimed_l2_block_number
-            );
+            if n == args.nth_proof_to_process {
+                channel
+                    .sender
+                    .send(Message::Proposal {
+                        index: last_proven.unwrap(),
+                        precondition_validation_data: None,
+                        l1_head: l1_head.header.hash,
+                        agreed_l2_head_hash: agreed_l2_block.header.hash,
+                        agreed_l2_output_root,
+                        claimed_l2_block_number,
+                        claimed_l2_output_root,
+                    })
+                    .await?;
+                info!(
+                    "Requested proof for blocks {} to {}. (N={n})",
+                    agreed_l2_block_number, claimed_l2_block_number
+                );
+                n = 0;
+            } else {
+                info!(
+                    "Skipped proof for blocks {} to {}. (N={n})",
+                    agreed_l2_block_number, claimed_l2_block_number
+                );
+            }
+            n += 1;
             // update state
             last_proven = Some(claimed_l2_block_number);
         }
@@ -249,7 +267,6 @@ pub async fn handle_blocks(
             };
             let ending_block = starting_block + args.num_blocks_per_proof;
             info!("Computed proof for blocks {starting_block} to {ending_block}.");
-            // let blocks = (starting_block..=ending_block)
         }
     }
 }

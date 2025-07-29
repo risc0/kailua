@@ -20,6 +20,7 @@ use alloy::providers::RootProvider;
 use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
 use async_channel::{Receiver, Sender};
+use human_bytes::human_bytes;
 use kailua_build::KAILUA_FPVM_ID;
 use kailua_common::boot::StitchedBootInfo;
 use kailua_common::client::stitching::{split_executions, stitch_boot_info};
@@ -273,7 +274,13 @@ pub async fn compute_fpvm_proof(
         if witness_size > args.proving.max_witness_size {
             warn!(
                 "Derivation-only witness size {} exceeds limit {}.",
-                witness_size, args.proving.max_witness_size
+                human_bytes(witness_size as f64),
+                human_bytes(args.proving.max_witness_size as f64)
+            );
+        } else {
+            info!(
+                "Derivation-only witness size {}.",
+                human_bytes(witness_size as f64)
             );
         }
     }
@@ -321,9 +328,18 @@ pub async fn compute_fpvm_proof(
         match err {
             ProvingError::WitnessSizeError(f, t, e) => {
                 if force_attempt {
+                    error!(
+                        "Proof witness size {} above safety threshold {}.",
+                        human_bytes(f as f64),
+                        human_bytes(t as f64)
+                    );
                     return Err(ProvingError::WitnessSizeError(f, t, e));
                 }
-                warn!("Proof witness size {f} above safety threshold {t}. Splitting workload.")
+                warn!(
+                    "Proof witness size {} above safety threshold {}. Splitting workload.",
+                    human_bytes(f as f64),
+                    human_bytes(t as f64)
+                )
             }
             ProvingError::ExecutionError(e) => {
                 if force_attempt {
@@ -333,6 +349,11 @@ pub async fn compute_fpvm_proof(
             }
             ProvingError::OtherError(e) => {
                 return Err(ProvingError::OtherError(e));
+            }
+            ProvingError::NotAwaitingProof => {
+                // reduce required proofs by two to cancel out prior addition and one more proof
+                num_proofs -= 2;
+                continue;
             }
             ProvingError::NotSeekingProof(_, _) => {
                 unreachable!("Sought proof, found NotSeekingProof {err:?}")
@@ -395,15 +416,20 @@ pub async fn compute_fpvm_proof(
         })
         .unzip();
 
-    // Return no proof if derivation is not required
-    if args.proving.skip_derivation_proof {
-        return Ok(None);
+    // Return proof count without stitching if derivation is not required
+    if args.proving.skip_await_proof {
+        warn!("Skipping stitching unawaited execution proofs with derivation.");
+        return Err(ProvingError::NotAwaitingProof);
+    } else if args.proving.skip_derivation_proof {
+        let num_proofs = proofs.len();
+        warn!("Skipping stitching {num_proofs} execution proofs with derivation.");
+        return Err(ProvingError::DerivationProofError(num_proofs));
     }
 
     // Combine execution proofs with derivation proof
     let total_blocks = stitched_executions.iter().map(|e| e.len()).sum::<usize>();
     info!(
-        "Combining {}/{} execution proofs for {total_blocks} blocks with derivation proof.",
+        "Stitching {}/{} execution proofs for {total_blocks} blocks with derivation proof.",
         proofs.len(),
         stitched_executions.len()
     );
@@ -482,7 +508,7 @@ pub fn create_cached_execution_task(
 
 #[allow(clippy::too_many_arguments)]
 pub async fn compute_cached_proof(
-    args: ProveArgs,
+    mut args: ProveArgs,
     rollup_config: RollupConfig,
     disk_kv_store: Option<RWLKeyValueStore>,
     precondition_hash: B256,
@@ -511,6 +537,7 @@ pub async fn compute_cached_proof(
         precondition_hash,
         stitched_boot_info.clone(),
     );
+    let skip_await_proof = args.proving.skip_await_proof;
     // Skip computation if previously saved to disk
     let file_name = proof_file_name(&proof_journal);
     if Path::new(&file_name).try_exists().is_ok_and(identity) && seek_proof {
@@ -550,14 +577,19 @@ pub async fn compute_cached_proof(
                     ))
                 })
                 .unwrap();
-            crate::client::payload::run_payload_client(
+            if crate::client::payload::run_payload_client(
                 boot,
                 l2_provider,
                 op_node_provider,
                 disk_kv_store.clone(),
             )
             .await
-            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
+            {
+                // If we have used debug_executionWitness sucessfully then don't use Kona's
+                // debug_executePayload logic as it doesn't have caching
+                args.kona.enable_experimental_witness_endpoint = false;
+            }
         }
 
         // generate a proof using the kailua client and kona server
@@ -573,6 +605,11 @@ pub async fn compute_cached_proof(
             seek_proof,
         )
         .await?;
+    }
+
+    if skip_await_proof {
+        // this can be reached if proof file is cached
+        return Err(ProvingError::NotAwaitingProof);
     }
 
     read_bincoded_file(&file_name)

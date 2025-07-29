@@ -12,24 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::backends::{KailuaProveInfo, KailuaSessionStats};
+use crate::args::ProvingArgs;
 use crate::ProvingError;
 use anyhow::{anyhow, Context};
-use bonsai_sdk::non_blocking::Client;
+use bonsai_sdk::non_blocking::{Client, SessionId, SnarkId};
+use bonsai_sdk::responses::SessionStats;
 use human_bytes::human_bytes;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
+use kailua_sync::{retry_res, retry_res_timeout};
 use risc0_zkvm::serde::to_vec;
 use risc0_zkvm::sha::Digest;
 use risc0_zkvm::{is_dev_mode, InnerReceipt, Receipt};
 use std::time::Duration;
-use tracing::info;
+use tokio::time::sleep;
 use tracing::log::warn;
+use tracing::{error, info};
 
 pub async fn run_bonsai_client(
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Receipt>,
     prove_snark: bool,
-    skip_await_proof: bool,
+    proving_args: &ProvingArgs,
 ) -> Result<Receipt, ProvingError> {
     info!("Running Bonsai client.");
     // Instantiate client
@@ -69,39 +72,13 @@ pub async fn run_bonsai_client(
         }
     }
 
-    // Upload the ELF with the image_id as its key.
-    let elf = KAILUA_FPVM_ELF.to_vec();
-    info!(
-        "Uploading {} Kailua ELF to Bonsai.",
-        human_bytes(elf.len() as f64).to_string()
-    );
-    let image_id_hex = hex::encode(Digest::from(KAILUA_FPVM_ID));
-    client
-        .upload_img(&image_id_hex, elf)
-        .await
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+    // Create a session on Bonsai
+    let mut stark_session =
+        create_stark_session(&client, input.clone(), assumption_receipt_ids.clone()).await;
 
-    // Upload the input data
-    info!(
-        "Uploading {} input data to Bonsai.",
-        human_bytes(input.len() as f64).to_string()
-    );
-    let input_id = client
-        .upload_input(input)
-        .await
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-
-    // Create session on Bonsai
-    info!("Creating Bonsai proving session.");
-    let session = client
-        .create_session_with_limit(image_id_hex, input_id, assumption_receipt_ids, false, None)
-        .await
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-    info!("Bonsai proving SessionID: {}", session.uuid);
-
-    if skip_await_proof {
-        warn!("Skipping awaiting proof on Bonsai and exiting process.");
-        std::process::exit(0);
+    if proving_args.skip_await_proof {
+        warn!("Skipping awaiting proof on Bonsai.");
+        return Err(ProvingError::NotAwaitingProof);
     }
 
     let polling_interval = if let Ok(ms) = std::env::var("BONSAI_POLL_INTERVAL_MS") {
@@ -114,123 +91,195 @@ pub async fn run_bonsai_client(
         Duration::from_secs(1)
     };
 
-    let succinct_prove_info = loop {
+    let stark_receipt = loop {
         // The session has already been started in the executor. Poll bonsai to check if
         // the proof request succeeded.
-        let res = session
-            .status(&client)
-            .await
-            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-        if res.status == "RUNNING" {
-            std::thread::sleep(polling_interval);
-            continue;
-        }
-        if res.status == "SUCCEEDED" {
-            // Download the receipt, containing the output
-            info!("Downloading receipt from Bonsai.");
-            let receipt_url = res.receipt_url.ok_or(ProvingError::OtherError(anyhow!(
-                "API error, missing receipt on completed session"
-            )))?;
+        let res = retry_res!(stark_session.status(&client).await).await;
 
-            let stats = res
-                .stats
-                .context("Missing stats object on Bonsai status res")
-                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-            info!(
-                "Bonsai usage: user_cycles: {} total_cycles: {}",
-                stats.cycles, stats.total_cycles
-            );
+        match res.status.as_str() {
+            "RUNNING" => tokio::time::sleep(polling_interval).await,
+            "SUCCEEDED" => {
+                // Download the receipt, containing the output
+                let Some(receipt_url) = res.receipt_url else {
+                    error!("API error, missing receipt on completed session");
+                    continue;
+                };
 
-            let receipt_buf = client
-                .download(&receipt_url)
-                .await
-                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-            let receipt: Receipt = bincode::deserialize(&receipt_buf)
-                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+                let stats = res.stats.unwrap_or_else(|| {
+                    error!("Missing stats object on Bonsai response.");
+                    SessionStats {
+                        segments: 0,
+                        total_cycles: 0,
+                        cycles: 0,
+                    }
+                });
 
-            info!("Verifying receipt received from Bonsai.");
-            receipt
-                .verify(KAILUA_FPVM_ID)
-                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+                info!(
+                    "Bonsai usage: user_cycles: {} total_cycles: {}",
+                    stats.cycles, stats.total_cycles
+                );
 
-            break KailuaProveInfo {
-                receipt,
-                stats: KailuaSessionStats {
-                    segments: stats.segments,
-                    total_cycles: stats.total_cycles,
-                    user_cycles: stats.cycles,
-                    // These are currently unavailable from Bonsai
-                    paging_cycles: 0,
-                    reserved_cycles: 0,
-                },
-            };
-        } else {
-            return Err(ProvingError::OtherError(anyhow!(
-                "Bonsai prover workflow [{}] exited: {} err: {}",
-                session.uuid,
-                res.status,
-                res.error_msg
-                    .unwrap_or("Bonsai workflow missing error_msg".into()),
-            )));
+                info!("Downloading Bonsai receipt from {receipt_url}.");
+                let Ok(receipt_buf) = client.download(&receipt_url).await else {
+                    error!("Failed to download STARK receipt at {receipt_url}");
+                    continue;
+                };
+
+                info!("Verifying receipt received from Bonsai.");
+                let Ok(receipt) = bincode::deserialize::<Receipt>(&receipt_buf) else {
+                    error!("Failed to deserialize receipt at {receipt_url}");
+                    continue;
+                };
+                let Ok(()) = receipt.verify(KAILUA_FPVM_ID) else {
+                    error!("Failed to verify receipt at {receipt_url}.");
+                    continue;
+                };
+
+                break receipt;
+            }
+            _ => {
+                error!(
+                    "Bonsai prover session [{}] exited: {} err: {:?}. Retrying.",
+                    stark_session.uuid, res.status, res.error_msg
+                );
+                // Retry and create another session
+                stark_session =
+                    create_stark_session(&client, input.clone(), assumption_receipt_ids.clone())
+                        .await;
+            }
         }
     };
 
     if !prove_snark {
-        return Ok(succinct_prove_info.receipt);
+        return Ok(stark_receipt);
     }
     info!("Wrapping STARK as SNARK on Bonsai.");
+    let stark_receipt_bincoded =
+        bincode::serialize(&stark_receipt).map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
 
     // Request that Bonsai compress further, to Groth16.
-    let snark_session = client
-        .create_snark(session.uuid)
-        .await
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-    let snark_receipt_url = loop {
-        let res = snark_session
-            .status(&client)
-            .await
-            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+    let mut snark_session = create_snark_session(
+        &client,
+        stark_receipt_bincoded.clone(),
+        Some(stark_session.uuid),
+    )
+    .await;
+
+    let groth16_receipt = loop {
+        let res = retry_res!(snark_session.status(&client).await).await;
+
         match res.status.as_str() {
-            "RUNNING" => {
-                std::thread::sleep(polling_interval);
-                continue;
-            }
+            "RUNNING" => sleep(polling_interval).await,
             "SUCCEEDED" => {
-                break res
-                    .output
-                    .with_context(|| {
-                        format!(
-                            "Bonsai prover workflow [{}] reported success, but provided no receipt",
-                            snark_session.uuid
-                        )
-                    })
-                    .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+                let Some(receipt_url) = res.output else {
+                    error!("SNARK API error, missing output url.");
+                    continue;
+                };
+
+                info!("Downloading Groth16 receipt from Bonsai.");
+                let Ok(receipt_buf) = client.download(&receipt_url).await else {
+                    error!("Failed to download SNARK receipt at {receipt_url}");
+                    continue;
+                };
+
+                info!("Verifying receipt received from Bonsai.");
+                let Ok(receipt) = bincode::deserialize::<Receipt>(&receipt_buf) else {
+                    error!("Failed to deserialize SNARK receipt at {receipt_url}");
+                    continue;
+                };
+                let Ok(()) = receipt.verify(KAILUA_FPVM_ID) else {
+                    error!("Failed to verify SNARK receipt at {receipt_url}.");
+                    continue;
+                };
+
+                break receipt;
             }
             _ => {
-                return Err(ProvingError::OtherError(anyhow!(
-                    "Bonsai prover workflow [{}] exited: {} err: {}",
-                    snark_session.uuid,
-                    res.status,
-                    res.error_msg
-                        .unwrap_or("Bonsai workflow missing error_msg".into()),
-                )))
+                error!(
+                    "Bonsai prover workflow [{}] exited: {} err: {:?}",
+                    snark_session.uuid, res.status, res.error_msg
+                );
+                snark_session =
+                    create_snark_session(&client, stark_receipt_bincoded.clone(), None).await;
             }
         }
     };
 
-    info!("Downloading Groth16 receipt from Bonsai.");
-    let receipt_buf = client
-        .download(&snark_receipt_url)
-        .await
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-    let groth16_receipt: Receipt =
-        bincode::deserialize(&receipt_buf).map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-    groth16_receipt
-        .verify(KAILUA_FPVM_ID)
-        .context("failed to verify Groth16Receipt returned by Bonsai")
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-
     Ok(groth16_receipt)
+}
+
+pub async fn create_snark_session(
+    client: &Client,
+    receipt: Vec<u8>,
+    mut stark_id: Option<String>,
+) -> SnarkId {
+    loop {
+        // Reupload receipt if not first attempt
+        let stark_id = match stark_id.take() {
+            Some(id) => id,
+            None => retry_res!(client.upload_receipt(receipt.clone()).await).await,
+        };
+
+        // Request that Bonsai compress further, to Groth16.
+        if let Ok(result) = client.create_snark(stark_id.clone()).await {
+            break result;
+        }
+    }
+}
+
+pub async fn create_stark_session(
+    client: &Client,
+    input: Vec<u8>,
+    assumption_receipt_ids: Vec<String>,
+) -> SessionId {
+    // Upload the ELF with the image_id as its key.
+    let elf = KAILUA_FPVM_ELF.to_vec();
+    let image_id_hex = hex::encode(Digest::from(KAILUA_FPVM_ID));
+    let is_image_present = retry_res_timeout!(client.has_img(&image_id_hex).await).await;
+    if !is_image_present {
+        info!(
+            "Uploading {} Kailua ELF to Bonsai.",
+            human_bytes(elf.len() as f64)
+        );
+        retry_res!(client.upload_img(&image_id_hex, elf.clone()).await).await;
+    } else {
+        info!("Kailua ELF already exists on Bonsai.");
+    }
+
+    // Retry session creation w/ fresh input each time just in case.
+    loop {
+        // Upload the input data
+        info!(
+            "Uploading {} input data to Bonsai.",
+            human_bytes(input.len() as f64)
+        );
+        let input_id = retry_res!(client.upload_input(input.clone()).await).await;
+
+        // Create session on Bonsai
+        info!("Creating Bonsai proving session.");
+        let session = match client
+            .create_session_with_limit(
+                image_id_hex.clone(),
+                input_id.clone(),
+                assumption_receipt_ids.clone(),
+                false,
+                None,
+            )
+            .await
+        {
+            Ok(session) => session,
+            Err(err) => {
+                error!("Could not create Bonsai session ID: {err:?}");
+                sleep(Duration::from_millis(500)).await;
+                continue;
+            }
+        };
+
+        info!("Bonsai proving SessionID: {}", session.uuid);
+
+        sleep(Duration::from_millis(500)).await;
+        break session;
+    }
 }
 
 pub fn should_use_bonsai() -> bool {

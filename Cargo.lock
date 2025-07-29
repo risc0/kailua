@@ -5244,6 +5244,8 @@ version = "1.0.2"
 dependencies = [
  "alloy",
  "anyhow",
+ "bincode",
+ "bonsai-sdk",
  "bytemuck",
  "clap",
  "hex",
@@ -5362,6 +5364,7 @@ dependencies = [
  "kona-protocol",
  "kona-registry",
  "kona-std-fpvm",
+ "lazy_static",
  "opentelemetry",
  "risc0-ethereum-contracts",
  "risc0-zkvm",

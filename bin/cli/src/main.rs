@@ -71,6 +71,9 @@ async fn main() -> anyhow::Result<()> {
         KailuaCli::Rpc { args, .. } => {
             await_tel!(context, kailua_rpc::rpc::rpc(args, data_dir))
         }
+        KailuaCli::Bonsai { args, .. } => {
+            await_tel!(context, kailua_cli::bonsai::bonsai(args))
+        }
     };
 
     let span = context.span();

@@ -28,7 +28,10 @@ pub struct ValidateArgs {
     /// Path to the prover binary to use for proving
     #[clap(long, env)]
     pub kailua_cli: Option<PathBuf>,
-    /// Fast-forward block height
+    /// Block height to start fast-forwarding finality
+    #[clap(long, env, required = false, default_value_t = 0)]
+    pub fast_forward_start: u64,
+    /// Block height to end fast-forwarding finality
     #[clap(long, env, required = false, default_value_t = 0)]
     pub fast_forward_target: u64,
     /// How many proofs to compute simultaneously
