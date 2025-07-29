@@ -98,7 +98,7 @@ pub async fn handle_proposals(
     let mut computed_proof_buffer = VecDeque::new();
     let mut output_fault_buffer = BinaryHeap::new();
     let mut trail_fault_buffer = BinaryHeap::new();
-    let mut valid_buffer = BinaryHeap::new();
+    let mut proposal_validity_buffer = BinaryHeap::new();
     let mut last_proof_l1_head = BTreeMap::new();
     loop {
         // Wait for new data on every iteration
@@ -140,14 +140,14 @@ pub async fn handle_proposals(
             &meter_fault_latest,
             &meter_skipped_count,
             &meter_skipped_latest,
-            &mut valid_buffer,
+            &mut proposal_validity_buffer,
             &mut output_fault_buffer,
             &mut trail_fault_buffer,
         )
         .await;
 
         // dispatch buffered output fault proof requests
-        dispatch::dispatch_output_fault_proofs(
+        dispatch::dispatch_proof_requests(
             #[cfg(feature = "devnet")]
             &args,
             &mut agent,
@@ -155,18 +155,20 @@ pub async fn handle_proposals(
             &meter_proofs_requested,
             &mut last_proof_l1_head,
             &mut channel,
+            true,
         )
         .await;
 
         // dispatch buffered validity proof requests
-        dispatch::dispatch_proposal_validity_requests(
+        dispatch::dispatch_proof_requests(
             #[cfg(feature = "devnet")]
             &args,
             &mut agent,
-            &mut valid_buffer,
+            &mut proposal_validity_buffer,
             &meter_proofs_requested,
             &mut last_proof_l1_head,
             &mut channel,
+            false,
         )
         .await;
 
@@ -175,7 +177,7 @@ pub async fn handle_proposals(
             &args,
             &mut agent,
             &mut computed_proof_buffer,
-            &mut valid_buffer,
+            &mut proposal_validity_buffer,
             &mut output_fault_buffer,
             &meter_proofs_completed,
             &meter_proofs_discarded,
