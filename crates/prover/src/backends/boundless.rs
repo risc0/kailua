@@ -16,6 +16,7 @@ use crate::args::ProvingArgs;
 use crate::client::proving::save_to_bincoded_file;
 use crate::proof::read_bincoded_file;
 use crate::ProvingError;
+use alloy::eips::BlockNumberOrTag;
 use alloy::transports::http::reqwest::Url;
 use alloy_primitives::{keccak256, Address, U256};
 use anyhow::{anyhow, bail, Context};
@@ -126,7 +127,10 @@ pub struct MarketProviderConfig {
     /// Stake (USDC) per gigacycle of the proving order
     #[clap(long, env, required = false, default_value = "1000")]
     pub boundless_mega_cycle_stake: U256,
-    /// Duration in seconds for the price to ramp up from min to max.
+    /// Multiplier for delay before order price starts ramping up.
+    #[clap(long, env, required = false, default_value_t = 0.1)]
+    pub boundless_order_bid_delay_factor: f64,
+    /// Multiplier for order price to ramp up from min to max.
     #[clap(long, env, required = false, default_value_t = 0.25)]
     pub boundless_order_ramp_up_factor: f64,
     /// Multiplier for order fulfillment timeout (seconds/segment) after locking
@@ -522,13 +526,23 @@ pub async fn request_proof(
         .await
         .context("get_transaction_count boundless_wallet_address"))
     .await as u32;
+    let boundless_rpc_time = retry_res_timeout!(boundless_client
+        .provider()
+        .get_block_by_number(BlockNumberOrTag::Latest)
+        .await
+        .context("get_block_by_number latest")?
+        .ok_or_else(|| anyhow!("Failed to fetch latest block from Boundless RPC")))
+    .await
+    .header
+    .timestamp;
+
     let segment_count = cycle_count.div_ceil(1_000_000) as f64;
     let cycles = U256::from(cycle_count);
     let min_price = market.boundless_cycle_min_wei * cycles;
     let max_price = market.boundless_cycle_max_wei * cycles;
-    let lock_timeout_factor =
-        market.boundless_order_lock_timeout_factor + market.boundless_order_ramp_up_factor;
-    let expiry_factor = lock_timeout_factor + market.boundless_order_expiry_factor;
+    let bid_delay_time = (market.boundless_order_bid_delay_factor * segment_count) as u64;
+    let corrected_expiry_factor =
+        market.boundless_order_lock_timeout_factor + market.boundless_order_expiry_factor;
     let request = boundless_client
         .new_request()
         .with_journal(Journal::new(proof_journal.encode_packed()))
@@ -544,10 +558,11 @@ pub async fn request_proof(
             OfferParams::builder()
                 .min_price(min_price)
                 .max_price(max_price)
+                .bidding_start(boundless_rpc_time + bid_delay_time)
                 .lock_stake(market.boundless_mega_cycle_stake * U256::from(segment_count))
                 .ramp_up_period((market.boundless_order_ramp_up_factor * segment_count) as u32)
-                .lock_timeout((lock_timeout_factor * segment_count) as u32)
-                .timeout((expiry_factor * segment_count) as u32)
+                .lock_timeout((market.boundless_order_lock_timeout_factor * segment_count) as u32)
+                .timeout((corrected_expiry_factor * segment_count) as u32)
                 .build()
                 .context("OfferParamsBuilder::build()")
                 .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,

@@ -220,9 +220,7 @@ pub async fn handle_blocks(
                 )
             );
             // request proof
-            n = n.saturating_sub(1u64);
-            if n == 0 {
-                n = args.nth_proof_to_process;
+            if n == args.nth_proof_to_process {
                 channel
                     .sender
                     .send(Message::Proposal {
@@ -239,12 +237,14 @@ pub async fn handle_blocks(
                     "Requested proof for blocks {} to {}. (N={n})",
                     agreed_l2_block_number, claimed_l2_block_number
                 );
+                n = 0;
             } else {
                 info!(
                     "Skipped proof for blocks {} to {}. (N={n})",
                     agreed_l2_block_number, claimed_l2_block_number
                 );
             }
+            n += 1;
             // update state
             last_proven = Some(claimed_l2_block_number);
         }
