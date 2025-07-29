@@ -522,7 +522,7 @@ pub async fn request_proof(
         .await
         .context("get_transaction_count boundless_wallet_address"))
     .await as u32;
-    let segment_count = cycle_count.div_ceil(1 << 20) as f64;
+    let segment_count = cycle_count.div_ceil(1_000_000) as f64;
     let cycles = U256::from(cycle_count);
     let min_price = market.boundless_cycle_min_wei * cycles;
     let max_price = market.boundless_cycle_max_wei * cycles;
@@ -544,9 +544,7 @@ pub async fn request_proof(
             OfferParams::builder()
                 .min_price(min_price)
                 .max_price(max_price)
-                .lock_stake(U256::from(
-                    market.boundless_mega_cycle_stake * U256::from(segment_count),
-                ))
+                .lock_stake(market.boundless_mega_cycle_stake * U256::from(segment_count))
                 .ramp_up_period((market.boundless_order_ramp_up_factor * segment_count) as u32)
                 .lock_timeout((lock_timeout_factor * segment_count) as u32)
                 .timeout((expiry_factor * segment_count) as u32)
