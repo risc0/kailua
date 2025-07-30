@@ -19,15 +19,17 @@ use crate::ProvingError;
 use alloy::eips::BlockNumberOrTag;
 use alloy::transports::http::reqwest::Url;
 use alloy_primitives::{keccak256, Address, U256};
-use anyhow::{anyhow, bail, Context};
+use anyhow::{anyhow, Context};
 use boundless_market::alloy::providers::Provider;
 use boundless_market::alloy::signers::local::PrivateKeySigner;
 use boundless_market::client::{Client, ClientError};
 use boundless_market::contracts::boundless_market::MarketError;
-use boundless_market::contracts::{Predicate, RequestId, RequestStatus, Requirements};
+use boundless_market::contracts::{
+    Predicate, RequestError, RequestId, RequestStatus, Requirements,
+};
 use boundless_market::request_builder::OfferParams;
 use boundless_market::storage::{StorageProviderConfig, StorageProviderType};
-use boundless_market::{Deployment, GuestEnv, StandardStorageProvider};
+use boundless_market::{Deployment, GuestEnv, ProofRequest, StandardStorageProvider};
 use clap::Parser;
 use human_bytes::human_bytes;
 use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
@@ -112,8 +114,8 @@ pub struct MarketProviderConfig {
     pub boundless_order_stream_url: Option<Cow<'static, str>>,
 
     /// Number of transactions to lookback at
-    #[clap(long, env, required = false, default_value_t = 5)]
-    pub boundless_look_back: u32,
+    #[clap(long, env, required = false, default_value_t = true)]
+    pub boundless_look_back: bool,
 
     /// Whether to skip preflighting execution and assume a fixed cycle count.
     #[clap(long, env, required = false)]
@@ -193,14 +195,27 @@ impl MarketProviderConfig {
                 boundless_order_stream_url.to_string(),
             ]);
         };
+        // Lookback
+        if self.boundless_look_back {
+            proving_args.push(String::from("--boundless-lookback"));
+        }
+        // Preflight skip
+        if let Some(cycle_count) = self.boundless_assume_cycle_count {
+            proving_args.extend(vec![
+                String::from("--boundless-assume-cycle-count"),
+                cycle_count.to_string(),
+            ]);
+        }
         // Proving fee args
         proving_args.extend(vec![
-            String::from("--boundless-lookback"),
-            self.boundless_look_back.to_string(),
-            String::from("--boundless-cycle-min wei"),
+            String::from("--boundless-cycle-min-wei"),
             self.boundless_cycle_min_wei.to_string(),
             String::from("--boundless-cycle-max-wei"),
             self.boundless_cycle_max_wei.to_string(),
+            String::from("--boundless-mega-cycle-stake"),
+            self.boundless_mega_cycle_stake.to_string(),
+            String::from("--boundless-order-bid-delay-factor"),
+            self.boundless_order_bid_delay_factor.to_string(),
             String::from("--boundless-order-ramp-up-factor"),
             self.boundless_order_ramp_up_factor.to_string(),
             String::from("--boundless-order-lock-timeout-factor"),
@@ -365,6 +380,199 @@ pub async fn run_boundless_client(
     }
 }
 
+pub fn next_nonce(requirements: &Requirements, previous_nonce: Option<u32>) -> u32 {
+    let pred_type = (requirements.predicate.predicateType as u128).to_be_bytes();
+    let prev_nonce = previous_nonce.unwrap_or(u32::MAX).to_be_bytes();
+    let data = [
+        requirements.selector.as_slice(),
+        requirements.imageId.as_slice(),
+        pred_type.as_slice(),
+        requirements.callback.addr.as_slice(),
+        requirements.callback.gasLimit.as_le_slice(),
+        prev_nonce.as_slice(),
+        requirements.predicate.data.as_ref(),
+    ]
+    .concat();
+    let digest = data.digest().as_bytes().to_vec();
+    u32::from_be_bytes(digest[..4].try_into().unwrap())
+}
+
+pub async fn get_proof_request(
+    market: &MarketProviderConfig,
+    boundless_client: &Client,
+    request_id: U256,
+) -> Option<ProofRequest> {
+    loop {
+        // Bypass order stream check if not specified in config
+        match market.boundless_order_stream_url.is_some() {
+            true => {
+                match boundless_client
+                    .fetch_proof_request(request_id, None, None)
+                    .await
+                {
+                    Ok((req, _)) => break Some(req),
+                    Err(err) => {
+                        // No request for nonce
+                        if matches!(
+                            err,
+                            ClientError::MarketError(MarketError::RequestNotFound(_))
+                        ) {
+                            break None;
+                        }
+                        // Some other error that needs us to retry
+                        error!("fetch_proof_request error: {err:?}");
+                        sleep(Duration::from_secs(1)).await;
+                        continue;
+                    }
+                }
+            }
+            false => {
+                match boundless_client
+                    .boundless_market
+                    .get_submitted_request(request_id, None)
+                    .await
+                {
+                    Ok((req, _)) => break Some(req),
+                    Err(err) => {
+                        // No request for nonce
+                        if matches!(err, MarketError::RequestNotFound(_)) {
+                            break None;
+                        }
+                        // Some other error that needs us to retry
+                        error!("get_submitted_request error: {err:?}");
+                        sleep(Duration::from_secs(1)).await;
+                        continue;
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub async fn get_next_fresh_nonce(
+    market: &MarketProviderConfig,
+    boundless_client: &Client,
+    requirements: &Requirements,
+    mut previous_nonce: Option<u32>,
+) -> u32 {
+    let boundless_wallet_address = boundless_client.signer.as_ref().unwrap().address();
+
+    loop {
+        let nonce = next_nonce(requirements, previous_nonce);
+        let request_id = RequestId::u256(boundless_wallet_address, nonce);
+        info!("Checking request freshness for {request_id:x}");
+        // Return true if fresh request id
+        if get_proof_request(market, boundless_client, request_id)
+            .await
+            .is_none()
+        {
+            break nonce;
+        }
+        // A request exists
+        previous_nonce = Some(nonce);
+    }
+}
+
+pub async fn look_back(
+    market: &MarketProviderConfig,
+    boundless_client: &Client,
+    requirements: &Requirements,
+    proving_args: &ProvingArgs,
+    previous_nonce: &mut Option<u32>,
+) -> Result<Option<Receipt>, ProvingError> {
+    let boundless_wallet_address = boundless_client.signer.as_ref().unwrap().address();
+    loop {
+        let nonce = next_nonce(requirements, *previous_nonce);
+        let request_id = RequestId::u256(boundless_wallet_address, nonce);
+        let _ = previous_nonce.insert(nonce);
+        info!("Looking back at request {request_id:x}");
+        // Get request behind id
+        let Some(request) = get_proof_request(market, boundless_client, request_id).await else {
+            // we hit a fresh nonce
+            break Ok(None);
+        };
+        // Check if not expired
+        let request_status = retry_res_timeout!(boundless_client
+            .boundless_market
+            .get_status(request_id, Some(request.expires_at()))
+            .await
+            .context("get_status"))
+        .await;
+
+        if matches!(request_status, RequestStatus::Expired) {
+            // We found a duplicate but it was expired
+            continue;
+        }
+
+        // Skip unrelated request with nonce collision
+        if &request.requirements != requirements {
+            continue;
+        }
+
+        info!("Found matching request already submitted!");
+
+        if proving_args.skip_await_proof {
+            warn!("Skipping awaiting proof on Boundless.");
+            return Err(ProvingError::NotAwaitingProof);
+        }
+
+        // Return result if okay
+        match retrieve_proof(
+            boundless_client,
+            request_id,
+            market.boundless_order_check_interval,
+            request.expires_at(),
+        )
+        .await
+        {
+            Ok(proof) => {
+                break Ok(Some(proof));
+            }
+            Err(err) => {
+                error!("Failed to retrieve proof: {err:?}");
+                // continue to next nonce
+            }
+        }
+    }
+}
+
+pub async fn retrieve_proof(
+    boundless_client: &Client,
+    request_id: U256,
+    interval: u64,
+    expires_at: u64,
+) -> Result<Receipt, ClientError> {
+    // Wait for the request to be fulfilled by the market, returning the journal and seal.
+    info!("Waiting for 0x{request_id:x} to be fulfilled");
+    loop {
+        match boundless_client
+            .wait_for_request_fulfillment(request_id, Duration::from_secs(interval), expires_at)
+            .await
+        {
+            Ok((journal, seal)) => {
+                let Ok(risc0_ethereum_contracts::receipt::Receipt::Base(receipt)) =
+                    risc0_ethereum_contracts::receipt::decode_seal(seal, KAILUA_FPVM_ID, journal)
+                else {
+                    return Err(ClientError::RequestError(RequestError::MissingRequirements));
+                };
+
+                return Ok(*receipt);
+            }
+            Err(e) => {
+                if matches!(
+                    e,
+                    ClientError::MarketError(MarketError::RequestHasExpired(_))
+                ) {
+                    return Err(e);
+                }
+                // Try again
+                error!("Failed to wait for fulfillment: {e:?}");
+                sleep(Duration::from_secs(1)).await;
+            }
+        }
+    }
+}
+
 pub async fn request_proof(
     market: &MarketProviderConfig,
     boundless_client: &Client,
@@ -375,9 +583,24 @@ pub async fn request_proof(
     requirements: &Requirements,
 ) -> Result<Receipt, ProvingError> {
     // Check prior requests
-    if let Ok(Some(proof)) = look_back(market, boundless_client, proving_args, requirements).await {
-        return Ok(proof);
-    }
+    let fresh_nonce = if market.boundless_look_back {
+        let mut nonce_target = None;
+        // note: look_back only returns the NotAwaitingProof error
+        if let Some(proof) = look_back(
+            market,
+            boundless_client,
+            requirements,
+            proving_args,
+            &mut nonce_target,
+        )
+        .await?
+        {
+            return Ok(proof);
+        }
+        nonce_target.unwrap()
+    } else {
+        get_next_fresh_nonce(market, boundless_client, requirements, None).await
+    };
 
     // Upload program
     let bin_file_name = binary_file_name(proof_journal);
@@ -520,12 +743,7 @@ pub async fn request_proof(
     let boundless_req_lock = BOUNDLESS_REQ.lock().await;
     // Build final request
     let boundless_wallet_address = boundless_client.signer.as_ref().unwrap().address();
-    let boundless_wallet_nonce = retry_res_timeout!(boundless_client
-        .provider()
-        .get_transaction_count(boundless_wallet_address)
-        .await
-        .context("get_transaction_count boundless_wallet_address"))
-    .await as u32;
+
     let boundless_rpc_time = retry_res_timeout!(boundless_client
         .provider()
         .get_block_by_number(BlockNumberOrTag::Latest)
@@ -569,10 +787,7 @@ pub async fn request_proof(
                 .context("OfferParamsBuilder::build()")
                 .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
         )
-        .with_request_id(RequestId::new(
-            boundless_wallet_address,
-            boundless_wallet_nonce,
-        ));
+        .with_request_id(RequestId::new(boundless_wallet_address, fresh_nonce));
 
     // Send the request and wait for it to be completed.
     let (request_id, expires_at) = if market.boundless_order_stream_url.is_some() {
@@ -607,119 +822,6 @@ pub async fn request_proof(
     .await
     .context("retrieve_proof")
     .map_err(|e| ProvingError::OtherError(anyhow!(e)))
-}
-
-pub async fn look_back(
-    market: &MarketProviderConfig,
-    boundless_client: &Client,
-    proving_args: &ProvingArgs,
-    requirements: &Requirements,
-) -> Result<Option<Receipt>, ProvingError> {
-    // Check if an unexpired request had already been made recently
-    let boundless_wallet_address = boundless_client.signer.as_ref().unwrap().address();
-    let boundless_wallet_nonce = retry_res_timeout!(boundless_client
-        .provider()
-        .get_transaction_count(boundless_wallet_address)
-        .await
-        .context("get_transaction_count boundless_wallet_address"))
-    .await as u32;
-
-    // Look back at prior transactions to avoid repeated requests
-    for i in 0..market.boundless_look_back {
-        if i > boundless_wallet_nonce {
-            break;
-        }
-        if boundless_wallet_nonce < i + 1 {
-            // nowhere to go
-            break;
-        }
-        let nonce = boundless_wallet_nonce - (i + 1);
-
-        let request_id = RequestId::u256(boundless_wallet_address, nonce);
-        info!("Looking back at txn w/ nonce {nonce} | request: {request_id:x}");
-
-        let Ok((request, _)) = boundless_client
-            .boundless_market
-            .get_submitted_request(request_id, None)
-            .await
-        else {
-            // No request for that nonce
-            continue;
-        };
-
-        let request_status = retry_res_timeout!(boundless_client
-            .boundless_market
-            .get_status(request_id, Some(request.expires_at()))
-            .await
-            .context("get_status"))
-        .await;
-
-        if matches!(request_status, RequestStatus::Expired) {
-            // We found a duplicate but it was expired
-            continue;
-        }
-
-        // Skip unrelated request
-        if &request.requirements != requirements {
-            continue;
-        }
-
-        info!("Found matching request already submitted!");
-
-        if proving_args.skip_await_proof {
-            warn!("Skipping awaiting proof on Boundless.");
-            return Err(ProvingError::NotAwaitingProof);
-        }
-
-        // Return result unless expired
-        return Ok(retrieve_proof(
-            boundless_client,
-            request_id,
-            market.boundless_order_check_interval,
-            request.expires_at(),
-        )
-        .await
-        .context("retrieve_proof")
-        .ok());
-    }
-    Ok(None)
-}
-
-pub async fn retrieve_proof(
-    boundless_client: &Client,
-    request_id: U256,
-    interval: u64,
-    expires_at: u64,
-) -> anyhow::Result<Receipt> {
-    // Wait for the request to be fulfilled by the market, returning the journal and seal.
-    info!("Waiting for 0x{request_id:x} to be fulfilled");
-    loop {
-        match boundless_client
-            .wait_for_request_fulfillment(request_id, Duration::from_secs(interval), expires_at)
-            .await
-        {
-            Ok((journal, seal)) => {
-                let risc0_ethereum_contracts::receipt::Receipt::Base(receipt) =
-                    risc0_ethereum_contracts::receipt::decode_seal(seal, KAILUA_FPVM_ID, journal)?
-                else {
-                    bail!("Did not receive an unaggregated receipt.");
-                };
-
-                return Ok(*receipt);
-            }
-            Err(e) => {
-                if matches!(
-                    e,
-                    ClientError::MarketError(MarketError::RequestHasExpired(_))
-                ) {
-                    return Err(anyhow!(e));
-                }
-                // Try again
-                error!("Failed to wait for fulfillment: {e:?}");
-                sleep(Duration::from_millis(100)).await;
-            }
-        }
-    }
 }
 
 pub fn request_file_name(proof_journal: &ProofJournal) -> String {
