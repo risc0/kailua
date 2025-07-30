@@ -14,14 +14,16 @@
 
 use crate::channel::Message;
 use anyhow::Context;
+use futures::FutureExt;
 use kailua_prover::args::ProveArgs;
 use kailua_prover::channel::AsyncChannel;
 use kailua_prover::proof::read_bincoded_file;
 use kailua_prover::prove::prove;
 use kailua_sync::await_tel_res;
 use opentelemetry::global::tracer;
-use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
+use opentelemetry::trace::{FutureExt as TeleFutureExt, TraceContextExt, Tracer};
 use risc0_zkvm::is_dev_mode;
+use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::process::Command;
@@ -95,15 +97,26 @@ pub async fn handle_proving_tasks(
             }
         } else {
             info!("Proving internally.");
-            match await_tel_res!(context, tracer, "prove", prove(prove_args.clone())) {
-                Ok(_) => false,
-                Err(err) => {
-                    error!("Failed to prove: {err:?}");
-                    err.root_cause()
-                        .to_string()
-                        .contains("Expected zero claim hash")
+            // catch any proving errors
+            let result_fut = async {
+                match await_tel_res!(context, tracer, "prove", prove(prove_args.clone())) {
+                    Ok(_) => false,
+                    Err(err) => {
+                        error!("Prover encountered error: {err:?}");
+                        err.root_cause()
+                            .to_string()
+                            .contains("Expected zero claim hash")
+                    }
                 }
-            }
+            };
+            // catch panics
+            AssertUnwindSafe(result_fut)
+                .catch_unwind()
+                .await
+                .unwrap_or_else(|err| {
+                    error!("Prover panicked! {err:?}");
+                    false
+                })
         };
 
         // we do not get a stitched proof w/o all proofs

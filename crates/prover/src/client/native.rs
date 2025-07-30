@@ -19,6 +19,7 @@ use alloy_primitives::B256;
 use anyhow::anyhow;
 use kailua_common::boot::StitchedBootInfo;
 use kailua_common::executor::Execution;
+use kailua_sync::retry_res_ctx_timeout;
 use kona_host::single::{SingleChainHintHandler, SingleChainHost};
 use kona_host::{
     OfflineHostBackend, OnlineHostBackend, PreimageServer, PreimageServerError, SharedKeyValueStore,
@@ -27,6 +28,8 @@ use kona_preimage::{
     BidirectionalChannel, Channel, HintReader, HintWriter, OracleReader, OracleServer,
 };
 use kona_proof::HintType;
+use opentelemetry::trace::TraceContextExt;
+use opentelemetry::trace::Tracer;
 use risc0_zkvm::Receipt;
 use std::sync::Arc;
 use tokio::task;
@@ -110,7 +113,7 @@ where
             .start(),
         )
     } else {
-        let providers = kona.create_providers().await?;
+        let providers = retry_res_ctx_timeout!(20, kona.create_providers().await).await;
         let backend = OnlineHostBackend::new(
             kona.clone(),
             kv_store.clone(),

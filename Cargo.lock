@@ -5439,6 +5439,7 @@ dependencies = [
  "async-channel 2.3.1",
  "bytemuck",
  "clap",
+ "futures",
  "kailua-build",
  "kailua-common",
  "kailua-contracts",

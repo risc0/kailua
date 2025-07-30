@@ -43,7 +43,11 @@ pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
     let l2_provider = if args.kona.is_offline() {
         None
     } else {
-        Some(args.kona.create_providers().await?.l2)
+        Some(
+            retry_res_ctx_timeout!(20, args.kona.create_providers().await)
+                .await
+                .l2,
+        )
     };
     let op_node_provider = args.op_node_address.as_ref().map(|addr| {
         OpNodeProvider(RootProvider::new_http(

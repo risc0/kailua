@@ -98,7 +98,7 @@ pub async fn fetch_precondition_data(
 
     // fetch necessary data to validate blob equivalence precondition
     if hash_arguments.iter().all(|arg| !arg) {
-        let providers = cfg.kona.create_providers().await?;
+        let providers = retry_res_ctx_timeout!(20, cfg.kona.create_providers().await).await;
         if cfg.precondition_block_hashes.len() != cfg.precondition_blob_hashes.len() {
             bail!(
                 "Blob reference mismatch. Found {} block hashes and {} blob hashes",
@@ -156,7 +156,9 @@ pub async fn concurrent_execution_preflight(
     let context =
         opentelemetry::Context::current_with_span(tracer.start("concurrent_execution_preflight"));
 
-    let l2_provider = args.kona.create_providers().await?.l2;
+    let l2_provider = retry_res_ctx_timeout!(20, args.kona.create_providers().await)
+        .await
+        .l2;
     let starting_block = await_tel!(
         context,
         tracer,
