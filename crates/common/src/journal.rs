@@ -41,22 +41,19 @@ pub struct ProofJournal {
     /// The configuration hash.
     pub config_hash: B256,
     /// The FPVM version
-    pub fpvm_version: B256,
+    pub fpvm_image_id: B256,
 }
 
 impl ProofJournal {
     /// Constructs a new stand-alone instance.
     pub fn new(
         fpvm_image_id: B256,
-        #[cfg(feature = "eigen-da")] canoe_image_id: B256,
         payout_recipient: Address,
         precondition_output: B256,
         boot_info: &BootInfo,
     ) -> Self {
-        #[cfg(feature = "eigen-da")]
-        let fpvm_image_id = crate::hokulea::fpvm_version(fpvm_image_id, canoe_image_id);
         Self {
-            fpvm_version: fpvm_image_id,
+            fpvm_image_id,
             payout_recipient,
             precondition_hash: precondition_output,
             l1_head: boot_info.l1_head,
@@ -70,16 +67,13 @@ impl ProofJournal {
     /// Constructs a new instance used for stitching separate continuous journals together.
     pub fn new_stitched(
         fpvm_image_id: B256,
-        #[cfg(feature = "eigen-da")] canoe_image_id: B256,
         payout_recipient: Address,
         precondition_output: B256,
         config_hash: B256,
         stitched_boot_info: &StitchedBootInfo,
     ) -> Self {
-        #[cfg(feature = "eigen-da")]
-        let fpvm_image_id = crate::hokulea::fpvm_version(fpvm_image_id, canoe_image_id);
         Self {
-            fpvm_version: fpvm_image_id,
+            fpvm_image_id,
             payout_recipient,
             precondition_hash: precondition_output,
             l1_head: stitched_boot_info.l1_head,
@@ -113,7 +107,7 @@ impl ProofJournal {
             self.claimed_l2_output_root.as_slice(),
             self.claimed_l2_block_number.to_be_bytes().as_slice(),
             self.config_hash.as_slice(),
-            self.fpvm_version.as_slice(),
+            self.fpvm_image_id.as_slice(),
         ]
         .concat()
     }
@@ -148,7 +142,7 @@ impl ProofJournal {
             claimed_l2_output_root: encoded[116..148].try_into().unwrap(),
             claimed_l2_block_number: u64::from_be_bytes(encoded[148..156].try_into().unwrap()),
             config_hash: encoded[156..188].try_into().unwrap(),
-            fpvm_version: encoded[188..220].try_into().unwrap(),
+            fpvm_image_id: encoded[188..220].try_into().unwrap(),
         }
     }
 }
@@ -175,7 +169,6 @@ impl From<&Receipt> for ProofJournal {
 }
 
 #[cfg(test)]
-#[cfg(not(feature = "eigen-da"))]
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
@@ -206,7 +199,7 @@ pub mod tests {
         let encoded = proof_journal.encode_packed();
         Receipt::new(
             InnerReceipt::Fake(FakeReceipt::new(ReceiptClaim::ok(
-                proof_journal.fpvm_version.0,
+                proof_journal.fpvm_image_id.0,
                 encoded.clone(),
             ))),
             encoded,
@@ -240,7 +233,7 @@ pub mod tests {
                 rollup_config: Default::default(),
             };
             let new_journal = ProofJournal::new(
-                journal.fpvm_version,
+                journal.fpvm_image_id,
                 journal.payout_recipient,
                 journal.precondition_hash,
                 &boot_info,

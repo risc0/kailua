@@ -2390,7 +2390,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kailua-fpvm"
+name = "kailua-fpvm-kona"
 version = "1.0.0"
 dependencies = [
  "blst",

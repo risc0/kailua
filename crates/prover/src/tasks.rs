@@ -530,11 +530,9 @@ pub async fn compute_cached_proof(
         rollup_config,
     };
     // Construct expected journal
-    let (_, proof_journal) = stitch_boot_info(
-        boot.clone(),
+    let (boot, proof_journal) = stitch_boot_info(
+        boot,
         bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_KONA_ID).into(),
-        #[cfg(feature = "eigen-da")]
-        bytemuck::cast::<[u32; 8], [u8; 32]>(canoe_steel_methods::CERT_VERIFICATION_ID).into(), // todo: stable image id
         args.proving.payout_recipient_address.unwrap_or_default(),
         precondition_hash,
         stitched_boot_info.clone(),

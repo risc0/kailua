@@ -107,10 +107,6 @@ where
     let stitched_executions = vec![core::mem::take(executions.deref_mut())];
     // Construct witness
     let fpvm_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(KAILUA_FPVM_KONA_ID));
-    #[cfg(feature = "eigen-da")]
-    let canoe_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(
-        canoe_steel_methods::CERT_VERIFICATION_ID, // todo: stable image id
-    ));
     let mut witness = Witness {
         oracle_witness: core::mem::take(oracle_witness.lock().unwrap().deref_mut()),
         stream_witness: core::mem::take(stream_witness.lock().unwrap().deref_mut()),
@@ -120,8 +116,6 @@ where
         stitched_executions,
         stitched_boot_info,
         fpvm_image_id,
-        #[cfg(feature = "eigen-da")]
-        canoe_image_id,
     };
     witness
         .oracle_witness
@@ -129,14 +123,8 @@ where
     witness
         .stream_witness
         .finalize_preimages(preimage_oracle_shard_size, false);
-    let journal_output = ProofJournal::new(
-        fpvm_image_id,
-        #[cfg(feature = "eigen-da")]
-        canoe_image_id,
-        payout_recipient,
-        precondition_hash,
-        &boot,
-    );
+    let journal_output =
+        ProofJournal::new(fpvm_image_id, payout_recipient, precondition_hash, &boot);
 
     #[cfg(feature = "eigen-da")]
     let result = {

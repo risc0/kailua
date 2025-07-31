@@ -226,14 +226,14 @@ pub async fn publish_receipt_proofs<P: Provider>(
                 } else {
                     info!("Config hash {} confirmed.", proof_journal.config_hash);
                 }
-                if proof_journal.fpvm_version.0 != expected_fpvm_image_id {
+                if proof_journal.fpvm_image_id.0 != expected_fpvm_image_id {
                     warn!(
                         "Proof FPVM Image ID {} does not match expected {}",
-                        proof_journal.fpvm_version,
+                        proof_journal.fpvm_image_id,
                         B256::from(expected_fpvm_image_id)
                     );
                 } else {
-                    info!("FPVM Image ID {} confirmed", proof_journal.fpvm_version);
+                    info!("FPVM Image ID {} confirmed", proof_journal.fpvm_image_id);
                 }
                 let expected_block_number = parent.output_block_number
                     + agent.deployment.proposal_output_count * agent.deployment.output_block_span;

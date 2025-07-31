@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use kailua_common::client::stateless::run_stateless_client;
+use kailua_common::client::stitching::KonaStitchingClient;
 use kailua_common::oracle::vec::VecOracle;
 use kailua_common::{client::log, witness::Witness};
 use risc0_zkvm::guest::env;
@@ -46,7 +47,7 @@ fn main() {
     }
 
     // Run client using witness data
-    let proof_journal = run_stateless_client(witness);
+    let proof_journal = run_stateless_client(witness, KonaStitchingClient);
 
     // Prevent provability of insufficient data
     assert!(

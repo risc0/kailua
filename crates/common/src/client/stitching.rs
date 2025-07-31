@@ -13,11 +13,13 @@
 // limitations under the License.
 
 use crate::boot::StitchedBootInfo;
+use crate::client::core::DAWrapper;
 use crate::client::log;
 use crate::executor::Execution;
 use crate::journal::ProofJournal;
 use alloy_primitives::{Address, B256};
-use kona_derive::prelude::BlobProvider;
+use hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData;
+use kona_derive::prelude::{BlobProvider, DataAvailabilityProvider};
 use kona_preimage::CommsClient;
 use kona_proof::{BootInfo, FlushableCache};
 use std::fmt::Debug;
@@ -33,118 +35,222 @@ use {
     serde::Deserialize,
 };
 
-/// Executes the primary operation of stitching together execution and boot information for a client,
-/// while maintaining composable proofs for validation in a zero-knowledge environment.
-///
-/// # Arguments
-///
-/// * `precondition_validation_data_hash` - A `B256` hash used for precondition validation.
-/// * `oracle` - An `Arc` wrapped client that implements the `CommsClient` and `FlushableCache`
-///   traits. This serves as the provider for external data communication.
-/// * `stream` - An `Arc` wrapped client, similar to `oracle`, used for additional communication
-///   and streaming purposes.
-/// * `beacon` - A generic blob provider `B`, used as a shared dependency for validation
-///   operations.
-/// * `fpvm_image_id` - A `B256` identifier for the FPVM image to associate with the operations performed.
-/// * `payout_recipient_address` - The Ethereum address (`Address`) where payout rewards are allocated.
-/// * `stitched_executions` - A nested vector of `Execution` objects containing precomputed execution
-///   proofs to be stitched.
-/// * `stitched_boot_info` - A vector of `StitchedBootInfo` objects containing boot proofs
-///   to be stitched together.
-///
-/// # Returns
-///
-/// Returns a `ProofJournal` combining the stitched proofs.
-///
-/// # Functionality
-///
-/// - **Execution Queueing:** Precomputed executions are split into direct executables and cache components
-///   for intermediate processing.
-/// - **Output Validation:** Computes the output hash of the target block using a helper method
-///   (`run_core_client`) and validates the precondition against the provided hash.
-/// - **Proof Loading (Conditional):** For zero-knowledge validations (`zkvm`), loads previously
-///   proven FPVM journals to maintain composability and recursive proof validation.
-/// - **Execution Stitching:** Merges the precomputed execution proofs into a single verifiable
-///   entity while associating it with a target address.
-/// - **Boot Info Stitching:** Stitches together boot proofs based on the precondition hash and FPVM image ID.
-///
-/// # Platform Specific Behavior
-///
-/// This function behaves differently on platforms supporting `zkvm`:
-/// - It loads proven FPVM journals (`load_stitching_journals`) to ensure recursive zero-knowledge proofs
-///   are intact.
-/// - Passes the proven journals to the execution and boot info stitching processes for extended validation.
-///
-/// # Panics
-///
-/// This function will panic if:
-/// - The output hash computation (`run_core_client`) fails.
-#[allow(clippy::too_many_arguments)]
-pub fn run_stitching_client<
-    O: CommsClient + FlushableCache + Send + Sync + Debug,
-    B: BlobProvider + Send + Sync + Debug + Clone,
-    #[cfg(feature = "eigen-da")] E: hokulea_eigenda::EigenDABlobProvider + Send + Sync + Debug + Clone,
->(
-    precondition_validation_data_hash: B256,
-    oracle: Arc<O>,
-    stream: Arc<O>,
-    beacon: B,
-    #[cfg(feature = "eigen-da")] eigen_da: E,
-    fpvm_image_id: B256,
-    #[cfg(feature = "eigen-da")] canoe_image_id: B256,
-    payout_recipient_address: Address,
-    stitched_executions: Vec<Vec<Execution>>,
-    stitched_boot_info: Vec<StitchedBootInfo>,
-) -> (BootInfo, ProofJournal)
-where
-    <B as BlobProvider>::Error: Debug,
-{
-    // Queue up precomputed executions
-    let (stitched_executions, execution_cache) = split_executions(stitched_executions);
-
-    // Attempt to recompute the output hash at the target block number using kona
-    log("RUN");
-    let (boot, precondition_hash) = crate::client::core::run_core_client(
-        precondition_validation_data_hash,
-        oracle,
-        stream,
-        beacon,
-        #[cfg(feature = "eigen-da")]
-        eigen_da,
-        execution_cache,
-        None,
-    )
-    .expect("Failed to compute output hash.");
-
-    // Verify proofs recursively for boundless composition
-    #[cfg(target_os = "zkvm")]
-    let proven_fpvm_journals = load_stitching_journals(fpvm_image_id);
-
-    // Stitch recursively composed execution-only proofs
-    stitch_executions(
-        &boot,
-        fpvm_image_id,
-        #[cfg(feature = "eigen-da")]
-        canoe_image_id,
-        payout_recipient_address,
-        &stitched_executions,
-        #[cfg(target_os = "zkvm")]
-        &proven_fpvm_journals,
-    );
-
-    // Stitch recursively composed proofs
-    stitch_boot_info(
-        boot,
-        fpvm_image_id,
-        #[cfg(feature = "eigen-da")]
-        canoe_image_id,
-        payout_recipient_address,
-        precondition_hash,
-        stitched_boot_info,
-        #[cfg(target_os = "zkvm")]
-        &proven_fpvm_journals,
-    )
+pub trait StitchingClient {
+    /// Executes the primary operation of stitching together execution and boot information for a client,
+    /// while maintaining composable proofs for validation in a zero-knowledge environment.
+    ///
+    /// # Arguments
+    ///
+    /// * `precondition_validation_data_hash` - A `B256` hash used for precondition validation.
+    /// * `oracle` - An `Arc` wrapped client that implements the `CommsClient` and `FlushableCache`
+    ///   traits. This serves as the provider for external data communication.
+    /// * `stream` - An `Arc` wrapped client, similar to `oracle`, used for additional communication
+    ///   and streaming purposes.
+    /// * `beacon` - A generic blob provider `B`, used as a shared dependency for validation
+    ///   operations.
+    /// * `fpvm_image_id` - A `B256` identifier for the FPVM image to associate with the operations performed.
+    /// * `payout_recipient_address` - The Ethereum address (`Address`) where payout rewards are allocated.
+    /// * `stitched_executions` - A nested vector of `Execution` objects containing precomputed execution
+    ///   proofs to be stitched.
+    /// * `stitched_boot_info` - A vector of `StitchedBootInfo` objects containing boot proofs
+    ///   to be stitched together.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `ProofJournal` combining the stitched proofs.
+    ///
+    /// # Functionality
+    ///
+    /// - **Execution Queueing:** Precomputed executions are split into direct executables and cache components
+    ///   for intermediate processing.
+    /// - **Output Validation:** Computes the output hash of the target block using a helper method
+    ///   (`run_core_client`) and validates the precondition against the provided hash.
+    /// - **Proof Loading (Conditional):** For zero-knowledge validations (`zkvm`), loads previously
+    ///   proven FPVM journals to maintain composability and recursive proof validation.
+    /// - **Execution Stitching:** Merges the precomputed execution proofs into a single verifiable
+    ///   entity while associating it with a target address.
+    /// - **Boot Info Stitching:** Stitches together boot proofs based on the precondition hash and FPVM image ID.
+    ///
+    /// # Platform Specific Behavior
+    ///
+    /// This function behaves differently on platforms supporting `zkvm`:
+    /// - It loads proven FPVM journals (`load_stitching_journals`) to ensure recursive zero-knowledge proofs
+    ///   are intact.
+    /// - Passes the proven journals to the execution and boot info stitching processes for extended validation.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if:
+    /// - The output hash computation (`run_core_client`) fails.
+    #[allow(clippy::too_many_arguments)]
+    fn run_stitching_client<
+        D: DataAvailabilityProvider + Send + Sync + Debug + Clone,
+        E: DataAvailabilityProvider + Send + Sync + Debug + Clone,
+        O: CommsClient + FlushableCache + Send + Sync + Debug,
+        B: BlobProvider + Send + Sync + Debug + Clone,
+        W: DAWrapper<D, E> + Send + Sync + Debug + Clone,
+    >(
+        self,
+        precondition_validation_data_hash: B256,
+        oracle: Arc<O>,
+        stream: Arc<O>,
+        beacon: B,
+        da_wrapper: Option<W>,
+        fpvm_image_id: B256,
+        payout_recipient_address: Address,
+        stitched_executions: Vec<Vec<Execution>>,
+        stitched_boot_info: Vec<StitchedBootInfo>,
+    ) -> (BootInfo, ProofJournal);
 }
+
+#[derive(Clone, Copy, Debug)]
+pub struct KonaStitchingClient;
+
+impl StitchingClient for KonaStitchingClient {
+    fn run_stitching_client<
+        D: DataAvailabilityProvider + Send + Sync + Debug + Clone,
+        E: DataAvailabilityProvider + Send + Sync + Debug + Clone,
+        O: CommsClient + FlushableCache + Send + Sync + Debug,
+        B: BlobProvider + Send + Sync + Debug + Clone,
+        W: DAWrapper<D, E> + Send + Sync + Debug + Clone,
+    >(
+        self,
+        precondition_validation_data_hash: B256,
+        oracle: Arc<O>,
+        stream: Arc<O>,
+        beacon: B,
+        da_wrapper: Option<W>,
+        fpvm_image_id: B256,
+        payout_recipient_address: Address,
+        stitched_executions: Vec<Vec<Execution>>,
+        stitched_boot_info: Vec<StitchedBootInfo>,
+    ) -> (BootInfo, ProofJournal) {
+        // Queue up precomputed executions
+        let (stitched_executions, execution_cache) = split_executions(stitched_executions);
+
+        // Attempt to recompute the output hash at the target block number using kona
+        log("RUN");
+        let (boot, precondition_hash) = crate::client::core::run_core_client(
+            precondition_validation_data_hash,
+            oracle,
+            stream,
+            beacon,
+            da_wrapper,
+            execution_cache,
+            None,
+        )
+        .expect("Failed to compute output hash.");
+
+        // Verify proofs recursively for boundless composition
+        #[cfg(target_os = "zkvm")]
+        let proven_fpvm_journals = load_stitching_journals(fpvm_image_id);
+
+        // Stitch recursively composed execution-only proofs
+        stitch_executions(
+            &boot,
+            fpvm_image_id,
+            payout_recipient_address,
+            &stitched_executions,
+            #[cfg(target_os = "zkvm")]
+            &proven_fpvm_journals,
+        );
+
+        // Stitch recursively composed proofs
+        stitch_boot_info(
+            boot,
+            fpvm_image_id,
+            payout_recipient_address,
+            precondition_hash,
+            stitched_boot_info,
+            #[cfg(target_os = "zkvm")]
+            &proven_fpvm_journals,
+        )
+    }
+}
+
+#[cfg(feature = "eigen-da")]
+#[derive(Clone, Debug)]
+pub struct HokuleaStitchingClient {
+    pub eigen_da_witness: EigenDABlobWitnessData,
+    pub canoe_image_id: B256,
+}
+
+#[cfg(feature = "eigen-da")]
+impl HokuleaStitchingClient {
+    pub fn new(eigen_da_witness: EigenDABlobWitnessData, canoe_image_id: B256) -> Self {
+        Self {
+            eigen_da_witness,
+            canoe_image_id,
+        }
+    }
+}
+
+#[cfg(feature = "eigen-da")]
+impl StitchingClient for HokuleaStitchingClient {
+    fn run_stitching_client<
+        D: DataAvailabilityProvider + Send + Sync + Debug + Clone,
+        E: DataAvailabilityProvider + Send + Sync + Debug + Clone,
+        O: CommsClient + FlushableCache + Send + Sync + Debug,
+        B: BlobProvider + Send + Sync + Debug + Clone,
+        W: DAWrapper<D, E> + Send + Sync + Debug + Clone,
+    >(
+        self,
+        precondition_validation_data_hash: B256,
+        oracle: Arc<O>,
+        stream: Arc<O>,
+        beacon: B,
+        _: Option<W>,
+        fpvm_image_id: B256,
+        payout_recipient_address: Address,
+        stitched_executions: Vec<Vec<Execution>>,
+        stitched_boot_info: Vec<StitchedBootInfo>,
+    ) -> (BootInfo, ProofJournal) {
+        #[cfg(feature = "eigen-da")]
+        let eigen_da_precondition = crate::hokulea::da_witness_precondition(&self.eigen_da_witness);
+
+        #[cfg(feature = "eigen-da")]
+        let eigen_da =
+            hokulea_proof::preloaded_eigenda_provider::PreloadedEigenDABlobProvider::from_witness(
+                self.eigen_da_witness,
+                crate::hokulea::KailuaCanoeVerifier(self.canoe_image_id.0),
+            );
+
+        let (boot, proof_journal) = KonaStitchingClient.run_stitching_client(
+            precondition_validation_data_hash,
+            oracle,
+            stream,
+            beacon,
+            Some(eigen_da),
+            fpvm_image_id,
+            payout_recipient_address,
+            stitched_executions,
+            stitched_boot_info,
+        );
+
+        #[cfg(feature = "eigen-da")]
+        crate::hokulea::da_witness_postcondition(eigen_da_precondition, &boot);
+
+        (boot, proof_journal)
+    }
+}
+
+// pub fn run_stitching_client<
+//     O: CommsClient + FlushableCache + Send + Sync + Debug,
+//     B: BlobProvider + Send + Sync + Debug + Clone,
+// >(
+//     precondition_validation_data_hash: B256,
+//     oracle: Arc<O>,
+//     stream: Arc<O>,
+//     beacon: B,
+//     #[cfg(feature = "eigen-da")]
+//     eigen_da_witness: hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData,
+//     fpvm_image_id: B256,
+//     payout_recipient_address: Address,
+//     stitched_executions: Vec<Vec<Execution>>,
+//     stitched_boot_info: Vec<StitchedBootInfo>,
+// ) -> (BootInfo, ProofJournal)
+// where
+//     <B as BlobProvider>::Error: Debug,
 
 /// Loads and verifies stitching journals for a given FPVM image.
 ///
@@ -313,7 +419,6 @@ pub fn split_executions(
 pub fn stitch_executions(
     boot: &BootInfo,
     fpvm_image_id: B256,
-    #[cfg(feature = "eigen-da")] canoe_image_id: B256,
     payout_recipient_address: Address,
     stitched_executions: &Vec<Vec<Arc<Execution>>>,
     #[cfg(target_os = "zkvm")] proven_fpvm_journals: &HashSet<Digest>,
@@ -348,8 +453,6 @@ pub fn stitch_executions(
         // Construct expected proof journal
         let encoded_journal = ProofJournal::new_stitched(
             fpvm_image_id,
-            #[cfg(feature = "eigen-da")]
-            canoe_image_id,
             payout_recipient_address,
             precondition_hash,
             B256::from(config_hash),
@@ -435,7 +538,6 @@ pub fn stitch_executions(
 pub fn stitch_boot_info(
     boot: BootInfo,
     fpvm_image_id: B256,
-    #[cfg(feature = "eigen-da")] canoe_image_id: B256,
     payout_recipient_address: Address,
     precondition_hash: B256,
     stitched_boot_info: Vec<StitchedBootInfo>,
@@ -444,8 +546,6 @@ pub fn stitch_boot_info(
     // Stitch boots together into a journal
     let mut stitched_journal = ProofJournal::new(
         fpvm_image_id,
-        #[cfg(feature = "eigen-da")]
-        canoe_image_id,
         payout_recipient_address,
         precondition_hash,
         &boot,
@@ -464,8 +564,6 @@ pub fn stitch_boot_info(
             fpvm_image_id,
             ProofJournal::new_stitched(
                 fpvm_image_id,
-                #[cfg(feature = "eigen-da")]
-                canoe_image_id,
                 payout_recipient_address,
                 precondition_hash,
                 stitched_journal.config_hash,
@@ -492,7 +590,6 @@ pub fn stitch_boot_info(
 }
 
 #[cfg(test)]
-#[cfg(not(feature = "eigen-da"))]
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
@@ -535,7 +632,7 @@ pub mod tests {
             assert_eq!(proof_journal.precondition_hash, expected_precondition_hash);
         }
         assert!(proof_journal.payout_recipient.is_zero());
-        assert!(proof_journal.fpvm_version.is_zero());
+        assert!(proof_journal.fpvm_image_id.is_zero());
     }
 
     pub fn test_stitching(
@@ -567,17 +664,19 @@ pub mod tests {
             None => B256::ZERO,
             Some(data) => oracle.add_precondition_data(data),
         };
-        run_stitching_client(
-            precondition_validation_data_hash,
-            oracle.clone(),
-            oracle.clone(),
-            OracleBlobProvider::new(oracle.clone()),
-            B256::ZERO,
-            Address::ZERO,
-            stitched_executions,
-            stitched_boot_info,
-        )
-        .1
+        KonaStitchingClient
+            .run_stitching_client(
+                precondition_validation_data_hash,
+                oracle.clone(),
+                oracle.clone(),
+                OracleBlobProvider::new(oracle.clone()),
+                None,
+                B256::ZERO,
+                Address::ZERO,
+                stitched_executions,
+                stitched_boot_info,
+            )
+            .1
     }
 
     pub fn test_stitching_boots(

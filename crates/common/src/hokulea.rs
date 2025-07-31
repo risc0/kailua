@@ -83,7 +83,7 @@ pub fn da_witness_precondition(
 
 pub fn da_witness_postcondition(
     precondition: Option<(B256, u64, u64)>,
-    boot_info: kona_proof::BootInfo,
+    boot_info: &kona_proof::BootInfo,
 ) {
     if let Some((l1_head, l1_chain_id, recency)) = precondition {
         assert_eq!(l1_head, boot_info.l1_head);
@@ -94,13 +94,4 @@ pub fn da_witness_postcondition(
             boot_info.rollup_config.seq_window_size + 100_000_000
         )
     }
-}
-
-pub fn fpvm_version(fpvm_image_id: B256, canoe_image_id: B256) -> B256 {
-    B256::from_slice(
-        [fpvm_image_id.0, canoe_image_id.0]
-            .concat()
-            .digest()
-            .as_bytes(),
-    )
 }

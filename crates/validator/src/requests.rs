@@ -119,7 +119,7 @@ pub async fn handle_proof_requests(
             claimed_l2_output_root,
             claimed_l2_block_number,
             config_hash,
-            fpvm_version: fpvm_image_id,
+            fpvm_image_id,
         };
         let file_name = proof_file_name(&proof_journal);
         // Prepare proving args
