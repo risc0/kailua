@@ -32,7 +32,7 @@ use boundless_market::storage::{StorageProviderConfig, StorageProviderType};
 use boundless_market::{Deployment, GuestEnv, ProofRequest, StandardStorageProvider};
 use clap::Parser;
 use human_bytes::human_bytes;
-use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
+use kailua_build::{KAILUA_FPVM_KONA_ELF, KAILUA_FPVM_KONA_ID};
 use kailua_common::journal::ProofJournal;
 use kailua_sync::{retry_res, retry_res_timeout};
 use lazy_static::lazy_static;
@@ -352,9 +352,12 @@ pub async fn run_boundless_client(
     debug!("Deployment: {:?}", boundless_client.deployment);
 
     // Set the proof request requirements
-    let requirements = Requirements::new(KAILUA_FPVM_ID, Predicate::digest_match(journal.digest()))
-        // manually choose latest Groth16 receipt selector
-        .with_selector((Selector::groth16_latest() as u32).into());
+    let requirements = Requirements::new(
+        KAILUA_FPVM_KONA_ID,
+        Predicate::digest_match(journal.digest()),
+    )
+    // manually choose latest Groth16 receipt selector
+    .with_selector((Selector::groth16_latest() as u32).into());
 
     // Wait for a market request to be fulfilled
     loop {
@@ -551,7 +554,11 @@ pub async fn retrieve_proof(
         {
             Ok((journal, seal)) => {
                 let Ok(risc0_ethereum_contracts::receipt::Receipt::Base(receipt)) =
-                    risc0_ethereum_contracts::receipt::decode_seal(seal, KAILUA_FPVM_ID, journal)
+                    risc0_ethereum_contracts::receipt::decode_seal(
+                        seal,
+                        KAILUA_FPVM_KONA_ID,
+                        journal,
+                    )
                 else {
                     return Err(ClientError::RequestError(RequestError::MissingRequirements));
                 };
@@ -622,10 +629,10 @@ pub async fn request_proof(
 
                 info!(
                     "Uploading {} Kailua ELF.",
-                    human_bytes(KAILUA_FPVM_ELF.len() as f64)
+                    human_bytes(KAILUA_FPVM_KONA_ELF.len() as f64)
                 );
                 let program_url = retry_res!(boundless_client
-                    .upload_program(KAILUA_FPVM_ELF)
+                    .upload_program(KAILUA_FPVM_KONA_ELF)
                     .await
                     .context("Client::upload_program"))
                 .await;
@@ -674,7 +681,7 @@ pub async fn request_proof(
                     builder.write(proof)?;
                 }
                 let env = builder.build()?;
-                let session_info = default_executor().execute(env, KAILUA_FPVM_ELF)?;
+                let session_info = default_executor().execute(env, KAILUA_FPVM_KONA_ELF)?;
                 Ok::<_, anyhow::Error>(session_info)
             })
             .await

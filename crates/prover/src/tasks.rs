@@ -21,7 +21,7 @@ use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
 use async_channel::{Receiver, Sender};
 use human_bytes::human_bytes;
-use kailua_build::KAILUA_FPVM_ID;
+use kailua_build::KAILUA_FPVM_KONA_ID;
 use kailua_common::boot::StitchedBootInfo;
 use kailua_common::client::stitching::{split_executions, stitch_boot_info};
 use kailua_common::executor::{exec_precondition_hash, Execution};
@@ -532,7 +532,7 @@ pub async fn compute_cached_proof(
     // Construct expected journal
     let (_, proof_journal) = stitch_boot_info(
         boot.clone(),
-        bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
+        bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_KONA_ID).into(),
         #[cfg(feature = "eigen-da")]
         bytemuck::cast::<[u32; 8], [u8; 32]>(canoe_steel_methods::CERT_VERIFICATION_ID).into(), // todo: stable image id
         args.proving.payout_recipient_address.unwrap_or_default(),

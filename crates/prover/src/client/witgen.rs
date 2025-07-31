@@ -16,7 +16,7 @@ use alloy::consensus::Blob;
 use alloy::eips::eip4844::IndexedBlobHash;
 use alloy_primitives::{Address, B256};
 use async_trait::async_trait;
-use kailua_build::KAILUA_FPVM_ID;
+use kailua_build::KAILUA_FPVM_KONA_ID;
 use kailua_common::blobs::BlobWitnessData;
 use kailua_common::boot::StitchedBootInfo;
 use kailua_common::executor::Execution;
@@ -106,7 +106,7 @@ where
     }
     let stitched_executions = vec![core::mem::take(executions.deref_mut())];
     // Construct witness
-    let fpvm_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(KAILUA_FPVM_ID));
+    let fpvm_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(KAILUA_FPVM_KONA_ID));
     #[cfg(feature = "eigen-da")]
     let canoe_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(
         canoe_steel_methods::CERT_VERIFICATION_ID, // todo: stable image id

@@ -16,7 +16,7 @@ use crate::args::ProvingArgs;
 use crate::backends::{KailuaProveInfo, KailuaSessionStats};
 use crate::ProvingError;
 use anyhow::{anyhow, Context};
-use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
+use kailua_build::{KAILUA_FPVM_KONA_ELF, KAILUA_FPVM_KONA_ID};
 use risc0_zkvm::{default_prover, is_dev_mode, ExecutorEnv, InnerReceipt, ProverOpts, Receipt};
 use tracing::info;
 use tracing::log::warn;
@@ -43,7 +43,7 @@ pub async fn run_zkvm_client(
             ProverOpts::succinct()
         };
         let risc0_prove_info = prover
-            .prove_with_opts(env, KAILUA_FPVM_ELF, &prover_opts)
+            .prove_with_opts(env, KAILUA_FPVM_KONA_ELF, &prover_opts)
             .context("prove_with_opts")?;
 
         // Convert to our own KailuaProveInfo
@@ -70,7 +70,7 @@ pub async fn run_zkvm_client(
     );
     prove_info
         .receipt
-        .verify(KAILUA_FPVM_ID)
+        .verify(KAILUA_FPVM_KONA_ID)
         .context("receipt verification")
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     info!("Receipt verified.");

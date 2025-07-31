@@ -14,7 +14,7 @@
 
 use anyhow::{anyhow, Context};
 use bonsai_sdk::non_blocking::{Client, SessionId};
-use kailua_build::KAILUA_FPVM_ID;
+use kailua_build::KAILUA_FPVM_KONA_ID;
 use kailua_common::journal::ProofJournal;
 use kailua_prover::backends::{KailuaProveInfo, KailuaSessionStats};
 use kailua_prover::client::proving::save_to_bincoded_file;
@@ -77,7 +77,7 @@ pub async fn bonsai(args: BonsaiArgs) -> anyhow::Result<()> {
         let receipt: Receipt = bincode::deserialize(&receipt_buf)?;
 
         info!("Verifying receipt received from Bonsai.");
-        receipt.verify(KAILUA_FPVM_ID)?;
+        receipt.verify(KAILUA_FPVM_KONA_ID)?;
 
         break KailuaProveInfo {
             receipt,
@@ -97,7 +97,7 @@ pub async fn bonsai(args: BonsaiArgs) -> anyhow::Result<()> {
 
     info!("Writing proof to {file_name}.");
     if let Ok(prior_receipt) = read_bincoded_file::<Receipt>(&file_name).await {
-        if prior_receipt.verify(KAILUA_FPVM_ID).is_ok() {
+        if prior_receipt.verify(KAILUA_FPVM_KONA_ID).is_ok() {
             info!("Skipping overwriting valid receipt file.");
             return Ok(());
         }

@@ -15,7 +15,7 @@
 use alloy::primitives::address;
 use alloy::providers::ProviderBuilder;
 use anyhow::Context;
-use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
+use kailua_build::{KAILUA_FPVM_KONA_ELF, KAILUA_FPVM_KONA_ID};
 use kailua_common::config::config_hash;
 use kailua_contracts::SystemConfig;
 use kailua_sync::provider::optimism::fetch_rollup_config;
@@ -79,15 +79,15 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
     // report risc0 version
     println!("RISC0_VERSION: {}", risc0_zkvm::get_version()?);
     // report fpvm image id
-    let stored_image_id = Digest::new(KAILUA_FPVM_ID);
+    let stored_image_id = Digest::new(KAILUA_FPVM_KONA_ID);
     println!(
         "FPVM_IMAGE_ID: 0x{}",
         hex::encode_upper(stored_image_id.as_bytes())
     );
-    let computed_image_id = compute_image_id(KAILUA_FPVM_ELF).context("compute_image_id")?;
+    let computed_image_id = compute_image_id(KAILUA_FPVM_KONA_ELF).context("compute_image_id")?;
     assert_eq!(computed_image_id, stored_image_id);
     // report elf size
-    println!("FPVM_ELF_SIZE: {}", KAILUA_FPVM_ELF.len());
+    println!("FPVM_ELF_SIZE: {}", KAILUA_FPVM_KONA_ELF.len());
     // Report expected Groth16 verifier parameters
     println!(
         "CONTROL_ROOT: 0x{}",

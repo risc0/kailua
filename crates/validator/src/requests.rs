@@ -20,7 +20,7 @@ use alloy::network::primitives::HeaderResponse;
 use alloy::network::{BlockResponse, TxSigner};
 use alloy::primitives::B256;
 use anyhow::{bail, Context};
-use kailua_build::KAILUA_FPVM_ID;
+use kailua_build::KAILUA_FPVM_KONA_ID;
 use kailua_common::blobs::BlobFetchRequest;
 use kailua_common::config::config_hash;
 use kailua_common::journal::ProofJournal;
@@ -62,7 +62,7 @@ pub async fn handle_proof_requests(
     )
     .context("fetch_rollup_config")?;
     let config_hash = B256::from(config_hash(&rollup_config)?);
-    let fpvm_image_id = B256::from(bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID));
+    let fpvm_image_id = B256::from(bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_KONA_ID));
     // Set payout recipient
     let validator_wallet = await_tel_res!(
         context,

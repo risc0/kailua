@@ -70,7 +70,7 @@ fn main() {
                 opts
             };
             std::collections::HashMap::from([
-                ("kailua-fpvm", guest_options.clone()),
+                ("kailua-fpvm-kona", guest_options.clone()),
                 ("kailua-fpvm-hokulea", guest_options.clone()),
             ])
         });

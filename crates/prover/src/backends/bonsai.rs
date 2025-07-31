@@ -18,7 +18,7 @@ use anyhow::{anyhow, Context};
 use bonsai_sdk::non_blocking::{Client, SessionId, SnarkId};
 use bonsai_sdk::responses::SessionStats;
 use human_bytes::human_bytes;
-use kailua_build::{KAILUA_FPVM_ELF, KAILUA_FPVM_ID};
+use kailua_build::{KAILUA_FPVM_KONA_ELF, KAILUA_FPVM_KONA_ID};
 use kailua_sync::{retry_res, retry_res_timeout};
 use risc0_zkvm::serde::to_vec;
 use risc0_zkvm::sha::Digest;
@@ -130,7 +130,7 @@ pub async fn run_bonsai_client(
                     error!("Failed to deserialize receipt at {receipt_url}");
                     continue;
                 };
-                let Ok(()) = receipt.verify(KAILUA_FPVM_ID) else {
+                let Ok(()) = receipt.verify(KAILUA_FPVM_KONA_ID) else {
                     error!("Failed to verify receipt at {receipt_url}.");
                     continue;
                 };
@@ -187,7 +187,7 @@ pub async fn run_bonsai_client(
                     error!("Failed to deserialize SNARK receipt at {receipt_url}");
                     continue;
                 };
-                let Ok(()) = receipt.verify(KAILUA_FPVM_ID) else {
+                let Ok(()) = receipt.verify(KAILUA_FPVM_KONA_ID) else {
                     error!("Failed to verify SNARK receipt at {receipt_url}.");
                     continue;
                 };
@@ -233,8 +233,8 @@ pub async fn create_stark_session(
     assumption_receipt_ids: Vec<String>,
 ) -> SessionId {
     // Upload the ELF with the image_id as its key.
-    let elf = KAILUA_FPVM_ELF.to_vec();
-    let image_id_hex = hex::encode(Digest::from(KAILUA_FPVM_ID));
+    let elf = KAILUA_FPVM_KONA_ELF.to_vec();
+    let image_id_hex = hex::encode(Digest::from(KAILUA_FPVM_KONA_ID));
     let is_image_present = retry_res_timeout!(client.has_img(&image_id_hex).await).await;
     if !is_image_present {
         info!(

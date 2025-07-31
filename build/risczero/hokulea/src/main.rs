@@ -56,10 +56,7 @@ fn main() {
     }
 
     // Run client using witness data
-    let proof_journal = run_stateless_client(
-        witness,
-        eigen_da,
-    );
+    let proof_journal = run_stateless_client(witness, eigen_da);
 
     // Prevent provability of insufficient data
     assert!(

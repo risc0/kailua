@@ -17,7 +17,7 @@ canoe-steel-methods = { workspace = true, optional = true }
 risc0-build.workspace = true
 
 [package.metadata.risc0]
-methods = ["fpvm", "hokulea"]
+methods = ["kona", "hokulea"]
 
 [features]
 debug-guest-build = []
