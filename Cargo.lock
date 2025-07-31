@@ -5246,6 +5246,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "bonsai-sdk",
+ "boundless-market",
  "bytemuck",
  "clap",
  "hex",

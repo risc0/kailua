@@ -37,6 +37,8 @@ kailua-validator.workspace = true
 
 bonsai-sdk.workspace = true
 
+boundless-market.workspace = true
+
 kona-cli.workspace = true
 
 risc0-circuit-recursion.workspace = true
