@@ -93,6 +93,5 @@ eigen-da = [
     "dep:hokulea-host-bin",
     "dep:hokulea-proof",
     "dep:hokulea-witgen",
-    "kailua-build/eigen-da",
     "kailua-common/eigen-da",
 ]

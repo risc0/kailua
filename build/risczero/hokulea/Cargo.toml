@@ -1,5 +1,5 @@
 [package]
-name = "kailua-fpvm"
+name = "kailua-fpvm-hokulea"
 version = "1.0.0"
 edition = "2021"
 license = "Apache-2.0"
@@ -22,14 +22,17 @@ codegen-units = 1
 opt-level = 3
 
 [dependencies]
+alloy-primitives = { version = "1.1.2", default-features = false, features = ["map-hashbrown"] }
+bincode = "1.3.3"
 blst = { version = "=0.3.14", features = ["no-threads"] }
 c-kzg = { version = "2.1.1", features = ["eip-7594"] }
 rkyv = "0.8.9"
 substrate-bn = "=0.6.0"
 
-kailua-common = { path = "../../../crates/common" }
+kailua-common = { path = "../../../crates/common", features = ["eigen-da"] }
 
 risc0-zkvm = { version = "2.2.0", features = ["std", "heap-embedded-alloc", "unstable"] }
+hokulea-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "c336a3203211d7de41a554a571646a368a34da6c", default-features = false }
 
 [features]
 disable-dev-mode = [

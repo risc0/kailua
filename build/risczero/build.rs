@@ -13,18 +13,25 @@
 // limitations under the License.
 
 fn main() {
-    if cfg!(feature = "rebuild-fpvm") {
-        let build_opts = {
-            #[cfg(not(any(feature = "debug-guest-build", debug_assertions)))]
-            let root_dir = {
-                let cwd = std::env::current_dir().unwrap();
-                cwd.parent()
-                    .unwrap()
-                    .parent()
-                    .map(|d| d.to_path_buf())
-                    .unwrap()
-            };
-            std::collections::HashMap::from([("kailua-fpvm", {
+    #[cfg(feature = "rebuild-fpvm")]
+    {
+        risc0_build::embed_methods_with_options({
+            let guest_options = {
+                // set CANOE_IMAGE_ID if not set
+                let canoe_image_id = std::env::var("CANOE_IMAGE_ID").unwrap_or_else(|_| {
+                    // Warn about unstable build
+                    if std::env::var("RISC0_USE_DOCKER").is_err() {
+                        println!("cargo:warning=Building without RISC0_USE_DOCKER will yield an irreproducible build for kailua-fpvm-hokulea.");
+                    }
+                    let canoe_image_id = alloy_primitives::B256::from(bytemuck::cast::<_, [u8; 32]>(
+                        canoe_steel_methods::CERT_VERIFICATION_ID,
+                    ))
+                        .to_string();
+                    canoe_image_id
+                });
+                println!("cargo:rustc-env=CANOE_IMAGE_ID={canoe_image_id}");
+                std::env::set_var("CANOE_IMAGE_ID", &canoe_image_id);
+                // Start with default build options
                 let opts = risc0_build::GuestOptions::default();
                 // Build a reproducible ELF file using docker under the release profile
                 #[cfg(not(any(feature = "debug-guest-build", debug_assertions)))]
@@ -33,7 +40,18 @@ fn main() {
                     opts.use_docker = Some(
                         risc0_build::DockerOptionsBuilder::default()
                             .docker_container_tag("r0.1.88.0")
-                            .root_dir(root_dir)
+                            .root_dir({
+                                let cwd = std::env::current_dir().unwrap();
+                                cwd.parent()
+                                    .unwrap()
+                                    .parent()
+                                    .map(|d| d.to_path_buf())
+                                    .unwrap()
+                            })
+                            .env(vec![(
+                                String::from("CANOE_IMAGE_ID"),
+                                canoe_image_id.to_string(),
+                            )])
                             .build()
                             .unwrap(),
                     );
@@ -49,18 +67,13 @@ fn main() {
                     opts.features.push(String::from("disable-dev-mode"));
                     opts
                 };
-                // Enable eigen-da support
-                #[cfg(feature = "eigen-da")]
-                let opts = {
-                    let mut opts = opts;
-                    opts.features.push(String::from("eigen-da"));
-                    opts
-                };
                 opts
-            })])
-        };
-
-        risc0_build::embed_methods_with_options(build_opts);
+            };
+            std::collections::HashMap::from([
+                ("kailua-fpvm", guest_options.clone()),
+                ("kailua-fpvm-hokulea", guest_options.clone()),
+            ])
+        });
     }
 
     println!("cargo:rerun-if-changed=src");

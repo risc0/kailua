@@ -18,15 +18,25 @@ use kailua_common::{client::log, witness::Witness};
 use risc0_zkvm::guest::env;
 use rkyv::rancor::Error;
 
+const CANOE_IMAGE_ID: &str = env!("CANOE_IMAGE_ID");
+
 fn main() {
+    // Load eigen-da blob witness
+    let eigen_da: hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData = {
+        let data = env::read_frame();
+        bincode::deserialize(&data).expect("EigenDABlobWitnessData deserialization failed")
+    };
+
     // Load main witness
-    let witness = {
+    let mut witness = {
         // Read serialized witness data
         let witness_data = env::read_frame();
         log("DESERIALIZE");
         rkyv::from_bytes::<Witness<VecOracle>, Error>(&witness_data)
             .expect("Failed to deserialize witness")
     };
+    witness.canoe_image_id = CANOE_IMAGE_ID.parse().unwrap();
+
     // Load extension shards
     for (i, entry) in witness
         .oracle_witness
@@ -46,7 +56,10 @@ fn main() {
     }
 
     // Run client using witness data
-    let proof_journal = run_stateless_client(witness);
+    let proof_journal = run_stateless_client(
+        witness,
+        eigen_da,
+    );
 
     // Prevent provability of insufficient data
     assert!(

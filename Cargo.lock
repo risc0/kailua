@@ -6086,6 +6086,9 @@ dependencies = [
 name = "kailua-build"
 version = "1.0.2"
 dependencies = [
+ "alloy-primitives 1.2.0",
+ "bytemuck",
+ "canoe-steel-methods",
  "risc0-build",
 ]
 
