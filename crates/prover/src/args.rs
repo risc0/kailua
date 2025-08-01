@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::backends::boundless::BoundlessArgs;
+use crate::risczero::boundless::BoundlessArgs;
 use alloy_primitives::{Address, B256};
 use clap::Parser;
 use kailua_sync::args::{parse_address, parse_b256};
@@ -45,6 +45,16 @@ pub struct ProvingArgs {
     /// Whether to skip waiting for the proof generation process to complete
     #[clap(long, env, default_value_t = false)]
     pub skip_await_proof: bool,
+    /// URL of the EigenDA RPC endpoint.
+    #[clap(
+        long,
+        visible_alias = "eigenda",
+        requires = "l2_node_address",
+        requires = "l1_node_address",
+        requires = "l1_beacon_address",
+        env
+    )]
+    pub eigenda_proxy_address: Option<String>,
 }
 
 impl ProvingArgs {

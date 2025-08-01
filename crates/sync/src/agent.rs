@@ -26,12 +26,12 @@ use alloy::providers::Provider;
 use anyhow::{anyhow, bail, Context};
 use futures::future::join_all;
 use itertools::Itertools;
-use kailua_common::blobs::hash_to_fe;
-use kailua_common::config::config_hash;
 use kailua_contracts::{
     IDisputeGameFactory::{gameAtIndexReturn, IDisputeGameFactoryInstance},
     *,
 };
+use kailua_kona::blobs::hash_to_fe;
+use kailua_kona::config::config_hash;
 use kona_genesis::RollupConfig;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::FutureExt;
@@ -115,7 +115,7 @@ impl SyncAgent {
         #[cfg(not(feature = "devnet"))]
         {
             let image_id: B256 =
-                bytemuck::cast::<[u32; 8], [u8; 32]>(kailua_build::KAILUA_FPVM_ID).into();
+                bytemuck::cast::<[u32; 8], [u8; 32]>(kailua_build::KAILUA_FPVM_KONA_ID).into();
             if deployment.image_id != image_id {
                 bail!(
                     "Deployment image ID mismatch. Expected {:?}, got {:?}.",

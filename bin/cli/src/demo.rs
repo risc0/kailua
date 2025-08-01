@@ -16,7 +16,7 @@ use alloy::eips::BlockNumberOrTag;
 use alloy::providers::Provider;
 use anyhow::{anyhow, Context};
 use kailua_prover::args::ProvingArgs;
-use kailua_prover::backends::boundless::BoundlessArgs;
+use kailua_prover::risczero::boundless::BoundlessArgs;
 use kailua_sync::args::SyncArgs;
 use kailua_sync::provider::{ProviderArgs, SyncProvider};
 use kailua_sync::telemetry::TelemetryArgs;

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use alloy::primitives::FixedBytes;
-use kailua_common::precondition::PreconditionValidationData;
+use kailua_kona::precondition::PreconditionValidationData;
 use risc0_zkvm::Receipt;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 

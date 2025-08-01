@@ -1,4 +1,4 @@
-paths = ["./fpvm"]
+paths = ["./kona", "./hokulea"]
 
 [term]
 color = "always"

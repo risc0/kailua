@@ -24,7 +24,7 @@ use alloy::providers::{Provider, RootProvider};
 use alloy_primitives::B256;
 use anyhow::{anyhow, bail, Context};
 use human_bytes::human_bytes;
-use kailua_common::boot::StitchedBootInfo;
+use kailua_kona::boot::StitchedBootInfo;
 use kailua_sync::provider::optimism::OpNodeProvider;
 use kailua_sync::{await_tel, retry_res_ctx_timeout};
 use opentelemetry::global::tracer;
