@@ -14,20 +14,24 @@
 
 use alloy_primitives::keccak256;
 use anyhow::{bail, Context};
-use kailua_kona::journal::ProofJournal;
+use bytemuck::NoUninit;
+use risc0_zkvm::Journal;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::path::Path;
 use tokio::fs::File;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-pub fn proof_file_name(proof_journal: &ProofJournal) -> String {
+pub fn proof_file_name<A: NoUninit>(image_id: A, journal: impl Into<Journal>) -> String {
     let version = risc0_zkvm::get_version().unwrap();
     let suffix = if risc0_zkvm::is_dev_mode() {
         "fake"
     } else {
         "zkp"
     };
-    let file_name = keccak256(proof_journal.encode_packed());
+    let image_id = bytemuck::cast::<A, [u8; 32]>(image_id);
+    let data = [image_id.as_slice(), journal.into().bytes.as_slice()].concat();
+    let file_name = keccak256(&data);
     format!("risc0-{version}-{file_name}.{suffix}")
 }
 
@@ -46,4 +50,18 @@ pub async fn read_bincoded_file<T: DeserializeOwned>(file_name: &str) -> anyhow:
     bincode::deserialize::<T>(&data).context(format!(
         "Failed to deserialize file {file_name} data with bincode."
     ))
+}
+
+pub async fn save_to_bincoded_file<T: Serialize>(value: &T, file_name: &str) -> anyhow::Result<()> {
+    let mut file = File::create(file_name)
+        .await
+        .context("Failed to create output file.")?;
+    let data = bincode::serialize(value).context("Could not serialize proving data.")?;
+    file.write_all(data.as_slice())
+        .await
+        .context("Failed to write proof to file")?;
+    file.flush()
+        .await
+        .context("Failed to flush proof output file data.")?;
+    Ok(())
 }

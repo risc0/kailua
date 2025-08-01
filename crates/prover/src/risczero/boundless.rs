@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use crate::args::ProvingArgs;
-use crate::client::proving::save_to_bincoded_file;
 use crate::proof::read_bincoded_file;
+use crate::proof::save_to_bincoded_file;
 use crate::ProvingError;
 use alloy::eips::BlockNumberOrTag;
 use alloy::transports::http::reqwest::Url;

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use kailua_prover::args::ProvingArgs;
-use kailua_prover::backends::boundless::BoundlessArgs;
+use kailua_prover::risczero::boundless::BoundlessArgs;
 use kailua_sync::args::SyncArgs;
 use kailua_sync::transact::signer::ValidatorSignerArgs;
 use kailua_sync::transact::TransactArgs;

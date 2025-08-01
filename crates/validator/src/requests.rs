@@ -121,7 +121,7 @@ pub async fn handle_proof_requests(
             config_hash,
             fpvm_image_id,
         };
-        let file_name = proof_file_name(&proof_journal);
+        let file_name = proof_file_name(KAILUA_FPVM_KONA_ID, &proof_journal);
         // Prepare proving args
         let (precondition_params, precondition_block_hashes, precondition_blob_hashes) =
             precondition_validation_data

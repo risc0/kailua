@@ -539,7 +539,7 @@ pub async fn compute_cached_proof(
     );
     let skip_await_proof = args.proving.skip_await_proof;
     // Skip computation if previously saved to disk
-    let file_name = proof_file_name(&proof_journal);
+    let file_name = proof_file_name(KAILUA_FPVM_KONA_ID, &proof_journal);
     if Path::new(&file_name).try_exists().is_ok_and(identity) && seek_proof {
         info!("Proving skipped. Proof file {file_name} already exists.");
     } else {

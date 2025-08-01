@@ -15,7 +15,7 @@
 use crate::boot::StitchedBootInfo;
 use alloy_primitives::{Address, B256};
 use kona_proof::BootInfo;
-use risc0_zkvm::Receipt;
+use risc0_zkvm::{Journal, Receipt};
 use serde::{Deserialize, Serialize};
 
 /// Represents a (provable) state transition of a rollup ledger.
@@ -164,7 +164,19 @@ impl From<&Receipt> for ProofJournal {
     /// This function will panic if the decoding of the packed journal fails. Ensure that the `journal`
     /// field in the `Receipt` contains valid encoded data before calling this method.
     fn from(value: &Receipt) -> Self {
-        Self::decode_packed(value.journal.as_ref())
+        Self::from(&value.journal)
+    }
+}
+
+impl From<&Journal> for ProofJournal {
+    fn from(value: &Journal) -> Self {
+        Self::decode_packed(&value.bytes)
+    }
+}
+
+impl From<&ProofJournal> for Journal {
+    fn from(value: &ProofJournal) -> Self {
+        Journal::new(value.encode_packed())
     }
 }
 

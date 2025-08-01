@@ -76,6 +76,7 @@ jobs:
       - name: cargo clippy kailua-fpvm-hokulea
         run: cargo clippy --manifest-path build/risczero/hokulea/Cargo.toml --locked --workspace --all --all-targets --all-features
         env:
+          CANOE_IMAGE_ID: 0x
           RUSTFLAGS: -Dwarnings
 
   cargo-test:

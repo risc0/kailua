@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::args::ProvingArgs;
-use crate::backends::{KailuaProveInfo, KailuaSessionStats};
+use crate::risczero::{KailuaProveInfo, KailuaSessionStats};
 use crate::ProvingError;
 use anyhow::{anyhow, Context};
 use kailua_build::{KAILUA_FPVM_KONA_ELF, KAILUA_FPVM_KONA_ID};

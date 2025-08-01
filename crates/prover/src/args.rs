@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::backends::boundless::BoundlessArgs;
+use crate::risczero::boundless::BoundlessArgs;
 use alloy_primitives::{Address, B256};
 use clap::Parser;
 use kailua_sync::args::{parse_address, parse_b256};

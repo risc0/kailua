@@ -15,7 +15,6 @@
 use kailua_kona::executor::Execution;
 
 pub mod args;
-pub mod backends;
 pub mod channel;
 pub mod client;
 pub mod config;
@@ -23,6 +22,7 @@ pub mod kv;
 pub mod preflight;
 pub mod proof;
 pub mod prove;
+pub mod risczero;
 pub mod tasks;
 
 #[derive(Debug, thiserror::Error)]

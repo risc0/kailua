@@ -13,12 +13,9 @@
 // limitations under the License.
 
 use crate::args::ProvingArgs;
-use crate::backends::bonsai::{run_bonsai_client, should_use_bonsai};
-use crate::backends::boundless::{run_boundless_client, BoundlessArgs};
-use crate::backends::zkvm::run_zkvm_client;
 use crate::client::witgen;
 use crate::client::witgen::WitgenResult;
-use crate::proof::proof_file_name;
+use crate::risczero::boundless::BoundlessArgs;
 use crate::ProvingError;
 use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
@@ -26,18 +23,14 @@ use human_bytes::human_bytes;
 use kailua_kona::boot::StitchedBootInfo;
 use kailua_kona::client::stitching::split_executions;
 use kailua_kona::executor::Execution;
-use kailua_kona::journal::ProofJournal;
 use kailua_kona::oracle::vec::{PreimageVecEntry, VecOracle};
 use kailua_kona::witness::Witness;
 use kona_preimage::{HintWriterClient, PreimageOracleClient};
 use kona_proof::l1::OracleBlobProvider;
 use kona_proof::CachingOracle;
-use risc0_zkvm::{is_dev_mode, Receipt};
-use serde::Serialize;
+use risc0_zkvm::Receipt;
 use std::fmt::Debug;
 use std::sync::Arc;
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
 use tracing::{info, warn};
 
 /// The size of the LRU cache in the oracle.
@@ -186,7 +179,7 @@ where
             [stitched_proofs, eigen_assumptions].concat(),
         )
     };
-    seek_fpvm_proof(
+    crate::risczero::seek_proof(
         &proving,
         boundless,
         witgen_result.0,
@@ -246,59 +239,4 @@ pub fn sum_witness_size(witness: &Witness<VecOracle>) -> (usize, usize) {
         witness_frames.iter().map(|f| f.len()).sum::<usize>(),
         streamed_frames.iter().map(|f| f.len()).sum::<usize>(),
     )
-}
-pub async fn seek_fpvm_proof(
-    proving: &ProvingArgs,
-    boundless: BoundlessArgs,
-    proof_journal: ProofJournal,
-    witness_frames: Vec<Vec<u8>>,
-    stitched_proofs: Vec<Receipt>,
-    prove_snark: bool,
-) -> Result<(), ProvingError> {
-    // compute the zkvm proof
-    let proof = match (boundless.market, boundless.storage) {
-        (Some(marked_provider_config), Some(storage_provider_config)) if !is_dev_mode() => {
-            run_boundless_client(
-                marked_provider_config,
-                storage_provider_config,
-                proof_journal,
-                witness_frames,
-                stitched_proofs,
-                proving,
-            )
-            .await?
-        }
-        _ => {
-            if should_use_bonsai() {
-                run_bonsai_client(witness_frames, stitched_proofs, prove_snark, proving).await?
-            } else {
-                run_zkvm_client(witness_frames, stitched_proofs, prove_snark, proving).await?
-            }
-        }
-    };
-
-    // Save proof file to disk
-    let proof_journal = ProofJournal::decode_packed(proof.journal.as_ref());
-    let file_name = proof_file_name(&proof_journal);
-    save_to_bincoded_file(&proof, &file_name)
-        .await
-        .context("save_to_bincoded_file")
-        .map_err(ProvingError::OtherError)?;
-    info!("Saved proof to file {file_name}");
-
-    Ok(())
-}
-
-pub async fn save_to_bincoded_file<T: Serialize>(value: &T, file_name: &str) -> anyhow::Result<()> {
-    let mut file = File::create(file_name)
-        .await
-        .context("Failed to create output file.")?;
-    let data = bincode::serialize(value).context("Could not serialize proving data.")?;
-    file.write_all(data.as_slice())
-        .await
-        .context("Failed to write proof to file")?;
-    file.flush()
-        .await
-        .context("Failed to flush proof output file data.")?;
-    Ok(())
 }

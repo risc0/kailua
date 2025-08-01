@@ -15,10 +15,9 @@
 use anyhow::{anyhow, Context};
 use bonsai_sdk::non_blocking::{Client, SessionId};
 use kailua_build::KAILUA_FPVM_KONA_ID;
-use kailua_kona::journal::ProofJournal;
-use kailua_prover::backends::{KailuaProveInfo, KailuaSessionStats};
-use kailua_prover::client::proving::save_to_bincoded_file;
+use kailua_prover::proof::save_to_bincoded_file;
 use kailua_prover::proof::{proof_file_name, read_bincoded_file};
+use kailua_prover::risczero::{KailuaProveInfo, KailuaSessionStats};
 use kailua_prover::ProvingError;
 use kailua_sync::telemetry::TelemetryArgs;
 use risc0_zkvm::Receipt;
@@ -92,8 +91,10 @@ pub async fn bonsai(args: BonsaiArgs) -> anyhow::Result<()> {
         };
     };
 
-    let proof_journal = ProofJournal::decode_packed(kailua_prove_info.receipt.journal.as_ref());
-    let file_name = proof_file_name(&proof_journal);
+    let file_name = proof_file_name(
+        KAILUA_FPVM_KONA_ID,
+        kailua_prove_info.receipt.journal.clone(),
+    );
 
     info!("Writing proof to {file_name}.");
     if let Ok(prior_receipt) = read_bincoded_file::<Receipt>(&file_name).await {
