@@ -16,6 +16,7 @@ canoe-steel-methods = { workspace = true, optional = true }
 [build-dependencies]
 alloy-primitives = { workspace = true, optional = true }
 bytemuck = { workspace = true, optional = true }
+canoe-steel-methods = { workspace = true, optional = true }
 risc0-build.workspace = true
 
 [package.metadata.risc0]
