@@ -17,7 +17,7 @@ canoe-steel-methods = { workspace = true, optional = true }
 alloy-primitives = { workspace = true, optional = true }
 bytemuck = { workspace = true, optional = true }
 canoe-steel-methods = { workspace = true, optional = true }
-risc0-build.workspace = true
+risc0-build = { workspace = true, optional = true }
 
 [package.metadata.risc0]
 methods = ["kona", "hokulea"]
@@ -29,4 +29,5 @@ rebuild-fpvm = [
     "dep:alloy-primitives",
     "dep:bytemuck",
     "dep:canoe-steel-methods",
+    "dep:risc0-build"
 ]

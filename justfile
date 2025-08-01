@@ -10,6 +10,9 @@ build +ARGS="--release -F prove -F disable-dev-mode --locked":
 build-fpvm +ARGS="--release -F prove -F disable-dev-mode -F rebuild-fpvm --locked":
   RISC0_USE_DOCKER=1 cargo build {{ARGS}}
 
+export-fpvm +ARGS="--release -F prove -F disable-dev-mode -F rebuild-fpvm -F export-fpvm --locked":
+  RISC0_USE_DOCKER=1 cargo build {{ARGS}}
+
 fmt:
   cargo fmt --all
 
@@ -35,6 +38,8 @@ devnet-fetch:
 devnet-build +ARGS="-F devnet -F prove": (build ARGS)
 
 devnet-build-fpvm +ARGS="-F devnet -F prove -F rebuild-fpvm": (build ARGS)
+
+devnet-export-fpvm +ARGS="-F devnet -F prove -F rebuild-fpvm -F export-fpvm": (build ARGS)
 
 devnet-up:
   make -C optimism devnet-up > devnet.log
