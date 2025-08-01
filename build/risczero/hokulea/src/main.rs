@@ -22,7 +22,7 @@ use rkyv::rancor::Error;
 const CANOE_IMAGE_ID: &str = env!("CANOE_IMAGE_ID");
 
 fn main() {
-    // Load eigen-da blob witness
+    // Load EigenDA blob witness
     let eigen_da: hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData = {
         let data = env::read_frame();
         bincode::deserialize(&data).expect("EigenDABlobWitnessData deserialization failed")

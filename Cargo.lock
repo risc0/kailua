@@ -3285,25 +3285,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "canoe-steel-apps"
-version = "0.1.0"
-source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
-dependencies = [
- "alloy-provider 0.14.0",
- "anyhow",
- "async-trait",
- "canoe-bindings",
- "canoe-provider",
- "canoe-steel-methods",
- "hokulea-proof",
- "risc0-steel",
- "risc0-zkvm",
- "tokio",
- "tracing",
- "url",
-]
-
-[[package]]
 name = "canoe-steel-methods"
 version = "0.1.0"
 source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
@@ -6224,12 +6205,8 @@ dependencies = [
  "c-kzg",
  "canoe-bindings",
  "canoe-provider",
- "canoe-steel-apps",
- "canoe-steel-methods",
  "clap",
- "eigenda-cert",
  "hex",
- "hokulea-eigenda",
  "hokulea-host-bin",
  "hokulea-proof",
  "hokulea-witgen",

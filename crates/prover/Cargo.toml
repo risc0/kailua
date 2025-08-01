@@ -49,10 +49,6 @@ kona-std-fpvm.workspace = true
 
 canoe-bindings.workspace = true
 canoe-provider.workspace = true
-canoe-steel-apps.workspace = true
-canoe-steel-methods.workspace = true
-eigenda-cert.workspace = true
-hokulea-eigenda.workspace = true
 hokulea-host-bin.workspace = true
 hokulea-proof.workspace = true
 hokulea-witgen.workspace = true
@@ -88,4 +84,3 @@ rebuild-fpvm = [
     "kailua-build/rebuild-fpvm",
     "kailua-sync/rebuild-fpvm"
 ]
-eigen-da = []

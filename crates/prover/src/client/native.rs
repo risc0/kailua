@@ -66,53 +66,52 @@ pub async fn run_native_client(
     let kv_store = create_split_kv_store(&args.kona, disk_kv_store)
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
 
-    #[cfg(feature = "eigen-da")]
-    let server_task = {
-        let cfg = hokulea_host_bin::cfg::SingleChainHostWithEigenDA {
-            kona_cfg: args.kona.clone(),
-            eigenda_proxy_address: args.proving.eigenda_proxy_address.clone(),
-            verbose: 0,
-        };
-        let providers = cfg
-            .create_providers()
-            .await
-            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-        let is_offline = cfg.is_offline();
-        start_server(
-            cfg,
+    let use_hokulea = args.proving.eigenda_proxy_address.is_some();
+    let server_task = match use_hokulea {
+        false => start_server(
+            args.kona.clone(),
             kv_store,
             hint.host,
             preimage.host,
-            hokulea_host_bin::handler::SingleChainHintHandlerWithEigenDA,
-            providers,
-            is_offline,
-            hokulea_proof::hint::ExtendedHintType::Original(HintType::L2PayloadWitness),
+            kona_host::single::SingleChainHintHandler,
+            args.kona
+                .create_providers()
+                .await
+                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
+            args.kona.is_offline(),
+            HintType::L2PayloadWitness,
         )
         .await
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
-    };
-
-    #[cfg(not(feature = "eigen-da"))]
-    let server_task = start_server(
-        args.kona.clone(),
-        kv_store,
-        hint.host,
-        preimage.host,
-        kona_host::single::SingleChainHintHandler,
-        args.kona
-            .create_providers()
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
+        true => {
+            let cfg = hokulea_host_bin::cfg::SingleChainHostWithEigenDA {
+                kona_cfg: args.kona.clone(),
+                eigenda_proxy_address: args.proving.eigenda_proxy_address.clone(),
+                verbose: 0,
+            };
+            let providers = cfg
+                .create_providers()
+                .await
+                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+            let is_offline = cfg.is_offline();
+            start_server(
+                cfg,
+                kv_store,
+                hint.host,
+                preimage.host,
+                hokulea_host_bin::handler::SingleChainHintHandlerWithEigenDA,
+                providers,
+                is_offline,
+                hokulea_proof::hint::ExtendedHintType::Original(HintType::L2PayloadWitness),
+            )
             .await
-            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
-        args.kona.is_offline(),
-        HintType::L2PayloadWitness,
-    )
-    .await
-    .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
+        }
+    };
 
     // Start the client program in a separate thread
     let client_task = tokio::spawn(crate::client::proving::run_proving_client(
-        #[cfg(feature = "eigen-da")]
-        args.kona.l1_node_address,
+        use_hokulea.then_some(args.kona.l1_node_address).flatten(),
         args.proving,
         args.boundless,
         OracleReader::new(preimage.client),

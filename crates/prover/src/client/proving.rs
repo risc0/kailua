@@ -14,13 +14,13 @@
 
 use crate::args::ProvingArgs;
 use crate::client::witgen;
-use crate::client::witgen::WitgenResult;
 use crate::risczero::boundless::BoundlessArgs;
 use crate::ProvingError;
 use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
 use human_bytes::human_bytes;
 use kailua_kona::boot::StitchedBootInfo;
+use kailua_kona::client::core::EthereumDataSourceProvider;
 use kailua_kona::client::stitching::split_executions;
 use kailua_kona::executor::Execution;
 use kailua_kona::oracle::vec::{PreimageVecEntry, VecOracle};
@@ -38,7 +38,7 @@ pub const ORACLE_LRU_SIZE: usize = 1024;
 
 #[allow(clippy::too_many_arguments)]
 pub async fn run_proving_client<P, H>(
-    #[cfg(feature = "eigen-da")] l1_node_address: Option<String>,
+    l1_node_address: Option<String>,
     proving: ProvingArgs,
     boundless: BoundlessArgs,
     oracle_client: P,
@@ -67,34 +67,52 @@ where
         oracle_client,
         hint_client,
     ));
-    let mut witgen_result: WitgenResult<VecOracle> = {
-        // Instantiate oracles
-        let blob_provider = OracleBlobProvider::new(preimage_oracle.clone());
-        // Run witness generation with oracles
-        witgen::run_witgen_client(
-            preimage_oracle.clone(),
-            10 * 1024 * 1024, // default to 10MB chunks
-            blob_provider,
-            proving.payout_recipient_address.unwrap_or_default(),
-            precondition_validation_data_hash,
-            execution_cache.clone(),
-            stitched_boot_info.clone(),
-        )
-        .await
-        .context("Failed to run vec witgen client.")
-        .map_err(ProvingError::OtherError)?
+    // todo: run hok witgen if hokking
+
+    // Instantiate oracles
+    let blob_provider = OracleBlobProvider::new(preimage_oracle.clone());
+    // Run witness generation with oracles
+    let (proof_journal, mut witness, da_witness) = match l1_node_address.is_some() {
+        false => {
+            witgen::run_witgen_client(
+                preimage_oracle.clone(),
+                10 * 1024 * 1024, // default to 10MB chunks
+                blob_provider,
+                EthereumDataSourceProvider,
+                proving.payout_recipient_address.unwrap_or_default(),
+                precondition_validation_data_hash,
+                execution_cache.clone(),
+                stitched_boot_info.clone(),
+            )
+            .await
+            .context("Failed to run vec witgen client.")
+            .map_err(ProvingError::OtherError)
+            .map(|(_, j, w)| (j, w, None))?
+        }
+        true => {
+            witgen::run_hokulea_witgen_client(
+                preimage_oracle.clone(),
+                10 * 1024 * 1024, // default to 10MB chunks
+                blob_provider,
+                proving.payout_recipient_address.unwrap_or_default(),
+                precondition_validation_data_hash,
+                execution_cache.clone(),
+                stitched_boot_info.clone(),
+            )
+            .await
+            .context("Failed to run vec witgen client.")
+            .map_err(ProvingError::OtherError)
+            .map(|(j, w, e)| (j, w, Some(e)))?
+        }
     };
 
-    let execution_trace = core::mem::replace(
-        &mut witgen_result.1.stitched_executions,
-        stitched_executions,
-    );
+    let execution_trace = core::mem::replace(&mut witness.stitched_executions, stitched_executions);
 
     // sanity check kzg proofs
-    let _ = kailua_kona::blobs::PreloadedBlobProvider::from(witgen_result.1.blobs_witness.clone());
+    let _ = kailua_kona::blobs::PreloadedBlobProvider::from(witness.blobs_witness.clone());
 
     // check if we can prove this workload
-    let (preloaded_wit_size, streamed_wit_size) = sum_witness_size(&witgen_result.1);
+    let (preloaded_wit_size, streamed_wit_size) = sum_witness_size(&witness);
     let total_wit_size = preloaded_wit_size + streamed_wit_size;
     info!(
         "Witness size: {} ({} preloaded, {} streamed.)",
@@ -128,22 +146,42 @@ where
 
     // collect input frames
     let (preloaded_frames, streamed_frames) =
-        encode_witness_frames(witgen_result.1).expect("Failed to encode VecOracle");
+        encode_witness_frames(witness).expect("Failed to encode VecOracle");
 
-    #[cfg(feature = "eigen-da")]
+    let Some(l1_node_address) = l1_node_address else {
+        // Prove Kona program
+        return crate::risczero::seek_proof(
+            &proving,
+            boundless,
+            (
+                kailua_build::KAILUA_FPVM_KONA_ID,
+                kailua_build::KAILUA_FPVM_KONA_ELF,
+            ),
+            Journal::from(&proof_journal),
+            vec![],
+            [preloaded_frames, streamed_frames].concat(),
+            stitched_proofs,
+            prove_snark,
+        )
+        .await;
+    };
+
+    // Generate Hokulea DA proofs
     let (eigen_da_frame, stitched_proofs) = {
         use canoe_provider::CanoeProvider;
         use kona_derive::prelude::ChainProvider;
 
         // Compute canoe proof and append to eigen witness
         let canoe_provider = crate::canoe::KailuaCanoeSteelProvider {
-            eth_rpc_url: l1_node_address.expect("l1-node-address is required for Canoe"),
+            eth_rpc_url: l1_node_address,
             proving_args: proving.clone(),
             boundless_args: boundless.clone(),
         };
+        let mut da_witness = da_witness.unwrap();
+
         // todo: concurrency via generic prover pool
         let mut eigen_assumptions = Vec::new();
-        for (commitment, validity) in &mut witgen_result.2.validity {
+        for (commitment, validity) in &mut da_witness.validity {
             if validity.canoe_proof.is_some() {
                 continue;
             }
@@ -176,36 +214,22 @@ where
         }
 
         (
-            bincode::serialize(&witgen_result.2)
-                .expect("Failed to serialize EigenDABlobWitnessData"),
+            bincode::serialize(&da_witness).expect("Failed to serialize EigenDABlobWitnessData"),
             [stitched_proofs, eigen_assumptions].concat(),
         )
     };
 
-    #[cfg(feature = "eigen-da")]
-    let image = (
-        kailua_build::KAILUA_FPVM_HOKULEA_ID,
-        kailua_build::KAILUA_FPVM_HOKULEA_ELF,
-    );
-    #[cfg(not(feature = "eigen-da"))]
-    let image = (
-        kailua_build::KAILUA_FPVM_KONA_ID,
-        kailua_build::KAILUA_FPVM_KONA_ELF,
-    );
-
+    // Prove Hokulea Program
     crate::risczero::seek_proof(
         &proving,
         boundless,
-        image,
-        Journal::from(&witgen_result.0),
+        (
+            kailua_build::KAILUA_FPVM_HOKULEA_ID,
+            kailua_build::KAILUA_FPVM_HOKULEA_ELF,
+        ),
+        Journal::from(&proof_journal),
         vec![],
-        [
-            #[cfg(feature = "eigen-da")]
-            vec![eigen_da_frame],
-            preloaded_frames,
-            streamed_frames,
-        ]
-        .concat(),
+        [vec![eigen_da_frame], preloaded_frames, streamed_frames].concat(),
         stitched_proofs,
         prove_snark,
     )

@@ -54,7 +54,6 @@ pub struct ProvingArgs {
         requires = "l1_beacon_address",
         env
     )]
-    #[cfg(feature = "eigen-da")]
     pub eigenda_proxy_address: Option<String>,
 }
 
