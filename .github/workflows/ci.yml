@@ -34,9 +34,12 @@ jobs:
       - name: cargo fmt kailua
         run: |
           cargo fmt --all --check
-      - name: cargo fmt kailua-fpvm
+      - name: cargo fmt kailua-fpvm-kona
         run: |
-          cargo fmt --all --check --manifest-path build/risczero/fpvm/Cargo.toml
+          cargo fmt --all --check --manifest-path build/risczero/kona/Cargo.toml
+      - name: cargo fmt kailua-fpvm-hokulea
+        run: |
+          cargo fmt --all --check --manifest-path build/risczero/hokulea/Cargo.toml
 
   cargo-clippy:
     strategy:
@@ -66,8 +69,12 @@ jobs:
           RUSTFLAGS: -Dwarnings
           RISC0_SKIP_BUILD: true
           RISC0_SKIP_BUILD_KERNEL: true
-      - name: cargo clippy kailua-fpvm
-        run: cargo clippy --manifest-path build/risczero/fpvm/Cargo.toml --locked --workspace --all --all-targets --all-features
+      - name: cargo clippy kailua-fpvm-kona
+        run: cargo clippy --manifest-path build/risczero/kona/Cargo.toml --locked --workspace --all --all-targets --all-features
+        env:
+          RUSTFLAGS: -Dwarnings
+      - name: cargo clippy kailua-fpvm-hokulea
+        run: cargo clippy --manifest-path build/risczero/hokulea/Cargo.toml --locked --workspace --all --all-targets --all-features
         env:
           RUSTFLAGS: -Dwarnings
 
