@@ -22,6 +22,9 @@ use rkyv::rancor::Error;
 const CANOE_IMAGE_ID: &str = env!("CANOE_IMAGE_ID");
 
 fn main() {
+    // Force blst linkage
+    let _ = unsafe { blst::blst_p1_sizeof() };
+
     // Load EigenDA blob witness
     let eigen_da: hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData = {
         let data = env::read_frame();

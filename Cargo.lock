@@ -6084,6 +6084,7 @@ dependencies = [
  "bytemuck",
  "clap",
  "hex",
+ "human_bytes",
  "kailua-build",
  "kailua-contracts",
  "kailua-kona",

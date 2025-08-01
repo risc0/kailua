@@ -63,10 +63,6 @@ risc0-zkvm.workspace = true
 
 risc0-steel.workspace = true
 
-[build-dependencies]
-kailua-build = { workspace = true, optional = true }
-risc0-zkvm = { workspace = true, optional = true }
-
 [features]
 devnet = [
     "kailua-sync/devnet"
@@ -87,8 +83,4 @@ disable-dev-mode = [
 rebuild-fpvm = [
     "kailua-build/rebuild-fpvm",
     "kailua-sync/rebuild-fpvm"
-]
-export-fpvm = [
-    "dep:kailua-build",
-    "dep:risc0-zkvm"
 ]

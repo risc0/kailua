@@ -20,6 +20,7 @@ pub mod bench;
 pub mod bonsai;
 pub mod config;
 pub mod demo;
+pub mod export;
 pub mod fast_track;
 pub mod fault;
 
@@ -90,6 +91,14 @@ pub enum KailuaCli {
         #[clap(flatten)]
         cli: CliArgs,
     },
+    Export {
+        #[clap(long, env)]
+        data_dir: Option<PathBuf>,
+        #[clap(flatten)]
+        telemetry: TelemetryArgs,
+        #[clap(flatten)]
+        cli: CliArgs,
+    },
 }
 
 #[derive(clap::Args, Debug, Clone)]
@@ -111,6 +120,7 @@ impl KailuaCli {
             KailuaCli::Demo { cli, .. } => cli.v,
             KailuaCli::Rpc { cli, .. } => cli.v,
             KailuaCli::Bonsai { cli, .. } => cli.v,
+            KailuaCli::Export { cli, .. } => cli.v,
         }
     }
 
@@ -121,6 +131,7 @@ impl KailuaCli {
             KailuaCli::Prove { args, .. } => args.kona.data_dir.clone(),
             KailuaCli::Demo { args, .. } => args.data_dir.clone(),
             KailuaCli::Rpc { args, .. } => args.sync.data_dir.clone(),
+            KailuaCli::Export { data_dir, .. } => data_dir.clone(),
             _ => None,
         }
     }
@@ -137,6 +148,7 @@ impl KailuaCli {
             KailuaCli::Demo { args, .. } => &args.telemetry,
             KailuaCli::Rpc { args, .. } => &args.sync.telemetry,
             KailuaCli::Bonsai { args, .. } => &args.telemetry,
+            KailuaCli::Export { telemetry, .. } => telemetry,
         }
     }
 }
