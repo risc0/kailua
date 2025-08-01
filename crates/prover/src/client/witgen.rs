@@ -78,10 +78,12 @@ where
         witness: blobs_witness.clone(),
     };
     #[cfg(feature = "eigen-da")]
-    let eigen = hokulea_witgen::witness_provider::OracleEigenDAWitnessProvider {
-        provider: hokulea_proof::eigenda_provider::OracleEigenDAProvider::new(preimage_oracle),
-        witness: eigen_witness.clone(),
-    };
+    let eigen = kailua_hokulea::da::EigenDADataSourceProvider(
+        hokulea_witgen::witness_provider::OracleEigenDAWitnessProvider {
+            provider: hokulea_proof::eigenda_provider::OracleEigenDAProvider::new(preimage_oracle),
+            witness: eigen_witness.clone(),
+        },
+    );
 
     // Run client
     let collection_target = Arc::new(Mutex::new(Vec::new()));
@@ -90,6 +92,8 @@ where
         oracle,
         stream,
         beacon,
+        #[cfg(not(feature = "eigen-da"))]
+        kailua_kona::client::core::EthereumDataSourceProvider,
         #[cfg(feature = "eigen-da")]
         eigen,
         execution_cache,

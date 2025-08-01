@@ -29,7 +29,7 @@ fn main() {
     };
 
     // Load main witness
-    let mut witness = {
+    let witness = {
         // Read serialized witness data
         let witness_data = env::read_frame();
         log("DESERIALIZE");

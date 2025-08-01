@@ -66,7 +66,8 @@ impl<
 /// * `precondition_validation_data_hash` - A 256-bit hash used for fetching precondition data.
 /// * `oracle` - The client for communicating with the host environment.
 /// * `stream` - The client for streamed communication with the host.
-/// * `beacon` - An instance of the blob provider.
+/// * `beacon` - The blob provider.
+/// * `da_source_provider` - The provider for a data availability source.
 /// * `execution_cache` - A vector of cached executions to reuse.
 /// * `collection_target` - An optional target to dump uncached executions.
 ///

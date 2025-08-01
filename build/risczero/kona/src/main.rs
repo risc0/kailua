@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use kailua_kona::client::core::EthereumDataSourceProvider;
 use kailua_kona::client::stateless::run_stateless_client;
 use kailua_kona::client::stitching::KonaStitchingClient;
 use kailua_kona::oracle::vec::VecOracle;
@@ -47,7 +48,8 @@ fn main() {
     }
 
     // Run client using witness data
-    let proof_journal = run_stateless_client(witness, KonaStitchingClient);
+    let proof_journal =
+        run_stateless_client(witness, KonaStitchingClient(EthereumDataSourceProvider));
 
     // Prevent provability of insufficient data
     assert!(

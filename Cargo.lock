@@ -6234,6 +6234,7 @@ dependencies = [
  "hokulea-witgen",
  "human_bytes",
  "kailua-build",
+ "kailua-hokulea",
  "kailua-kona",
  "kailua-sync",
  "kona-derive",
