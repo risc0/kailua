@@ -14,14 +14,14 @@
 
 use crate::args::ProvingArgs;
 use crate::proof::proof_file_name;
-use crate::risczero::bonsai::{run_bonsai_client, should_use_bonsai};
-use crate::risczero::boundless::{run_boundless_client, BoundlessArgs};
-use crate::risczero::zkvm::run_zkvm_client;
+use crate::risczero::boundless::BoundlessArgs;
 use crate::{proof, ProvingError};
 use anyhow::Context;
-use kailua_build::KAILUA_FPVM_KONA_ID;
+use bytemuck::NoUninit;
 use kailua_kona::journal::ProofJournal;
-use risc0_zkvm::{is_dev_mode, Receipt};
+use risc0_zkvm::{is_dev_mode, Digest, Journal, Receipt};
+use std::convert::identity;
+use std::path::Path;
 use tracing::info;
 
 pub mod bonsai;
@@ -45,21 +45,32 @@ pub struct KailuaProveInfo {
     pub stats: KailuaSessionStats,
 }
 
-pub async fn seek_proof(
+#[allow(clippy::too_many_arguments)]
+pub async fn seek_proof<A: NoUninit + Into<Digest>>(
     proving: &ProvingArgs,
     boundless: BoundlessArgs,
-    proof_journal: ProofJournal,
+    image: (A, &[u8]),
+    journal: Journal,
+    witness_slices: Vec<Vec<u32>>,
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Receipt>,
     prove_snark: bool,
 ) -> Result<(), ProvingError> {
+    // Check proof cache
+    let file_name = proof_file_name(image.0, journal.clone());
+    if Path::new(&file_name).try_exists().is_ok_and(identity) {
+        info!("Proving skipped. Proof file {file_name} already exists.");
+    }
+
     // compute the zkvm proof
     let proof = match (boundless.market, boundless.storage) {
         (Some(marked_provider_config), Some(storage_provider_config)) if !is_dev_mode() => {
-            run_boundless_client(
+            boundless::run_boundless_client(
                 marked_provider_config,
                 storage_provider_config,
-                proof_journal,
+                image,
+                journal,
+                witness_slices,
                 witness_frames,
                 stitched_proofs,
                 proving,
@@ -67,17 +78,33 @@ pub async fn seek_proof(
             .await?
         }
         _ => {
-            if should_use_bonsai() {
-                run_bonsai_client(witness_frames, stitched_proofs, prove_snark, proving).await?
+            if bonsai::should_use_bonsai() {
+                bonsai::run_bonsai_client(
+                    image,
+                    witness_slices,
+                    witness_frames,
+                    stitched_proofs,
+                    prove_snark,
+                    proving,
+                )
+                .await?
             } else {
-                run_zkvm_client(witness_frames, stitched_proofs, prove_snark, proving).await?
+                zkvm::run_zkvm_client(
+                    image,
+                    witness_slices,
+                    witness_frames,
+                    stitched_proofs,
+                    prove_snark,
+                    proving,
+                )
+                .await?
             }
         }
     };
 
     // Save proof file to disk
     let proof_journal = ProofJournal::decode_packed(proof.journal.as_ref());
-    let file_name = proof_file_name(KAILUA_FPVM_KONA_ID, &proof_journal);
+    let file_name = proof_file_name(image.0, &proof_journal);
     proof::save_to_bincoded_file(&proof, &file_name)
         .await
         .context("save_to_bincoded_file")

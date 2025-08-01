@@ -13,12 +13,12 @@
 // limitations under the License.
 
 use crate::args::ProvingArgs;
-use crate::proof::read_bincoded_file;
 use crate::proof::save_to_bincoded_file;
+use crate::proof::{proof_id, read_bincoded_file};
 use crate::ProvingError;
 use alloy::eips::BlockNumberOrTag;
 use alloy::transports::http::reqwest::Url;
-use alloy_primitives::{keccak256, Address, U256};
+use alloy_primitives::{Address, B256, U256};
 use anyhow::{anyhow, Context};
 use boundless_market::alloy::providers::Provider;
 use boundless_market::alloy::signers::local::PrivateKeySigner;
@@ -30,15 +30,14 @@ use boundless_market::contracts::{
 use boundless_market::request_builder::OfferParams;
 use boundless_market::storage::{StorageProviderConfig, StorageProviderType};
 use boundless_market::{Deployment, GuestEnv, ProofRequest, StandardStorageProvider};
+use bytemuck::NoUninit;
 use clap::Parser;
 use human_bytes::human_bytes;
-use kailua_build::{KAILUA_FPVM_KONA_ELF, KAILUA_FPVM_KONA_ID};
-use kailua_kona::journal::ProofJournal;
 use kailua_sync::{retry_res, retry_res_timeout};
 use lazy_static::lazy_static;
 use risc0_ethereum_contracts::selector::Selector;
 use risc0_zkvm::sha::Digestible;
-use risc0_zkvm::{default_executor, ExecutorEnv, Journal, Receipt};
+use risc0_zkvm::{default_executor, Digest, ExecutorEnv, Journal, Receipt};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::sync::Arc;
@@ -288,17 +287,18 @@ lazy_static! {
     static ref BOUNDLESS_BIN: Arc<Mutex<()>> = Default::default();
 }
 
-pub async fn run_boundless_client(
+#[allow(clippy::too_many_arguments)]
+pub async fn run_boundless_client<A: NoUninit + Into<Digest>>(
     market: MarketProviderConfig,
     storage: StorageProviderConfig,
-    proof_journal: ProofJournal,
+    image: (A, &[u8]),
+    journal: Journal,
+    witness_slices: Vec<Vec<u32>>,
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Receipt>,
     proving_args: &ProvingArgs,
 ) -> Result<Receipt, ProvingError> {
     info!("Running boundless client.");
-    let journal = Journal::new(proof_journal.encode_packed());
-
     // Instantiate storage provider
     let storage_provider = StandardStorageProvider::from_config(&storage)
         .context("StandardStorageProvider::from_config")
@@ -352,12 +352,9 @@ pub async fn run_boundless_client(
     debug!("Deployment: {:?}", boundless_client.deployment);
 
     // Set the proof request requirements
-    let requirements = Requirements::new(
-        KAILUA_FPVM_KONA_ID,
-        Predicate::digest_match(journal.digest()),
-    )
-    // manually choose latest Groth16 receipt selector
-    .with_selector((Selector::groth16_latest() as u32).into());
+    let requirements = Requirements::new(image.0, Predicate::digest_match(journal.digest()))
+        // manually choose latest Groth16 receipt selector
+        .with_selector((Selector::groth16_latest() as u32).into());
 
     // Wait for a market request to be fulfilled
     loop {
@@ -365,7 +362,9 @@ pub async fn run_boundless_client(
         match request_proof(
             &market,
             &boundless_client,
-            &proof_journal,
+            image,
+            journal.clone(),
+            &witness_slices,
             &witness_frames,
             &stitched_proofs,
             proving_args,
@@ -523,6 +522,7 @@ pub async fn look_back(
         match retrieve_proof(
             boundless_client,
             request_id,
+            requirements.imageId.0,
             market.boundless_order_check_interval,
             request.expires_at(),
         )
@@ -542,6 +542,7 @@ pub async fn look_back(
 pub async fn retrieve_proof(
     boundless_client: &Client,
     request_id: U256,
+    image_id: impl Into<Digest>,
     interval: u64,
     expires_at: u64,
 ) -> Result<Receipt, ClientError> {
@@ -554,11 +555,7 @@ pub async fn retrieve_proof(
         {
             Ok((journal, seal)) => {
                 let Ok(risc0_ethereum_contracts::receipt::Receipt::Base(receipt)) =
-                    risc0_ethereum_contracts::receipt::decode_seal(
-                        seal,
-                        KAILUA_FPVM_KONA_ID,
-                        journal,
-                    )
+                    risc0_ethereum_contracts::receipt::decode_seal(seal, image_id, journal)
                 else {
                     return Err(ClientError::RequestError(RequestError::MissingRequirements));
                 };
@@ -580,10 +577,13 @@ pub async fn retrieve_proof(
     }
 }
 
-pub async fn request_proof(
+#[allow(clippy::too_many_arguments)]
+pub async fn request_proof<A: NoUninit + Into<Digest>>(
     market: &MarketProviderConfig,
     boundless_client: &Client,
-    proof_journal: &ProofJournal,
+    image: (A, &[u8]),
+    journal: Journal,
+    witness_slices: &Vec<Vec<u32>>,
     witness_frames: &Vec<Vec<u8>>,
     stitched_proofs: &Vec<Receipt>,
     proving_args: &ProvingArgs,
@@ -610,7 +610,7 @@ pub async fn request_proof(
     };
 
     // Upload program
-    let bin_file_name = binary_file_name(proof_journal);
+    let bin_file_name = binary_file_name(image.0);
     let program_url = loop {
         match read_bincoded_file::<String>(&bin_file_name)
             .await
@@ -629,10 +629,10 @@ pub async fn request_proof(
 
                 info!(
                     "Uploading {} Kailua ELF.",
-                    human_bytes(KAILUA_FPVM_KONA_ELF.len() as f64)
+                    human_bytes(image.1.len() as f64)
                 );
                 let program_url = retry_res!(boundless_client
-                    .upload_program(KAILUA_FPVM_KONA_ELF)
+                    .upload_program(image.1)
                     .await
                     .context("Client::upload_program"))
                 .await;
@@ -648,7 +648,7 @@ pub async fn request_proof(
     };
 
     // Preflight execution to get cycle count
-    let req_file_name = request_file_name(proof_journal);
+    let req_file_name = request_file_name(image.0, journal.clone());
     let cycle_count = match (
         market.boundless_assume_cycle_count,
         read_bincoded_file::<BoundlessRequest>(&req_file_name).await,
@@ -665,14 +665,20 @@ pub async fn request_proof(
         }
         (None, Err(err)) => {
             warn!("Preflighting execution: {err:?}");
+            let preflight_witness_slices = witness_slices.clone();
             let preflight_witness_frames = witness_frames.clone();
             let preflight_stitched_proofs = stitched_proofs.clone();
             let segment_limit = proving_args.segment_limit;
+            let elf = image.1.to_vec();
             let session_info = tokio::task::spawn_blocking(move || {
                 let mut builder = ExecutorEnv::builder();
                 // Set segment po2
                 builder.segment_limit_po2(segment_limit);
-                // Pass in witness data
+                // Pass in witness data slices
+                for slice in &preflight_witness_slices {
+                    builder.write_slice(slice);
+                }
+                // Pass in witness data frames
                 for frame in &preflight_witness_frames {
                     builder.write_frame(frame);
                 }
@@ -681,7 +687,7 @@ pub async fn request_proof(
                     builder.write(proof)?;
                 }
                 let env = builder.build()?;
-                let session_info = default_executor().execute(env, KAILUA_FPVM_KONA_ELF)?;
+                let session_info = default_executor().execute(env, &elf)?;
                 Ok::<_, anyhow::Error>(session_info)
             })
             .await
@@ -702,7 +708,7 @@ pub async fn request_proof(
     };
 
     // Pass in input frames
-    let inp_file_name = input_file_name(proof_journal);
+    let inp_file_name = input_file_name(image.0, journal.clone());
     let input_url = match read_bincoded_file::<String>(&inp_file_name)
         .await
         .map(|s| Url::parse(&s))
@@ -712,8 +718,12 @@ pub async fn request_proof(
             url
         }
         _ => {
-            // Pass in input frames
             let mut guest_env_builder = GuestEnv::builder();
+            // Pass in input slices
+            for slice in witness_slices {
+                guest_env_builder = guest_env_builder.write_slice(slice);
+            }
+            // Pass in input frames
             for frame in witness_frames {
                 guest_env_builder = guest_env_builder.write_frame(frame);
             }
@@ -772,7 +782,7 @@ pub async fn request_proof(
         corrected_lock_timeout_factor + market.boundless_order_expiry_factor;
     let request = boundless_client
         .new_request()
-        .with_journal(Journal::new(proof_journal.encode_packed()))
+        .with_journal(journal)
         .with_cycles(cycle_count)
         .with_program_url(program_url)
         .context("RequestParams::with_program_url")
@@ -823,6 +833,7 @@ pub async fn request_proof(
     retrieve_proof(
         boundless_client,
         request_id,
+        image.0,
         market.boundless_order_check_interval,
         expires_at,
     )
@@ -831,18 +842,19 @@ pub async fn request_proof(
     .map_err(|e| ProvingError::OtherError(anyhow!(e)))
 }
 
-pub fn request_file_name(proof_journal: &ProofJournal) -> String {
-    let journal_hash = keccak256(proof_journal.encode_packed());
-    format!("boundless-{journal_hash}.req")
+pub fn request_file_name<A: NoUninit>(image_id: A, journal: impl Into<Journal>) -> String {
+    format!("boundless-{}.req", proof_id(image_id, journal))
 }
 
-pub fn binary_file_name(proof_journal: &ProofJournal) -> String {
-    format!("boundless-{}.req", proof_journal.fpvm_image_id)
+pub fn binary_file_name<A: NoUninit>(image_id: A) -> String {
+    format!(
+        "boundless-{}.req",
+        B256::from(bytemuck::cast::<A, [u8; 32]>(image_id))
+    )
 }
 
-pub fn input_file_name(proof_journal: &ProofJournal) -> String {
-    let journal_hash = !keccak256(proof_journal.encode_packed());
-    format!("boundless-{journal_hash}.req")
+pub fn input_file_name<A: NoUninit>(image_id: A, journal: impl Into<Journal>) -> String {
+    format!("boundless-{}.req", !proof_id(image_id, journal))
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

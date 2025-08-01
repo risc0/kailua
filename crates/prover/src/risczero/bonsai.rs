@@ -17,8 +17,8 @@ use crate::ProvingError;
 use anyhow::{anyhow, Context};
 use bonsai_sdk::non_blocking::{Client, SessionId, SnarkId};
 use bonsai_sdk::responses::SessionStats;
+use bytemuck::NoUninit;
 use human_bytes::human_bytes;
-use kailua_build::{KAILUA_FPVM_KONA_ELF, KAILUA_FPVM_KONA_ID};
 use kailua_sync::{retry_res, retry_res_timeout};
 use risc0_zkvm::serde::to_vec;
 use risc0_zkvm::sha::Digest;
@@ -28,7 +28,9 @@ use tokio::time::sleep;
 use tracing::log::warn;
 use tracing::{error, info};
 
-pub async fn run_bonsai_client(
+pub async fn run_bonsai_client<A: NoUninit + Into<Digest>>(
+    image: (A, &[u8]),
+    witness_slices: Vec<Vec<u32>>,
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Receipt>,
     prove_snark: bool,
@@ -39,8 +41,12 @@ pub async fn run_bonsai_client(
     let client =
         Client::from_env(risc0_zkvm::VERSION).map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     // Prepare input payload
-    let mut input = Vec::new();
-    // Load witness data
+    let mut input: Vec<u8> = Vec::new();
+    // Load witness data slices
+    for slice in witness_slices {
+        input.extend_from_slice(bytemuck::cast_slice(slice.as_slice()));
+    }
+    // Load witness data frames
     for frame in witness_frames {
         let witness_len = frame.len() as u32;
         input.extend_from_slice(&witness_len.to_le_bytes());
@@ -73,8 +79,13 @@ pub async fn run_bonsai_client(
     }
 
     // Create a session on Bonsai
-    let mut stark_session =
-        create_stark_session(&client, input.clone(), assumption_receipt_ids.clone()).await;
+    let mut stark_session = create_stark_session(
+        image,
+        &client,
+        input.clone(),
+        assumption_receipt_ids.clone(),
+    )
+    .await;
 
     if proving_args.skip_await_proof {
         warn!("Skipping awaiting proof on Bonsai.");
@@ -130,7 +141,7 @@ pub async fn run_bonsai_client(
                     error!("Failed to deserialize receipt at {receipt_url}");
                     continue;
                 };
-                let Ok(()) = receipt.verify(KAILUA_FPVM_KONA_ID) else {
+                let Ok(()) = receipt.verify(image.0) else {
                     error!("Failed to verify receipt at {receipt_url}.");
                     continue;
                 };
@@ -143,9 +154,13 @@ pub async fn run_bonsai_client(
                     stark_session.uuid, res.status, res.error_msg
                 );
                 // Retry and create another session
-                stark_session =
-                    create_stark_session(&client, input.clone(), assumption_receipt_ids.clone())
-                        .await;
+                stark_session = create_stark_session(
+                    image,
+                    &client,
+                    input.clone(),
+                    assumption_receipt_ids.clone(),
+                )
+                .await;
             }
         }
     };
@@ -187,7 +202,7 @@ pub async fn run_bonsai_client(
                     error!("Failed to deserialize SNARK receipt at {receipt_url}");
                     continue;
                 };
-                let Ok(()) = receipt.verify(KAILUA_FPVM_KONA_ID) else {
+                let Ok(()) = receipt.verify(image.0) else {
                     error!("Failed to verify SNARK receipt at {receipt_url}.");
                     continue;
                 };
@@ -227,14 +242,15 @@ pub async fn create_snark_session(
     }
 }
 
-pub async fn create_stark_session(
+pub async fn create_stark_session<A: NoUninit + Into<Digest>>(
+    image: (A, &[u8]),
     client: &Client,
     input: Vec<u8>,
     assumption_receipt_ids: Vec<String>,
 ) -> SessionId {
     // Upload the ELF with the image_id as its key.
-    let elf = KAILUA_FPVM_KONA_ELF.to_vec();
-    let image_id_hex = hex::encode(Digest::from(KAILUA_FPVM_KONA_ID));
+    let elf = image.1.to_vec();
+    let image_id_hex = hex::encode(image.0.into());
     let is_image_present = retry_res_timeout!(client.has_img(&image_id_hex).await).await;
     if !is_image_present {
         info!(

@@ -35,7 +35,7 @@ alloy-primitives = { workspace = true, features = ["map-hashbrown"] }
 
 kailua-build.workspace = true
 kailua-kona.workspace = true
-kailua-hokulea = { workspace = true, optional = true }
+kailua-hokulea.workspace = true
 kailua-sync.workspace = true
 
 kona-derive.workspace = true
@@ -47,14 +47,15 @@ kona-proof.workspace = true
 kona-protocol.workspace = true
 kona-std-fpvm.workspace = true
 
-canoe-provider = { workspace = true, optional = true }
-canoe-steel-apps = { workspace = true, optional = true }
-canoe-steel-methods = { workspace = true, optional = true }
-eigenda-cert = { workspace = true, optional = true }
-hokulea-eigenda = { workspace = true, optional = true }
-hokulea-host-bin = { workspace = true, optional = true }
-hokulea-proof = { workspace = true, optional = true }
-hokulea-witgen = { workspace = true, optional = true }
+canoe-bindings.workspace = true
+canoe-provider.workspace = true
+canoe-steel-apps.workspace = true
+canoe-steel-methods.workspace = true
+eigenda-cert.workspace = true
+hokulea-eigenda.workspace = true
+hokulea-host-bin.workspace = true
+hokulea-proof.workspace = true
+hokulea-witgen.workspace = true
 
 bonsai-sdk.workspace = true
 boundless-market.workspace = true
@@ -63,6 +64,8 @@ opentelemetry.workspace = true
 
 risc0-ethereum-contracts.workspace = true
 risc0-zkvm.workspace = true
+
+risc0-steel.workspace = true
 
 [features]
 devnet = [
@@ -85,14 +88,4 @@ rebuild-fpvm = [
     "kailua-build/rebuild-fpvm",
     "kailua-sync/rebuild-fpvm"
 ]
-eigen-da = [
-    "dep:canoe-provider",
-    "dep:canoe-steel-apps",
-    "dep:canoe-steel-methods",
-    "dep:eigenda-cert",
-    "dep:hokulea-eigenda",
-    "dep:hokulea-host-bin",
-    "dep:hokulea-proof",
-    "dep:hokulea-witgen",
-    "dep:kailua-hokulea",
-]
+eigen-da = []

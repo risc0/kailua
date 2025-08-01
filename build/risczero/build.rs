@@ -1,4 +1,4 @@
-// Copyright 2024 RISC Zero, Inc.
+// Copyright 2024, 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ fn main() {
                 let canoe_image_id = std::env::var("CANOE_IMAGE_ID").unwrap_or_else(|_| {
                     // Warn about unstable build
                     if std::env::var("RISC0_USE_DOCKER").is_err() {
-                        println!("cargo:warning=Building without RISC0_USE_DOCKER will yield an irreproducible build for kailua-fpvm-hokulea.");
+                        println!("cargo:warning=Building without RISC0_USE_DOCKER=1 will yield an irreproducible build for kailua-fpvm-hokulea.");
                     }
                     let canoe_image_id = alloy_primitives::B256::from(bytemuck::cast::<_, [u8; 32]>(
                         canoe_steel_methods::CERT_VERIFICATION_ID,

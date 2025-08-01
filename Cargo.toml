@@ -100,6 +100,7 @@ kona-registry = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0
 kona-std-fpvm = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
 
 # Hokulea git = "https://github.com/Layr-Labs/hokulea", rev = "c336a3203211d7de41a554a571646a368a34da6c"
+canoe-bindings = { git = "https://github.com/Layr-Labs/hokulea", rev = "c336a3203211d7de41a554a571646a368a34da6c" }
 canoe-provider = { git = "https://github.com/Layr-Labs/hokulea", rev = "c336a3203211d7de41a554a571646a368a34da6c" }
 canoe-steel-apps = { git = "https://github.com/Layr-Labs/hokulea", rev = "c336a3203211d7de41a554a571646a368a34da6c" }
 canoe-steel-methods = { git = "https://github.com/Layr-Labs/hokulea", rev = "c336a3203211d7de41a554a571646a368a34da6c" }
@@ -125,6 +126,9 @@ risc0-zkvm = { version = "2.2.0", features = ["heap-embedded-alloc", "unstable"]
 
 # Boundless
 boundless-market = "0.12.1"
+
+# STEEL
+risc0-steel = { git = "https://github.com/risc0/risc0-ethereum.git", rev = "fd7e39bc3427abfa7e8b1837c55ecbd5e49351db", default-features = false}
 
 [profile.dev]
 opt-level = 3

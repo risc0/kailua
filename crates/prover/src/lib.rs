@@ -15,6 +15,7 @@
 use kailua_kona::executor::Execution;
 
 pub mod args;
+pub mod canoe;
 pub mod channel;
 pub mod client;
 pub mod config;

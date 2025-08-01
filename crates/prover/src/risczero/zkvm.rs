@@ -16,12 +16,16 @@ use crate::args::ProvingArgs;
 use crate::risczero::{KailuaProveInfo, KailuaSessionStats};
 use crate::ProvingError;
 use anyhow::{anyhow, Context};
-use kailua_build::{KAILUA_FPVM_KONA_ELF, KAILUA_FPVM_KONA_ID};
-use risc0_zkvm::{default_prover, is_dev_mode, ExecutorEnv, InnerReceipt, ProverOpts, Receipt};
+use bytemuck::NoUninit;
+use risc0_zkvm::{
+    default_prover, is_dev_mode, Digest, ExecutorEnv, InnerReceipt, ProverOpts, Receipt,
+};
 use tracing::info;
 use tracing::log::warn;
 
-pub async fn run_zkvm_client(
+pub async fn run_zkvm_client<A: NoUninit + Into<Digest>>(
+    image: (A, &[u8]),
+    witness_slices: Vec<Vec<u32>>,
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Receipt>,
     prove_snark: bool,
@@ -34,8 +38,14 @@ pub async fn run_zkvm_client(
     }
 
     let segment_limit = proving_args.segment_limit;
+    let elf = image.1.to_vec();
     let prove_info = tokio::task::spawn_blocking(move || {
-        let env = build_zkvm_env(witness_frames, stitched_proofs, segment_limit)?;
+        let env = build_zkvm_env(
+            witness_slices,
+            witness_frames,
+            stitched_proofs,
+            segment_limit,
+        )?;
         let prover = default_prover();
         let prover_opts = if prove_snark {
             ProverOpts::groth16()
@@ -43,7 +53,7 @@ pub async fn run_zkvm_client(
             ProverOpts::succinct()
         };
         let risc0_prove_info = prover
-            .prove_with_opts(env, KAILUA_FPVM_KONA_ELF, &prover_opts)
+            .prove_with_opts(env, &elf, &prover_opts)
             .context("prove_with_opts")?;
 
         // Convert to our own KailuaProveInfo
@@ -70,7 +80,7 @@ pub async fn run_zkvm_client(
     );
     prove_info
         .receipt
-        .verify(KAILUA_FPVM_KONA_ID)
+        .verify(image.0)
         .context("receipt verification")
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     info!("Receipt verified.");
@@ -79,6 +89,7 @@ pub async fn run_zkvm_client(
 }
 
 pub fn build_zkvm_env<'a>(
+    witness_slices: Vec<Vec<u32>>,
     witness_frames: Vec<Vec<u8>>,
     stitched_proofs: Vec<Receipt>,
     segment_limit: u32,
@@ -87,7 +98,11 @@ pub fn build_zkvm_env<'a>(
     let mut builder = ExecutorEnv::builder();
     // Set segment po2
     builder.segment_limit_po2(segment_limit);
-    // Pass in witness data
+    // Pass in witness data slices
+    for slice in &witness_slices {
+        builder.write_slice(slice);
+    }
+    // Pass in witness data frames
     for frame in &witness_frames {
         builder.write_frame(frame);
     }

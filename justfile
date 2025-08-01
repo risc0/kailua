@@ -8,7 +8,7 @@ build +ARGS="--release -F prove -F disable-dev-mode --locked":
   cargo build {{ARGS}}
 
 build-fpvm +ARGS="--release -F prove -F disable-dev-mode -F rebuild-fpvm --locked":
-  cargo build {{ARGS}}
+  RISC0_USE_DOCKER=1 cargo build {{ARGS}}
 
 fmt:
   cargo fmt --all

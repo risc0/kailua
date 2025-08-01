@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use alloy_primitives::keccak256;
+use alloy_primitives::{keccak256, B256};
 use anyhow::{bail, Context};
 use bytemuck::NoUninit;
 use risc0_zkvm::Journal;
@@ -29,10 +29,13 @@ pub fn proof_file_name<A: NoUninit>(image_id: A, journal: impl Into<Journal>) ->
     } else {
         "zkp"
     };
+    format!("risc0-{version}-{}.{suffix}", proof_id(image_id, journal))
+}
+
+pub fn proof_id<A: NoUninit>(image_id: A, journal: impl Into<Journal>) -> B256 {
     let image_id = bytemuck::cast::<A, [u8; 32]>(image_id);
     let data = [image_id.as_slice(), journal.into().bytes.as_slice()].concat();
-    let file_name = keccak256(&data);
-    format!("risc0-{version}-{file_name}.{suffix}")
+    keccak256(&data)
 }
 
 pub async fn read_bincoded_file<T: DeserializeOwned>(file_name: &str) -> anyhow::Result<T> {

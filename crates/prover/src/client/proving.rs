@@ -20,6 +20,7 @@ use crate::ProvingError;
 use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
 use human_bytes::human_bytes;
+use kailua_build::{KAILUA_FPVM_KONA_ELF, KAILUA_FPVM_KONA_ID};
 use kailua_kona::boot::StitchedBootInfo;
 use kailua_kona::client::stitching::split_executions;
 use kailua_kona::executor::Execution;
@@ -28,7 +29,7 @@ use kailua_kona::witness::Witness;
 use kona_preimage::{HintWriterClient, PreimageOracleClient};
 use kona_proof::l1::OracleBlobProvider;
 use kona_proof::CachingOracle;
-use risc0_zkvm::Receipt;
+use risc0_zkvm::{Journal, Receipt};
 use std::fmt::Debug;
 use std::sync::Arc;
 use tracing::{info, warn};
@@ -135,9 +136,11 @@ where
         use canoe_provider::CanoeProvider;
         use kona_derive::prelude::ChainProvider;
 
-        // todo: compute canoe proof and append to eigen witness
-        let canoe_provider = canoe_steel_apps::apps::CanoeSteelProvider {
+        // Compute canoe proof and append to eigen witness
+        let canoe_provider = crate::canoe::KailuaCanoeSteelProvider {
             eth_rpc_url: l1_node_address.expect("l1-node-address is required for Canoe"),
+            proving_args: proving.clone(),
+            boundless_args: boundless.clone(),
         };
         // todo: concurrency via generic prover pool
         let mut eigen_assumptions = Vec::new();
@@ -182,7 +185,9 @@ where
     crate::risczero::seek_proof(
         &proving,
         boundless,
-        witgen_result.0,
+        (KAILUA_FPVM_KONA_ID, KAILUA_FPVM_KONA_ELF),
+        Journal::from(&witgen_result.0),
+        vec![],
         [
             #[cfg(feature = "eigen-da")]
             vec![eigen_da_frame],
