@@ -261,6 +261,7 @@ pub mod tests {
         for proof_journal in proof_journals {
             let receipt = to_fake_receipt(&proof_journal);
             assert_eq!(proof_journal, (&receipt).into());
+            assert_eq!(receipt.journal, Journal::from(&proof_journal));
         }
     }
 }
