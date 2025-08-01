@@ -14,7 +14,7 @@
 
 use alloy_primitives::keccak256;
 use anyhow::{bail, Context};
-use kailua_common::journal::ProofJournal;
+use kailua_kona::journal::ProofJournal;
 use serde::de::DeserializeOwned;
 use std::path::Path;
 use tokio::fs::File;

@@ -33,7 +33,7 @@ use boundless_market::{Deployment, GuestEnv, ProofRequest, StandardStorageProvid
 use clap::Parser;
 use human_bytes::human_bytes;
 use kailua_build::{KAILUA_FPVM_KONA_ELF, KAILUA_FPVM_KONA_ID};
-use kailua_common::journal::ProofJournal;
+use kailua_kona::journal::ProofJournal;
 use kailua_sync::{retry_res, retry_res_timeout};
 use lazy_static::lazy_static;
 use risc0_ethereum_contracts::selector::Selector;

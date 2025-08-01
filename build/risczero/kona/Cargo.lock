@@ -2354,8 +2354,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "kailua-common"
+name = "kailua-fpvm-kona"
 version = "1.0.0"
+dependencies = [
+ "blst",
+ "c-kzg",
+ "kailua-kona",
+ "risc0-zkvm",
+ "rkyv",
+ "substrate-bn",
+]
+
+[[package]]
+name = "kailua-kona"
+version = "1.1.0"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -2387,18 +2399,6 @@ dependencies = [
  "serde_json",
  "spin 0.10.0",
  "tracing",
-]
-
-[[package]]
-name = "kailua-fpvm-kona"
-version = "1.0.0"
-dependencies = [
- "blst",
- "c-kzg",
- "kailua-common",
- "risc0-zkvm",
- "rkyv",
- "substrate-bn",
 ]
 
 [[package]]

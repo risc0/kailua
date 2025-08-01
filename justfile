@@ -25,10 +25,10 @@ clippy:
   CANOE_IMAGE_ID=0x cargo clippy --manifest-path build/risczero/hokulea/Cargo.toml --locked --workspace --all --all-targets -- -D warnings
 
 coverage:
-  cargo +nightly llvm-cov -p kailua-common --branch
+  cargo +nightly llvm-cov -p kailua-kona --branch
 
 coverage-open:
-  cargo +nightly llvm-cov -p kailua-common --branch --open
+  cargo +nightly llvm-cov -p kailua-kona --branch --open
 
 devnet-fetch:
   git clone --depth 1 --branch v1.9.1 --recursive https://github.com/ethereum-optimism/optimism.git

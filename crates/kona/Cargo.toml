@@ -1,6 +1,6 @@
 [package]
-name = "kailua-common"
-version = "1.0.0"
+name = "kailua-kona"
+version = "1.1.0"
 edition = "2021"
 license = "Apache-2.0"
 rust-version = "1.86"
@@ -46,10 +46,6 @@ kona-protocol.workspace = true
 
 risc0-zkvm.workspace = true
 
-eigenda-cert = { workspace = true, optional = true }
-hokulea-eigenda = { workspace = true, optional = true }
-hokulea-proof = { workspace = true, optional = true }
-
 [dev-dependencies]
 copy_dir.workspace = true
 kona-cli.workspace = true
@@ -61,6 +57,3 @@ tracing-subscriber.workspace = true
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage,coverage_nightly)'] }
-
-[features]
-eigen-da = ["dep:hokulea-eigenda", "dep:hokulea-proof", "dep:eigenda-cert"]

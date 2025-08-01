@@ -16,10 +16,10 @@ use crate::executor::{exec_precondition_hash, new_execution_cursor, CachedExecut
 use crate::kona::OracleL1ChainProvider;
 use crate::{client, precondition};
 use alloy_op_evm::OpEvmFactory;
-use alloy_primitives::{Address, Sealed, B256};
+use alloy_primitives::{Sealed, B256};
 use anyhow::{bail, Context};
 use kona_derive::prelude::{
-    BlobProvider, ChainProvider, DataAvailabilityProvider, EthereumDataSource, PipelineResult,
+    BlobProvider, ChainProvider, DataAvailabilityProvider, EthereumDataSource,
 };
 use kona_driver::{Driver, Executor};
 use kona_executor::TrieDBProvider;
@@ -31,55 +31,32 @@ use kona_proof::l1::OraclePipeline;
 use kona_proof::l2::OracleL2ChainProvider;
 use kona_proof::sync::new_oracle_pipeline_cursor;
 use kona_proof::{BootInfo, FlushableCache, HintType};
-use kona_protocol::BlockInfo;
 use std::fmt::Debug;
 use std::mem::take;
 use std::sync::{Arc, Mutex};
 
 pub trait DASourceProvider<
-    C: ChainProvider + Send + Clone + Debug,
-    B: BlobProvider + Send + Clone + Debug,
-    S: DataAvailabilityProvider + Send + Sync + Debug + Clone,
+    C: ChainProvider + Send + Sync + Clone + Debug,
+    B: BlobProvider + Send + Sync + Clone + Debug,
 >
 {
-    fn new_from_parts(self, l1_provider: C, blobs: B, cfg: &RollupConfig) -> S;
+    type DAS: DataAvailabilityProvider + Send + Sync + Debug + Clone;
+
+    fn new_from_parts(self, l1_provider: C, blobs: B, cfg: &RollupConfig) -> Self::DAS;
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct EthereumDataSourceProvider;
 
-impl<C: ChainProvider + Send + Clone + Debug, B: BlobProvider + Send + Clone + Debug>
-    DASourceProvider<C, B, EthereumDataSource<C, B>> for EthereumDataSourceProvider
-{
-    fn new_from_parts(
-        self,
-        l1_provider: C,
-        blobs: B,
-        cfg: &RollupConfig,
-    ) -> EthereumDataSource<C, B> {
-        EthereumDataSource::new_from_parts(l1_provider, blobs, cfg)
-    }
-}
-
-#[cfg(feature = "eigen-da")]
-pub struct EigenDADataSourceProvider;
-
-#[cfg(feature = "eigen-da")]
 impl<
-        C: ChainProvider + Send + Clone + Debug,
-        B: BlobProvider + Send + Clone + Debug,
-        E: hokulea_eigenda::EigenDABlobProvider + Send,
-    > DASourceProvider<C, B, hokulea_eigenda::EigenDADataSource<C, B, E>> for E
+        C: ChainProvider + Send + Sync + Clone + Debug,
+        B: BlobProvider + Send + Sync + Clone + Debug,
+    > DASourceProvider<C, B> for EthereumDataSourceProvider
 {
-    fn new_from_parts(
-        self,
-        l1_provider: C,
-        blobs: B,
-        cfg: &RollupConfig,
-    ) -> hokulea_eigenda::EigenDADataSource<C, B, E> {
-        hokulea_eigenda::EigenDADataSource::new(
-            EthereumDataSourceProvider.new_from_parts(l1_provider, blobs, cfg),
-            hokulea_eigenda::EigenDABlobSource::new(self),
-        )
+    type DAS = EthereumDataSource<C, B>;
+
+    fn new_from_parts(self, l1_provider: C, blobs: B, cfg: &RollupConfig) -> Self::DAS {
+        EthereumDataSource::new_from_parts(l1_provider, blobs, cfg)
     }
 }
 
@@ -132,8 +109,7 @@ impl<
 pub fn run_core_client<
     O: CommsClient + FlushableCache + Send + Sync + Debug,
     B: BlobProvider + Send + Sync + Debug + Clone,
-    S: DataAvailabilityProvider + Send + Sync + Debug + Clone,
-    D: DASourceProvider<O, B, S>,
+    D: DASourceProvider<OracleL1ChainProvider<O>, B>,
 >(
     precondition_validation_data_hash: B256,
     oracle: Arc<O>,
@@ -266,14 +242,6 @@ where
         .await
         .context("new_oracle_pipeline_cursor")?;
         l2_provider.set_cursor(cursor.clone());
-
-        // let da_provider =
-        //     EthereumDataSource::new_from_parts(l1_provider.clone(), beacon, &rollup_config);
-        // let da_switch = if let Some(wrapper) = da_wrapper {
-        //     DASourceSwitch::Wrapped(wrapper.wrap(da_provider))
-        // } else {
-        //     DASourceSwitch::Direct(da_provider)
-        // };
 
         let da_provider =
             da_source_provider.new_from_parts(l1_provider.clone(), beacon, &rollup_config);

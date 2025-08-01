@@ -23,12 +23,12 @@ use crate::ProvingError;
 use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
 use human_bytes::human_bytes;
-use kailua_common::boot::StitchedBootInfo;
-use kailua_common::client::stitching::split_executions;
-use kailua_common::executor::Execution;
-use kailua_common::journal::ProofJournal;
-use kailua_common::oracle::vec::{PreimageVecEntry, VecOracle};
-use kailua_common::witness::Witness;
+use kailua_kona::boot::StitchedBootInfo;
+use kailua_kona::client::stitching::split_executions;
+use kailua_kona::executor::Execution;
+use kailua_kona::journal::ProofJournal;
+use kailua_kona::oracle::vec::{PreimageVecEntry, VecOracle};
+use kailua_kona::witness::Witness;
 use kona_preimage::{HintWriterClient, PreimageOracleClient};
 use kona_proof::l1::OracleBlobProvider;
 use kona_proof::CachingOracle;
@@ -98,8 +98,7 @@ where
     );
 
     // sanity check kzg proofs
-    let _ =
-        kailua_common::blobs::PreloadedBlobProvider::from(witgen_result.1.blobs_witness.clone());
+    let _ = kailua_kona::blobs::PreloadedBlobProvider::from(witgen_result.1.blobs_witness.clone());
 
     // check if we can prove this workload
     let (preloaded_wit_size, streamed_wit_size) = sum_witness_size(&witgen_result.1);

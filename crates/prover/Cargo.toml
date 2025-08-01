@@ -34,7 +34,7 @@ alloy = { workspace = true, features = ["full", "kzg"] }
 alloy-primitives = { workspace = true, features = ["map-hashbrown"] }
 
 kailua-build.workspace = true
-kailua-common.workspace = true
+kailua-kona.workspace = true
 kailua-sync.workspace = true
 
 kona-derive.workspace = true
@@ -93,5 +93,4 @@ eigen-da = [
     "dep:hokulea-host-bin",
     "dep:hokulea-proof",
     "dep:hokulea-witgen",
-    "kailua-common/eigen-da",
 ]

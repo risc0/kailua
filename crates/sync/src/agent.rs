@@ -26,12 +26,12 @@ use alloy::providers::Provider;
 use anyhow::{anyhow, bail, Context};
 use futures::future::join_all;
 use itertools::Itertools;
-use kailua_common::blobs::hash_to_fe;
-use kailua_common::config::config_hash;
 use kailua_contracts::{
     IDisputeGameFactory::{gameAtIndexReturn, IDisputeGameFactoryInstance},
     *,
 };
+use kailua_kona::blobs::hash_to_fe;
+use kailua_kona::config::config_hash;
 use kona_genesis::RollupConfig;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::FutureExt;

@@ -26,9 +26,6 @@ pub mod client;
 pub mod config;
 /// Implementation for an execution engine with caching support.
 pub mod executor;
-/// A module for eigen-da support
-#[cfg(feature = "eigen-da")]
-pub mod hokulea;
 /// A tightly packed representation for extended execution trace results.
 pub mod journal;
 /// A modified `kona_proof::l1::chain_provider` with caching support.

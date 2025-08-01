@@ -17,12 +17,12 @@ use alloy::eips::eip4844::IndexedBlobHash;
 use alloy_primitives::{Address, B256};
 use async_trait::async_trait;
 use kailua_build::KAILUA_FPVM_KONA_ID;
-use kailua_common::blobs::BlobWitnessData;
-use kailua_common::boot::StitchedBootInfo;
-use kailua_common::executor::Execution;
-use kailua_common::journal::ProofJournal;
-use kailua_common::oracle::WitnessOracle;
-use kailua_common::witness::Witness;
+use kailua_kona::blobs::BlobWitnessData;
+use kailua_kona::boot::StitchedBootInfo;
+use kailua_kona::executor::Execution;
+use kailua_kona::journal::ProofJournal;
+use kailua_kona::oracle::WitnessOracle;
+use kailua_kona::witness::Witness;
 use kona_derive::prelude::BlobProvider;
 use kona_preimage::errors::PreimageOracleResult;
 use kona_preimage::{CommsClient, HintWriterClient, PreimageKey, PreimageOracleClient};
@@ -85,7 +85,7 @@ where
 
     // Run client
     let collection_target = Arc::new(Mutex::new(Vec::new()));
-    let (boot, precondition_hash) = kailua_common::client::core::run_core_client(
+    let (boot, precondition_hash) = kailua_kona::client::core::run_core_client(
         precondition_validation_data_hash,
         oracle,
         stream,

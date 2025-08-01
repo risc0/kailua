@@ -42,7 +42,7 @@ pub const SAFE_DEFAULT_ADDRESS: Address = address!("4bfa59be6b388d77d213ce997acb
 /// # Examples
 /// ```
 /// use anyhow::Result;
-/// use kailua_common::config::safe_default;
+/// use kailua_kona::config::safe_default;
 ///
 /// let value = safe_default(Some(42), 0);
 /// assert_eq!(value.unwrap(), 42);

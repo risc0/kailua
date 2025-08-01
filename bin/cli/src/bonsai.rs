@@ -15,7 +15,7 @@
 use anyhow::{anyhow, Context};
 use bonsai_sdk::non_blocking::{Client, SessionId};
 use kailua_build::KAILUA_FPVM_KONA_ID;
-use kailua_common::journal::ProofJournal;
+use kailua_kona::journal::ProofJournal;
 use kailua_prover::backends::{KailuaProveInfo, KailuaSessionStats};
 use kailua_prover::client::proving::save_to_bincoded_file;
 use kailua_prover::proof::{proof_file_name, read_bincoded_file};

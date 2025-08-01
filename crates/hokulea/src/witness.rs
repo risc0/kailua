@@ -13,50 +13,6 @@
 // limitations under the License.
 
 use alloy_primitives::B256;
-use eigenda_cert::AltDACommitment;
-use hokulea_proof::canoe_verifier::errors::HokuleaCanoeVerificationError;
-use hokulea_proof::canoe_verifier::{to_journal_bytes, CanoeVerifier};
-use hokulea_proof::cert_validity::CertValidity;
-use risc0_zkvm::sha::Digestible;
-use risc0_zkvm::Receipt;
-
-#[derive(Copy, Clone, Debug)]
-pub struct KailuaCanoeVerifier(pub [u8; 32]);
-
-impl CanoeVerifier for KailuaCanoeVerifier {
-    fn validate_cert_receipt(
-        &self,
-        cert_validity: CertValidity,
-        eigenda_cert: AltDACommitment,
-    ) -> Result<(), HokuleaCanoeVerificationError> {
-        let journal_bytes = to_journal_bytes(&cert_validity, &eigenda_cert);
-
-        let Some(proof) = cert_validity.canoe_proof else {
-            crate::client::log(&format!("ASSUME {} (EIGEN)", journal_bytes.digest()));
-            #[cfg(target_os = "zkvm")]
-            return risc0_zkvm::guest::env::verify(self.0, &journal_bytes)
-                .map_err(|e| HokuleaCanoeVerificationError::InvalidProofAndJournal(e.to_string()));
-            #[cfg(not(target_os = "zkvm"))]
-            return Err(HokuleaCanoeVerificationError::MissingProof);
-        };
-
-        // todo: avoid serde_json
-        // todo: load seal only
-        let receipt: Receipt = serde_json::from_slice(proof.as_ref()).map_err(|e| {
-            HokuleaCanoeVerificationError::UnableToDeserializeReceipt(e.to_string())
-        })?;
-
-        receipt
-            .verify(self.0)
-            .map_err(|e| HokuleaCanoeVerificationError::InvalidProofAndJournal(e.to_string()))?;
-
-        if receipt.journal.bytes != journal_bytes {
-            return Err(HokuleaCanoeVerificationError::InconsistentPublicJournal);
-        }
-
-        Ok(())
-    }
-}
 
 pub fn da_witness_precondition(
     eigen_da: &hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData,

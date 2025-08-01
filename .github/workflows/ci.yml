@@ -158,8 +158,8 @@ jobs:
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
           crate: cargo-llvm-cov
-      - name: kailua-common coverage
-        run: cargo +nightly llvm-cov -p kailua-common --branch --fail-uncovered-functions 0 --fail-uncovered-lines 1
+      - name: kailua-kona coverage
+        run: cargo +nightly llvm-cov -p kailua-kona --branch --fail-uncovered-functions 0 --fail-uncovered-lines 1
 
   forge-fmt:
     runs-on: ubuntu-latest

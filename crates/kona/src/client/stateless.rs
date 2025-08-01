@@ -48,7 +48,7 @@ use std::sync::Arc;
 /// * Logs the count of preimages provided via the `oracle_witness`.
 /// * Logs the count of blobs contained in the `blobs_witness`.
 /// * Logs a warning if any extra preimages are found during execution.
-pub fn run_stateless_client<O: WitnessOracle, S: StitchingClient>(
+pub fn run_stateless_client<O: WitnessOracle, S: StitchingClient<O, PreloadedBlobProvider>>(
     witness: Witness<O>,
     stitching_client: S,
 ) -> ProofJournal {
@@ -74,7 +74,6 @@ pub fn run_stateless_client<O: WitnessOracle, S: StitchingClient>(
         oracle.clone(),
         stream,
         beacon,
-        None,
         witness.fpvm_image_id,
         witness.payout_recipient_address,
         witness.stitched_executions,
@@ -93,6 +92,7 @@ pub fn run_stateless_client<O: WitnessOracle, S: StitchingClient>(
 pub mod tests {
     use super::*;
     use crate::client::core::tests::test_derivation;
+    use crate::client::core::EthereumDataSourceProvider;
     use crate::client::stitching::KonaStitchingClient;
     use crate::client::tests::TestOracle;
     use alloy_primitives::{b256, B256};
@@ -132,7 +132,7 @@ pub mod tests {
             fpvm_image_id: Default::default(),
         };
 
-        run_stateless_client(witness, KonaStitchingClient);
+        run_stateless_client(witness, KonaStitchingClient(EthereumDataSourceProvider));
 
         Ok(())
     }

@@ -27,7 +27,7 @@ opentelemetry.workspace = true
 alloy = { workspace = true, features = ["full", "kzg", "signer-aws", "signer-gcp"] }
 
 kailua-build.workspace = true
-kailua-common.workspace = true
+kailua-kona.workspace = true
 kailua-contracts.workspace = true
 kailua-proposer.workspace = true
 kailua-prover.workspace = true

@@ -17,8 +17,8 @@ use crate::kv::{create_disk_kv_store, create_split_kv_store, RWLKeyValueStore};
 use crate::ProvingError;
 use alloy_primitives::B256;
 use anyhow::anyhow;
-use kailua_common::boot::StitchedBootInfo;
-use kailua_common::executor::Execution;
+use kailua_kona::boot::StitchedBootInfo;
+use kailua_kona::executor::Execution;
 use kona_host::{
     HintHandler, OfflineHostBackend, OnlineHostBackend, OnlineHostBackendCfg, PreimageServer,
     PreimageServerError, SharedKeyValueStore,

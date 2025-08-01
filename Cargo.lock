@@ -6104,8 +6104,8 @@ dependencies = [
  "clap",
  "hex",
  "kailua-build",
- "kailua-common",
  "kailua-contracts",
+ "kailua-kona",
  "kailua-proposer",
  "kailua-prover",
  "kailua-rpc",
@@ -6125,8 +6125,33 @@ dependencies = [
 ]
 
 [[package]]
-name = "kailua-common"
-version = "1.0.0"
+name = "kailua-contracts"
+version = "1.0.2"
+dependencies = [
+ "alloy 1.0.9",
+ "foundry-compilers",
+]
+
+[[package]]
+name = "kailua-hokulea"
+version = "1.1.0"
+dependencies = [
+ "alloy-primitives 1.2.0",
+ "eigenda-cert",
+ "hokulea-eigenda",
+ "hokulea-proof",
+ "kailua-kona",
+ "kona-derive",
+ "kona-genesis",
+ "kona-preimage",
+ "kona-proof",
+ "risc0-zkvm",
+ "serde_json",
+]
+
+[[package]]
+name = "kailua-kona"
+version = "1.1.0"
 dependencies = [
  "alloy-consensus 1.0.9",
  "alloy-eips 1.0.9",
@@ -6141,9 +6166,6 @@ dependencies = [
  "async-trait",
  "c-kzg",
  "copy_dir",
- "eigenda-cert",
- "hokulea-eigenda",
- "hokulea-proof",
  "kona-cli",
  "kona-derive",
  "kona-driver",
@@ -6171,22 +6193,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "kailua-contracts"
-version = "1.0.2"
-dependencies = [
- "alloy 1.0.9",
- "foundry-compilers",
-]
-
-[[package]]
 name = "kailua-proposer"
 version = "1.0.2"
 dependencies = [
  "alloy 1.0.9",
  "anyhow",
  "clap",
- "kailua-common",
  "kailua-contracts",
+ "kailua-kona",
  "kailua-sync",
  "opentelemetry",
  "tokio",
@@ -6220,7 +6234,7 @@ dependencies = [
  "hokulea-witgen",
  "human_bytes",
  "kailua-build",
- "kailua-common",
+ "kailua-kona",
  "kailua-sync",
  "kona-derive",
  "kona-genesis",
@@ -6279,8 +6293,8 @@ dependencies = [
  "hex",
  "itertools 0.14.0",
  "kailua-build",
- "kailua-common",
  "kailua-contracts",
+ "kailua-kona",
  "kona-genesis",
  "kona-registry",
  "opentelemetry",
@@ -6307,8 +6321,8 @@ dependencies = [
  "clap",
  "futures",
  "kailua-build",
- "kailua-common",
  "kailua-contracts",
+ "kailua-kona",
  "kailua-prover",
  "kailua-sync",
  "kona-host",

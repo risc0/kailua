@@ -2441,8 +2441,41 @@ dependencies = [
 ]
 
 [[package]]
-name = "kailua-common"
+name = "kailua-fpvm-hokulea"
 version = "1.0.0"
+dependencies = [
+ "alloy-primitives",
+ "bincode",
+ "blst",
+ "c-kzg",
+ "hokulea-proof",
+ "kailua-hokulea",
+ "kailua-kona",
+ "risc0-zkvm",
+ "rkyv",
+ "substrate-bn",
+]
+
+[[package]]
+name = "kailua-hokulea"
+version = "1.1.0"
+dependencies = [
+ "alloy-primitives",
+ "eigenda-cert",
+ "hokulea-eigenda",
+ "hokulea-proof",
+ "kailua-kona",
+ "kona-derive",
+ "kona-genesis",
+ "kona-preimage",
+ "kona-proof",
+ "risc0-zkvm",
+ "serde_json",
+]
+
+[[package]]
+name = "kailua-kona"
+version = "1.1.0"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -2456,9 +2489,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "c-kzg",
- "eigenda-cert",
- "hokulea-eigenda",
- "hokulea-proof",
  "kona-derive",
  "kona-driver",
  "kona-executor",
@@ -2477,21 +2507,6 @@ dependencies = [
  "serde_json",
  "spin 0.10.0",
  "tracing",
-]
-
-[[package]]
-name = "kailua-fpvm-hokulea"
-version = "1.0.0"
-dependencies = [
- "alloy-primitives",
- "bincode",
- "blst",
- "c-kzg",
- "hokulea-proof",
- "kailua-common",
- "risc0-zkvm",
- "rkyv",
- "substrate-bn",
 ]
 
 [[package]]

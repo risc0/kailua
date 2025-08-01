@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use kailua_common::client::stateless::run_stateless_client;
-use kailua_common::client::stitching::HokuleaStitchingClient;
-use kailua_common::oracle::vec::VecOracle;
-use kailua_common::{client::log, witness::Witness};
+use kailua_hokulea::stitching::HokuleaStitchingClient;
+use kailua_kona::client::stateless::run_stateless_client;
+use kailua_kona::oracle::vec::VecOracle;
+use kailua_kona::{client::log, witness::Witness};
 use risc0_zkvm::guest::env;
 use rkyv::rancor::Error;
 
@@ -52,7 +52,7 @@ fn main() {
         log(&format!("DESERIALIZE SHARD {i}"));
         // read_shard is undefined on non-zkvm platforms
         #[cfg(target_os = "zkvm")]
-        let _ = core::mem::replace(entry, kailua_common::oracle::vec::read_shard());
+        let _ = core::mem::replace(entry, kailua_kona::oracle::vec::read_shard());
     }
 
     // Run client using witness data

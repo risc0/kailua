@@ -39,7 +39,7 @@ opentelemetry_sdk.workspace = true
 opentelemetry-otlp.workspace = true
 
 kailua-build.workspace = true
-kailua-common.workspace = true
+kailua-kona.workspace = true
 kailua-contracts.workspace = true
 
 kona-genesis.workspace = true
