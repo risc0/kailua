@@ -20,7 +20,6 @@ use crate::ProvingError;
 use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
 use human_bytes::human_bytes;
-use kailua_build::{KAILUA_FPVM_KONA_ELF, KAILUA_FPVM_KONA_ID};
 use kailua_kona::boot::StitchedBootInfo;
 use kailua_kona::client::stitching::split_executions;
 use kailua_kona::executor::Execution;
@@ -156,7 +155,7 @@ where
                 .header_by_hash(validity.l1_head_block_hash)
                 .await
                 .expect("Failed to get l1 head block for canoe");
-            // todo: call local/bonsai/boundless prover w/ receipt caching
+            // Call local/bonsai/boundless prover w/ receipt caching
             let receipt = canoe_provider
                 .create_cert_validity_proof(canoe_provider::CanoeInput {
                     altda_commitment: commitment.clone(),
@@ -182,10 +181,22 @@ where
             [stitched_proofs, eigen_assumptions].concat(),
         )
     };
+
+    #[cfg(feature = "eigen-da")]
+    let image = (
+        kailua_build::KAILUA_FPVM_HOKULEA_ID,
+        kailua_build::KAILUA_FPVM_HOKULEA_ELF,
+    );
+    #[cfg(not(feature = "eigen-da"))]
+    let image = (
+        kailua_build::KAILUA_FPVM_KONA_ID,
+        kailua_build::KAILUA_FPVM_KONA_ELF,
+    );
+
     crate::risczero::seek_proof(
         &proving,
         boundless,
-        (KAILUA_FPVM_KONA_ID, KAILUA_FPVM_KONA_ELF),
+        image,
         Journal::from(&witgen_result.0),
         vec![],
         [
