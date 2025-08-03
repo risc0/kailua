@@ -19,7 +19,7 @@ use crate::{proof, ProvingError};
 use anyhow::Context;
 use bytemuck::NoUninit;
 use kailua_kona::journal::ProofJournal;
-use risc0_zkvm::{is_dev_mode, Digest, Journal, Receipt};
+use risc0_zkvm::{Digest, Journal, Receipt};
 use std::convert::identity;
 use std::path::Path;
 use tracing::info;
@@ -46,6 +46,7 @@ pub struct KailuaProveInfo {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(deprecated)]
 pub async fn seek_proof<A: NoUninit + Into<Digest>>(
     proving: &ProvingArgs,
     boundless: BoundlessArgs,
@@ -64,7 +65,9 @@ pub async fn seek_proof<A: NoUninit + Into<Digest>>(
 
     // compute the zkvm proof
     let proof = match (boundless.market, boundless.storage) {
-        (Some(marked_provider_config), Some(storage_provider_config)) if !is_dev_mode() => {
+        (Some(marked_provider_config), Some(storage_provider_config))
+            if !risc0_zkvm::is_dev_mode() =>
+        {
             boundless::run_boundless_client(
                 marked_provider_config,
                 storage_provider_config,

@@ -1151,7 +1151,7 @@ dependencies = [
 [[package]]
 name = "canoe-bindings"
 version = "0.1.0"
-source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#f8beab09c280c5e485719da0c62bf8fb1cd1a18e"
 dependencies = [
  "alloy-sol-types",
 ]
@@ -1616,7 +1616,7 @@ dependencies = [
 [[package]]
 name = "eigenda-cert"
 version = "0.1.0"
-source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#f8beab09c280c5e485719da0c62bf8fb1cd1a18e"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -2070,7 +2070,7 @@ dependencies = [
 [[package]]
 name = "hokulea-eigenda"
 version = "0.1.0"
-source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#f8beab09c280c5e485719da0c62bf8fb1cd1a18e"
 dependencies = [
  "alloy-primitives",
  "async-trait",
@@ -2086,7 +2086,7 @@ dependencies = [
 [[package]]
 name = "hokulea-proof"
 version = "0.1.0"
-source = "git+https://github.com/Layr-Labs/hokulea?rev=c336a3203211d7de41a554a571646a368a34da6c#c336a3203211d7de41a554a571646a368a34da6c"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#f8beab09c280c5e485719da0c62bf8fb1cd1a18e"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -3953,9 +3953,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-build"
-version = "2.2.0"
+version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "714776c8ccf3e206ecf499dab6561259beef6e7a82dfb49ccf5c911c7350dd5e"
+checksum = "62ffc0f135e6c1e9851e7e19438d03ff41a9d49199ee4f6c17b8bb30b4f83910"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -4093,9 +4093,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-zkvm"
-version = "2.2.0"
+version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c59aaf1898f2f5d526a79d53dbe6288aeb1ce52a17184b85af84d06dedb1a367"
+checksum = "9684b333c1c5d83f29ce2a92314ccfafd9d8cdfa6c4e19c07b97015d2f1eb9d0"
 dependencies = [
  "anyhow",
  "bincode",

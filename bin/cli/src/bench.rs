@@ -17,7 +17,6 @@ use alloy::providers::{Provider, ProviderBuilder};
 use kailua_sync::args::SyncArgs;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt, Span, Status, TraceContextExt, Tracer};
-use risc0_zkvm::is_dev_mode;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::fs::OpenOptions;
@@ -62,6 +61,7 @@ impl Ord for CandidateBlock {
     }
 }
 
+#[allow(deprecated)]
 pub async fn benchmark(args: BenchArgs, verbosity: u8) -> anyhow::Result<()> {
     let tracer = tracer("kailua");
     let context = opentelemetry::Context::current_with_span(tracer.start("benchmark"));
@@ -127,7 +127,7 @@ pub async fn benchmark(args: BenchArgs, verbosity: u8) -> anyhow::Result<()> {
             String::new()
         };
         let mut cmd = Command::new("just");
-        if is_dev_mode() {
+        if risc0_zkvm::is_dev_mode() {
             cmd.env("RISC0_DEV_MODE", "1");
         }
         let block_number = block_number.to_string();

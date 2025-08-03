@@ -26,7 +26,7 @@ use hokulea_proof::cert_validity::CertValidity;
 use kailua_build::{KAILUA_DA_HOKULEA_ELF, KAILUA_DA_HOKULEA_ID};
 use risc0_steel::alloy::providers::ProviderBuilder;
 use risc0_steel::ethereum::{
-    EthEvmEnv, ETH_HOLESKY_CHAIN_SPEC, ETH_MAINNET_CHAIN_SPEC, ETH_SEPOLIA_CHAIN_SPEC,
+    EthChainSpec, EthEvmEnv, ETH_HOLESKY_CHAIN_SPEC, ETH_MAINNET_CHAIN_SPEC, ETH_SEPOLIA_CHAIN_SPEC,
 };
 use risc0_steel::host::BlockNumberOrTag;
 use risc0_steel::Contract;
@@ -59,20 +59,21 @@ impl CanoeProvider for KailuaCanoeSteelProvider {
         let eth_rpc_url = Url::from_str(&self.eth_rpc_url)?;
 
         // Create an alloy provider for that private key and URL.
-        let l1_provider = ProviderBuilder::new().on_http(eth_rpc_url); //.await?;
+        let l1_provider = ProviderBuilder::new().connect_http(eth_rpc_url); //.await?;
 
-        let builder = EthEvmEnv::builder()
-            .provider(l1_provider)
-            .block_number_or_tag(BlockNumberOrTag::Number(input.l1_head_block_number));
-
-        let mut env = builder.build().await?;
-
-        env = match input.l1_chain_id {
-            1 => env.with_chain_spec(&ETH_MAINNET_CHAIN_SPEC),
-            11155111 => env.with_chain_spec(&ETH_SEPOLIA_CHAIN_SPEC),
-            17000 => env.with_chain_spec(&ETH_HOLESKY_CHAIN_SPEC),
-            _ => env,
+        let chain_spec = match input.l1_chain_id {
+            1 => ETH_MAINNET_CHAIN_SPEC.clone(),
+            11155111 => ETH_SEPOLIA_CHAIN_SPEC.clone(),
+            17000 => ETH_HOLESKY_CHAIN_SPEC.clone(),
+            _ => EthChainSpec::new_single(input.l1_chain_id, Default::default()),
         };
+
+        let mut env = EthEvmEnv::builder()
+            .chain_spec(&chain_spec)
+            .provider(l1_provider)
+            .block_number_or_tag(BlockNumberOrTag::Number(input.l1_head_block_number))
+            .build()
+            .await?;
 
         let verifier_address = cert_verifier_address(input.l1_chain_id, &input.altda_commitment);
 

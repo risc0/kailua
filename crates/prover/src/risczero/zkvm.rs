@@ -17,9 +17,7 @@ use crate::risczero::{KailuaProveInfo, KailuaSessionStats};
 use crate::ProvingError;
 use anyhow::{anyhow, Context};
 use bytemuck::NoUninit;
-use risc0_zkvm::{
-    default_prover, is_dev_mode, Digest, ExecutorEnv, InnerReceipt, ProverOpts, Receipt,
-};
+use risc0_zkvm::{default_prover, Digest, ExecutorEnv, InnerReceipt, ProverOpts, Receipt};
 use tracing::info;
 use tracing::log::warn;
 
@@ -88,6 +86,7 @@ pub async fn run_zkvm_client<A: NoUninit + Into<Digest>>(
     Ok(prove_info.receipt)
 }
 
+#[allow(deprecated)]
 pub fn build_zkvm_env<'a>(
     witness_slices: Vec<Vec<u32>>,
     witness_frames: Vec<Vec<u8>>,
@@ -107,7 +106,7 @@ pub fn build_zkvm_env<'a>(
         builder.write_frame(frame);
     }
     // Dev-mode for recursive proofs
-    if is_dev_mode() {
+    if risc0_zkvm::is_dev_mode() {
         builder.env_var("RISC0_DEV_MODE", "1");
     }
     // Pass in proofs

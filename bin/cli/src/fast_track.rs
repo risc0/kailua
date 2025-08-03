@@ -455,6 +455,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[allow(deprecated)]
 pub async fn deploy_verifier<P1: Provider<N>, P2: Provider<N>, N: Network>(
     deployer_provider: P1,
     owner_provider: P2,

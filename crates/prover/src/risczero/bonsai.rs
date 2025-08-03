@@ -22,7 +22,7 @@ use human_bytes::human_bytes;
 use kailua_sync::{retry_res, retry_res_timeout};
 use risc0_zkvm::serde::to_vec;
 use risc0_zkvm::sha::Digest;
-use risc0_zkvm::{is_dev_mode, InnerReceipt, Receipt};
+use risc0_zkvm::{InnerReceipt, Receipt};
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::log::warn;
@@ -298,8 +298,9 @@ pub async fn create_stark_session<A: NoUninit + Into<Digest>>(
     }
 }
 
+#[allow(deprecated)]
 pub fn should_use_bonsai() -> bool {
-    !is_dev_mode()
+    !risc0_zkvm::is_dev_mode()
         && std::env::var("BONSAI_API_URL").is_ok()
         && std::env::var("BONSAI_API_KEY").is_ok()
 }
