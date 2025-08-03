@@ -102,7 +102,7 @@ kona-std-fpvm = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0
 # Hokulea git = "https://github.com/Layr-Labs/hokulea", rev = "c336a3203211d7de41a554a571646a368a34da6c"
 canoe-bindings = { git = "https://github.com/hashcashier/hokulea", branch = "steel" }
 canoe-provider = { git = "https://github.com/hashcashier/hokulea", branch = "steel" }
-canoe-steel-methods = { path = "../hokulea/canoe/steel/methods" }
+canoe-steel-methods = { git = "https://github.com/hashcashier/hokulea", branch = "steel" }
 eigenda-cert = { git = "https://github.com/hashcashier/hokulea", branch = "steel" }
 hokulea-host-bin = { git = "https://github.com/hashcashier/hokulea", branch = "steel", default-features = false }
 hokulea-eigenda = { git = "https://github.com/hashcashier/hokulea", branch = "steel", default-features = false }
