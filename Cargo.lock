@@ -2770,7 +2770,7 @@ dependencies = [
 [[package]]
 name = "canoe-bindings"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/hokulea?branch=steel#0387cd9e97c7bc26cf1903f6e230c71cfc3913fc"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#e631577d4e6dc1fd18fdb77f3e6bfaf7eb28b7f6"
 dependencies = [
  "alloy-sol-types",
 ]
@@ -2778,7 +2778,7 @@ dependencies = [
 [[package]]
 name = "canoe-provider"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/hokulea?branch=steel#0387cd9e97c7bc26cf1903f6e230c71cfc3913fc"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#e631577d4e6dc1fd18fdb77f3e6bfaf7eb28b7f6"
 dependencies = [
  "alloy-primitives 1.2.0",
  "alloy-sol-types",
@@ -2792,7 +2792,7 @@ dependencies = [
 [[package]]
 name = "canoe-steel-methods"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/hokulea?branch=steel#0387cd9e97c7bc26cf1903f6e230c71cfc3913fc"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#e631577d4e6dc1fd18fdb77f3e6bfaf7eb28b7f6"
 dependencies = [
  "hex",
  "risc0-build",
@@ -3622,7 +3622,7 @@ dependencies = [
 [[package]]
 name = "eigenda-cert"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/hokulea?branch=steel#0387cd9e97c7bc26cf1903f6e230c71cfc3913fc"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#e631577d4e6dc1fd18fdb77f3e6bfaf7eb28b7f6"
 dependencies = [
  "alloy-primitives 1.2.0",
  "alloy-rlp",
@@ -4622,7 +4622,7 @@ dependencies = [
 [[package]]
 name = "hokulea-client"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/hokulea?branch=steel#0387cd9e97c7bc26cf1903f6e230c71cfc3913fc"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#e631577d4e6dc1fd18fdb77f3e6bfaf7eb28b7f6"
 dependencies = [
  "alloy-consensus",
  "alloy-evm 0.10.0",
@@ -4641,7 +4641,7 @@ dependencies = [
 [[package]]
 name = "hokulea-client-bin"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/hokulea?branch=steel#0387cd9e97c7bc26cf1903f6e230c71cfc3913fc"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#e631577d4e6dc1fd18fdb77f3e6bfaf7eb28b7f6"
 dependencies = [
  "alloy-evm 0.10.0",
  "cfg-if",
@@ -4659,7 +4659,7 @@ dependencies = [
 [[package]]
 name = "hokulea-compute-proof"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/hokulea?branch=steel#0387cd9e97c7bc26cf1903f6e230c71cfc3913fc"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#e631577d4e6dc1fd18fdb77f3e6bfaf7eb28b7f6"
 dependencies = [
  "alloy-primitives 1.2.0",
  "num",
@@ -4670,7 +4670,7 @@ dependencies = [
 [[package]]
 name = "hokulea-eigenda"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/hokulea?branch=steel#0387cd9e97c7bc26cf1903f6e230c71cfc3913fc"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#e631577d4e6dc1fd18fdb77f3e6bfaf7eb28b7f6"
 dependencies = [
  "alloy-primitives 1.2.0",
  "async-trait",
@@ -4686,7 +4686,7 @@ dependencies = [
 [[package]]
 name = "hokulea-host-bin"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/hokulea?branch=steel#0387cd9e97c7bc26cf1903f6e230c71cfc3913fc"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#e631577d4e6dc1fd18fdb77f3e6bfaf7eb28b7f6"
 dependencies = [
  "alloy-primitives 1.2.0",
  "anyhow",
@@ -4712,7 +4712,7 @@ dependencies = [
 [[package]]
 name = "hokulea-proof"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/hokulea?branch=steel#0387cd9e97c7bc26cf1903f6e230c71cfc3913fc"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#e631577d4e6dc1fd18fdb77f3e6bfaf7eb28b7f6"
 dependencies = [
  "alloy-primitives 1.2.0",
  "alloy-sol-types",
@@ -4736,7 +4736,7 @@ dependencies = [
 [[package]]
 name = "hokulea-witgen"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/hokulea?branch=steel#0387cd9e97c7bc26cf1903f6e230c71cfc3913fc"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#e631577d4e6dc1fd18fdb77f3e6bfaf7eb28b7f6"
 dependencies = [
  "alloy-consensus",
  "alloy-primitives 1.2.0",
@@ -7072,7 +7072,7 @@ version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af1844ef2428cc3e1cb900be36181049ef3d3193c63e43026cfe202983b27a56"
 dependencies = [
- "proc-macro-crate 3.2.0",
+ "proc-macro-crate 1.1.3",
  "proc-macro2",
  "quote",
  "syn 2.0.98",

@@ -1151,7 +1151,7 @@ dependencies = [
 [[package]]
 name = "canoe-bindings"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/hokulea?branch=steel#0387cd9e97c7bc26cf1903f6e230c71cfc3913fc"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#e631577d4e6dc1fd18fdb77f3e6bfaf7eb28b7f6"
 dependencies = [
  "alloy-sol-types",
 ]
@@ -1616,7 +1616,7 @@ dependencies = [
 [[package]]
 name = "eigenda-cert"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/hokulea?branch=steel#0387cd9e97c7bc26cf1903f6e230c71cfc3913fc"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#e631577d4e6dc1fd18fdb77f3e6bfaf7eb28b7f6"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -2070,7 +2070,7 @@ dependencies = [
 [[package]]
 name = "hokulea-eigenda"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/hokulea?branch=steel#0387cd9e97c7bc26cf1903f6e230c71cfc3913fc"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#e631577d4e6dc1fd18fdb77f3e6bfaf7eb28b7f6"
 dependencies = [
  "alloy-primitives",
  "async-trait",
@@ -2086,7 +2086,7 @@ dependencies = [
 [[package]]
 name = "hokulea-proof"
 version = "0.1.0"
-source = "git+https://github.com/hashcashier/hokulea?branch=steel#0387cd9e97c7bc26cf1903f6e230c71cfc3913fc"
+source = "git+https://github.com/hashcashier/hokulea?branch=steel#e631577d4e6dc1fd18fdb77f3e6bfaf7eb28b7f6"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
