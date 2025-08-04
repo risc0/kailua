@@ -17,7 +17,7 @@ fn main() {
     {
         risc0_build::embed_methods_with_options({
             let guest_options = {
-                // set CANOE_IMAGE_ID if not set
+                #[cfg(feature = "rebuild-da")]
                 let canoe_image_id = std::env::var("CANOE_IMAGE_ID").unwrap_or_else(|_| {
                     // Warn about unstable build
                     if std::env::var("RISC0_USE_DOCKER").is_err() {
@@ -29,6 +29,11 @@ fn main() {
                         .to_string();
                     canoe_image_id
                 });
+                #[cfg(not(feature = "rebuild-da"))]
+                let canoe_image_id = std::env::var("CANOE_IMAGE_ID").unwrap_or(String::from(
+                    "e6ae1f0ee0fee9e253db02250fad8c0c8dc65141a0042a879fbacbdae50ea2cb",
+                ));
+
                 println!("cargo:rustc-env=CANOE_IMAGE_ID={canoe_image_id}");
                 std::env::set_var("CANOE_IMAGE_ID", &canoe_image_id);
                 // Start with default build options
@@ -77,5 +82,6 @@ fn main() {
     }
 
     println!("cargo:rerun-if-changed=src");
-    println!("cargo:rerun-if-changed=fpvm/src");
+    println!("cargo:rerun-if-changed=kona/src");
+    println!("cargo:rerun-if-changed=hokulea/src");
 }

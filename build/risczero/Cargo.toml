@@ -28,6 +28,8 @@ disable-dev-mode = []
 rebuild-fpvm = [
     "dep:alloy-primitives",
     "dep:bytemuck",
-    "dep:canoe-steel-methods",
     "dep:risc0-build"
+]
+rebuild-da = [
+    "dep:canoe-steel-methods",
 ]

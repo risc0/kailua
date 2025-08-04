@@ -5,7 +5,3 @@ pub const KAILUA_FPVM_KONA_ID: [u32; 8] = [0x61C29DB8, 0x2DCBC472, 0xC8B6F4D4, 0
 pub const KAILUA_FPVM_HOKULEA_ELF: &[u8] = include_bytes!("kailua-fpvm-hokulea.bin");
 pub const KAILUA_FPVM_HOKULEA_PATH: &str = "./kailua-fpvm-hokulea.bin";
 pub const KAILUA_FPVM_HOKULEA_ID: [u32; 8] = [0x5DE60004, 0x5D7C5627, 0x9702CE06, 0x7CAD5D74, 0x9338AC4D, 0x31E22F4F, 0xF877756A, 0x5365EEA8];
-
-pub const KAILUA_DA_HOKULEA_ELF: &[u8] = include_bytes!("kailua-da-hokulea.bin");
-pub const KAILUA_DA_HOKULEA_PATH: &str = "./kailua-da-hokulea.bin";
-pub const KAILUA_DA_HOKULEA_ID: [u32; 8] = [0xE1FAEE6, 0xE2E9FEE0, 0x2502DB53, 0xC8CAD0F, 0x4151C68D, 0x872A04A0, 0xDACBBA9F, 0xCBA20EE5];
