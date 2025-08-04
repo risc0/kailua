@@ -99,15 +99,15 @@ kona-protocol = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0
 kona-registry = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
 kona-std-fpvm = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
 
-# Hokulea git = "https://github.com/Layr-Labs/hokulea", rev = "c336a3203211d7de41a554a571646a368a34da6c"
-canoe-bindings = { git = "https://github.com/hashcashier/hokulea", branch = "steel" }
-canoe-provider = { git = "https://github.com/hashcashier/hokulea", branch = "steel" }
-canoe-steel-methods = { git = "https://github.com/hashcashier/hokulea", branch = "steel" }
-eigenda-cert = { git = "https://github.com/hashcashier/hokulea", branch = "steel" }
-hokulea-host-bin = { git = "https://github.com/hashcashier/hokulea", branch = "steel", default-features = false }
-hokulea-eigenda = { git = "https://github.com/hashcashier/hokulea", branch = "steel", default-features = false }
-hokulea-proof = { git = "https://github.com/hashcashier/hokulea", branch = "steel", default-features = false }
-hokulea-witgen = { git = "https://github.com/hashcashier/hokulea", branch = "steel", default-features = false }
+# Hokulea git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc"
+canoe-bindings = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc" }
+canoe-provider = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc" }
+canoe-steel-methods = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc" }
+eigenda-cert = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc" }
+hokulea-host-bin = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc", default-features = false }
+hokulea-eigenda = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc", default-features = false }
+hokulea-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc", default-features = false }
+hokulea-witgen = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc", default-features = false }
 
 
 # Bonsai
