@@ -18,11 +18,10 @@ use crate::risczero::boundless::BoundlessArgs;
 use crate::{proof, ProvingError};
 use anyhow::Context;
 use bytemuck::NoUninit;
-use kailua_kona::journal::ProofJournal;
 use risc0_zkvm::{Digest, Journal, Receipt};
 use std::convert::identity;
 use std::path::Path;
-use tracing::info;
+use tracing::{error, info};
 
 pub mod bonsai;
 pub mod boundless;
@@ -72,7 +71,7 @@ pub async fn seek_proof<A: NoUninit + Into<Digest>>(
                 marked_provider_config,
                 storage_provider_config,
                 image,
-                journal,
+                journal.clone(),
                 witness_slices,
                 witness_frames,
                 stitched_proofs,
@@ -106,8 +105,14 @@ pub async fn seek_proof<A: NoUninit + Into<Digest>>(
     };
 
     // Save proof file to disk
-    let proof_journal = ProofJournal::decode_packed(proof.journal.as_ref());
-    let file_name = proof_file_name(image.0, &proof_journal);
+    if journal != proof.journal {
+        error!(
+            "Expected journal {} but found {}",
+            hex::encode(&journal),
+            hex::encode(&proof.journal)
+        );
+    }
+    let file_name = proof_file_name(image.0, proof.journal.clone());
     proof::save_to_bincoded_file(&proof, &file_name)
         .await
         .context("save_to_bincoded_file")

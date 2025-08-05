@@ -52,14 +52,15 @@ impl CanoeProvider for KailuaCanoeSteelProvider {
 
     async fn create_cert_validity_proof(&self, input: CanoeInput) -> anyhow::Result<Self::Receipt> {
         info!(
-            "Begin to generate a Canoe using l1 block number {}",
+            "Begin to generate a Canoe proof using l1 block number {}",
             input.l1_head_block_number
         );
 
-        let eth_rpc_url = Url::from_str(&self.eth_rpc_url)?;
+        let eth_rpc_url =
+            Url::from_str(&self.eth_rpc_url).context("Failed to parse Ethereum RPC URL")?;
 
         // Create an alloy provider for that private key and URL.
-        let l1_provider = ProviderBuilder::new().connect_http(eth_rpc_url); //.await?;
+        let l1_provider = ProviderBuilder::new().connect_http(eth_rpc_url);
 
         let chain_spec = match input.l1_chain_id {
             1 => ETH_MAINNET_CHAIN_SPEC.clone(),
@@ -76,6 +77,7 @@ impl CanoeProvider for KailuaCanoeSteelProvider {
             .await?;
 
         let verifier_address = cert_verifier_address(input.l1_chain_id, &input.altda_commitment);
+        info!("Using Cert Verifier address: {verifier_address}");
 
         // Preflight the call to prepare the input that is required to execute the function in
         // the guest without RPC access. It also returns the result of the call.
@@ -114,7 +116,7 @@ impl CanoeProvider for KailuaCanoeSteelProvider {
             &input.altda_commitment,
         ));
 
-        // todo: dynamic lookup of CANOE IMAGE ID corresponding to FPVM IMAGE ID
+        // todo: dynamic lookup of KAILUA_DA_HOKULEA_ID corresponding to KAILUA_FPVM_HOKULEA_ID
         let file_name = proof_file_name(KAILUA_DA_HOKULEA_ID, journal.clone());
 
         seek_proof(

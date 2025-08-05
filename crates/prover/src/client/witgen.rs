@@ -16,7 +16,6 @@ use alloy::consensus::Blob;
 use alloy::eips::eip4844::IndexedBlobHash;
 use alloy_primitives::{Address, B256};
 use async_trait::async_trait;
-use kailua_build::KAILUA_FPVM_KONA_ID;
 use kailua_kona::blobs::BlobWitnessData;
 use kailua_kona::boot::StitchedBootInfo;
 use kailua_kona::client::core::DASourceProvider;
@@ -93,7 +92,9 @@ where
     }
     let stitched_executions = vec![core::mem::take(executions.deref_mut())];
     // Construct witness
-    let fpvm_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(KAILUA_FPVM_KONA_ID));
+    let fpvm_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(
+        kailua_build::KAILUA_FPVM_KONA_ID,
+    ));
     let mut witness = Witness {
         oracle_witness: core::mem::take(oracle_witness.lock().unwrap().deref_mut()),
         stream_witness: core::mem::take(stream_witness.lock().unwrap().deref_mut()),
@@ -147,7 +148,7 @@ where
         },
     );
     // Run regular witgen client
-    let (boot, proof_journal, witness) = run_witgen_client(
+    let (boot, mut proof_journal, witness) = run_witgen_client(
         preimage_oracle,
         preimage_oracle_shard_size,
         blob_provider,
@@ -164,6 +165,13 @@ where
         validity.l1_head_block_hash = boot.l1_head;
         validity.l1_chain_id = boot.rollup_config.l1_chain_id;
     }
+    for (_, recency) in &mut eigen_witness.recency {
+        // todo remove this workaround once hokulea does
+        *recency = boot.rollup_config.seq_window_size + 100_000_000;
+    }
+    proof_journal.fpvm_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(
+        kailua_build::KAILUA_FPVM_HOKULEA_ID,
+    ));
     // Return extended result
     Ok((proof_journal, witness, eigen_witness))
 }

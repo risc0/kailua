@@ -21,7 +21,6 @@ use alloy_primitives::B256;
 use anyhow::{anyhow, Context};
 use async_channel::{Receiver, Sender};
 use human_bytes::human_bytes;
-use kailua_build::KAILUA_FPVM_KONA_ID;
 use kailua_kona::boot::StitchedBootInfo;
 use kailua_kona::client::stitching::{split_executions, stitch_boot_info};
 use kailua_kona::executor::{exec_precondition_hash, Execution};
@@ -529,17 +528,22 @@ pub async fn compute_cached_proof(
         chain_id: rollup_config.l2_chain_id,
         rollup_config,
     };
+    // Choose image id
+    let image_id = match args.proving.eigenda_proxy_address.is_some() {
+        true => kailua_build::KAILUA_FPVM_HOKULEA_ID,
+        false => kailua_build::KAILUA_FPVM_KONA_ID,
+    };
     // Construct expected journal
     let (boot, proof_journal) = stitch_boot_info(
         boot,
-        bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_KONA_ID).into(),
+        bytemuck::cast::<[u32; 8], [u8; 32]>(image_id).into(),
         args.proving.payout_recipient_address.unwrap_or_default(),
         precondition_hash,
         stitched_boot_info.clone(),
     );
     let skip_await_proof = args.proving.skip_await_proof;
     // Skip computation if previously saved to disk
-    let file_name = proof_file_name(KAILUA_FPVM_KONA_ID, &proof_journal);
+    let file_name = proof_file_name(image_id, &proof_journal);
     if Path::new(&file_name).try_exists().is_ok_and(identity) && seek_proof {
         info!("Proving skipped. Proof file {file_name} already exists.");
     } else {
