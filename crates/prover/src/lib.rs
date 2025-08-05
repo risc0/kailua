@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use kailua_common::executor::Execution;
+use kailua_kona::executor::Execution;
 
 pub mod args;
-pub mod backends;
+pub mod canoe;
 pub mod channel;
 pub mod client;
 pub mod config;
@@ -23,6 +23,7 @@ pub mod kv;
 pub mod preflight;
 pub mod proof;
 pub mod prove;
+pub mod risczero;
 pub mod tasks;
 
 #[derive(Debug, thiserror::Error)]

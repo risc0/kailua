@@ -34,7 +34,8 @@ alloy = { workspace = true, features = ["full", "kzg"] }
 alloy-primitives = { workspace = true, features = ["map-hashbrown"] }
 
 kailua-build.workspace = true
-kailua-common.workspace = true
+kailua-kona.workspace = true
+kailua-hokulea.workspace = true
 kailua-sync.workspace = true
 
 kona-derive.workspace = true
@@ -46,6 +47,12 @@ kona-proof.workspace = true
 kona-protocol.workspace = true
 kona-std-fpvm.workspace = true
 
+canoe-bindings.workspace = true
+canoe-provider.workspace = true
+hokulea-host-bin.workspace = true
+hokulea-proof.workspace = true
+hokulea-witgen.workspace = true
+
 bonsai-sdk.workspace = true
 boundless-market.workspace = true
 
@@ -53,6 +60,8 @@ opentelemetry.workspace = true
 
 risc0-ethereum-contracts.workspace = true
 risc0-zkvm.workspace = true
+
+risc0-steel.workspace = true
 
 [features]
 devnet = [

@@ -26,12 +26,12 @@ use alloy::providers::Provider;
 use anyhow::{anyhow, bail, Context};
 use futures::future::join_all;
 use itertools::Itertools;
-use kailua_common::blobs::hash_to_fe;
-use kailua_common::config::config_hash;
 use kailua_contracts::{
     IDisputeGameFactory::{gameAtIndexReturn, IDisputeGameFactoryInstance},
     *,
 };
+use kailua_kona::blobs::hash_to_fe;
+use kailua_kona::config::config_hash;
 use kona_genesis::RollupConfig;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::FutureExt;
@@ -114,12 +114,13 @@ impl SyncAgent {
         )?;
         #[cfg(not(feature = "devnet"))]
         {
-            let image_id: B256 =
-                bytemuck::cast::<[u32; 8], [u8; 32]>(kailua_build::KAILUA_FPVM_ID).into();
-            if deployment.image_id != image_id {
+            let kona_image_id: B256 =
+                bytemuck::cast::<[u32; 8], [u8; 32]>(kailua_build::KAILUA_FPVM_KONA_ID).into();
+            let hokulea_image_id: B256 =
+                bytemuck::cast::<[u32; 8], [u8; 32]>(kailua_build::KAILUA_FPVM_HOKULEA_ID).into();
+            if deployment.image_id != kona_image_id && deployment.image_id != hokulea_image_id {
                 bail!(
-                    "Deployment image ID mismatch. Expected {:?}, got {:?}.",
-                    image_id,
+                    "Deployment image ID mismatch. Expected {kona_image_id} or {hokulea_image_id}, got {:?}.",
                     deployment.image_id
                 );
             }

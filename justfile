@@ -8,24 +8,26 @@ build +ARGS="--release -F prove -F disable-dev-mode --locked":
   cargo build {{ARGS}}
 
 build-fpvm +ARGS="--release -F prove -F disable-dev-mode -F rebuild-fpvm --locked":
-  cargo build {{ARGS}}
+  RISC0_USE_DOCKER=1 cargo build {{ARGS}}
 
 fmt:
   cargo fmt --all
 
-  cargo fmt --all --manifest-path build/risczero/fpvm/Cargo.toml
+  cargo fmt --all --manifest-path build/risczero/kona/Cargo.toml
+  cargo fmt --all --manifest-path build/risczero/hokulea/Cargo.toml
 
 clippy:
   RISC0_SKIP_BUILD=true cargo clippy -F devnet --locked --workspace --all --all-targets -- -D warnings
   RISC0_SKIP_BUILD=true cargo clippy --locked --workspace --all --all-targets -- -D warnings
 
-  cargo clippy --manifest-path build/risczero/fpvm/Cargo.toml --locked --workspace --all --all-targets -- -D warnings
+  cargo clippy --manifest-path build/risczero/kona/Cargo.toml --locked --workspace --all --all-targets -- -D warnings
+  CANOE_IMAGE_ID=0x cargo clippy --manifest-path build/risczero/hokulea/Cargo.toml --locked --workspace --all --all-targets -- -D warnings
 
 coverage:
-  cargo +nightly llvm-cov -p kailua-common --branch
+  cargo +nightly llvm-cov -p kailua-kona --branch
 
 coverage-open:
-  cargo +nightly llvm-cov -p kailua-common --branch --open
+  cargo +nightly llvm-cov -p kailua-kona --branch --open
 
 devnet-fetch:
   git clone --depth 1 --branch v1.9.1 --recursive https://github.com/ethereum-optimism/optimism.git
@@ -140,6 +142,9 @@ bench l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data start length range count 
           --bench-count {{count}} \
           {{verbosity}}
 
+export-fpvm target="release" data="./" verbosity="":
+  ./target/{{target}}/kailua-cli export {{verbosity}} --data-dir {{data}}
+
 # Run the client program natively with the host program attached.
 prove block_number block_count l1_rpc l1_beacon_rpc l2_rpc rollup_node_rpc data target="release" seq_window="50" verbosity="":
   #!/usr/bin/env bash
@@ -228,8 +233,9 @@ test verbosity="":
 test-offline target="release" verbosity="": (prove-offline "16491249" "0x33a3e5721faa4dc6f25e75000d9810fd6c41320868f3befcc0c261a71da398e1" "0x09b298a83baf4c2e3c6a2e355bb09e27e3fdca435080e8754f8749233d7333b2" "0x82da7204148ba4d8d59e587b6b3fdde5561dc31d9e726220f7974bf9f2158d75" "0xa548f22e1aa590de7ed271e3eab5b66c6c3db9b8cb0e3f91618516ea9ececde4" "11155420" "./testdata/16491249" target verbosity)
 
 cleanup:
-    echo "Cleanup: Removing any .fake receipt files in directory."
     rm ./*.fake
+
+    rm ./*.req
 
 grep-proving-log log:
     grep -v -e kona_protocol -e R0VM -e block_builder -e batch_validator -e attributes_queue -e client_derivation_driver -e single_hint_handler -e kailua_common -e complete, -e client_blob_oracle -e agent -e channel_assembler -e kailua_sync {{log}}

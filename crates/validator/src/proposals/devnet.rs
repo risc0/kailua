@@ -12,15 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use risc0_zkvm::{is_dev_mode, Digest, InnerReceipt, MaybePruned, Receipt};
+use risc0_zkvm::{Digest, InnerReceipt, MaybePruned, Receipt};
 use tracing::warn;
 
+#[allow(deprecated)]
 pub fn maybe_patch_proof(
     mut receipt: Receipt,
     expected_fpvm_image_id: [u8; 32],
 ) -> anyhow::Result<Receipt> {
     // Return the proof if we can't patch it
-    if !is_dev_mode() {
+    if !risc0_zkvm::is_dev_mode() {
         return Ok(receipt);
     }
 

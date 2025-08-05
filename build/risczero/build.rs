@@ -1,4 +1,4 @@
-// Copyright 2024 RISC Zero, Inc.
+// Copyright 2024, 2025 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,18 +13,30 @@
 // limitations under the License.
 
 fn main() {
-    if cfg!(feature = "rebuild-fpvm") {
-        let build_opts = {
-            #[cfg(not(any(feature = "debug-guest-build", debug_assertions)))]
-            let root_dir = {
-                let cwd = std::env::current_dir().unwrap();
-                cwd.parent()
-                    .unwrap()
-                    .parent()
-                    .map(|d| d.to_path_buf())
-                    .unwrap()
-            };
-            std::collections::HashMap::from([("kailua-fpvm", {
+    #[cfg(feature = "rebuild-fpvm")]
+    {
+        risc0_build::embed_methods_with_options({
+            let guest_options = {
+                #[cfg(feature = "rebuild-da")]
+                let canoe_image_id = std::env::var("CANOE_IMAGE_ID").unwrap_or_else(|_| {
+                    // Warn about unstable build
+                    if std::env::var("RISC0_USE_DOCKER").is_err() {
+                        println!("cargo:warning=Building without RISC0_USE_DOCKER=1 will yield an irreproducible build for kailua-fpvm-hokulea.");
+                    }
+                    let canoe_image_id = alloy_primitives::B256::from(bytemuck::cast::<_, [u8; 32]>(
+                        canoe_steel_methods::CERT_VERIFICATION_ID,
+                    ))
+                        .to_string();
+                    canoe_image_id
+                });
+                #[cfg(not(feature = "rebuild-da"))]
+                let canoe_image_id = std::env::var("CANOE_IMAGE_ID").unwrap_or(String::from(
+                    "e6ae1f0ee0fee9e253db02250fad8c0c8dc65141a0042a879fbacbdae50ea2cb",
+                ));
+
+                println!("cargo:rustc-env=CANOE_IMAGE_ID={canoe_image_id}");
+                std::env::set_var("CANOE_IMAGE_ID", &canoe_image_id);
+                // Start with default build options
                 let opts = risc0_build::GuestOptions::default();
                 // Build a reproducible ELF file using docker under the release profile
                 #[cfg(not(any(feature = "debug-guest-build", debug_assertions)))]
@@ -33,7 +45,18 @@ fn main() {
                     opts.use_docker = Some(
                         risc0_build::DockerOptionsBuilder::default()
                             .docker_container_tag("r0.1.88.0")
-                            .root_dir(root_dir)
+                            .root_dir({
+                                let cwd = std::env::current_dir().unwrap();
+                                cwd.parent()
+                                    .unwrap()
+                                    .parent()
+                                    .map(|d| d.to_path_buf())
+                                    .unwrap()
+                            })
+                            .env(vec![(
+                                String::from("CANOE_IMAGE_ID"),
+                                canoe_image_id.to_string(),
+                            )])
                             .build()
                             .unwrap(),
                     );
@@ -50,12 +73,15 @@ fn main() {
                     opts
                 };
                 opts
-            })])
-        };
-
-        risc0_build::embed_methods_with_options(build_opts);
+            };
+            std::collections::HashMap::from([
+                ("kailua-fpvm-kona", guest_options.clone()),
+                ("kailua-fpvm-hokulea", guest_options.clone()),
+            ])
+        });
     }
 
     println!("cargo:rerun-if-changed=src");
-    println!("cargo:rerun-if-changed=fpvm/src");
+    println!("cargo:rerun-if-changed=kona/src");
+    println!("cargo:rerun-if-changed=hokulea/src");
 }

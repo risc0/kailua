@@ -17,9 +17,9 @@ use alloy::primitives::{Address, Bytes, B256, U256};
 use alloy::providers::{Provider, RootProvider};
 use alloy::sol_types::SolValue;
 use anyhow::{anyhow, bail, Context};
-use kailua_build::KAILUA_FPVM_ID;
-use kailua_common::config::config_hash;
+use kailua_build::KAILUA_FPVM_KONA_ID;
 use kailua_contracts::*;
+use kailua_kona::config::config_hash;
 use kailua_sync::provider::optimism::fetch_rollup_config;
 use kailua_sync::provider::optimism::OpNodeProvider;
 use kailua_sync::stall::Stall;
@@ -216,7 +216,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     let receipt = KailuaTreasury::deploy_builder(
         &deployer_provider,
         verifier_contract_address,
-        bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_ID).into(),
+        bytemuck::cast::<[u32; 8], [u8; 32]>(KAILUA_FPVM_KONA_ID).into(),
         rollup_config_hash.into(),
         args.proposal_output_count,
         args.output_block_span,
@@ -455,6 +455,7 @@ pub async fn fast_track(args: FastTrackArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[allow(deprecated)]
 pub async fn deploy_verifier<P1: Provider<N>, P2: Provider<N>, N: Network>(
     deployer_provider: P1,
     owner_provider: P2,

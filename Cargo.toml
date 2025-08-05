@@ -1,5 +1,5 @@
 [workspace.package]
-version = "1.0.2"
+version = "1.1.0"
 edition = "2021"
 license = "Apache-2.0"
 rust-version = "1.86"
@@ -76,7 +76,8 @@ op-alloy-rpc-types-engine = { version = "0.17.2", default-features = false, feat
 
 # Kailua
 kailua-build = { path = "build/risczero" }
-kailua-common = { path = "crates/common" }
+kailua-kona = { path = "crates/kona" }
+kailua-hokulea = { path = "crates/hokulea" }
 kailua-contracts = { path = "crates/contracts" }
 kailua-proposer = { path = "crates/proposer" }
 kailua-prover = { path = "crates/prover" }
@@ -98,21 +99,34 @@ kona-protocol = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0
 kona-registry = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
 kona-std-fpvm = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
 
+# Hokulea git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc"
+canoe-bindings = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc" }
+canoe-provider = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc" }
+canoe-steel-methods = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc" }
+eigenda-cert = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc" }
+hokulea-host-bin = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc", default-features = false }
+hokulea-eigenda = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc", default-features = false }
+hokulea-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc", default-features = false }
+hokulea-witgen = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc", default-features = false }
+
+
 # Bonsai
 bonsai-sdk = { version = "1.4.0", features = ["non_blocking"] }
 
 # RISC Zero
-risc0-build = { version = "2.2.0", features = ["unstable"] }
+risc0-build = { version = "2.3.1", features = ["unstable"] }
 risc0-circuit-recursion = "3.0.0"
 risc0-ethereum-contracts = "2.2.2"
-risc0-zkvm = { version = "2.2.0", features = ["heap-embedded-alloc", "unstable"] }
+risc0-zkvm = { version = "2.3.1", features = ["heap-embedded-alloc", "unstable"] }
 
 # Boundless
 boundless-market = "0.12.1"
 
+# STEEL
+risc0-steel = { git = "https://github.com/risc0/risc0-ethereum.git", tag = "v2.2.2", features = ["host"] }
+
 [profile.dev]
 opt-level = 3
-
 
 [profile.release]
 codegen-units = 1

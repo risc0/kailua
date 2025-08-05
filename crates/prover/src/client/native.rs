@@ -17,19 +17,16 @@ use crate::kv::{create_disk_kv_store, create_split_kv_store, RWLKeyValueStore};
 use crate::ProvingError;
 use alloy_primitives::B256;
 use anyhow::anyhow;
-use kailua_common::boot::StitchedBootInfo;
-use kailua_common::executor::Execution;
-use kailua_sync::retry_res_ctx_timeout;
-use kona_host::single::{SingleChainHintHandler, SingleChainHost};
+use kailua_kona::boot::StitchedBootInfo;
+use kailua_kona::executor::Execution;
 use kona_host::{
-    OfflineHostBackend, OnlineHostBackend, PreimageServer, PreimageServerError, SharedKeyValueStore,
+    HintHandler, OfflineHostBackend, OnlineHostBackend, OnlineHostBackendCfg, PreimageServer,
+    PreimageServerError, SharedKeyValueStore,
 };
 use kona_preimage::{
     BidirectionalChannel, Channel, HintReader, HintWriter, OracleReader, OracleServer,
 };
 use kona_proof::HintType;
-use opentelemetry::trace::TraceContextExt;
-use opentelemetry::trace::Tracer;
 use risc0_zkvm::Receipt;
 use std::sync::Arc;
 use tokio::task;
@@ -68,11 +65,53 @@ pub async fn run_native_client(
     };
     let kv_store = create_split_kv_store(&args.kona, disk_kv_store)
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
-    let server_task = start_server(&args.kona, kv_store, hint.host, preimage.host)
+
+    let use_hokulea = args.proving.eigenda_proxy_address.is_some();
+    let server_task = match use_hokulea {
+        false => start_server(
+            args.kona.clone(),
+            kv_store,
+            hint.host,
+            preimage.host,
+            kona_host::single::SingleChainHintHandler,
+            args.kona
+                .create_providers()
+                .await
+                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
+            args.kona.is_offline(),
+            HintType::L2PayloadWitness,
+        )
         .await
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
+        true => {
+            let cfg = hokulea_host_bin::cfg::SingleChainHostWithEigenDA {
+                kona_cfg: args.kona.clone(),
+                eigenda_proxy_address: args.proving.eigenda_proxy_address.clone(),
+                verbose: 0,
+            };
+            let providers = cfg
+                .create_providers()
+                .await
+                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+            let is_offline = cfg.is_offline();
+            start_server(
+                cfg,
+                kv_store,
+                hint.host,
+                preimage.host,
+                hokulea_host_bin::handler::SingleChainHintHandlerWithEigenDA,
+                providers,
+                is_offline,
+                hokulea_proof::hint::ExtendedHintType::Original(HintType::L2PayloadWitness),
+            )
+            .await
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
+        }
+    };
+
     // Start the client program in a separate thread
     let client_task = tokio::spawn(crate::client::proving::run_proving_client(
+        use_hokulea.then_some(args.kona.l1_node_address).flatten(),
         args.proving,
         args.boundless,
         OracleReader::new(preimage.client),
@@ -94,16 +133,25 @@ pub async fn run_native_client(
     client_result
 }
 
-pub async fn start_server<C>(
-    kona: &SingleChainHost,
+#[allow(clippy::too_many_arguments)]
+pub async fn start_server<
+    C,
+    B: OnlineHostBackendCfg + Send + Sync + 'static,
+    H: HintHandler<Cfg = B> + Send + Sync + 'static,
+>(
+    backend: B,
     kv_store: SharedKeyValueStore,
     hint: C,
     preimage: C,
+    handler: H,
+    providers: B::Providers,
+    is_offline: bool,
+    proactive_hint: B::HintType,
 ) -> anyhow::Result<JoinHandle<Result<(), PreimageServerError>>>
 where
     C: Channel + Send + Sync + 'static,
 {
-    let task_handle = if kona.is_offline() {
+    let task_handle = if is_offline {
         task::spawn(
             PreimageServer::new(
                 OracleServer::new(preimage),
@@ -113,14 +161,8 @@ where
             .start(),
         )
     } else {
-        let providers = retry_res_ctx_timeout!(20, kona.create_providers().await).await;
-        let backend = OnlineHostBackend::new(
-            kona.clone(),
-            kv_store.clone(),
-            providers,
-            SingleChainHintHandler,
-        )
-        .with_proactive_hint(HintType::L2PayloadWitness);
+        let backend = OnlineHostBackend::new(backend, kv_store.clone(), providers, handler)
+            .with_proactive_hint(proactive_hint);
 
         task::spawn(
             PreimageServer::new(

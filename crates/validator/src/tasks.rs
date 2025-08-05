@@ -22,7 +22,6 @@ use kailua_prover::prove::prove;
 use kailua_sync::await_tel_res;
 use opentelemetry::global::tracer;
 use opentelemetry::trace::{FutureExt as TeleFutureExt, TraceContextExt, Tracer};
-use risc0_zkvm::is_dev_mode;
 use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -38,6 +37,7 @@ pub struct Task {
     pub proof_file_name: String,
 }
 
+#[allow(deprecated)]
 pub async fn handle_proving_tasks(
     kailua_cli: Option<PathBuf>,
     task_channel: AsyncChannel<Task>,
@@ -65,7 +65,7 @@ pub async fn handle_proving_tasks(
             // Prove (note: dev-mode/bonsai env vars are inherited!)
             let mut kailua_cli_command = Command::new(kailua_cli);
             // get fake receipts when building under devnet
-            if is_dev_mode() {
+            if risc0_zkvm::is_dev_mode() {
                 kailua_cli_command.env("RISC0_DEV_MODE", "1");
             }
             // pass arguments to point at target block
