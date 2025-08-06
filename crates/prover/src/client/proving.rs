@@ -67,8 +67,6 @@ where
         oracle_client,
         hint_client,
     ));
-    // todo: run hok witgen if hokking
-
     // Instantiate oracles
     let blob_provider = OracleBlobProvider::new(preimage_oracle.clone());
     // Run witness generation with oracles

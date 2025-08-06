@@ -44,10 +44,6 @@ pub fn da_witness_postcondition(
     if let Some((l1_head, l1_chain_id, recency)) = precondition {
         assert_eq!(l1_head, boot_info.l1_head);
         assert_eq!(l1_chain_id, boot_info.rollup_config.l1_chain_id);
-        // ToDo (bx) fix the hack at eigenda-proxy. For now + 100_000_000 to avoid recency failure
-        assert_eq!(
-            recency,
-            boot_info.rollup_config.seq_window_size + 100_000_000
-        )
+        assert_eq!(recency, boot_info.rollup_config.seq_window_size);
     }
 }

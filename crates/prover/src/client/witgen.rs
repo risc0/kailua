@@ -166,8 +166,7 @@ where
         validity.l1_chain_id = boot.rollup_config.l1_chain_id;
     }
     for (_, recency) in &mut eigen_witness.recency {
-        // todo remove this workaround once hokulea does
-        *recency = boot.rollup_config.seq_window_size + 100_000_000;
+        *recency = boot.rollup_config.seq_window_size;
     }
     proof_journal.fpvm_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(
         kailua_build::KAILUA_FPVM_HOKULEA_ID,
