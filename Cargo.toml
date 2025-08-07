@@ -109,6 +109,13 @@ hokulea-eigenda = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f4
 hokulea-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc", default-features = false }
 hokulea-witgen = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc", default-features = false }
 
+# Hana git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17"
+hana-client = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
+hana-celestia = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
+hana-proofs = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
+hana-blobstream = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
+hana-oracle = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
+
 
 # Bonsai
 bonsai-sdk = { version = "1.4.0", features = ["non_blocking"] }

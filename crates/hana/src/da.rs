@@ -12,27 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use hokulea_eigenda::{EigenDABlobProvider, EigenDABlobSource, EigenDADataSource};
+use hana_celestia::{CelestiaDADataSource, CelestiaDASource, CelestiaProvider};
 use kailua_kona::client::core::{DASourceProvider, EthereumDataSourceProvider};
 use kona_derive::prelude::{BlobProvider, ChainProvider};
 use kona_genesis::RollupConfig;
 use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
-pub struct EigenDADataSourceProvider<E: EigenDABlobProvider + Send + Sync + Clone + Debug>(pub E);
+pub struct CelestiaDataSourceProvider<A: CelestiaProvider + Send + Clone>(pub A);
 
 impl<
         C: ChainProvider + Send + Sync + Clone + Debug,
         B: BlobProvider + Send + Sync + Clone + Debug,
-        E: EigenDABlobProvider + Send + Sync + Clone + Debug,
-    > DASourceProvider<C, B> for EigenDADataSourceProvider<E>
+        A: CelestiaProvider + Send + Sync + Clone + Debug,
+    > DASourceProvider<C, B> for CelestiaDataSourceProvider<A>
 {
-    type DAS = EigenDADataSource<C, B, E>;
+    type DAS = CelestiaDADataSource<C, B, A>;
 
     fn new_from_parts(self, l1_provider: C, blobs: B, cfg: &RollupConfig) -> Self::DAS {
-        EigenDADataSource::new(
+        CelestiaDADataSource::new(
             EthereumDataSourceProvider.new_from_parts(l1_provider, blobs, cfg),
-            EigenDABlobSource::new(self.0),
+            CelestiaDASource::new(self.0),
         )
     }
 }
