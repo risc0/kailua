@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use kailua_build::{KAILUA_DA_HOKULEA_ELF, KAILUA_FPVM_HOKULEA_ELF, KAILUA_FPVM_KONA_ELF};
+use kailua_build::{
+    KAILUA_DA_HOKULEA_ELF, KAILUA_FPVM_HANA_ELF, KAILUA_FPVM_HOKULEA_ELF, KAILUA_FPVM_KONA_ELF,
+};
 use std::path::PathBuf;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
@@ -23,6 +25,7 @@ pub async fn export(data_dir: PathBuf) -> anyhow::Result<()> {
         (KAILUA_FPVM_KONA_ELF, "kailua-fpvm-kona.bin"),
         (KAILUA_FPVM_HOKULEA_ELF, "kailua-fpvm-hokulea.bin"),
         (KAILUA_DA_HOKULEA_ELF, "kailua-da-hokulea.bin"),
+        (KAILUA_FPVM_HANA_ELF, "kailua-fpvm-hana.bin"),
     ];
 
     for (elf, file_name) in programs {

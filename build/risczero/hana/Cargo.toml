@@ -1,0 +1,48 @@
+[package]
+name = "kailua-fpvm-hana"
+version = "1.1.0"
+edition = "2021"
+license = "Apache-2.0"
+rust-version = "1.86"
+authors = ["hashcashier"]
+homepage = "https://risc0.github.io/kailua/"
+repository = "https://github.com/risc0/kailua"
+keywords = ["zkvm", "ethereum", "optimism", "fault", "proof"]
+categories = ["cryptography", "cryptography::cryptocurrencies"]
+
+[workspace]
+
+[profile.release]
+codegen-units = 1
+debug = 1
+lto = "fat"
+
+[profile.release.build-override]
+codegen-units = 1
+opt-level = 3
+
+[dependencies]
+blst = { version = "=0.3.15", features = ["no-threads"] }
+c-kzg = { version = "2.1.1", features = ["eip-7594"] }
+rkyv = "0.8.9"
+substrate-bn = "=0.6.0"
+
+kailua-hana = { path = "../../../crates/hana" }
+kailua-kona = { path = "../../../crates/kona" }
+
+risc0-zkvm = { version = "2.3.1", features = ["std", "heap-embedded-alloc", "unstable"] }
+
+[features]
+disable-dev-mode = [
+    "risc0-zkvm/disable-dev-mode"
+]
+
+[patch.crates-io]
+blst = { git = "https://github.com/risc0/blst", tag = "v0.3.15-risczero.1"}
+#c-kzg = { git = "https://github.com/risc0/c-kzg-4844.git", tag = "c-kzg/v2.1.1-risczero.1" }
+c-kzg = { git = "https://github.com/hashcashier/c-kzg-risczero", branch = "p2.1.1" }
+crypto-bigint = { git = "https://github.com/risc0/RustCrypto-crypto-bigint", tag = "v0.5.5-risczero.0" }
+k256 = { git = "https://github.com/risc0/RustCrypto-elliptic-curves", tag = "k256/v0.13.4-risczero.1" }
+sha2 = { git = "https://github.com/risc0/RustCrypto-hashes", tag = "sha2-v0.10.8-risczero.0" }
+substrate-bn = { git = "https://github.com/risc0/paritytech-bn", branch = "release/v0.6.0" }
+tiny-keccak = { git = "https://github.com/risc0/tiny-keccak", tag = "tiny-keccak/v2.0.2-risczero.0" }
