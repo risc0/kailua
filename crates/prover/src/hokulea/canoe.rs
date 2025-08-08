@@ -23,7 +23,6 @@ use canoe_bindings::StatusCode;
 use canoe_provider::{CanoeInput, CanoeProvider, CertVerifierCall};
 use hokulea_proof::canoe_verifier::{cert_verifier_address, to_journal_bytes};
 use hokulea_proof::cert_validity::CertValidity;
-use kailua_build::{KAILUA_DA_HOKULEA_ELF, KAILUA_DA_HOKULEA_ID};
 use risc0_steel::alloy::providers::ProviderBuilder;
 use risc0_steel::ethereum::{
     EthChainSpec, EthEvmEnv, ETH_HOLESKY_CHAIN_SPEC, ETH_MAINNET_CHAIN_SPEC, ETH_SEPOLIA_CHAIN_SPEC,
@@ -117,12 +116,11 @@ impl CanoeProvider for KailuaCanoeSteelProvider {
         ));
 
         // todo: dynamic lookup of KAILUA_DA_HOKULEA_ID corresponding to KAILUA_FPVM_HOKULEA_ID
-        let file_name = proof_file_name(KAILUA_DA_HOKULEA_ID, journal.clone());
+        let file_name = proof_file_name(kailua_build::KAILUA_DA_HOKULEA_ID, journal.clone());
 
         seek_proof(
             &self.proving_args,
             self.boundless_args.clone(),
-            (KAILUA_DA_HOKULEA_ID, KAILUA_DA_HOKULEA_ELF),
             journal,
             vec![
                 to_vec(&evm_input)?,

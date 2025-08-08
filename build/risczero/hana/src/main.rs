@@ -18,8 +18,18 @@ use kailua_kona::oracle::vec::VecOracle;
 use kailua_kona::{client::log, witness::Witness};
 use risc0_zkvm::guest::env;
 use rkyv::rancor::Error;
+use std::sync::Arc;
 
 fn main() {
+    // Load Celestia DA witness
+    let celestia_da = {
+        // Read serialized witness data
+        let witness_data = env::read_frame();
+        log("DESERIALIZE CELESTIA");
+        rkyv::from_bytes::<VecOracle, Error>(&witness_data)
+            .expect("Failed to deserialize celestia witness")
+    };
+
     // Load main witness
     let witness = {
         // Read serialized witness data
@@ -48,7 +58,7 @@ fn main() {
     }
 
     // Run client using witness data
-    let proof_journal = run_stateless_client(witness, HanaStitchingClient);
+    let proof_journal = run_stateless_client(witness, HanaStitchingClient(Arc::new(celestia_da)));
 
     // Prevent provability of insufficient data
     assert!(

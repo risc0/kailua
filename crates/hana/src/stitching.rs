@@ -25,13 +25,14 @@ use kona_proof::{BootInfo, FlushableCache};
 use std::fmt::Debug;
 use std::sync::Arc;
 
-#[derive(Clone, Copy, Debug)]
-pub struct HanaStitchingClient;
+#[derive(Clone, Debug)]
+pub struct HanaStitchingClient<T: CommsClient + Clone>(pub Arc<T>);
 
 impl<
         O: CommsClient + FlushableCache + Send + Sync + Debug,
         B: BlobProvider + Send + Sync + Debug + Clone,
-    > StitchingClient<O, B> for HanaStitchingClient
+        T: CommsClient + Send + Sync + Debug + Clone,
+    > StitchingClient<O, B> for HanaStitchingClient<T>
 {
     fn run_stitching_client(
         self,
@@ -47,9 +48,10 @@ impl<
     where
         <B as BlobProvider>::Error: Debug,
     {
-        let celestia_provider = OracleCelestiaProvider::new(oracle.clone());
-
-        KonaStitchingClient(CelestiaDataSourceProvider(celestia_provider)).run_stitching_client(
+        KonaStitchingClient(CelestiaDataSourceProvider(OracleCelestiaProvider::new(
+            self.0,
+        )))
+        .run_stitching_client(
             precondition_validation_data_hash,
             oracle,
             stream,

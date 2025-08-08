@@ -73,11 +73,13 @@ alloy-trie = { version = "0.8.1", default-features = false, features = ["std", "
 # OP Alloy
 op-alloy-consensus = { version = "0.17.2", default-features = false, features = ["serde"] }
 op-alloy-rpc-types-engine = { version = "0.17.2", default-features = false, features = ["serde"] }
+op-alloy-network = { version = "0.17.2", default-features = false, features = ["serde"] }
 
 # Kailua
 kailua-build = { path = "build/risczero" }
 kailua-kona = { path = "crates/kona" }
 kailua-hokulea = { path = "crates/hokulea" }
+kailua-hana = { path = "crates/hana" }
 kailua-contracts = { path = "crates/contracts" }
 kailua-proposer = { path = "crates/proposer" }
 kailua-prover = { path = "crates/prover" }
@@ -96,6 +98,7 @@ kona-mpt = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2", 
 kona-preimage = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2", features = ["serde", "rkyv", "std"] }
 kona-proof = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
 kona-protocol = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
+kona-providers-alloy = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
 kona-registry = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
 kona-std-fpvm = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
 
@@ -110,11 +113,14 @@ hokulea-proof = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498
 hokulea-witgen = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f498a942f53f2d5218e26125aed7980f9cc", default-features = false }
 
 # Hana git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17"
+celestia-rpc = "0.11.3"
+celestia-types = "0.13.0"
+hana-blobstream = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
 hana-client = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
 hana-celestia = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
-hana-proofs = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
-hana-blobstream = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
+hana-host = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
 hana-oracle = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
+hana-proofs = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
 
 
 # Bonsai

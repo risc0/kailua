@@ -25,6 +25,7 @@ fn main() {
     // Load EigenDA blob witness
     let eigen_da: hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData = {
         let data = env::read_frame();
+        log("DESERIALIZE EIGENDA");
         bincode::deserialize(&data).expect("EigenDABlobWitnessData deserialization failed")
     };
 
