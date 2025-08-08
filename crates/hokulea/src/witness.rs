@@ -13,10 +13,10 @@
 // limitations under the License.
 
 use alloy_primitives::B256;
+use hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData;
+use kona_proof::BootInfo;
 
-pub fn da_witness_precondition(
-    eigen_da: &hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData,
-) -> Option<(B256, u64, u64)> {
+pub fn da_witness_precondition(eigen_da: &EigenDABlobWitnessData) -> Option<(B256, u64, u64)> {
     // Enforce sufficient data requirements
     assert!(eigen_da.recency.len() >= eigen_da.validity.len());
     assert!(eigen_da.validity.len() >= eigen_da.blob.len());
@@ -37,17 +37,10 @@ pub fn da_witness_precondition(
     Some((l1_head, l1_chain_id, recency))
 }
 
-pub fn da_witness_postcondition(
-    precondition: Option<(B256, u64, u64)>,
-    boot_info: &kona_proof::BootInfo,
-) {
+pub fn da_witness_postcondition(precondition: Option<(B256, u64, u64)>, boot_info: &BootInfo) {
     if let Some((l1_head, l1_chain_id, recency)) = precondition {
         assert_eq!(l1_head, boot_info.l1_head);
         assert_eq!(l1_chain_id, boot_info.rollup_config.l1_chain_id);
-        // ToDo (bx) fix the hack at eigenda-proxy. For now + 100_000_000 to avoid recency failure
-        assert_eq!(
-            recency,
-            boot_info.rollup_config.seq_window_size + 100_000_000
-        )
+        assert_eq!(recency, boot_info.rollup_config.seq_window_size);
     }
 }

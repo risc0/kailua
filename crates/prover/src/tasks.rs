@@ -529,10 +529,7 @@ pub async fn compute_cached_proof(
         rollup_config,
     };
     // Choose image id
-    let image_id = match args.proving.eigenda_proxy_address.is_some() {
-        true => kailua_build::KAILUA_FPVM_HOKULEA_ID,
-        false => kailua_build::KAILUA_FPVM_KONA_ID,
-    };
+    let image_id = args.proving.image_id();
     // Construct expected journal
     let (boot, proof_journal) = stitch_boot_info(
         boot,

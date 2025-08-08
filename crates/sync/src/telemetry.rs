@@ -26,6 +26,15 @@ pub struct TelemetryArgs {
     pub otlp_collector: Option<String>,
 }
 
+impl TelemetryArgs {
+    pub fn to_arg_vec(&self) -> Vec<String> {
+        self.otlp_collector
+            .as_ref()
+            .map(|v| vec![String::from("--otlp-collector"), v.to_string()])
+            .unwrap_or_default()
+    }
+}
+
 pub fn init_tracer_provider(args: &TelemetryArgs) -> anyhow::Result<()> {
     if let Some(otlp_collector) = &args.otlp_collector {
         println!("OTLP Collector endpoint: {otlp_collector}");

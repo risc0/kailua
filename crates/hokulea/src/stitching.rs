@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::canoe::KailuaCanoeVerifier;
 use crate::da::EigenDADataSourceProvider;
+use crate::witness::{da_witness_postcondition, da_witness_precondition};
 use alloy_primitives::aliases::B256;
 use alloy_primitives::Address;
+use hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData;
+use hokulea_proof::preloaded_eigenda_provider::PreloadedEigenDABlobProvider;
 use kailua_kona::boot::StitchedBootInfo;
 use kailua_kona::client::stitching::{KonaStitchingClient, StitchingClient};
 use kailua_kona::executor::Execution;
@@ -28,15 +32,12 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub struct HokuleaStitchingClient {
-    pub eigen_da_witness: hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData,
+    pub eigen_da_witness: EigenDABlobWitnessData,
     pub canoe_image_id: B256,
 }
 
 impl HokuleaStitchingClient {
-    pub fn new(
-        eigen_da_witness: hokulea_proof::eigenda_blob_witness::EigenDABlobWitnessData,
-        canoe_image_id: B256,
-    ) -> Self {
+    pub fn new(eigen_da_witness: EigenDABlobWitnessData, canoe_image_id: B256) -> Self {
         Self {
             eigen_da_witness,
             canoe_image_id,
@@ -63,13 +64,12 @@ impl<
     where
         <B as BlobProvider>::Error: Debug,
     {
-        let eigen_da_precondition = crate::witness::da_witness_precondition(&self.eigen_da_witness);
+        let eigen_da_precondition = da_witness_precondition(&self.eigen_da_witness);
 
-        let eigen_da =
-            hokulea_proof::preloaded_eigenda_provider::PreloadedEigenDABlobProvider::from_witness(
-                self.eigen_da_witness,
-                crate::canoe::KailuaCanoeVerifier(self.canoe_image_id.0),
-            );
+        let eigen_da = PreloadedEigenDABlobProvider::from_witness(
+            self.eigen_da_witness,
+            KailuaCanoeVerifier(self.canoe_image_id.0),
+        );
 
         let (boot, proof_journal) = KonaStitchingClient(EigenDADataSourceProvider(eigen_da))
             .run_stitching_client(
@@ -83,7 +83,7 @@ impl<
                 stitched_boot_info,
             );
 
-        crate::witness::da_witness_postcondition(eigen_da_precondition, &boot);
+        da_witness_postcondition(eigen_da_precondition, &boot);
 
         (boot, proof_journal)
     }
