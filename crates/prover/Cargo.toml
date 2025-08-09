@@ -30,7 +30,7 @@ tracing.workspace = true
 tokio.workspace = true
 tokio-retry.workspace = true
 
-alloy = { workspace = true, features = ["full", "kzg"] }
+alloy = { workspace = true, features = ["full", "kzg", "contract", "rlp", "sol-types"] }
 alloy-primitives = { workspace = true, features = ["map-hashbrown"] }
 
 op-alloy-network.workspace = true
@@ -59,6 +59,7 @@ hokulea-witgen.workspace = true
 
 celestia-rpc.workspace = true
 celestia-types.workspace = true
+hana-blobstream.workspace = true
 hana-host.workspace = true
 hana-oracle.workspace = true
 

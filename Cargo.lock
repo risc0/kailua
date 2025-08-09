@@ -6053,6 +6053,7 @@ dependencies = [
  "celestia-rpc",
  "celestia-types",
  "clap",
+ "hana-blobstream",
  "hana-host",
  "hana-oracle",
  "hex",

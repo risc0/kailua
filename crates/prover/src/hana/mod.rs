@@ -13,5 +13,6 @@
 // limitations under the License.
 
 pub mod args;
+pub mod handler;
 pub mod providers;
 pub mod witgen;

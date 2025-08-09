@@ -25,6 +25,7 @@ use alloy_primitives::B256;
 use anyhow::{anyhow, bail, Context};
 use human_bytes::human_bytes;
 use kailua_kona::boot::StitchedBootInfo;
+use kailua_kona::client::core::L1_HEAD_INSUFFICIENT;
 use kailua_sync::provider::optimism::OpNodeProvider;
 use kailua_sync::{await_tel, retry_res_ctx_timeout};
 use opentelemetry::global::tracer;
@@ -251,10 +252,7 @@ pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
                         warn!("Splitting proof after ZKVM execution error: {e:?}")
                     }
                     ProvingError::OtherError(e) => {
-                        if e.root_cause()
-                            .to_string()
-                            .contains("Expected zero claim hash")
-                        {
+                        if e.root_cause().to_string().contains(L1_HEAD_INSUFFICIENT) {
                             // we use this special exit code to signal an insufficient l1 head
                             error!("Insufficient L1 head.");
                             // todo: revisit

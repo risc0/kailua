@@ -124,7 +124,7 @@ pub async fn run_native_client(
                     .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
                 hint.host,
                 preimage.host,
-                hana_host::celestia::CelestiaChainHintHandler,
+                crate::hana::handler::HanaHintHandler,
                 providers,
                 is_offline,
                 hana_oracle::hint::HintWrapper::Standard(HintType::L2PayloadWitness),
@@ -151,10 +151,11 @@ pub async fn run_native_client(
     ));
     // Wait for both tasks to complete.
     info!("Starting preimage server and client program.");
-    let (_, client_result) = tokio::try_join!(server_task, client_task,)
+    let (server_result, client_result) = tokio::try_join!(server_task, client_task,)
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     info!(target: "kona_host", "Preimage server and client program have joined.");
     // Return execution result
+    dbg!(&server_result);
     client_result
 }
 

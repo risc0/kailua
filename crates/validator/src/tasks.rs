@@ -15,6 +15,7 @@
 use crate::channel::Message;
 use anyhow::Context;
 use futures::FutureExt;
+use kailua_kona::client::core::L1_HEAD_INSUFFICIENT;
 use kailua_prover::args::ProveArgs;
 use kailua_prover::channel::AsyncChannel;
 use kailua_prover::proof::read_bincoded_file;
@@ -103,9 +104,7 @@ pub async fn handle_proving_tasks(
                     Ok(_) => false,
                     Err(err) => {
                         error!("Prover encountered error: {err:?}");
-                        err.root_cause()
-                            .to_string()
-                            .contains("Expected zero claim hash")
+                        err.root_cause().to_string().contains(L1_HEAD_INSUFFICIENT)
                     }
                 }
             };

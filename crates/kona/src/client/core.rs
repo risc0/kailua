@@ -36,6 +36,8 @@ use std::fmt::Debug;
 use std::mem::take;
 use std::sync::{Arc, Mutex};
 
+pub const L1_HEAD_INSUFFICIENT: &str = "Expected zero claim hash.";
+
 pub trait DASourceProvider<
     C: ChainProvider + Send + Sync + Clone + Debug,
     B: BlobProvider + Send + Sync + Clone + Debug,
@@ -345,7 +347,7 @@ where
         assert_eq!(boot.claimed_l2_output_root, computed_output);
     } else if !boot.claimed_l2_output_root.is_zero() {
         // We use the zero claim hash to denote that the data as of l1 head is insufficient
-        bail!("Expected zero claim hash.");
+        bail!(L1_HEAD_INSUFFICIENT);
     }
 
     Ok((boot, precondition_hash))
