@@ -135,6 +135,7 @@ where
         let boot = BootInfo::load(oracle.as_ref())
             .await
             .context("BootInfo::load")?;
+        assert_eq!(boot.chain_id, boot.rollup_config.l2_chain_id);
         client::log(&format!("{:?} L1_HEAD", boot.l1_head));
         client::log(&format!("{:?} L2_AGREED", boot.agreed_l2_output_root));
         client::log(&format!(
