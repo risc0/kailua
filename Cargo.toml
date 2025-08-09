@@ -115,12 +115,9 @@ hokulea-witgen = { git = "https://github.com/Layr-Labs/hokulea", rev = "ed038f49
 # Hana git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17"
 celestia-rpc = "0.11.3"
 celestia-types = "0.13.0"
-hana-blobstream = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
-hana-client = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
 hana-celestia = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
 hana-host = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
 hana-oracle = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
-hana-proofs = { git = "https://github.com/celestiaorg/hana", tag = "v0.1.0-beta.17", default-features = false }
 
 
 # Bonsai

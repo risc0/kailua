@@ -133,6 +133,12 @@ where
         let boot = BootInfo::load(oracle.as_ref())
             .await
             .context("BootInfo::load")?;
+        client::log(&format!("{:?} L1_HEAD", boot.l1_head));
+        client::log(&format!("{:?} L2_AGREED", boot.agreed_l2_output_root));
+        client::log(&format!(
+            "{:?} L2_CLAIMED (#{})",
+            boot.claimed_l2_output_root, boot.claimed_l2_block_number
+        ));
         let rollup_config = Arc::new(boot.rollup_config.clone());
 
         client::log("SAFE HEAD HASH");

@@ -20,9 +20,9 @@ use kona_preimage::{
     CommsClient, HintWriterClient, PreimageKey, PreimageKeyType, PreimageOracleClient,
 };
 use kona_proof::FlushableCache;
+use spin::Mutex;
 use std::fmt::Debug;
 use std::sync::Arc;
-use spin::Mutex;
 
 /// Ensures the prover cannot change unauthenticated local key values
 #[derive(Clone, Debug)]
