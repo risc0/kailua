@@ -14,6 +14,8 @@
 
 use kailua_hana::stitching::HanaStitchingClient;
 use kailua_kona::client::stateless::run_stateless_client;
+use kailua_kona::config::config_hash;
+use kailua_kona::oracle::local::LocalOnceOracle;
 use kailua_kona::oracle::vec::VecOracle;
 use kailua_kona::{client::log, witness::Witness};
 use risc0_zkvm::guest::env;
@@ -58,7 +60,30 @@ fn main() {
     }
 
     // Run client using witness data
-    let proof_journal = run_stateless_client(witness, HanaStitchingClient(Arc::new(celestia_da)));
+    let celestia_oracle = Arc::new(LocalOnceOracle::new(Arc::new(celestia_da)));
+    let proof_journal = run_stateless_client(witness, HanaStitchingClient(celestia_oracle.clone()));
+
+    // Ensure BootInfo consistency on celestia oracle
+    let boot_info = kona_proof::block_on(kona_proof::BootInfo::load(celestia_oracle.as_ref()))
+        .expect("Failed to load boot info");
+    assert_eq!(boot_info.l1_head, proof_journal.l1_head,);
+    assert_eq!(
+        boot_info.agreed_l2_output_root,
+        proof_journal.agreed_l2_output_root
+    );
+    assert_eq!(
+        boot_info.claimed_l2_output_root,
+        proof_journal.claimed_l2_output_root
+    );
+    assert_eq!(
+        boot_info.claimed_l2_block_number,
+        proof_journal.claimed_l2_block_number
+    );
+    assert_eq!(boot_info.chain_id, boot_info.rollup_config.l2_chain_id);
+    assert_eq!(
+        config_hash(&boot_info.rollup_config).unwrap(),
+        proof_journal.config_hash
+    );
 
     // Prevent provability of insufficient data
     assert!(
