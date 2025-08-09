@@ -14,6 +14,7 @@
 
 use crate::executor::{exec_precondition_hash, new_execution_cursor, CachedExecutor, Execution};
 use crate::kona::OracleL1ChainProvider;
+use crate::oracle::local::LocalOnceOracle;
 use crate::{client, precondition};
 use alloy_op_evm::OpEvmFactory;
 use alloy_primitives::{Sealed, B256};
@@ -123,6 +124,7 @@ pub fn run_core_client<
 where
     <B as BlobProvider>::Error: Debug,
 {
+    let oracle = Arc::new(LocalOnceOracle::new(oracle));
     let (boot, precondition_hash, output_hash) = kona_proof::block_on(async move {
         ////////////////////////////////////////////////////////////////
         //                          PROLOGUE                          //
