@@ -43,7 +43,7 @@ where
         },
     );
     // Run regular witgen client
-    let (boot, mut proof_journal, witness) = witgen::run_witgen_client(
+    let (boot, mut proof_journal, mut witness) = witgen::run_witgen_client(
         preimage_oracle,
         preimage_oracle_shard_size,
         blob_provider,
@@ -66,6 +66,7 @@ where
     proof_journal.fpvm_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(
         kailua_build::KAILUA_FPVM_HOKULEA_ID,
     ));
+    witness.fpvm_image_id = proof_journal.fpvm_image_id;
     // Return extended result
     Ok((proof_journal, witness, eigen_witness))
 }
