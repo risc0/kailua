@@ -69,7 +69,7 @@ pub fn run_stateless_client<O: WitnessOracle, S: StitchingClient<O, PreloadedBlo
     ));
     let beacon = PreloadedBlobProvider::from(witness.blobs_witness);
 
-    let (_, stitching_output) = stitching_client.run_stitching_client(
+    let (_, proof_journal) = stitching_client.run_stitching_client(
         witness.precondition_validation_data_hash,
         oracle.clone(),
         stream,
@@ -84,7 +84,7 @@ pub fn run_stateless_client<O: WitnessOracle, S: StitchingClient<O, PreloadedBlo
         log(&format!("EXTRA PREIMAGES: {}", oracle.preimage_count()));
     }
 
-    stitching_output
+    proof_journal
 }
 
 #[cfg(test)]

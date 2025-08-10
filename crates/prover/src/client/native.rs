@@ -151,11 +151,10 @@ pub async fn run_native_client(
     ));
     // Wait for both tasks to complete.
     info!("Starting preimage server and client program.");
-    let (server_result, client_result) = tokio::try_join!(server_task, client_task,)
+    let (_, client_result) = tokio::try_join!(server_task, client_task,)
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
     info!(target: "kona_host", "Preimage server and client program have joined.");
     // Return execution result
-    dbg!(&server_result);
     client_result
 }
 

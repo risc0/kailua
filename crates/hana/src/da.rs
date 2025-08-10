@@ -19,7 +19,7 @@ use kona_genesis::RollupConfig;
 use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
-pub struct CelestiaDataSourceProvider<A: CelestiaProvider + Send + Clone>(pub A);
+pub struct CelestiaDataSourceProvider<A: CelestiaProvider + Send + Sync + Clone + Debug>(pub A);
 
 impl<
         C: ChainProvider + Send + Sync + Clone + Debug,

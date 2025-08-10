@@ -27,8 +27,6 @@ c-kzg = { version = "2.1.1", features = ["eip-7594"] }
 rkyv = "0.8.9"
 substrate-bn = "=0.6.0"
 
-kona-proof = { git = "https://github.com/op-rs/kona", tag = "kona-client/v1.0.2" }
-
 kailua-hana = { path = "../../../crates/hana" }
 kailua-kona = { path = "../../../crates/kona" }
 

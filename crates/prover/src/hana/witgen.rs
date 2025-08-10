@@ -15,11 +15,12 @@
 use crate::client::witgen;
 use crate::client::witgen::OracleWitnessProvider;
 use alloy_primitives::{Address, B256};
-use hana_oracle::provider::OracleCelestiaProvider;
 use kailua_hana::da::CelestiaDataSourceProvider;
+use kailua_hana::provider::HanaProvider;
 use kailua_kona::boot::StitchedBootInfo;
 use kailua_kona::executor::Execution;
 use kailua_kona::journal::ProofJournal;
+use kailua_kona::oracle::local::LocalOnceOracle;
 use kailua_kona::oracle::WitnessOracle;
 use kailua_kona::witness::Witness;
 use kona_derive::prelude::BlobProvider;
@@ -47,13 +48,13 @@ where
 {
     // Create witness target
     let celestia_witness = Arc::new(Mutex::new(O::default()));
+    let celestia_witness_oracle = Arc::new(OracleWitnessProvider {
+        oracle: preimage_oracle.clone(),
+        witness: celestia_witness.clone(),
+    });
+    let celestia_oracle = Arc::new(LocalOnceOracle::new(celestia_witness_oracle));
     // Create provider around witness
-    let celestia = CelestiaDataSourceProvider(OracleCelestiaProvider::new(Arc::new(
-        OracleWitnessProvider {
-            oracle: preimage_oracle.clone(),
-            witness: celestia_witness.clone(),
-        },
-    )));
+    let celestia = CelestiaDataSourceProvider(HanaProvider::new(celestia_oracle).0);
     // Run regular witgen client
     let (_, mut proof_journal, mut witness) = witgen::run_witgen_client(
         preimage_oracle,
@@ -67,11 +68,14 @@ where
     )
     .await?;
     // Set expected values
-    let celestia_witness = core::mem::take(celestia_witness.lock().unwrap().deref_mut());
     proof_journal.fpvm_image_id = B256::from(bytemuck::cast::<_, [u8; 32]>(
         kailua_build::KAILUA_FPVM_HANA_ID,
     ));
     witness.fpvm_image_id = proof_journal.fpvm_image_id;
+    // Finalize witness
+    let mut celestia_witness = core::mem::take(celestia_witness.lock().unwrap().deref_mut());
+    // todo: shard celestia witness
+    celestia_witness.finalize_preimages(usize::MAX, true);
     // Return extended result
     Ok((proof_journal, witness, celestia_witness))
 }

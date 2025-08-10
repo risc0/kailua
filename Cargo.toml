@@ -134,7 +134,7 @@ risc0-zkvm = { version = "2.3.1", features = ["heap-embedded-alloc", "unstable"]
 boundless-market = "0.12.1"
 
 # STEEL
-risc0-steel = { git = "https://github.com/risc0/risc0-ethereum.git", tag = "v2.2.2", features = ["host"] }
+risc0-steel = { git = "https://github.com/risc0/risc0-ethereum.git", tag = "v2.2.2" }
 
 [profile.dev]
 opt-level = 3

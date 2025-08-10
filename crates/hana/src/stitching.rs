@@ -13,12 +13,13 @@
 // limitations under the License.
 
 use crate::da::CelestiaDataSourceProvider;
+use crate::provider::HanaProvider;
 use alloy_primitives::{Address, B256};
-use hana_oracle::provider::OracleCelestiaProvider;
 use kailua_kona::boot::StitchedBootInfo;
 use kailua_kona::client::stitching::{KonaStitchingClient, StitchingClient};
 use kailua_kona::executor::Execution;
 use kailua_kona::journal::ProofJournal;
+use kailua_kona::oracle::local::LocalOnceOracle;
 use kona_derive::prelude::BlobProvider;
 use kona_preimage::CommsClient;
 use kona_proof::{BootInfo, FlushableCache};
@@ -26,12 +27,12 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
-pub struct HanaStitchingClient<T: CommsClient + Clone>(pub Arc<T>);
+pub struct HanaStitchingClient<T: CommsClient + FlushableCache + Clone>(pub Arc<T>);
 
 impl<
         O: CommsClient + FlushableCache + Send + Sync + Debug,
         B: BlobProvider + Send + Sync + Debug + Clone,
-        T: CommsClient + Send + Sync + Debug + Clone,
+        T: CommsClient + FlushableCache + Send + Sync + Debug + Clone,
     > StitchingClient<O, B> for HanaStitchingClient<T>
 {
     fn run_stitching_client(
@@ -48,10 +49,14 @@ impl<
     where
         <B as BlobProvider>::Error: Debug,
     {
-        KonaStitchingClient(CelestiaDataSourceProvider(OracleCelestiaProvider::new(
-            self.0,
-        )))
-        .run_stitching_client(
+        // Boot up hana provider with validated max height
+        let celestia_oracle = Arc::new(LocalOnceOracle::new(self.0));
+        let (hana_provider, boot) = HanaProvider::new(celestia_oracle);
+
+        // Run the stitching client with the Celestia DASProvider
+        let celestia_stitching_client =
+            KonaStitchingClient(CelestiaDataSourceProvider(hana_provider));
+        let (kona_boot_info, proof_journal) = celestia_stitching_client.run_stitching_client(
             precondition_validation_data_hash,
             oracle,
             stream,
@@ -60,6 +65,10 @@ impl<
             payout_recipient_address,
             stitched_executions,
             stitched_boot_info,
-        )
+        );
+        // Ensure boot record is the same for both oracles
+        assert_eq!(boot, kona_boot_info);
+
+        (kona_boot_info, proof_journal)
     }
 }

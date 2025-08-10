@@ -71,7 +71,7 @@ opentelemetry.workspace = true
 risc0-ethereum-contracts.workspace = true
 risc0-zkvm.workspace = true
 
-risc0-steel.workspace = true
+risc0-steel = { workspace = true, features = ["host"] }
 
 [features]
 devnet = [

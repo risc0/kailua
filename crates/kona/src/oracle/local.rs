@@ -26,12 +26,12 @@ use std::sync::Arc;
 
 /// Ensures the prover cannot change unauthenticated local key values
 #[derive(Clone, Debug)]
-pub struct LocalOnceOracle<O: CommsClient + FlushableCache + Send + Sync + Debug> {
+pub struct LocalOnceOracle<O: CommsClient + FlushableCache + Send + Sync + Debug + Clone> {
     pub oracle: Arc<O>,
     pub cache: Arc<Mutex<HashMap<PreimageKey, Vec<u8>>>>,
 }
 
-impl<O: CommsClient + FlushableCache + Send + Sync + Debug> LocalOnceOracle<O> {
+impl<O: CommsClient + FlushableCache + Send + Sync + Debug + Clone> LocalOnceOracle<O> {
     pub fn new(oracle: Arc<O>) -> Self {
         Self {
             oracle,
@@ -41,7 +41,7 @@ impl<O: CommsClient + FlushableCache + Send + Sync + Debug> LocalOnceOracle<O> {
 }
 
 #[async_trait]
-impl<O: CommsClient + FlushableCache + Send + Sync + Debug> PreimageOracleClient
+impl<O: CommsClient + FlushableCache + Send + Sync + Debug + Clone> PreimageOracleClient
     for LocalOnceOracle<O>
 {
     async fn get(&self, key: PreimageKey) -> PreimageOracleResult<Vec<u8>> {
@@ -83,7 +83,7 @@ impl<O: CommsClient + FlushableCache + Send + Sync + Debug> PreimageOracleClient
 }
 
 #[async_trait]
-impl<O: CommsClient + FlushableCache + Send + Sync + Debug> HintWriterClient
+impl<O: CommsClient + FlushableCache + Send + Sync + Debug + Clone> HintWriterClient
     for LocalOnceOracle<O>
 {
     async fn write(&self, hint: &str) -> PreimageOracleResult<()> {
@@ -92,7 +92,9 @@ impl<O: CommsClient + FlushableCache + Send + Sync + Debug> HintWriterClient
 }
 
 #[async_trait]
-impl<O: CommsClient + FlushableCache + Send + Sync + Debug> FlushableCache for LocalOnceOracle<O> {
+impl<O: CommsClient + FlushableCache + Send + Sync + Debug + Clone> FlushableCache
+    for LocalOnceOracle<O>
+{
     fn flush(&self) {
         self.oracle.flush();
     }

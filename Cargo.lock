@@ -5949,6 +5949,11 @@ name = "kailua-hana"
 version = "1.1.0"
 dependencies = [
  "alloy-primitives 1.2.0",
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "celestia-types",
+ "hana-blobstream",
  "hana-celestia",
  "hana-oracle",
  "kailua-kona",
@@ -5956,6 +5961,7 @@ dependencies = [
  "kona-genesis",
  "kona-preimage",
  "kona-proof",
+ "risc0-steel",
 ]
 
 [[package]]
