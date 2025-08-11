@@ -132,6 +132,7 @@ jobs:
         run: |
           curl -L https://foundry.paradigm.xyz | bash
           echo "$HOME/.foundry/bin" >> "$GITHUB_PATH"
+          mkdir foundry-1.0.0
       - name: Install Foundry 1.0.0
         working-directory: foundry-1.0.0
         run: foundryup -b v1.0.0
