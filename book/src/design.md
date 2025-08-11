@@ -89,7 +89,7 @@ Consider the above example scenario, where proposal `A` is finalized, while `B`,
 proposals pending finalization, while all others are invalid.
 
 A plain edge from a parent to a child indicates that the child proposal was made while no contradictory siblings should have existed.
-A checkmark on the edge indicates that the proposal was made within the timeout period of the contradicotry sibling.
+A checkmark on the edge indicates that the proposal was made within the timeout period of the contradictory sibling.
 A crossmark indicates that the timeout period of the contradictory sibling proposal had expired before the child proposal was introduced.
 
 The following three challenges are the only ones implied:
