@@ -15,6 +15,7 @@
 use crate::channel::Message;
 use anyhow::Context;
 use futures::FutureExt;
+use kailua_kona::client::core::L1_HEAD_INSUFFICIENT;
 use kailua_prover::args::ProveArgs;
 use kailua_prover::channel::AsyncChannel;
 use kailua_prover::proof::read_bincoded_file;
@@ -103,9 +104,7 @@ pub async fn handle_proving_tasks(
                     Ok(_) => false,
                     Err(err) => {
                         error!("Prover encountered error: {err:?}");
-                        err.root_cause()
-                            .to_string()
-                            .contains("Expected zero claim hash")
+                        err.root_cause().to_string().contains(L1_HEAD_INSUFFICIENT)
                     }
                 }
             };
@@ -164,119 +163,14 @@ pub async fn handle_proving_tasks(
 #[allow(clippy::too_many_arguments)]
 pub fn create_proving_args(args: &ProveArgs, verbosity: u8) -> Vec<String> {
     // Prepare prover parameters
-    let mut proving_args = vec![
-        // Invoke the CLI prove command
-        String::from("prove"),
-    ];
-    if let Some(payout_recipient_address) = &args.proving.payout_recipient_address {
-        proving_args.extend(vec![
-            // wallet address for payouts
-            String::from("--payout-recipient-address"),
-            payout_recipient_address.to_string(),
-        ]);
-    }
-    if let Some(op_node_address) = &args.op_node_address {
-        proving_args.extend(vec![
-            // l2 el node
-            String::from("--op-node-address"),
-            op_node_address.to_string(),
-        ])
-    }
-    // precondition data
-    if !args.precondition_params.is_empty() {
-        proving_args.extend(vec![
-            String::from("--precondition-params"),
-            args.precondition_params
-                .iter()
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>()
-                .join(","),
-        ]);
-    }
-    if !args.precondition_block_hashes.is_empty() {
-        proving_args.extend(vec![
-            String::from("--precondition-block-hashes"),
-            args.precondition_block_hashes
-                .iter()
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>()
-                .join(","),
-        ]);
-    }
-    if !args.precondition_blob_hashes.is_empty() {
-        proving_args.extend(vec![
-            String::from("--precondition-blob-hashes"),
-            args.precondition_blob_hashes
-                .iter()
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>()
-                .join(","),
-        ]);
-    }
-    // boundless args
-    if let Some(market) = &args.boundless.market {
-        proving_args.extend(market.to_arg_vec(&args.boundless.storage));
-    }
-    // kona args
-    proving_args.extend(vec![
-        // l1 head from on-chain proposal
-        String::from("--l1-head"),
-        args.kona.l1_head.to_string(),
-        // l2 starting block hash from on-chain proposal
-        String::from("--agreed-l2-head-hash"),
-        args.kona.agreed_l2_head_hash.to_string(),
-        // l2 starting output root
-        String::from("--agreed-l2-output-root"),
-        args.kona.agreed_l2_output_root.to_string(),
-        // proposed output root
-        String::from("--claimed-l2-output-root"),
-        args.kona.claimed_l2_output_root.to_string(),
-        // proposed block number
-        String::from("--claimed-l2-block-number"),
-        args.kona.claimed_l2_block_number.to_string(),
-    ]);
-    if let Some(l2_chain_id) = args.kona.l2_chain_id {
-        proving_args.extend(vec![
-            // rollup chain id
-            String::from("--l2-chain-id"),
-            l2_chain_id.to_string(),
-        ]);
-    }
-    if let Some(l1_node_address) = &args.kona.l1_node_address {
-        proving_args.extend(vec![
-            // l1 el node
-            String::from("--l1-node-address"),
-            l1_node_address.clone(),
-        ]);
-    }
-    if let Some(l1_beacon_address) = &args.kona.l1_beacon_address {
-        proving_args.extend(vec![
-            // l1 cl node
-            String::from("--l1-beacon-address"),
-            l1_beacon_address.clone(),
-        ]);
-    }
-    if let Some(l2_node_address) = &args.kona.l2_node_address {
-        proving_args.extend(vec![
-            // l2 el node
-            String::from("--l2-node-address"),
-            l2_node_address.clone(),
-        ]);
-    }
-    if let Some(data_dir) = &args.kona.data_dir {
-        proving_args.extend(vec![
-            // path to cache
-            String::from("--data-dir"),
-            data_dir.to_str().unwrap().to_string(),
-        ]);
-    }
-    proving_args.extend(vec![
-        // run the client natively
-        String::from("--native"),
-    ]);
+    let mut prove_args = args.to_arg_vec();
+
+    // run the client natively
+    prove_args.extend(vec![String::from("--native")]);
+
     // verbosity level
     if verbosity > 0 {
-        proving_args.push(
+        prove_args.push(
             [
                 String::from("-"),
                 (0..verbosity).map(|_| 'v').collect::<String>(),
@@ -284,5 +178,6 @@ pub fn create_proving_args(args: &ProveArgs, verbosity: u8) -> Vec<String> {
             .concat(),
         );
     }
-    proving_args
+
+    prove_args
 }

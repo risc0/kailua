@@ -63,14 +63,14 @@ pub async fn run_native_client(
         None => create_disk_kv_store(&args.kona),
         v => v,
     };
-    let kv_store = create_split_kv_store(&args.kona, disk_kv_store)
-        .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
 
-    let use_hokulea = args.proving.eigenda_proxy_address.is_some();
-    let server_task = match use_hokulea {
-        false => start_server(
+    let use_hokulea = args.proving.use_hokulea();
+    let use_hana = args.proving.use_hana();
+    let server_task = match (use_hokulea, use_hana) {
+        (false, false) => start_server(
             args.kona.clone(),
-            kv_store,
+            create_split_kv_store(&args.kona, disk_kv_store)
+                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
             hint.host,
             preimage.host,
             kona_host::single::SingleChainHintHandler,
@@ -83,10 +83,10 @@ pub async fn run_native_client(
         )
         .await
         .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
-        true => {
+        (true, _) => {
             let cfg = hokulea_host_bin::cfg::SingleChainHostWithEigenDA {
                 kona_cfg: args.kona.clone(),
-                eigenda_proxy_address: args.proving.eigenda_proxy_address.clone(),
+                eigenda_proxy_address: args.proving.hokulea.eigenda_proxy_address.clone(),
                 verbose: 0,
             };
             let providers = cfg
@@ -96,13 +96,38 @@ pub async fn run_native_client(
             let is_offline = cfg.is_offline();
             start_server(
                 cfg,
-                kv_store,
+                create_split_kv_store(&args.kona, disk_kv_store)
+                    .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
                 hint.host,
                 preimage.host,
                 hokulea_host_bin::handler::SingleChainHintHandlerWithEigenDA,
                 providers,
                 is_offline,
                 hokulea_proof::hint::ExtendedHintType::Original(HintType::L2PayloadWitness),
+            )
+            .await
+            .map_err(|e| ProvingError::OtherError(anyhow!(e)))?
+        }
+        (_, true) => {
+            let cfg = hana_host::celestia::CelestiaChainHost {
+                single_host: args.kona.clone(),
+                celestia_args: args.proving.hana.clone().into(),
+            };
+            let providers = crate::hana::providers::create_providers(&cfg)
+                .await
+                .map_err(|e| ProvingError::OtherError(anyhow!(e)))?;
+            let is_offline = cfg.is_offline();
+            let disk_kv_store = disk_kv_store.map(|dkv| dkv.with_global_mask(args.kona.l1_head));
+            start_server(
+                cfg,
+                create_split_kv_store(&args.kona, disk_kv_store)
+                    .map_err(|e| ProvingError::OtherError(anyhow!(e)))?,
+                hint.host,
+                preimage.host,
+                crate::hana::handler::HanaHintHandler,
+                providers,
+                is_offline,
+                hana_oracle::hint::HintWrapper::Standard(HintType::L2PayloadWitness),
             )
             .await
             .map_err(|e| ProvingError::OtherError(anyhow!(e)))?

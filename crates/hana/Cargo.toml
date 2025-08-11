@@ -1,0 +1,31 @@
+[package]
+name = "kailua-hana"
+version = "1.1.0"
+edition = "2021"
+license = "Apache-2.0"
+rust-version = "1.86"
+authors = ["hashcashier"]
+homepage = "https://risc0.github.io/kailua/"
+repository = "https://github.com/risc0/kailua"
+keywords = ["zkvm", "ethereum", "optimism", "fault", "proof"]
+categories = ["cryptography", "cryptography::cryptocurrencies"]
+
+[dependencies]
+alloy-primitives.workspace = true
+anyhow.workspace = true
+async-trait.workspace = true
+bincode.workspace = true
+
+kailua-kona.workspace = true
+
+kona-derive.workspace = true
+kona-genesis.workspace = true
+kona-preimage.workspace = true
+kona-proof.workspace = true
+
+celestia-types.workspace = true
+hana-blobstream.workspace = true
+hana-celestia.workspace = true
+hana-oracle.workspace = true
+
+risc0-steel.workspace = true

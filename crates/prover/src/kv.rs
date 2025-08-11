@@ -17,34 +17,63 @@ use kona_host::single::{SingleChainHost, SingleChainLocalInputs};
 use kona_host::{
     DiskKeyValueStore, KeyValueStore, MemoryKeyValueStore, SharedKeyValueStore, SplitKeyValueStore,
 };
+use kona_preimage::PreimageKeyType;
 use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 use tokio::sync;
 
 #[derive(Debug, Clone)]
-pub struct RWLKeyValueStore(Arc<RwLock<DiskKeyValueStore>>);
+pub struct RWLKeyValueStore {
+    pub kv: Arc<RwLock<DiskKeyValueStore>>,
+    pub global_mask: B256,
+}
+
+impl RWLKeyValueStore {
+    pub fn new(kv: Arc<RwLock<DiskKeyValueStore>>, global_mask: B256) -> Self {
+        Self { kv, global_mask }
+    }
+
+    pub fn with_global_mask(self, global_mask: B256) -> Self {
+        Self {
+            kv: self.kv,
+            global_mask,
+        }
+    }
+
+    /// Applies a mask to global generics that may be relevant only in certain contexts
+    pub fn mask(&self, key: B256) -> B256 {
+        if let Ok(PreimageKeyType::GlobalGeneric) = PreimageKeyType::try_from(key.0[0]) {
+            key ^ self.global_mask
+        } else {
+            key
+        }
+    }
+}
 
 impl Deref for RWLKeyValueStore {
     type Target = Arc<RwLock<DiskKeyValueStore>>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.kv
     }
 }
 
 impl From<DiskKeyValueStore> for RWLKeyValueStore {
     fn from(value: DiskKeyValueStore) -> Self {
-        Self(Arc::new(RwLock::new(value)))
+        Self {
+            kv: Arc::new(RwLock::new(value)),
+            global_mask: B256::ZERO,
+        }
     }
 }
 
 impl KeyValueStore for RWLKeyValueStore {
     fn get(&self, key: B256) -> Option<Vec<u8>> {
-        self.read().unwrap().get(key)
+        self.read().unwrap().get(self.mask(key))
     }
 
     fn set(&mut self, key: B256, value: Vec<u8>) -> anyhow::Result<()> {
-        self.write().unwrap().set(key, value)
+        self.write().unwrap().set(self.mask(key), value)
     }
 }
 

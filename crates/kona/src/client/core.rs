@@ -14,6 +14,7 @@
 
 use crate::executor::{exec_precondition_hash, new_execution_cursor, CachedExecutor, Execution};
 use crate::kona::OracleL1ChainProvider;
+use crate::oracle::local::LocalOnceOracle;
 use crate::{client, precondition};
 use alloy_op_evm::OpEvmFactory;
 use alloy_primitives::{Sealed, B256};
@@ -34,6 +35,8 @@ use kona_proof::{BootInfo, FlushableCache, HintType};
 use std::fmt::Debug;
 use std::mem::take;
 use std::sync::{Arc, Mutex};
+
+pub const L1_HEAD_INSUFFICIENT: &str = "Expected zero claim hash.";
 
 pub trait DASourceProvider<
     C: ChainProvider + Send + Sync + Clone + Debug,
@@ -123,6 +126,7 @@ pub fn run_core_client<
 where
     <B as BlobProvider>::Error: Debug,
 {
+    let oracle = Arc::new(LocalOnceOracle::new(oracle));
     let (boot, precondition_hash, output_hash) = kona_proof::block_on(async move {
         ////////////////////////////////////////////////////////////////
         //                          PROLOGUE                          //
@@ -131,6 +135,13 @@ where
         let boot = BootInfo::load(oracle.as_ref())
             .await
             .context("BootInfo::load")?;
+        assert_eq!(boot.chain_id, boot.rollup_config.l2_chain_id);
+        client::log(&format!("{:?} L1_HEAD", boot.l1_head));
+        client::log(&format!("{:?} L2_AGREED", boot.agreed_l2_output_root));
+        client::log(&format!(
+            "{:?} L2_CLAIMED (#{})",
+            boot.claimed_l2_output_root, boot.claimed_l2_block_number
+        ));
         let rollup_config = Arc::new(boot.rollup_config.clone());
 
         client::log("SAFE HEAD HASH");
@@ -337,7 +348,7 @@ where
         assert_eq!(boot.claimed_l2_output_root, computed_output);
     } else if !boot.claimed_l2_output_root.is_zero() {
         // We use the zero claim hash to denote that the data as of l1 head is insufficient
-        bail!("Expected zero claim hash.");
+        bail!(L1_HEAD_INSUFFICIENT);
     }
 
     Ok((boot, precondition_hash))

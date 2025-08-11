@@ -12,28 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use hokulea_eigenda::{EigenDABlobProvider, EigenDABlobSource, EigenDADataSource};
 use kailua_kona::client::core::{DASourceProvider, EthereumDataSourceProvider};
 use kona_derive::prelude::{BlobProvider, ChainProvider};
 use kona_genesis::RollupConfig;
 use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
-pub struct EigenDADataSourceProvider<
-    E: hokulea_eigenda::EigenDABlobProvider + Send + Sync + Clone + Debug,
->(pub E);
+pub struct EigenDADataSourceProvider<E: EigenDABlobProvider + Send + Sync + Clone + Debug>(pub E);
 
 impl<
         C: ChainProvider + Send + Sync + Clone + Debug,
         B: BlobProvider + Send + Sync + Clone + Debug,
-        E: hokulea_eigenda::EigenDABlobProvider + Send + Sync + Clone + Debug,
+        E: EigenDABlobProvider + Send + Sync + Clone + Debug,
     > DASourceProvider<C, B> for EigenDADataSourceProvider<E>
 {
-    type DAS = hokulea_eigenda::EigenDADataSource<C, B, E>;
+    type DAS = EigenDADataSource<C, B, E>;
 
     fn new_from_parts(self, l1_provider: C, blobs: B, cfg: &RollupConfig) -> Self::DAS {
-        hokulea_eigenda::EigenDADataSource::new(
+        EigenDADataSource::new(
             EthereumDataSourceProvider.new_from_parts(l1_provider, blobs, cfg),
-            hokulea_eigenda::EigenDABlobSource::new(self.0),
+            EigenDABlobSource::new(self.0),
         )
     }
 }

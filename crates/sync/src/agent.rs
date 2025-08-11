@@ -114,15 +114,19 @@ impl SyncAgent {
         )?;
         #[cfg(not(feature = "devnet"))]
         {
-            let kona_image_id: B256 =
-                bytemuck::cast::<[u32; 8], [u8; 32]>(kailua_build::KAILUA_FPVM_KONA_ID).into();
-            let hokulea_image_id: B256 =
-                bytemuck::cast::<[u32; 8], [u8; 32]>(kailua_build::KAILUA_FPVM_HOKULEA_ID).into();
-            if deployment.image_id != kona_image_id && deployment.image_id != hokulea_image_id {
-                bail!(
-                    "Deployment image ID mismatch. Expected {kona_image_id} or {hokulea_image_id}, got {:?}.",
-                    deployment.image_id
-                );
+            let known_image_ids = [
+                B256::from(bytemuck::cast::<[u32; 8], [u8; 32]>(
+                    kailua_build::KAILUA_FPVM_KONA_ID,
+                )),
+                B256::from(bytemuck::cast::<[u32; 8], [u8; 32]>(
+                    kailua_build::KAILUA_FPVM_HOKULEA_ID,
+                )),
+                B256::from(bytemuck::cast::<[u32; 8], [u8; 32]>(
+                    kailua_build::KAILUA_FPVM_HANA_ID,
+                )),
+            ];
+            if !known_image_ids.contains(&deployment.image_id) {
+                bail!("Deployment image ID {:?} unknown.", deployment.image_id);
             }
         }
 
