@@ -21,7 +21,7 @@ All the parameters above can be provided as environment variables.
 
 ### Remote Endpoints
 The mandatory arguments specify the endpoints that the validator should use to resolve disputes:
-* `eth-rpc-url`: The parent chain (ethereum) endpoint for reading proposals.
+* `eth-rpc-url`: The parent chain (Ethereum) endpoint for reading proposals.
 * `beacon-rpc-url`: The DA layer (eth-beacon chain) endpoint for retrieving rollup data.
 * `op-geth-url`: The rollup `op-geth` endpoint to read configuration data from.
 * `op-node-url`: The rollup `op-node` endpoint to read sequencing proposals from.
@@ -60,7 +60,7 @@ The validator requires a funded wallet to be able to publish fault proofs on cha
 to direct fault proof submission payouts towards.
 This wallet can be specified directly as a private key or as an external AWS/GCP signer.
 * `validator-key`: The private key for the validator wallet.
-* `payout-recipient-address`: The ethereum address to use as the recipient of fault proof payouts.
+* `payout-recipient-address`: The Ethereum address to use as the recipient of fault proof payouts.
 * `validator-aws-key-id`: AWS KMS Key ID
 * `validator-google-project-id`: GCP KMS Project ID
 * `validator-google-location`: GCP KMS Location
@@ -81,7 +81,7 @@ Running `kailua-cli validate` should monitor your rollup for any disputes and ge
 ```
 
 ### Transactions
-You can control transaction publication through the two following parameters:
+You can control transaction publication through the following two parameters:
 * `txn-timeout`: A timeout in seconds for transaction broadcast (default 120)
 * `exec-gas-premium`: An added premium percentage to estimated execution gas fees (Default 25)
 
