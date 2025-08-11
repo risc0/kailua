@@ -16,7 +16,7 @@ The steps required to upgrade your on-chain rollup contracts to support Kailua a
 
 ```admonish tip
 The Kailua CLI has a `fast-track` command for automating the L1 transactions required to migrate to Kailua.
-If the command does not yet support your configuration, you'll need to follow the manual steps in the next sub-sections.
+If the command does not yet support your configuration, you'll need to follow the manual steps in the next subsections.
 ```
 
 ```admonish hint
