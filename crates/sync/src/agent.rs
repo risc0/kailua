@@ -229,7 +229,7 @@ impl SyncAgent {
 
     pub async fn sync(
         &mut self,
-        #[cfg(feature = "devnet")] delay_l2_blocks: u64,
+        op_rpc_delay: u64,
         final_l2_block: Option<u64>,
     ) -> anyhow::Result<Vec<u64>> {
         let tracer = tracer("kailua");
@@ -242,9 +242,10 @@ impl SyncAgent {
             "sync_status",
             retry_res_ctx_timeout!(self.provider.op_provider.sync_status().await)
         );
-        let safe_l2_number = sync_status["safe_l2"]["number"].as_u64().unwrap();
-        #[cfg(feature = "devnet")]
-        let safe_l2_number = safe_l2_number.saturating_sub(delay_l2_blocks);
+        let safe_l2_number = sync_status["safe_l2"]["number"]
+            .as_u64()
+            .ok_or_else(|| anyhow::anyhow!("failed to parse safe_l2"))?
+            .saturating_sub(op_rpc_delay);
         let output_block_number = safe_l2_number
             .min(self.cursor.last_output_index + self.deployment.blocks_per_proposal());
         if self.cursor.last_output_index + self.deployment.output_block_span < output_block_number {

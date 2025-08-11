@@ -39,7 +39,7 @@ use opentelemetry::KeyValue;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::time::sleep;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 
 pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()> {
     // Telemetry
@@ -98,11 +98,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
         // fetch latest games
         if let Err(err) = await_tel!(
             context,
-            agent.sync(
-                #[cfg(feature = "devnet")]
-                args.sync.delay_l2_blocks,
-                args.sync.final_l2_block
-            )
+            agent.sync(args.sync.provider.op_rpc_delay, args.sync.final_l2_block)
         )
         .context("SyncAgent::sync")
         {
@@ -184,14 +180,7 @@ pub async fn propose(args: ProposeArgs, data_dir: PathBuf) -> anyhow::Result<()>
             }
         }
 
-        // Query op-node to get latest safe l2 head
-        let sync_status = await_tel!(
-            context,
-            tracer,
-            "sync_status",
-            retry_res_ctx_timeout!(agent.provider.op_provider.sync_status().await)
-        );
-        debug!("sync_status[safe_l2] {:?}", &sync_status["safe_l2"]);
+        // Check latest safe l2 head
         let proposal_block_number =
             canonical_tip.output_block_number + agent.deployment.blocks_per_proposal();
         if agent.cursor.last_output_index < canonical_tip.output_block_number {
