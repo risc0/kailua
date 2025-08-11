@@ -31,7 +31,7 @@ All the parameters above can be provided as environment variables.
 
 ### Remote Endpoints
 The mandatory arguments specify the endpoints that the RPC should use to track sequencing proposals:
-* `eth-rpc-url`: The parent chain (ethereum) endpoint for reading proposals.
+* `eth-rpc-url`: The parent chain (Ethereum) endpoint for reading proposals.
 * `beacon-rpc-url`: The DA layer (eth-beacon chain) endpoint for retrieving rollup data.
 * `op-geth-url`: The rollup `op-geth` endpoint to read configuration data from.
 * `op-node-url`: The rollup `op-node` endpoint to read sequencing proposals from.
