@@ -5998,6 +5998,7 @@ dependencies = [
  "async-trait",
  "c-kzg",
  "copy_dir",
+ "futures",
  "kona-cli",
  "kona-derive",
  "kona-driver",

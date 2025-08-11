@@ -99,3 +99,63 @@ impl<O: CommsClient + FlushableCache + Send + Sync + Debug + Clone> FlushableCac
         self.oracle.flush();
     }
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub mod tests {
+    use crate::oracle::local::LocalOnceOracle;
+    use crate::oracle::vec::VecOracle;
+    use alloy_primitives::keccak256;
+    use futures::FutureExt;
+    use kona_preimage::{PreimageKey, PreimageOracleClient};
+    use kona_proof::FlushableCache;
+    use std::panic::AssertUnwindSafe;
+    use std::sync::{Arc, Mutex};
+
+    #[tokio::test(flavor = "multi_thread")]
+    pub async fn test_local_once_oracle() -> anyhow::Result<()> {
+        // create a new vec oracle with only 1 entry
+        let local_key = PreimageKey::new_local(0xf0);
+        let preimage = b"LocalOnceOracle".to_vec();
+        let digest = keccak256(&preimage);
+        let keccak_key = PreimageKey::new_keccak256(*digest);
+        let vec_oracle = VecOracle {
+            preimages: Arc::new(Mutex::new(vec![vec![
+                (local_key, vec![0x0f; 32], None),
+                (keccak_key, preimage.clone(), None),
+                (keccak_key, preimage.clone(), None),
+            ]])),
+        };
+        // wrap vec oracle
+        let local_once_oracle = LocalOnceOracle::new(Arc::new(vec_oracle));
+        // query same key multiple times
+        for _ in 0..10 {
+            let value = local_once_oracle.get(local_key).await?;
+            let mut exact_value = vec![0x00; value.len()];
+            local_once_oracle
+                .get_exact(local_key, &mut exact_value)
+                .await?;
+            assert_eq!(exact_value, value);
+            local_once_oracle.flush();
+        }
+        // query keccak key twice
+        let value = local_once_oracle.get(keccak_key).await?;
+        let mut exact_value = vec![0x00; value.len()];
+        local_once_oracle
+            .get_exact(keccak_key, &mut exact_value)
+            .await?;
+        assert_eq!(exact_value, value);
+        assert_eq!(exact_value, preimage);
+        // fail to query again
+        AssertUnwindSafe(local_once_oracle.get(keccak_key))
+            .catch_unwind()
+            .await
+            .unwrap_err();
+        AssertUnwindSafe(local_once_oracle.get_exact(keccak_key, &mut []))
+            .catch_unwind()
+            .await
+            .unwrap_err();
+
+        Ok(())
+    }
+}
