@@ -69,6 +69,7 @@ impl<T: CommsClient + FlushableCache + Send + Sync + Debug + Clone>
         let blobstream_height = Contract::new(blobstream_addr, &env)
             .call_builder(&SP1Blobstream::latestBlockCall)
             .call();
+        // ensure STEEL proof uses l1 head as a reference
         assert_eq!(env.header().seal(), boot.l1_head);
         log(&format!("BLOBSTREAM HEIGHT {blobstream_height}"));
         (
