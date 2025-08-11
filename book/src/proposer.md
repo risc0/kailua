@@ -17,7 +17,7 @@ All the parameters above can be provided as environment variables.
 
 ### Endpoints
 The mandatory arguments specify the endpoints that the proposer should use for sequencing:
-* `eth-rpc-url`: The parent chain (ethereum) endpoint for reading/publishing proposals.
+* `eth-rpc-url`: The parent chain (Ethereum) endpoint for reading/publishing proposals.
 * `beacon-rpc-url`: The DA layer (eth-beacon chain) endpoint for retrieving published proposal data.
 * `op-geth-url`: The rollup `op-geth` endpoint to read configuration data from.
 * `op-node-url`: The rollup `op-node` endpoint to read sequencing proposals from.
@@ -61,7 +61,7 @@ You must keep your proposer's wallet well funded to guarantee the safety and liv
 ```
 
 ### Transactions
-You can control transaction publication through the three following parameters:
+You can control transaction publication through the following three parameters:
 * `txn-timeout`: A timeout in seconds for transaction broadcast (default 120)
 * `exec-gas-premium`: An added premium percentage to estimated execution gas fees (Default 25)
 * `blob-gas-premium`: An added premium percentage to estimated blob gas fees (Default 25).
