@@ -11,7 +11,7 @@ The commands below will be using Foundry's `cast` utility, which you should have
 foundry [prerequisite](quickstart.md#prerequisites).
 
 ```admonish note
-The below foundry commands expect both a parameter that determines the wallet to use and the rpc endpoint of the parent
+The below foundry commands expect both a parameter that determines the wallet to use and the RPC endpoint of the parent
 chain.
 You will have to add these two parameters manually to every command below.
 For more information, refer to `cast call --help`, and `cast send --help`
