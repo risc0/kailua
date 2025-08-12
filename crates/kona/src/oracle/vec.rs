@@ -463,6 +463,7 @@ pub mod tests {
     use std::collections::HashSet;
 
     pub fn prepare_vec_oracle(value_count: usize, copies: usize) -> (VecOracle, Vec<Vec<u8>>) {
+        QUEUE.clear_poison();
         let mut oracle = VecOracle::default();
         assert_eq!(oracle.preimage_count(), 0);
 

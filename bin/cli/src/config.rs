@@ -17,8 +17,8 @@ use alloy::providers::ProviderBuilder;
 use anyhow::Context;
 use human_bytes::human_bytes;
 use kailua_build::{
-    KAILUA_DA_HOKULEA_ELF, KAILUA_DA_HOKULEA_ID, KAILUA_FPVM_HOKULEA_ELF, KAILUA_FPVM_HOKULEA_ID,
-    KAILUA_FPVM_KONA_ELF, KAILUA_FPVM_KONA_ID,
+    KAILUA_DA_HOKULEA_ELF, KAILUA_DA_HOKULEA_ID, KAILUA_FPVM_HANA_ELF, KAILUA_FPVM_HANA_ID,
+    KAILUA_FPVM_HOKULEA_ELF, KAILUA_FPVM_HOKULEA_ID, KAILUA_FPVM_KONA_ELF, KAILUA_FPVM_KONA_ID,
 };
 use kailua_contracts::SystemConfig;
 use kailua_kona::config::config_hash;
@@ -82,45 +82,33 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
 
     // report risc0 version
     println!("RISC0_VERSION: {}", risc0_zkvm::get_version()?);
-    // report kona fpvm image id
-    let stored_image_id = Digest::new(KAILUA_FPVM_KONA_ID);
-    println!(
-        "KAILUA_FPVM_KONA_ID: 0x{}",
-        hex::encode_upper(stored_image_id.as_bytes())
-    );
-    let computed_image_id = compute_image_id(KAILUA_FPVM_KONA_ELF).context("compute_image_id")?;
-    assert_eq!(computed_image_id, stored_image_id);
-    // report hokulea fpvm image id
-    let stored_image_id = Digest::new(KAILUA_FPVM_HOKULEA_ID);
-    println!(
-        "KAILUA_FPVM_HOKULEA_ID: 0x{}",
-        hex::encode_upper(stored_image_id.as_bytes())
-    );
-    let computed_image_id =
-        compute_image_id(KAILUA_FPVM_HOKULEA_ELF).context("compute_image_id")?;
-    assert_eq!(computed_image_id, stored_image_id);
-    // report canoe da image id
-    let stored_image_id = Digest::new(KAILUA_DA_HOKULEA_ID);
-    println!(
-        "KAILUA_DA_HOKULEA_ID: 0x{}",
-        hex::encode_upper(stored_image_id.as_bytes())
-    );
-    let computed_image_id = compute_image_id(KAILUA_DA_HOKULEA_ELF).context("compute_image_id")?;
-    assert_eq!(computed_image_id, stored_image_id);
 
-    // report elf size
-    println!(
-        "KAILUA_FPVM_KONA_ELF_SIZE: {}",
-        human_bytes(KAILUA_FPVM_KONA_ELF.len() as f64)
-    );
-    println!(
-        "KAILUA_FPVM_HOKULEA_ELF_SIZE: {}",
-        human_bytes(KAILUA_FPVM_HOKULEA_ELF.len() as f64)
-    );
-    println!(
-        "KAILUA_DA_HOKULEA_ELF_SIZE: {}",
-        human_bytes(KAILUA_DA_HOKULEA_ELF.len() as f64)
-    );
+    // report image ids
+    for (image_id, elf, label) in [
+        (
+            KAILUA_FPVM_KONA_ID,
+            KAILUA_FPVM_KONA_ELF,
+            "KAILUA_FPVM_KONA",
+        ),
+        (
+            KAILUA_FPVM_HOKULEA_ID,
+            KAILUA_FPVM_HOKULEA_ELF,
+            "KAILUA_FPVM_HOKULEA",
+        ),
+        (
+            KAILUA_DA_HOKULEA_ID,
+            KAILUA_DA_HOKULEA_ELF,
+            "KAILUA_DA_HOKULEA",
+        ),
+        (
+            KAILUA_FPVM_HANA_ID,
+            KAILUA_FPVM_HANA_ELF,
+            "KAILUA_FPVM_HANA",
+        ),
+    ] {
+        report_image_id(image_id, elf, label);
+    }
+
     // Report expected Groth16 verifier parameters
     println!(
         "CONTROL_ROOT: 0x{}",
@@ -211,4 +199,15 @@ pub async fn config(args: ConfigArgs) -> anyhow::Result<()> {
 
     context.span().set_status(Status::Ok);
     Ok(())
+}
+
+pub fn report_image_id(stored_image_id: [u32; 8], stored_elf: &[u8], label: &str) {
+    let stored_image_id = Digest::new(stored_image_id);
+    println!(
+        "{label}_ID: 0x{}",
+        hex::encode_upper(stored_image_id.as_bytes())
+    );
+    let computed_image_id = compute_image_id(stored_elf).expect("compute_image_id");
+    assert_eq!(computed_image_id, stored_image_id);
+    println!("{label}_ELF: {}", human_bytes(stored_elf.len() as f64));
 }

@@ -48,6 +48,7 @@ risc0-zkvm.workspace = true
 
 [dev-dependencies]
 copy_dir.workspace = true
+futures.workspace = true
 kona-cli.workspace = true
 kona-host.workspace = true
 rayon.workspace = true

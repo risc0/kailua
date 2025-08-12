@@ -17,8 +17,7 @@ use crate::proof::proof_file_name;
 use crate::risczero::boundless::BoundlessArgs;
 use crate::{proof, ProvingError};
 use anyhow::Context;
-use bytemuck::NoUninit;
-use risc0_zkvm::{Digest, Journal, Receipt};
+use risc0_zkvm::{Journal, Receipt};
 use std::convert::identity;
 use std::path::Path;
 use tracing::{error, info};
@@ -46,10 +45,9 @@ pub struct KailuaProveInfo {
 
 #[allow(clippy::too_many_arguments)]
 #[allow(deprecated)]
-pub async fn seek_proof<A: NoUninit + Into<Digest>>(
+pub async fn seek_proof(
     proving: &ProvingArgs,
     boundless: BoundlessArgs,
-    image: (A, &[u8]),
     journal: Journal,
     witness_slices: Vec<Vec<u32>>,
     witness_frames: Vec<Vec<u8>>,
@@ -57,7 +55,7 @@ pub async fn seek_proof<A: NoUninit + Into<Digest>>(
     prove_snark: bool,
 ) -> Result<(), ProvingError> {
     // Check proof cache
-    let file_name = proof_file_name(image.0, journal.clone());
+    let file_name = proof_file_name(proving.image_id(), journal.clone());
     if Path::new(&file_name).try_exists().is_ok_and(identity) {
         info!("Proving skipped. Proof file {file_name} already exists.");
     }
@@ -70,7 +68,7 @@ pub async fn seek_proof<A: NoUninit + Into<Digest>>(
             boundless::run_boundless_client(
                 marked_provider_config,
                 storage_provider_config,
-                image,
+                proving.image(),
                 journal.clone(),
                 witness_slices,
                 witness_frames,
@@ -82,7 +80,7 @@ pub async fn seek_proof<A: NoUninit + Into<Digest>>(
         _ => {
             if bonsai::should_use_bonsai() {
                 bonsai::run_bonsai_client(
-                    image,
+                    proving.image(),
                     witness_slices,
                     witness_frames,
                     stitched_proofs,
@@ -92,7 +90,7 @@ pub async fn seek_proof<A: NoUninit + Into<Digest>>(
                 .await?
             } else {
                 zkvm::run_zkvm_client(
-                    image,
+                    proving.image(),
                     witness_slices,
                     witness_frames,
                     stitched_proofs,
@@ -112,7 +110,7 @@ pub async fn seek_proof<A: NoUninit + Into<Digest>>(
             hex::encode(&proof.journal)
         );
     }
-    let file_name = proof_file_name(image.0, proof.journal.clone());
+    let file_name = proof_file_name(proving.image_id(), proof.journal.clone());
     proof::save_to_bincoded_file(&proof, &file_name)
         .await
         .context("save_to_bincoded_file")
