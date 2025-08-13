@@ -58,6 +58,7 @@ jobs:
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
           crate: svm-rs
+          version: '0.5.17'
       - name: Install solc
         continue-on-error: true
         run: svm install $SOLC_VERSION
@@ -122,6 +123,7 @@ jobs:
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
           crate: svm-rs
+          version: '0.5.17'
       - name: Install solc
         continue-on-error: true
         run: svm install $SOLC_VERSION
@@ -159,6 +161,7 @@ jobs:
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
           crate: svm-rs
+          version: '0.5.17'
       - name: Install solc
         continue-on-error: true
         run: svm install $SOLC_VERSION
@@ -183,6 +186,7 @@ jobs:
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
           crate: svm-rs
+          version: '0.5.17'
       - name: Install solc
         continue-on-error: true
         run: svm install $SOLC_VERSION
@@ -203,6 +207,7 @@ jobs:
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
           crate: svm-rs
+          version: '0.5.17'
       - name: Install solc
         continue-on-error: true
         run: svm install $SOLC_VERSION
@@ -225,6 +230,7 @@ jobs:
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
           crate: svm-rs
+          version: '0.5.17'
       - name: Install solc
         continue-on-error: true
         run: svm install $SOLC_VERSION
