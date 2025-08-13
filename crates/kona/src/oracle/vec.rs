@@ -766,7 +766,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn test_noop() {
-        let oracle = VecOracle::default();
+        let oracle = prepare_vec_oracle(0, 0).0;
         oracle.write("noop").await.unwrap();
         oracle.flush();
         assert_eq!(oracle.preimage_count(), 0);

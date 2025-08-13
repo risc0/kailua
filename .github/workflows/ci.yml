@@ -58,6 +58,7 @@ jobs:
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
           crate: svm-rs
+          version: '0.5.17'
       - name: Install solc
         continue-on-error: true
         run: svm install $SOLC_VERSION
@@ -122,6 +123,7 @@ jobs:
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
           crate: svm-rs
+          version: '0.5.17'
       - name: Install solc
         continue-on-error: true
         run: svm install $SOLC_VERSION
@@ -132,7 +134,9 @@ jobs:
         run: |
           curl -L https://foundry.paradigm.xyz | bash
           echo "$HOME/.foundry/bin" >> "$GITHUB_PATH"
-      - run: foundryup -b v1.0.0
+      - name: Install Foundry 1.0.0
+        continue-on-error: true
+        run: foundryup -b v1.0.0
       - name: cargo test kailua
         run: cargo test --locked --workspace --all --all-targets -F devnet -F prove -F rebuild-fpvm -- --test-threads 1
 
@@ -157,6 +161,7 @@ jobs:
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
           crate: svm-rs
+          version: '0.5.17'
       - name: Install solc
         continue-on-error: true
         run: svm install $SOLC_VERSION
@@ -181,6 +186,7 @@ jobs:
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
           crate: svm-rs
+          version: '0.5.17'
       - name: Install solc
         continue-on-error: true
         run: svm install $SOLC_VERSION
@@ -201,6 +207,7 @@ jobs:
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
           crate: svm-rs
+          version: '0.5.17'
       - name: Install solc
         continue-on-error: true
         run: svm install $SOLC_VERSION
@@ -223,6 +230,7 @@ jobs:
         uses: risc0/cargo-install@b9307573043522ab0d3e3be64a51763b765b52a4
         with:
           crate: svm-rs
+          version: '0.5.17'
       - name: Install solc
         continue-on-error: true
         run: svm install $SOLC_VERSION

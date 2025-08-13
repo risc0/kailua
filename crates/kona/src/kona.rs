@@ -259,7 +259,7 @@ impl<T: CommsClient> TrieProvider for OracleL1ChainProvider<T> {
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
-    use crate::oracle::vec::VecOracle;
+    use crate::oracle::vec::tests::prepare_vec_oracle;
     use crate::oracle::WitnessOracle;
     use alloy_consensus::{ReceiptWithBloom, SignableTransaction, TxEip1559};
     use alloy_eips::Encodable2718;
@@ -268,7 +268,7 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     pub async fn test_l1_chain_provider_trie_provider() {
-        let mut vec_oracle = VecOracle::default();
+        let mut vec_oracle = prepare_vec_oracle(0, 0).0;
         let node = TrieNode::Leaf {
             prefix: Nibbles::unpack(keccak256(b"yummy").as_slice()),
             value: bytes!("deadbeef"),
@@ -285,7 +285,7 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     pub async fn test_l1_chain_provider() {
         // prepare data
-        let mut vec_oracle = VecOracle::default();
+        let mut vec_oracle = prepare_vec_oracle(0, 0).0;
         // prepare txn data
         let txn = TxEnvelope::Eip1559(
             TxEip1559 {
@@ -384,7 +384,7 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     pub async fn test_l1_chain_provider_block_info_by_number() {
         // prepare data
-        let mut vec_oracle = VecOracle::default();
+        let mut vec_oracle = prepare_vec_oracle(0, 0).0;
         let genesis = Header {
             state_root: TrieNode::Empty.blind(),
             transactions_root: TrieNode::Empty.blind(),

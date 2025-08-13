@@ -422,7 +422,7 @@ mod tests {
     use super::*;
     use crate::blobs::tests::gen_blobs;
     use crate::blobs::{intermediate_outputs, BlobWitnessData, PreloadedBlobProvider};
-    use crate::oracle::vec::VecOracle;
+    use crate::oracle::vec::tests::prepare_vec_oracle;
     use crate::oracle::WitnessOracle;
     use alloy_eips::eip4844::{kzg_to_versioned_hash, IndexedBlobHash, BYTES_PER_BLOB};
     use kona_proof::block_on;
@@ -483,7 +483,7 @@ mod tests {
                     };
                     // test data loading
                     let precondition_data_hash = precondition_validation_data.hash();
-                    let mut oracle = VecOracle::default();
+                    let mut oracle = prepare_vec_oracle(0, 0).0;
                     oracle.insert_preimage(
                         PreimageKey::new(precondition_data_hash.0, PreimageKeyType::Sha256),
                         precondition_validation_data.to_vec(),

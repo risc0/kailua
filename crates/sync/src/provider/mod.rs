@@ -30,6 +30,9 @@ pub struct ProviderArgs {
     /// Address of the OP-GETH endpoint to use (eth and debug namespace required).
     #[clap(long, env)]
     pub op_geth_url: String,
+    /// Number of L2 blocks to delay observation by
+    #[clap(long, env, default_value_t = 0)]
+    pub op_rpc_delay: u64,
     /// Address of the ethereum rpc endpoint to use (eth namespace required)
     #[clap(long, env)]
     pub eth_rpc_url: String,

@@ -89,8 +89,6 @@ pub async fn demo(args: DemoArgs, verbosity: u8, data_dir: PathBuf) -> anyhow::R
             provider: args.provider,
             kailua_game_implementation: None,
             kailua_anchor_address: None,
-            #[cfg(feature = "devnet")]
-            delay_l2_blocks: 0,
             final_l2_block: None,
             data_dir: args.data_dir,
             telemetry: args.telemetry,
@@ -162,7 +160,10 @@ pub async fn handle_blocks(
             "sync_status",
             retry_res_ctx_timeout!(provider.op_provider.sync_status().await)
         );
-        let Some(safe_l2_number) = sync_status["safe_l2"]["number"].as_u64() else {
+        let Some(safe_l2_number) = sync_status["safe_l2"]["number"]
+            .as_u64()
+            .map(|v| v.saturating_sub(args.provider.op_rpc_delay))
+        else {
             error!("Failed to parse safe_l2_number");
             continue;
         };

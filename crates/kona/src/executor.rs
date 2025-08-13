@@ -504,7 +504,7 @@ pub fn exec_precondition_hash(executions: &[Arc<Execution>]) -> B256 {
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
-    use crate::oracle::vec::VecOracle;
+    use crate::oracle::vec::tests::prepare_vec_oracle;
     use crate::oracle::WitnessOracle;
     use crate::rkyv::execution::tests::gen_execution_outcomes;
     use alloy_primitives::{keccak256, Address, Sealable};
@@ -761,7 +761,7 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     pub async fn test_execution_cursor() {
         // prepare oracle data
-        let mut vec_oracle = VecOracle::default();
+        let mut vec_oracle = prepare_vec_oracle(0, 0).0;
         let safe_head = Header {
             number: 0,
             ..Default::default()
