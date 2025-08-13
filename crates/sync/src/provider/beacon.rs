@@ -55,7 +55,7 @@ impl BlobProvider {
         debug!("genesis {:?}", &genesis);
         let genesis_time = genesis["data"]["genesis_time"]
             .as_str()
-            .unwrap()
+            .ok_or_else(|| anyhow::anyhow!("genesis time is None"))?
             .parse::<u64>()?;
         let spec = await_tel!(
             context,
@@ -71,7 +71,7 @@ impl BlobProvider {
         debug!("spec {:?}", &spec);
         let seconds_per_slot = spec["data"]["SECONDS_PER_SLOT"]
             .as_str()
-            .unwrap()
+            .ok_or_else(|| anyhow::anyhow!("seconds per slot is None"))?
             .parse::<u64>()?;
         Ok(Self {
             cl_node_endpoint,
