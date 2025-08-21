@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::await_tel;
 use crate::provider::beacon::BlobProvider;
 use crate::provider::optimism::OpNodeProvider;
+use crate::{await_tel, retry_res_ctx};
 use alloy::providers::RootProvider;
-use anyhow::Context;
 use opentelemetry::trace::{FutureExt, TraceContextExt, Tracer};
 
 pub mod beacon;
@@ -58,8 +57,13 @@ impl SyncProvider {
         let tracer = opentelemetry::global::tracer("kailua");
         let context = opentelemetry::Context::current_with_span(tracer.start("SyncProvider::new"));
 
-        let da_provider = await_tel!(context, BlobProvider::new(args.beacon_rpc_url.clone()))
-            .context("BlobProvider::new")?;
+        let da_provider = await_tel!(
+            context,
+            tracer,
+            "BlobProvider::new",
+            retry_res_ctx!(BlobProvider::new(args.beacon_rpc_url.clone()))
+        );
+
         let l1_provider = RootProvider::new_http(args.eth_rpc_url.as_str().try_into()?);
         let op_provider = OpNodeProvider(RootProvider::new_http(
             args.op_node_url.as_str().try_into()?,

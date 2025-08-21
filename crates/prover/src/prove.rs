@@ -34,6 +34,7 @@ use opentelemetry::trace::{TraceContextExt, Tracer};
 use std::collections::BinaryHeap;
 use std::env::set_var;
 use tempfile::tempdir;
+use tokio::fs::remove_dir_all;
 use tracing::{error, info, warn};
 
 pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
@@ -338,7 +339,7 @@ pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
         if proofs.len() > 1 {
             info!("Composing {} proofs together.", proofs.len());
             // construct a proving instruction with no blocks to derive
-            let mut base_args = args;
+            let mut base_args = args.clone();
             {
                 // set last block as starting point
                 base_args.kona.agreed_l2_output_root = base_args.kona.claimed_l2_output_root;
@@ -380,6 +381,28 @@ pub async fn prove(mut args: ProveArgs) -> anyhow::Result<()> {
         }
     }
 
+    // Cleanup cached data
+    drop(disk_kv_store);
+    cleanup_cache_data(&args).await;
+
     info!("Exiting prover program.");
     Ok(())
+}
+
+pub async fn cleanup_cache_data(args: &ProveArgs) {
+    let Some(data_dir) = args.kona.data_dir.as_ref() else {
+        return;
+    };
+    if !args.proving.clear_cache_data {
+        warn!("Cache data directory {} was persisted.", data_dir.display());
+        return;
+    }
+    if let Err(err) = remove_dir_all(data_dir).await {
+        error!(
+            "Failed to cleanup cache directory {}: {err:?}",
+            data_dir.display()
+        );
+    } else {
+        info!("Cache data directory {} was removed.", data_dir.display());
+    }
 }
