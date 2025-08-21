@@ -29,7 +29,7 @@ contract CostsTest is KailuaTest {
     function test_propose_n(uint256 n) internal {
         // Deploy dispute contracts
         (treasury, game, anchor) = deployKailua(
-            uint64(4096 * n + 1), // 1 blob
+            uint64(4096 * n + 1), // n blobs
             uint64(0x01), // 1 block per commitment
             sha256(abi.encodePacked(bytes32(0x00))), // arbitrary genesis hash
             uint64(0x0), // genesis
