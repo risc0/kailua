@@ -68,6 +68,7 @@ pub async fn seek_proof(
             boundless::run_boundless_client(
                 marked_provider_config,
                 storage_provider_config,
+                boundless.r2_domain,
                 proving.image(),
                 journal.clone(),
                 witness_slices,
