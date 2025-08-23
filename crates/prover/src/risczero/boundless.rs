@@ -956,7 +956,7 @@ impl R2Storage {
         let domain = if r2_domain.starts_with("http://") || r2_domain.starts_with("https://") {
             r2_domain.to_string()
         } else {
-            format!("https://{}", r2_domain)
+            format!("https://{r2_domain}")
         };
 
         Ok(Self {
@@ -981,7 +981,7 @@ impl R2Storage {
 
     async fn upload_program(&self, program: &[u8]) -> anyhow::Result<Url> {
         let image_id = risc0_zkvm::compute_image_id(program)?;
-        let key = format!("v2/kailua/program/{}", image_id);
+        let key = format!("v2/kailua/program/{image_id}");
         self.upload(&key, program.to_vec()).await
     }
 
